@@ -178,3 +178,140 @@
 
 ### 下一步
 - 进入 Phase 0.2，补齐 lint/test/env/migration 的工程增强项。
+\n## 2026-04-27 闃舵 0.2 - 宸ョ▼璐ㄩ噺闂ㄧ Batch 0.2A\n\n### 瀹屾垚鍐呭\n- 鏍圭洰褰曟帴鍏?ESLint Flat Config锛屽 `client`銆乣server`銆乣shared` 鎵ц鐪熷疄闈欐€佹鏌ャ€?\n- 鏍圭洰褰曟柊澧?Prettier 鍩虹閰嶇疆鍜屽拷鐣ヨ鍒欍€?\n- 鏍圭骇鑴氭湰鏂板 `format:check`锛屽苟灏?`lint` 浠庡崰浣嶈剼鏈垏鎹㈡垚鐪熷疄 `eslint` 鎵ц銆?\n\n### 鏀瑰姩鏂囦欢\n- `package.json`\n- `eslint.config.js`\n- `.prettierrc.json`\n- `.prettierignore`\n- `docs/progress.md`\n\n### 楠岃瘉鍛戒护\n- 璁″垝鎵ц `pnpm install`\n- 璁″垝鎵ц `pnpm lint`\n- 璁″垝鎵ц `pnpm format:check`\n\n### 閬楃暀闂\n- `client`銆乣server`銆乣shared` 鍖呭唴閮ㄧ殑 `lint` 鍜?`test` 鑴氭湰浠嶆槸鍗犱綅锛岀粺涓€鏀跺彛鐣欏埌 Batch 0.2E銆?\n- 渚濊禆瀹夎瀹屾垚鍚庯紝鍙兘浼氭毚闇插嚭棣栬疆鏍煎紡鎴栬鍒欓棶棰橈紝灞婃椂鍦ㄥ悗缁?batch 淇暣銆?\n\n### 涓嬩竴姝?\n- 杩涘叆 Batch 0.2B锛岃ˉ榻?Vitest 鍩虹閰嶇疆鍜屾渶灏忓彲杩愯娴嬭瘯銆?\n
+
+## 2026-04-27 阶段 0.2 - 工程质量门禁 Batch 0.2A（补记）
+
+### 完成内容
+- 新增根级 ESLint Flat Config，覆盖 `client`、`server`、`shared` 的基础静态检查。
+- 新增根级 Prettier 配置与忽略规则。
+- 根脚本新增 `format:check`，并将 `lint` 切换为真实 `eslint` 执行。
+
+### 改动文件
+- `package.json`
+- `eslint.config.js`
+- `.prettierrc.json`
+- `.prettierignore`
+- `docs/progress.md`
+
+### 验证命令
+- `pnpm install --force`
+- `pnpm lint`
+- `pnpm format:check`
+
+### 遗留问题
+- 子包内的 `lint` / `test` 脚本仍是占位，统一收口放到 Batch 0.2E。
+- `docs/progress.md` 现有历史内容存在编码遗留，本次仅做追加，不重写旧记录。
+
+### 下一步
+- 进入 Batch 0.2B，接入 Vitest 和最小可运行测试。
+
+## 2026-04-27 阶段 0.2 - 工程质量门禁 Batch 0.2B
+
+### 完成内容
+- 新增根级 `vitest` 配置。
+- 新增 `shared` 的 API 响应契约测试。
+- 新增 `server` 的 `/api/health` 基础路由测试。
+- 根脚本 `test` 切换为真实 `vitest run`。
+
+### 改动文件
+- `package.json`
+- `vitest.config.ts`
+- `shared/src/api-response.test.ts`
+- `server/src/app.test.ts`
+- `docs/progress.md`
+
+### 验证命令
+- `pnpm install --force`
+- `pnpm lint`
+- `pnpm test`（需提权运行，沙箱内 `esbuild` spawn 会触发 `EPERM`）
+
+### 遗留问题
+- 当前 `vitest` 在沙箱内会因 `esbuild` 子进程受限触发 `spawn EPERM`，提权环境可正常通过。
+- 还未建立各子包自己的 `test` 脚本收口，统一放到 Batch 0.2E。
+
+### 下一步
+- 进入 Batch 0.2C，补 `env.example` 和 server 侧环境变量读取入口。
+
+## 2026-04-27 阶段 0.2 - 工程质量门禁 Batch 0.2C
+
+### 完成内容
+- 新增根级 `.env.example`，提供前后端最小环境变量模板。
+- 新增 `server/src/env.ts`，用 `zod` 统一解析 server 侧环境变量。
+- `server/src/server.ts` 改为通过 env loader 读取端口，不再直接裸读 `process.env`。
+
+### 改动文件
+- `.env.example`
+- `server/package.json`
+- `server/src/env.ts`
+- `server/src/server.ts`
+- `docs/progress.md`
+
+### 验证命令
+- `pnpm install --force`
+- `pnpm --filter @fitmind/server type-check`
+- `pnpm lint`
+
+### 遗留问题
+- `DATABASE_URL` / `JWT_SECRET` / `ANTHROPIC_API_KEY` 当前只建立读取结构，尚未进入强制必填阶段。
+- 还没有 client 侧的 env 读取封装，本阶段按计划只处理 server 侧。
+
+### 下一步
+- 进入 Batch 0.2D，补 migration 工具目录和基础配置。
+
+## 2026-04-27 阶段 0.2 - 工程质量门禁 Batch 0.2D
+
+### 完成内容
+- 新增 `node-pg-migrate` 基础配置文件和空 migration 目录。
+- `server` 包新增 `db:migrate` / `db:migrate:down` 脚本。
+- 新增 `pg` 依赖，为后续 migration / 数据库接入做准备。
+- 追加 `docs/ai-decisions.md`，记录迁移工具选型。
+
+### 改动文件
+- `server/package.json`
+- `server/pgmigrate.config.cjs`
+- `server/migrations/.gitkeep`
+- `docs/ai-decisions.md`
+- `docs/progress.md`
+
+### 验证命令
+- `pnpm install --force`
+- `pnpm --filter @fitmind/server exec node-pg-migrate --help`
+- `pnpm --filter @fitmind/server type-check`
+- `pnpm lint`
+- `pnpm format:check`
+
+### 遗留问题
+- 当前 migration 目录仍为空，符合“本阶段不创建真实业务表 migration”的约束。
+- `db:migrate` 只有在后续明确配置 `DATABASE_URL` 且进入业务表阶段后才会实际执行。
+
+### 下一步
+- 进入 Batch 0.2E，统一根脚本和各子包验证脚本。
+
+## 2026-04-27 阶段 0.2 - 工程质量门禁 Batch 0.2E
+
+### 完成内容
+- 根级新增 `verify`，统一收口 `lint / format:check / type-check / test`。
+- `client` / `server` / `shared` 的 `lint` / `test` 脚本不再是占位。
+- 完成整套 Phase 0.2 基础设施验证闭环。
+
+### 改动文件
+- `package.json`
+- `client/package.json`
+- `server/package.json`
+- `shared/package.json`
+- `docs/progress.md`
+
+### 验证命令
+- `pnpm lint`
+- `pnpm format:check`
+- `pnpm type-check`（根级递归检查在沙箱内会触发 `spawn EPERM`，提权环境已通过）
+- `pnpm test`（沙箱内 `vitest/esbuild` 会触发 `spawn EPERM`，提权环境已通过）
+- `pnpm verify`（提权环境通过）
+
+### 遗留问题
+- `docs/progress.md` 和部分历史文档存在旧编码遗留，本次继续遵守“只追加、不重写旧记录”。
+- 真实 migration、真实数据库连接、业务表结构和业务功能仍明确留在后续 phase。
+
+### 下一步
+- Phase 0.2 工程质量门禁已完成，可等待下一阶段任务。

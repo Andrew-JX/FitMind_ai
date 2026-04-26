@@ -6,7 +6,7 @@ healthRouter.get("/", (_request, response) => {
   response.status(200).json({
     ok: true,
     data: {
-      status: "ok"
-    }
+      status: "ok",
+    },
   });
 });

@@ -5,9 +5,21 @@
   "packageManager": "pnpm@10",
   "scripts": {
     "type-check": "pnpm --recursive --if-present run type-check",
-    "lint": "pnpm --recursive --if-present run lint",
-    "test": "pnpm --recursive --if-present run test",
+    "lint": "eslint .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "verify": "pnpm lint && pnpm format:check && pnpm type-check && pnpm test",
     "dev:client": "pnpm --filter @fitmind/client dev",
     "dev:server": "pnpm --filter @fitmind/server dev"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.4.0",
+    "prettier": "^3.6.2",
+    "typescript-eslint": "^8.46.3",
+    "vitest": "^4.0.8"
   }
 }

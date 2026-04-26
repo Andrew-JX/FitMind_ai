@@ -451,3 +451,38 @@ Output format:
 - [ ] D14: 多轮对话上下文裁剪策略（token 控制）
 - [ ] D15: SSE 中断后是否继续后端的 AI 调用（成本 vs 体验）
 - [ ] D16: 是否对每条 AI 响应做事后审计（risk_level=high 自动标记）
+## [D17] 迁移工具选择：node-pg-migrate
+
+- **日期**：2026-04-27
+- **状态**：Accepted
+
+### 背景
+
+Phase 0.2 需要在不连接真实数据库、也不创建真实业务表 migration 的前提下，先补齐后端 migration 基础设施。
+
+### 备选方案
+
+1. **node-pg-migrate**：轻量、贴近 SQL、适合当前手写 SQL 路线
+2. **Prisma Migrate**：体验完整，但会把数据层路线带向 Prisma
+3. **Knex Migrations**：可用，但当前没有引入 Knex 的必要
+
+### 决定
+
+采用 `node-pg-migrate`，当前阶段只创建：
+- `server/migrations/` 基础目录
+- `pgmigrate.config.cjs` 配置文件
+- `db:migrate` / `db:migrate:down` 脚本
+
+本阶段明确不做：
+- 不创建真实业务表 migration
+- 不连接真实数据库
+- 不启用 `pgvector`
+
+### 复审条件
+
+- 如果后续数据层路线从手写 SQL 转向其他 ORM / query builder
+- 如果迁移脚本需要更强的 TS 类型支持或 seed 生态
+
+### 面试讲点
+
+> 我在工程早期先把 migration 工具链补齐，但没有急着生成业务表迁移。因为这个阶段的目标是先建立“可演进的工程底座”，而不是提前进入业务实现。之所以选 `node-pg-migrate`，是因为项目的数据层路线本来就是 `node-postgres + 手写 SQL`，它和这条路线一致，不会额外引入 ORM 心智负担。
