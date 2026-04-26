@@ -1,0 +1,11 @@
+{
+  "name": "fitmind-ai",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10",
+  "scripts": {
+    "type-check": "echo \"Phase 0.1 Batch 1: type-check is not configured yet\"",
+    "lint": "echo \"Phase 0.1 Batch 1: lint is not configured yet\"",
+    "test": "echo \"Phase 0.1 Batch 1: test is not configured yet\""
+  }
+}
