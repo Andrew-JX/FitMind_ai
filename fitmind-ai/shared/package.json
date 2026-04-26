@@ -4,6 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "type-check": "tsc -p tsconfig.json --noEmit"
+    "type-check": "tsc -p tsconfig.json --noEmit",
+    "lint": "echo \"Shared lint is not configured yet\"",
+    "test": "echo \"Shared test is not configured yet\""
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
   }
 }
