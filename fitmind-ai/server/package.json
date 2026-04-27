@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "db:migrate": "node-pg-migrate --config-file ./pgmigrate.config.cjs up",
-    "db:migrate:down": "node-pg-migrate --config-file ./pgmigrate.config.cjs down",
+    "db:migrate": "node-pg-migrate -m ./migrations -t pgmigrations up",
+    "db:migrate:down": "node-pg-migrate -m ./migrations -t pgmigrations down",
     "dev": "tsx watch src/server.ts",
     "type-check": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src pgmigrate.config.cjs",

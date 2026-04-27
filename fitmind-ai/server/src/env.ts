@@ -33,3 +33,21 @@ export function loadServerEnv(
     anthropicApiKey: parsed.ANTHROPIC_API_KEY,
   };
 }
+
+/**
+ * Read the configured DATABASE_URL or throw a descriptive error.
+ *
+ * @param source - Environment variable source, defaults to process.env.
+ * @returns Non-empty database connection string.
+ */
+export function requireDatabaseUrl(
+  source: NodeJS.ProcessEnv = process.env,
+): string {
+  const env = loadServerEnv(source);
+
+  if (env.databaseUrl === undefined) {
+    throw new Error("DATABASE_URL is required for database access.");
+  }
+
+  return env.databaseUrl;
+}

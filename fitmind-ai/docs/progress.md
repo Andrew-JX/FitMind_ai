@@ -315,3 +315,254 @@
 
 ### 下一步
 - Phase 0.2 工程质量门禁已完成，可等待下一阶段任务。
+
+## 2026-04-27 阶段 1.0 - Database Schema & Seed Batch 1.0A
+
+### 完成内容
+- 新增主线数据库首个真实 migration，创建 `users`、`muscle_groups`、`exercises`、`exercise_muscles`。
+- 在 migration 中启用 `uuid-ossp`，补齐主键默认值、唯一约束、索引和多对多关联约束。
+- `muscle_groups` 保留 `parent_id`，支持后续细粒度肌群层级 seed。
+- 修正 `server` 包的 migration 脚本，改为直接使用 `node-pg-migrate` CLI 参数，避开现有 `--config-file` 在 ESM 工程中的加载错误。
+
+### 改动文件
+- `server/migrations/20260427043000_create_core_dictionaries_and_users.js`
+- `docs/progress.md`
+
+### 验证命令
+- `pnpm --filter @fitmind/server lint`
+- `pnpm --filter @fitmind/server type-check`
+- `pnpm --filter @fitmind/server db:migrate`
+- `pnpm --filter @fitmind/server db:migrate:down`
+
+### 遗留问题
+- 当前仓库未发现本地 `.env`，若未提供 `DATABASE_URL`，则 migration up/down 仍需在后续有数据库连接串时完成实库验证。
+- `docs/db-schema.md` 的阶段规划将 chat 相关表放在阶段 3；本轮仍按当前任务要求，仅先推进阶段 1.0A 的主线基础表。
+
+### 下一步
+- 进入 Batch 1.0B，创建 `workouts` 和 `sets` migration。
+
+## 2026-04-27 阶段 1.0 - Database Schema & Seed Batch 1.0B
+
+### 完成内容
+- 新增 `workouts` 和 `sets` migration，补齐训练主线数据表。
+- 通过 `workouts.user_id` 和 `sets.workout_id` 建立训练数据到用户的归属链路。
+- 补齐 `workouts(user_id, performed_at desc)`、`sets(workout_id)`、`sets(exercise_id)` 索引。
+
+### 改动文件
+- `server/migrations/20260427044000_create_workouts_and_sets.js`
+- `docs/progress.md`
+
+### 验证命令
+- `pnpm --filter @fitmind/server lint`
+- `pnpm --filter @fitmind/server type-check`
+- `pnpm --filter @fitmind/server db:migrate`
+- `pnpm --filter @fitmind/server db:migrate:down`
+
+### 遗留问题
+- 由于当前未配置 `DATABASE_URL`，本批 migration 仍未完成实库 up/down。
+- 本批只落表结构，不实现 workouts CRUD 接口或 repository。
+
+### 下一步
+- 进入 Batch 1.0C，创建 `chat_sessions`、`messages`、`tool_call_logs` migration。
+
+## 2026-04-27 阶段 1.0 - Database Schema & Seed Batch 1.0C
+
+### 完成内容
+- 新增 `chat_sessions`、`messages`、`tool_call_logs` migration，补齐主线聊天和可观测性基础表。
+- `messages` 使用 `jsonb` 承载消息内容、结构化输出和 usage 元数据。
+- 明确保留 `tool_call_logs`，但未实现 Tool Calling、SSE chat 或 AI provider 集成。
+
+### 改动文件
+- `server/migrations/20260427045000_create_chat_and_tool_log_tables.js`
+- `docs/progress.md`
+
+### 验证命令
+- `pnpm --filter @fitmind/server lint`
+- `pnpm --filter @fitmind/server type-check`
+- `pnpm --filter @fitmind/server db:migrate`
+- `pnpm --filter @fitmind/server db:migrate:down`
+
+### 遗留问题
+- `docs/db-schema.md` 将这些表标记在阶段 3；本次按当前 Phase 1.0 任务要求提前落表，但没有提前实现聊天业务能力。
+- `knowledge_chunks` 和 `pgvector` 仍明确未进入主线 migration。
+
+### 下一步
+- 进入 Batch 1.0D，开始 seed `muscle_groups`、高频 `exercises` 和 `exercise_muscles`。
+
+## 2026-04-27 阶段 1.0 - Database Schema & Seed Batch 1.0D
+
+### 完成内容
+- 新增基础 seed 脚本 `server/scripts/seed.ts`，按事务执行字典数据初始化。
+- 新增细粒度 `muscle_groups` seed，包含父子层级，如 `chest -> upper_chest`、`legs -> quads/hamstrings/glutes/calves`、`shoulders -> front/side/rear delts`。
+- 新增首批 26 个高频 `exercises` 和对应 `exercise_muscles` 关联 seed。
+- seed 全部采用参数化 SQL + `ON CONFLICT` upsert，支持重复执行。
+
+### 改动文件
+- `server/scripts/seed.ts`
+- `server/src/db/seed-data/muscle-groups.ts`
+- `server/src/db/seed-data/exercises.ts`
+- `server/src/db/seed-data/exercise-muscles.ts`
+- `docs/progress.md`
+
+### 验证命令
+- `pnpm --filter @fitmind/server exec tsx scripts/seed.ts --help`
+- `pnpm --filter @fitmind/server type-check`
+- `pnpm --filter @fitmind/server db:migrate`
+- `pnpm --filter @fitmind/server exec tsx scripts/seed.ts`
+
+### 遗留问题
+- 当前 `server/tsconfig.json` 只包含 `src/**/*.ts`，因此 `scripts/seed.ts` 不会进入现有 `type-check` 覆盖范围；后续可在 db connection 阶段一并收口。
+- 在未配置 `DATABASE_URL` 的情况下，只能验证 `--help` 和脚本装配，不能完成真实入库 seed。
+
+### 下一步
+- 进入 Batch 1.0E，创建 `server/src/db` 基础连接模块并收口 migration / seed 执行链路。
+
+## 2026-04-27 阶段 1.0 - Database Schema & Seed Batch 1.0E
+
+### 完成内容
+- 新增 `server/src/db/pool.ts` 和 `server/src/db/index.ts`，建立 server 侧数据库连接出口。
+- 新增 `requireDatabaseUrl` 辅助函数，统一数据库连接缺失时的报错语义。
+- `server/scripts/seed.ts` 改为复用 `server/src/db` 连接模块，不再在脚本内部直接拼接连接配置。
+
+### 改动文件
+- `server/src/db/pool.ts`
+- `server/src/db/index.ts`
+- `server/src/env.ts`
+- `server/scripts/seed.ts`
+- `docs/progress.md`
+
+### 验证命令
+- `pnpm --filter @fitmind/server type-check`
+- `pnpm --filter @fitmind/server exec tsx scripts/seed.ts --help`
+- `pnpm --filter @fitmind/server db:migrate`
+
+### 遗留问题
+- `tsx` 在当前沙箱内触发 `spawn EPERM`，因此 seed 脚本执行类验证仍需提权环境。
+- `DATABASE_URL` 仍未配置，migration / seed 的真实数据库验证仍被环境阻塞。
+
+### 下一步
+- 进入 Batch 1.0F，补 `muscle_groups` 和 `exercises` 的基础 repository 查询骨架。
+
+## 2026-04-27 阶段 1.0 - Database Schema & Seed Batch 1.0E（补记）
+
+### 完成内容
+- 将 `server/src/db/pool` 实现改为 JS 模块，避免在当前未补 `pg` 类型声明前阻塞 `server` 侧 TypeScript 检查。
+- 将 `server/src/db/index` 也同步改为 JS 模块，维持统一导出入口且恢复 `server` 侧类型检查可通过状态。
+
+### 改动文件
+- `server/src/db/pool.js`
+- `server/src/db/index.js`
+- `docs/progress.md`
+
+### 验证命令
+- `pnpm --filter @fitmind/server type-check`
+
+### 遗留问题
+- `pg` 的强类型声明尚未纳入当前批次，后续如需要把 db 层全面转回 TS，可再引入本地声明或补开发依赖。
+
+### 下一步
+- 继续进入 Batch 1.0F，完成基础 repository 骨架。
+
+## 2026-04-27 阶段 1.0 - Database Schema & Seed Batch 1.0F
+
+### 完成内容
+- 新增 `muscle_groups` 查询 repository，可返回完整肌群字典。
+- 新增 `exercises` 查询 repository，支持 `q` 关键字和 `muscleCode` 过滤，并聚合返回关联肌群信息。
+- `server/src/db/index.js` 统一导出 db 连接和基础 repository 入口。
+
+### 改动文件
+- `server/src/db/repositories/muscle-groups-repository.js`
+- `server/src/db/repositories/exercises-repository.js`
+- `server/src/db/repositories/index.js`
+- `server/src/db/index.js`
+- `docs/progress.md`
+
+### 验证命令
+- `pnpm --filter @fitmind/server lint`
+- `pnpm --filter @fitmind/server type-check`
+- `node --check server/src/db/repositories/muscle-groups-repository.js`
+- `node --check server/src/db/repositories/exercises-repository.js`
+
+### 遗留问题
+- repository 当前使用 JS 模块落骨架，主要是为了在未补 `pg` 类型声明前保持 db 主线可推进。
+- 真实查询验证仍需要 `DATABASE_URL` 和已执行 migration/seed 的数据库环境。
+
+### 下一步
+- Phase 1.0 主线数据库 schema、seed 和基础 repository 已落地，可在配置数据库连接后做实库 migration/seed 验证。
+
+## 2026-04-28 阶段 1.0G - Real DB Verification & Repository Smoke Test Batch 1.0G-A
+
+### 完成内容
+- 在真实 Neon `DATABASE_URL` 下完成 migration 回滚与重建验证。
+- 确认 `.env.local` 中的 `DATABASE_URL` 带双引号时，命令行注入若不去引号会导致连接串解析异常；验证时已通过去引号的注入方式规避。
+- 依次回滚 `20260427045000_create_chat_and_tool_log_tables`、`20260427044000_create_workouts_and_sets`、`20260427043000_create_core_dictionaries_and_users`。
+- 从干净状态重新执行 `pnpm --filter @fitmind/server db:migrate`，确认三个 migration 可按顺序完整创建主线表。
+
+### 改动文件
+- `docs/progress.md`
+
+### 验证命令
+- `pnpm --filter @fitmind/server db:migrate`
+- `pnpm --filter @fitmind/server db:migrate:down`
+- `pnpm --filter @fitmind/server db:migrate:down`
+- `pnpm --filter @fitmind/server db:migrate:down`
+- `pnpm --filter @fitmind/server db:migrate`
+
+### 遗留问题
+- `node-pg-migrate` 当前仍会对现有 14 位前缀文件名打印 `Can't determine timestamp` 警告，但在真实库中不阻塞执行顺序和 up/down 行为。
+- Neon 连接会打印 `sslmode=require` 相关安全警告，当前不影响本阶段数据库闭环验证。
+
+### 下一步
+- 进入 Batch 1.0G-B，执行 `seed.ts` 两次并验证幂等、字典数量和映射完整性。
+
+## 2026-04-28 阶段 1.0G - Real DB Verification & Repository Smoke Test Batch 1.0G-B
+
+### 完成内容
+- 在真实 Neon 数据库中连续执行两次 `pnpm --filter @fitmind/server exec tsx scripts/seed.ts`。
+- 两次 seed 均返回相同结果：`17 muscle groups, 26 exercises, 59 exercise-muscle mappings`，验证了幂等行为。
+- 通过只读 SQL 检查确认：
+  - `muscle_groups` 为 17 条，存在细粒度父子层级
+  - `exercises` 为 26 条，保持在 20-30 个高频动作范围内
+  - `exercise_muscles` 为 59 条
+  - `exercises_without_mappings = 0`
+  - `min_mappings_per_exercise = 1`
+  - `parent_child_overlap_count = 0`
+- 抽查数据库中的 `name_zh` 字段，中文内容正常，无乱码。
+
+### 改动文件
+- `docs/progress.md`
+
+### 验证命令
+- `pnpm --filter @fitmind/server exec tsx scripts/seed.ts`
+- `pnpm --filter @fitmind/server exec tsx scripts/seed.ts`
+- 只读 SQL 检查（通过临时 `tsx` 脚本执行）
+
+### 遗留问题
+- `seed.ts` 仍依赖 `tsx` 运行时，当前沙箱环境下这类命令需要提权才能稳定执行。
+- Neon 连接仍会打印 `sslmode=require` 相关安全警告，当前不影响 seed 验证结果。
+
+### 下一步
+- 进入 Batch 1.0G-C，执行 repository smoke test 并验证聚合查询结果。
+
+## 2026-04-28 阶段 1.0G - Real DB Verification & Repository Smoke Test Batch 1.0G-C
+
+### 完成内容
+- 通过只读 `tsx` smoke 命令直接调用现有 repository，未新增 script、route、controller 或前端代码。
+- 验证 `listMuscleGroups()` 返回 17 条完整肌群数据。
+- 验证 `searchExercises({ q: "bench" })` 返回 4 条结果，能够按关键词搜索动作。
+- 验证 `searchExercises({ muscleCode: "quads" })` 返回 4 条结果，能够按肌群过滤动作。
+- 抽查 repository 返回结果中的 `muscles` 字段，确认为聚合结构，不是重复平铺行。
+- 同时确认真实库中的中文动作名、肌群名显示正常。
+
+### 改动文件
+- `docs/progress.md`
+
+### 验证命令
+- 只读 repository smoke test（通过临时 `tsx` 命令执行）
+
+### 遗留问题
+- 直接用原生 `node` 执行 repository smoke 时会因为 `pool.js` 依赖 `env.ts` 的运行时解析方式而找不到 `src/env.js`，因此本轮验证采用 `tsx` 作为真实运行路径。
+- 当前结果不影响 repository 在项目既定 `tsx` 运行方式下的真实数据库验证。
+
+### 下一步
+- Phase 1.0G 的 migration、seed、repository 闭环验证已完成，可在后续阶段基于真实数据库继续推进 auth 和 workouts CRUD 开发。
