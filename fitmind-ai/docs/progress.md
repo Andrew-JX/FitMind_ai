@@ -566,3 +566,158 @@
 
 ### 下一步
 - Phase 1.0G 的 migration、seed、repository 闭环验证已完成，可在后续阶段基于真实数据库继续推进 auth 和 workouts CRUD 开发。
+## 2026-04-28 阶段 1.1 - Auth MVP Batch 1
+
+### 完成内容
+- 新增 `shared/src/auth.ts`，定义 Auth MVP 共享请求与响应 DTO。
+- `shared/src/index.ts` 补齐 Auth 类型导出，供后续 controller / service 复用。
+- 新增 `server/src/schemas/auth-schemas.ts`，建立 `register` / `login` 的 Zod 入参校验。
+- `server/src/env.ts` 新增 `requireJwtSecret()`，为 JWT helper 提供 fail-fast 环境约束。
+
+### 改动文件
+- `shared/src/auth.ts`
+- `shared/src/index.ts`
+- `server/src/schemas/auth-schemas.ts`
+- `server/src/env.ts`
+- `docs/progress.md`
+
+### 验证命令
+- `pnpm --filter @fitmind/shared type-check`
+- `pnpm --filter @fitmind/server type-check`
+- `pnpm lint`
+
+### 遗留问题
+- 本批只建立契约、校验和 env 约束，尚未引入密码库、JWT 实现或任何 Auth HTTP 路由。
+- `display_name` 当前按可选字段处理，空白字符串会在 Zod 校验中被拒绝，不会自动转为 `undefined`。
+
+### 下一步
+- 进入 Batch 2，新增 `users` repository 和密码 hash / compare 工具。
+## 2026-04-28 阶段 1.1 - Auth MVP Batch 2
+
+### 完成内容
+- `server/package.json` 新增 `bcryptjs` 依赖，为 Auth MVP 提供纯 JS 密码哈希能力。
+- 新增 `server/src/db/repositories/users-repository.js`，提供 `findUserByEmail`、`findUserById`、`createUser`。
+- `server/src/db/repositories/index.js` 补齐 `users` repository 导出。
+- 新增 `server/src/services/auth/password.ts`，封装 `hashPassword` 和 `comparePassword`。
+
+### 改动文件
+- `server/package.json`
+- `server/src/db/repositories/users-repository.js`
+- `server/src/db/repositories/index.js`
+- `server/src/services/auth/password.ts`
+- `docs/progress.md`
+
+### 验证命令
+- `pnpm install --force`
+- `pnpm --filter @fitmind/server type-check`
+- `pnpm lint`
+
+### 遗留问题
+- 本批只补齐 users 数据访问与密码原语，尚未引入 JWT helper、Auth service 或 HTTP 路由。
+- `users` repository 当前继续沿用既有 `.js` 路线，未在本阶段顺手做 db 层 TS 化重构。
+
+### 下一步
+- 进入 Batch 3，新增 JWT helper、Auth service 和统一响应/错误工具。
+## 2026-04-28 阶段 1.1 - Auth MVP Batch 3
+
+### 完成内容
+- `server/package.json` 新增 `jose` 依赖，为 Bearer Token MVP 提供 JWT 签发与校验能力。
+- 新增 `server/src/services/auth/jwt.ts`，统一封装 `signJwt` / `verifyJwt`。
+- 新增 `server/src/services/auth/auth-service.ts`，收口 `register`、`login`、`getCurrentUser` 三条 Auth 业务链路。
+- 新增 `server/src/utils/api-response.ts` 和 `server/src/utils/http-error.ts`，统一成功/失败响应与应用错误结构。
+
+### 改动文件
+- `server/package.json`
+- `server/src/services/auth/jwt.ts`
+- `server/src/services/auth/auth-service.ts`
+- `server/src/utils/api-response.ts`
+- `server/src/utils/http-error.ts`
+- `docs/progress.md`
+
+### 验证命令
+- `pnpm install --force`
+- `pnpm --filter @fitmind/server type-check`
+- `pnpm lint`
+
+### 遗留问题
+- 本批只完成 service 层闭环，尚未接入 controller、route、middleware 和 `app.ts`。
+- `register` 对邮箱重复场景默认仍映射为 `400 VALIDATION_ERROR`，未扩展新的错误码。
+
+### 下一步
+- 进入 Batch 4，接入 Auth controller、route、middleware 和 `/api/auth/*` 路由。
+## 2026-04-28 阶段 1.1 - Auth MVP Batch 4
+
+### 完成内容
+- 新增 `server/src/controllers/auth-controller.ts`，接入 `register` / `login` / `me` 三个薄 controller。
+- 新增 `server/src/middleware/auth-middleware.ts`，统一解析 `Authorization: Bearer <token>` 并校验 JWT。
+- 新增 `server/src/routes/auth.ts`，暴露 `/api/auth/register`、`/api/auth/login`、`/api/auth/me`。
+- `server/src/app.ts` 接入 `express.json()`、Auth 路由和统一错误响应格式。
+
+### 改动文件
+- `server/src/controllers/auth-controller.ts`
+- `server/src/middleware/auth-middleware.ts`
+- `server/src/routes/auth.ts`
+- `server/src/app.ts`
+- `docs/progress.md`
+
+### 验证命令
+- `pnpm --filter @fitmind/server type-check`
+- `pnpm lint`
+- `pnpm --filter @fitmind/server dev`
+- 手动 smoke：`POST /api/auth/register`、`POST /api/auth/login`、`GET /api/auth/me`
+
+### 遗留问题
+- 本批完成了 HTTP 闭环，但自动化测试和真实接口 smoke 还需要在 Batch 5 一起收口。
+- 当前错误处理中，未识别的异常统一映射为 `500 INTERNAL_ERROR`，未额外输出调试细节。
+
+### 下一步
+- 进入 Batch 5，补 Auth service、middleware 和 route 的最小测试，并完成最终验证。
+## 2026-04-28 阶段 1.1 - Auth MVP Batch 5
+
+### 完成内容
+- 新增 `server/src/services/auth/auth-service.test.ts`，覆盖注册成功、重复邮箱、密码错误登录、`me` 查不到用户。
+- 新增 `server/src/middleware/auth-middleware.test.ts`，覆盖缺失 header、格式错误、无效 token、有效 token。
+- `server/src/app.test.ts` 补充 `/api/auth/me` 未授权访问的最小 route smoke。
+
+### 改动文件
+- `server/src/services/auth/auth-service.test.ts`
+- `server/src/middleware/auth-middleware.test.ts`
+- `server/src/app.test.ts`
+- `docs/progress.md`
+
+### 验证命令
+- `pnpm --filter @fitmind/server test`
+- `pnpm test`
+- `pnpm verify`
+
+### 遗留问题
+- 若后续要把 Auth 扩展到前端或生产化 cookie 流程，需要另起阶段，不在本批处理。
+- 本批测试主要覆盖 Auth MVP 主路径和关键失败路径，尚未引入真实数据库 integration test。
+
+### 下一步
+- 完成最终验证，并按需要把本阶段真实踩坑追加到 `docs/troubleshooting.md`。
+## 2026-04-28 阶段 1.1 - Auth MVP Verification Addendum
+
+### 完成内容
+- 固定根级 `eslint-plugin-react-hooks` 到 `7.0.1`，修复 `pnpm install --force` 后的 lint 依赖漂移。
+- 调整 `server` 包 `test` 脚本为回到 workspace 根目录执行，保证 `pnpm --filter @fitmind/server test` 可用。
+- 追加 `docs/troubleshooting.md`，记录 Auth 阶段真实遇到的类型解析和工具链脚本问题。
+
+### 改动文件
+- `package.json`
+- `server/package.json`
+- `docs/progress.md`
+- `docs/troubleshooting.md`
+
+### 验证命令
+- `pnpm lint`
+- `pnpm type-check`（提权环境通过）
+- `pnpm --filter @fitmind/server test`（提权环境通过）
+- `pnpm test`（提权环境通过）
+
+### 遗留问题
+- 根级 `pnpm verify` 仍会被仓库里既有的旧格式问题拦住，不是本次 Auth 改动单独引入。
+- `pnpm test` / `pnpm type-check` 在当前沙箱内仍会受 `spawn EPERM` 影响，需要提权环境执行。
+
+### 下一步
+- Auth MVP 后端闭环已完成，可进入后续 workouts / chat 等用户级数据功能开发。

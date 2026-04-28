@@ -31,4 +31,29 @@ describe("createApp", () => {
       },
     });
   });
+
+  it("rejects unauthenticated access to /api/auth/me", async () => {
+    const address = server.address();
+
+    if (address === null || typeof address === "string") {
+      throw new Error("Expected the test server to bind to a TCP port");
+    }
+
+    const response = await fetch(
+      `http://127.0.0.1:${address.port}/api/auth/me`,
+    );
+    const payload = (await response.json()) as {
+      ok: boolean;
+      error: { code: string; message: string };
+    };
+
+    expect(response.status).toBe(401);
+    expect(payload).toEqual({
+      ok: false,
+      error: {
+        code: "UNAUTHORIZED",
+        message: "Missing Authorization header.",
+      },
+    });
+  });
 });

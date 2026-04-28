@@ -51,3 +51,21 @@ export function requireDatabaseUrl(
 
   return env.databaseUrl;
 }
+
+/**
+ * Read the configured JWT_SECRET or throw a descriptive error.
+ *
+ * @param source - Environment variable source, defaults to process.env.
+ * @returns Non-empty JWT signing secret.
+ */
+export function requireJwtSecret(
+  source: NodeJS.ProcessEnv = process.env,
+): string {
+  const env = loadServerEnv(source);
+
+  if (env.jwtSecret === undefined) {
+    throw new Error("JWT_SECRET is required for authentication.");
+  }
+
+  return env.jwtSecret;
+}

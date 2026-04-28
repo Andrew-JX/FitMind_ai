@@ -9,10 +9,12 @@
     "dev": "tsx watch src/server.ts",
     "type-check": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src pgmigrate.config.cjs",
-    "test": "vitest run src/**/*.test.ts"
+    "test": "cd .. && vitest run"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.2",
     "express": "^5.1.0",
+    "jose": "^6.1.0",
     "pg": "^8.16.3",
     "zod": "^4.1.12"
   },
