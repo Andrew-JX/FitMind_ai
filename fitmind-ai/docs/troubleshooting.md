@@ -185,3 +185,79 @@
 
 ### 面试讲点
 - 这是很适合讲“工具链稳定性”的案例：业务代码没问题，真正卡人的是版本漂移和 monorepo 脚本路径假设。我没有盲目重装到能跑为止，而是把问题拆成“依赖版本”和“执行目录”两个根因分别处理。
+## [T03] [宸蹭慨澶峕 Runtime JS repository import 鎸囧悜 `env.js` 瀵艰嚧鐪熷疄 HTTP + DB 璺緞 500
+
+- **鏃ユ湡**锛?026-04-29
+- **闃舵**锛氶樁娈?1.2 - Workout HTTP APIs / Batch 6 Verification
+- **鑰楁椂**锛氱害 30+ 鍒嗛挓
+
+### 鐜拌薄
+- 鍗曞厓娴嬭瘯鍜?service 灞傝皟鐢ㄩ兘姝ｅ父锛屼絾鐢ㄧ湡瀹?HTTP 璇锋眰璺?`/api/auth/register` 鏃朵細杩斿洖 `500 INTERNAL_ERROR`銆?
+- 鐩存帴鐢?`tsx` 璋冪敤 `register()` 鏈嶅姟鍙堣兘姝ｅ父鎻掑叆鐢ㄦ埛锛岃〃闈㈢湅璧锋潵鍍忔槸鈥滄湁鏃跺ソ銆佹湁鏃跺潖鈥濈殑闅愯棌杩愯鏃堕棶棰樸€?
+
+### 鎺掓煡杩囩▼
+- 鍏堢敤鐪熷疄 `.env.local` + 涓存椂 `JWT_SECRET` 鍋?service 鐩存帴璋冪敤锛岀‘璁?DB 杩炴帴銆乁ser repository 鍜?JWT 绛惧彂鏈韩閮藉彲鐢ㄣ€?
+- 鍐嶇敤 `tsx` 鎵ц鐪熷疄 HTTP smoke锛屽彂鐜颁竴鏃﹁蛋鍒?repository 灞傦紝`pool.js` 浼氬湪杩愯鏃舵姤 `Cannot find module '../env.js'`銆?
+- 杩芥煡 `server/src/db/pool.js` 鍙戠幇瀹冩槸 JS 杩囨浮鏂囦欢锛屼絾鎸夌収 TS 璺嚎鍘?import `../env.js`锛屼粨搴撻噷瀹為檯鍙湁 `env.ts`銆?
+
+### 鏍规湰鍘熷洜
+- 椤圭洰褰撳墠鏄?TS app/service + JS repository/db 鐨勮繃娓″舰鎬侊紝TS 鍏ュ彛鍦?`tsx` 涓嬭兘鎶?`.js` 瑙ｆ瀽鍥炲搴旂殑 `.ts`锛屼絾 JS repository 鏂囦欢骞朵笉鑷姩浜彈鍚屾牱鐨勬ā鍧楅噸鍐欒鍒欍€?
+- 缁撴灉灏辨槸锛?db 鍏ュ彛鍦ㄧ湡瀹炶姹傞噷鎵嶄細瑙﹀彂鐨勬椂鍊欙紝鍘讳簡涓€涓笉瀛樺湪鐨?`env.js`锛屽艰嚧璺敱灞傜湅鍒扮粺涓€ `500`銆?
+
+### 瑙ｅ喅鏂规
+- 灏?`server/src/db/pool.js` 鐨勫鍏ヤ粠:
+
+```js
+import { loadServerEnv } from "../env.js";
+```
+
+- 鏀逛负:
+
+```js
+import { loadServerEnv } from "../env.ts";
+```
+
+- 淇畬鍚庯紝`pnpm --filter @fitmind/server test`鍜?`pnpm --filter @fitmind/server type-check` 缁х画閫氳繃锛岃€屼笖 `tsx` 鐩存帴璋冪敤 `register()` 宸茬粡鑳藉熷湪鐪熷疄鏁版嵁搴撲笂鎴愬姛鎻掑叆鐢ㄦ埛銆?
+
+### 缁忛獙鏁欒
+- JS 杩囨浮灞傚拰 TS 鍏ュ彛灞傛贩鐢ㄦ椂锛屼笉鑳藉亣璁?`.js` 鍚庣紑鍦ㄦ墍鏈夎繍琛屾椂璺緞涓婇兘浼氳鑷姩閲嶅啓鍒?`.ts`銆?
+- 鐪熷疄 HTTP smoke 鍜?service 鐩存帴璋冪敤鍚勮嚜鑳芥姄鍒颁笉鍚岀殑闂锛氬墠鑰呮洿瀹规槗鎵撳埌鈥滆矾鐢?-> controller -> service -> db鈥濈殑缁堢偣鍏抽棴鐜己鍙ｃ€?
+
+### 闈㈣瘯璁茬偣
+- 杩欐槸涓€涓緢濂界殑鈥滆繃娓℃灦鏋勯殣鎬ц繍琛屾椂 bug鈥濇晠浜嬶細闈欐€佺被鍨嬪拰鍗曞厓娴嬭瘯閮借繃浜嗭紝浣嗙湡瀹炶姹傝繕鏄細鍦?JS repository 杈圭晫鐖嗘帀銆傚叧閿笉鏄贡鏀癸紝鑰屾槸鐢?service 鐩存帴璋冪敤鍜?HTTP smoke 鎶婇棶棰樺垏鍒嗗紑锛屾渶鍚庡畾浣嶅埌涓€琛屽鍏ュ悗缂€銆?
+## [T04] [已修复] Workout service 直接按 string DTO 校验真实 DB 行，导致 `Date` / `numeric` 运行时映射误报 `400`
+
+- **日期**：2026-04-29
+- **阶段**：Phase 1.2 - Closeout Verification Fix & Smoke Stabilization
+- **耗时**：约 20 分钟
+
+### 现象
+- 新增真实 `workout-api-smoke.ts` 后，`POST /api/workouts` 在 repository 已写入成功的情况下仍返回 `400 VALIDATION_ERROR`。
+- 错误详情是：
+  - `performed_at: Invalid input: expected string, received Date`
+- 这说明问题不在请求 body，而在 controller -> service -> db -> service DTO 回填这一段真实运行链路。
+
+### 排查过程
+- 先确认 smoke 发出的 JSON payload 是标准字符串时间，不存在请求序列化错误。
+- 再根据 `ZodError` 返回的 path 反查到 `server/src/services/training/workout-service.ts`，发现 DTO schema 直接把 `performed_at`、`created_at` 写成了 `z.string()`。
+- 继续顺着 PostgreSQL 驱动返回值检查，确认：
+  - `timestamptz` 在真实运行时会回到 JS `Date`
+  - `numeric` 列在部分查询路径下会回到 string
+- 单测之所以没暴露，是因为 mock row 使用的是理想化字符串/数字，而不是真实 pg driver 返回形态。
+
+### 根本原因
+- service 层把 repository row 当成“已经是 API DTO 形状”的数据使用了。
+- 但真实数据库驱动返回的是“数据库友好形状”，并不天然等于“HTTP DTO 形状”。
+- 于是 workout service 在真实运行时把正常数据误判成校验失败，并通过全局 `ZodError -> 400` 映射暴露成假性的请求错误。
+
+### 解决方案
+- 在 `server/src/services/training/workout-service.ts` 增加最小归一化：
+  - `Date -> ISO string`
+  - numeric string -> `number`
+- 归一化范围只收口到 workout DTO 映射层，没有改 schema、controller、repository 或数据库结构。
+- 修复后重新跑 `pnpm --filter @fitmind/server exec tsx scripts/workout-api-smoke.ts`，workout / set 全链路通过。
+
+### 经验教训
+- “单测全绿 + service mock 正常”并不能替代真实 HTTP smoke，尤其是 DB driver 会把时间和数值列转成运行时特定对象时。
+- repository row 和 API DTO 之间最好显式做一次边界归一化，不要默认它们天然同形。
+- 把 `ZodError` 统一映射为 `400` 很方便，但也会掩盖“服务端回填数据形状不符”这类非请求侧问题，所以真实 smoke 很有必要。

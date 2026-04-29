@@ -70,7 +70,8 @@ async function seedMuscleGroups(
   const idByCode = new Map<string, string>();
 
   for (const seed of seeds) {
-    const parentId = seed.parentCode === null ? null : idByCode.get(seed.parentCode);
+    const parentId =
+      seed.parentCode === null ? null : idByCode.get(seed.parentCode);
 
     if (seed.parentCode !== null && parentId === undefined) {
       throw new Error(`Missing parent muscle group seed: ${seed.parentCode}`);
@@ -94,7 +95,13 @@ async function seedMuscleGroups(
           recovery_hours = EXCLUDED.recovery_hours
         RETURNING id
       `,
-      [seed.code, seed.nameEn, seed.nameZh, parentId ?? null, seed.recoveryHours],
+      [
+        seed.code,
+        seed.nameEn,
+        seed.nameZh,
+        parentId ?? null,
+        seed.recoveryHours,
+      ],
     );
 
     const insertedId = result.rows[0]?.id;
@@ -188,11 +195,15 @@ async function seedExerciseMuscles(
     const muscleGroupId = muscleGroupIds.get(seed.muscleCode);
 
     if (exerciseId === undefined) {
-      throw new Error(`Missing exercise seed for mapping: ${seed.exerciseCode}`);
+      throw new Error(
+        `Missing exercise seed for mapping: ${seed.exerciseCode}`,
+      );
     }
 
     if (muscleGroupId === undefined) {
-      throw new Error(`Missing muscle group seed for mapping: ${seed.muscleCode}`);
+      throw new Error(
+        `Missing muscle group seed for mapping: ${seed.muscleCode}`,
+      );
     }
 
     await pool.query(

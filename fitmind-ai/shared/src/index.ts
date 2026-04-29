@@ -7,3 +7,16 @@ export type {
   RegisterRequest,
 } from "./auth";
 export type { ApiError, ErrorCode } from "./errors";
+export type {
+  AddWorkoutSetRequest,
+  CreateWorkoutRequest,
+  DeleteEntityResponseData,
+  UpdateWorkoutRequest,
+  UpdateWorkoutSetRequest,
+  WorkoutDetailDto,
+  WorkoutDetailResponseData,
+  WorkoutListResponseData,
+  WorkoutMutationResponseData,
+  WorkoutSetDto,
+  WorkoutSummaryDto,
+} from "./training";

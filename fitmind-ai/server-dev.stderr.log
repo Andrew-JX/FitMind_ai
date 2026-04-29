@@ -1,0 +1,13 @@
+E:\studyspace\webroad\FitMind\fitmind-ai\server\src\services\training\workout-service.ts:120
+  weight_kg: numericValueSchema.nonnegative(),
+                                ^
+
+
+TypeError: numericValueSchema.nonnegative is not a function
+    at <anonymous> (E:\studyspace\webroad\FitMind\fitmind-ai\server\src\services\training\workout-service.ts:120:33)
+    at ModuleJob.run (node:internal/modules/esm/module_job:271:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:547:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:116:5)
+
+Node.js v22.12.0
+ning was created)

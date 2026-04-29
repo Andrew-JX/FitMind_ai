@@ -138,9 +138,13 @@ export const up = (pgm) => {
     },
   });
 
-  pgm.createIndex("tool_call_logs", ["user_id", { name: "created_at", sort: "DESC" }], {
-    name: "idx_tool_call_logs_user_time",
-  });
+  pgm.createIndex(
+    "tool_call_logs",
+    ["user_id", { name: "created_at", sort: "DESC" }],
+    {
+      name: "idx_tool_call_logs_user_time",
+    },
+  );
 
   pgm.createIndex("tool_call_logs", "tool_name", {
     name: "idx_tool_call_logs_tool",

@@ -1,7 +1,10 @@
 import express from "express";
+import { ZodError } from "zod";
 
 import { authRouter } from "./routes/auth.js";
 import { healthRouter } from "./routes/health.js";
+import { apiRouter } from "./routes/api.js";
+import { workoutsRouter } from "./routes/workouts.js";
 import { createErrorResponse } from "./utils/api-response.js";
 import { HttpError, isHttpError } from "./utils/http-error.js";
 
@@ -12,6 +15,8 @@ export function createApp() {
 
   app.use("/api/auth", authRouter);
   app.use("/api/health", healthRouter);
+  app.use("/api", apiRouter);
+  app.use("/api", workoutsRouter);
 
   app.use(
     (
@@ -26,6 +31,24 @@ export function createApp() {
         return res
           .status(error.statusCode)
           .json(createErrorResponse(error.toApiError()));
+      }
+
+      if (error instanceof ZodError) {
+        const validationError = new HttpError(
+          400,
+          "VALIDATION_ERROR",
+          "Request validation failed.",
+          {
+            issues: error.issues.map((issue) => ({
+              path: issue.path.join("."),
+              message: issue.message,
+            })),
+          },
+        );
+
+        return res
+          .status(validationError.statusCode)
+          .json(createErrorResponse(validationError.toApiError()));
       }
 
       const fallbackError = new HttpError(

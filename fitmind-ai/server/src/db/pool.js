@@ -1,6 +1,6 @@
 import { Pool } from "pg";
 
-import { loadServerEnv } from "../env.js";
+import { loadServerEnv } from "../env.ts";
 
 /**
  * Create a PostgreSQL pool using the configured DATABASE_URL.

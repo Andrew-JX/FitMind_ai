@@ -44,9 +44,13 @@ export const up = (pgm) => {
     },
   });
 
-  pgm.createIndex("workouts", ["user_id", { name: "performed_at", sort: "DESC" }], {
-    name: "idx_workouts_user_perf",
-  });
+  pgm.createIndex(
+    "workouts",
+    ["user_id", { name: "performed_at", sort: "DESC" }],
+    {
+      name: "idx_workouts_user_perf",
+    },
+  );
 
   pgm.createTable("sets", {
     id: {
