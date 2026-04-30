@@ -1,160 +1,153 @@
-# 面试笔记
+# Interview Notes
 
-## 项目定位
-FitMind AI 的定位是：训练日志系统 + 确定性计算层，并为未来“可追溯证据的 AI 建议”预留扩展空间。
+## Project Positioning
+FitMind AI is positioned as a training log product plus a deterministic calculation layer, with room reserved for future explainable AI guidance.
 
-核心思路是，这个产品不应该只是一个通用聊天壳子。它首先要拥有可信的训练数据，能基于这些数据计算出可复现的指标，并保留可追溯性，这样未来任何更高层的建议都可以回溯到对应的 workout 和 set。
+The important framing is:
+- it is not just a generic chat shell
+- it starts from real first-party workout data
+- every future recommendation should be traceable back to workout evidence and calculation rules
 
-如果用面试表述来概括，这个项目的卖点是：
-- 一个保存真实训练历史的训练记录产品
-- 一个产出确定性训练总结的后端计算层
-- 一个让未来建议可解释、可检查，而不是黑盒的 evidence 模型
+## Why The Project Does Not Start With AI Chat
+The project intentionally does not start with AI chat because a chat-first product is weak if it cannot deterministically answer basic training questions.
 
-## 为什么项目不从 AI Chat 开始
-这个项目刻意不从 AI Chat 开始，因为如果只有聊天能力，整个系统的基础会很弱。假如系统连“练了什么”“总训练量是多少”“某个动作最近是进步还是停滞”这类基础问题都不能用确定性方式回答，那么任何 LLM 生成的建议都很难验证。
+Before any future model explanation, the system should already be able to answer:
+- what the user trained
+- how much total work was done
+- which exercises contributed the most
+- whether one exercise is progressing or stalling
 
-先做计算层有几个好处：
-- 派生指标可以测试
-- API 行为比纯 prompt 行为更容易调试
-- 输出可以绑定到真实 evidence，用户信任更高
-- 未来 AI 功能可以消费稳定输入，而不是在运行时临时发明计算逻辑
+That is why the project narrative is "deterministic first, generative later".
 
-这套思路可以概括为“先确定性，后生成式”，在面试里是一个很强的工程化叙事。
+## Phase 1 Value: Workout Log CRUD
+Phase 1 established the base product loop:
+- register and login
+- memory-only MVP auth
+- search and choose exercises
+- create workouts with sets
+- browse workout list and detail
+- delete workouts
 
-## Phase 1 的价值：训练日志 CRUD
-Phase 1 建立了训练日志的核心闭环：
-- 注册与登录
-- MVP 阶段的仅内存认证
-- 搜索和选择动作
-- 创建带 sets 的 workout
-- 浏览 workout 列表
-- 查看 workout 详情
-- 删除 workout
+The value of Phase 1 is not CRUD by itself. The value is that the product now owns real user training data with clear user boundaries.
 
-Phase 1 的价值不只是 CRUD 本身，而是证明这个产品已经拥有第一方训练数据，并且具备了清晰的用户边界。如果没有这一层，后面的分析能力和 AI 解释能力都没有可靠的数据源。
-
-## Phase 2 的价值：确定性计算层
-Phase 2 在不修改 workout CRUD 合同、不修改数据库 schema 的前提下，新增了只读计算 API。
+## Phase 2 Value: Deterministic Calculation Layer
+Phase 2 added deterministic readonly calculation APIs without changing workout CRUD contracts or database schema.
 
 ### `GET /api/training/summary`
-这个接口返回用户在某个时间范围内的只读训练总结，回答的问题包括：
-- 这个范围内一共包含多少次 workout
-- 一共包含多少个 set
-- 一共累计了多少 reps
-- 一共累计了多少 total volume
-- 在这个范围内，哪些动作贡献最大
+This endpoint answers:
+- how many workouts are in a range
+- how many sets are in a range
+- how many reps were accumulated
+- how much total volume was accumulated
+- which exercises contributed the most volume
 
 ### `GET /api/training/exercise-progress`
-这个接口返回某一个动作在指定范围内的只读进展视图，回答的问题包括：
-- 有多少次 workout 包含这个动作
-- 一共包含多少个匹配的 set
-- 这个动作累计了多少 reps 和 total volume
-- 这个范围内观察到的最大重量是多少
-- 这个范围内近似最佳 estimated 1RM 是多少
-- 每次 session 的聚合情况如何
+This endpoint answers:
+- how many workouts included one exercise
+- how many matching sets were included
+- that exercise's total reps and total volume
+- the max observed weight
+- the approximate best estimated 1RM
+- per-session rollups
 
-这里最关键的架构点是：两个接口都放在鉴权之后，用户身份都来自 auth context，计算都在服务端基于 workouts 和 sets 完成。
+## Evidence Design
+One of the strongest interview points is the evidence model.
 
-## Evidence 设计
-这个项目最适合在面试中展开讲的点之一，就是 evidence 模型。
+Current deterministic outputs include:
+- `workout_ids`: which workouts contributed to the result
+- `set_ids`: which sets contributed when relevant
+- `calculation_rules`: plain-language rules describing how the values were calculated
 
-当前计算结果会返回：
-- `workout_ids`：哪些 workout 参与了本次聚合
-- `set_ids`：哪些 set 参与了计算，尤其是 exercise progress
-- `calculation_rules`：描述这些数值如何计算出来的纯文本规则
+This matters because future explanations should be auditable rather than black-box claims.
 
-这很重要，因为未来建议必须可解释。系统不应该只说“AI 觉得你的卧推在进步”，而应该能够进一步说明：“这个判断基于这些 workout、这些 set，以及这些确定性的计算规则。”
-
-这就在原始训练日志、后端计算结果和未来解释层之间建立了一条可审计链路。
-
-## 为什么日期范围使用半开区间
-API 接收的是用户更容易理解的日历日期输入，例如 `start_date=YYYY-MM-DD` 和 `end_date=YYYY-MM-DD`，但内部过滤 timestamp 时使用半开区间：
+## Why The Date Filter Uses A Half-Open Interval
+API input uses calendar dates like `start_date=YYYY-MM-DD` and `end_date=YYYY-MM-DD`, but internal filtering uses:
 - `performed_at >= start_date::date`
 - `performed_at < (end_date::date + interval '1 day')`
 
-这是一个很常见的后端安全写法。它可以避免临近一天结束时的 off-by-one 问题，也能避免依赖 `23:59:59.999...` 这种脆弱边界。同时，它保留了用户的直觉模型：结束日期应该被包含。
+This avoids end-of-day off-by-one issues while preserving the user's calendar mental model.
 
-## 为什么 `estimated_1rm` 只是近似值
-`exercise-progress` 接口中的 `estimated_1rm_kg` 使用的是 Epley 公式：
+## Why `estimated_1rm` Is Only An Approximation
+The current progress signal uses the Epley formula:
 
 `estimated_1rm_kg = weight_kg * (1 + reps / 30)`
 
-这个值被明确视为“近似训练信号”，而不是处方、也不是保证准确的真实 one-rep max。在面试表述上，可以强调它的作用是帮助比较不同 set 和 session 的训练趋势，而不是给出医学建议或绝对结论。
+In interviews, describe it as an approximate training signal, not a prescription and not a guaranteed true max.
 
-这个边界很重要，因为它体现了产品表达上的克制，也避免高估简单确定性公式的能力。
+## Why The Phase 2 Panels Are Readonly
+The Phase 2 frontend panels are intentionally readonly. The focus is calculation correctness and stable display, not complex analytics UI.
 
-## 为什么 Phase 2 的前端面板是只读的
-Phase 2 中的 summary 和 progress 面板是有意设计成只读的。
+That keeps responsibilities clear:
+- backend owns calculation logic
+- frontend owns readonly rendering and refresh behavior
+- data mutation still happens through workout CRUD
 
-这样做的目的是把这一批工作的重点放在“计算正确性”上，而不是放在更复杂的 UI 分析台能力上。当前前端负责的事情是展示确定性输出、处理 loading 和 empty state，以及在 workout 数据变化后刷新视图，而不是立刻扩展成图表、日期筛选器或推荐系统。
+## Refresh Behavior After Create/Delete
+Current behavior is deliberately simple and explicit.
 
-这种收敛也让架构边界更清晰：
-- 后端负责计算逻辑
-- 前端负责稳定展示只读结果
-- 所有数据变更仍然通过 workout CRUD 发生
+After workout create:
+- workout list refreshes
+- summary refreshes
+- exercise progress refreshes when an exercise is selected
+- recommendation context preview refreshes
 
-## Create/Delete 后的刷新行为
-当前刷新行为是有意保持简单且明确的。
+After workout delete:
+- workout list refreshes
+- summary refreshes
+- exercise progress refreshes when an exercise is selected
+- recommendation context preview refreshes
 
-当 workout 创建成功时：
-- workout 列表会刷新
-- training summary 会刷新
-- 如果当前选中了某个动作，exercise progress 面板也会刷新
+## Recommendation Context Builder
+Recommendation Context Builder is the key Phase 2.1 story. It is not an AI recommendation feature. It is a deterministic backend context package builder for future Tool Calling or LLM explanation.
 
-当 workout 删除成功时：
-- workout 列表会更新
-- training summary 会刷新
-- 如果当前选中了某个动作，exercise progress 面板也会刷新
+A clean interview framing is:
+- raw workout logs answer whether we have real data
+- calculation endpoints answer whether we can deterministically compute the right numbers
+- recommendation context answers whether we can assemble the right backend context before any AI explanation
+- future LLM explanation should consume that context package instead of querying tables directly
 
-这一点也是不错的面试切入点，因为它说明 UI 已经能对数据变更做出响应，但还没有引入更复杂的状态管理或路由体系。
+## Why This Still Comes Before AI Chat
+If recommendation context does not exist first, then a future LLM would need to decide which tables to read, what to aggregate, which workouts matter, and how to interpret the range boundaries.
 
-## 当前明确的非目标
-当前项目范围明确不包含：
+That makes the system harder to test, harder to audit, and more likely to hallucinate. Phase 2.1 removes that ambiguity before any model layer is introduced.
+
+## Raw Logs vs Calculation Endpoints vs Recommendation Context vs Future LLM
+- raw logs: original `workouts` and `sets` facts
+- calculation endpoints: deterministic answers to one focused question
+- recommendation context: one structured package combining multiple deterministic outputs for future AI consumption
+- future LLM explanation: language-layer interpretation on top of that package, not a replacement for the deterministic layer
+
+## 30-Second Chinese Pitch For Phase 2.1
+��Phase 2.1 �����Ĳ��� AI �Ƽ����ɣ����� Recommendation Context Builder����������һ����� API����ĳ�����ڷ�Χ�ڵ���ѵ�������ص㶯����չ����� workout ժҪ��evidence �� calculation rules ��װ��һ���ṹ�� context package������ȷ���Եģ����� LLM�������ɽ��飬��ҪĿ����Ϊδ�� Tool Calling �� AI �����ṩһ���Ѿ������á�����֤���ɻ��ݵĺ�������ġ���
+
+## Deep-Dive Q&A
+
+### Why not let the LLM query all tables directly?
+Because that mixes data access, aggregation logic, calculation rules, and language generation into one place. It becomes harder to test, harder to audit, and more likely to leak across user boundaries or hallucinate.
+
+### Why build context before Tool Calling?
+Because the first question is not ��can the model call tools?�� The first question is ��what exact backend context should exist before the model says anything?�� Recommendation Context Builder locks that down first.
+
+### What does context include?
+Right now it includes:
+- summary
+- focus_exercises
+- recent_workouts
+- evidence
+
+### How does this reduce hallucination?
+Because the future model receives a prepared deterministic package instead of messy raw tables. The numbers, evidence ids, and calculation rules are already assembled on the backend.
+
+### What is still not implemented?
+Still intentionally not implemented:
 - AI chat
 - Tool Calling
 - SSE
-- RAG
-- MCP
-- Agent 编排
-- 图表或报告
-- 教练式推荐
+- recommendation generation
+- charts or reports
+- RAG, MCP, or agent orchestration
 
-这些不是“还没来得及做”的遗漏，而是有意设置的边界，用来保护当前确定性计算层的聚焦度。
+## Recommended Interview Summary
+A concise version is:
 
-## 面试问答
-
-### 和普通 workout tracker 的区别是什么？
-普通 workout tracker 往往停留在“保存日志”和“展示历史记录”这一步。FitMind AI 想再往前走一步：在拥有训练日志的基础上，增加确定性计算层和 evidence 模型，让未来的建议能够绑定到具体 workout 和 set。它的差异点不是“它有 AI”，而是“它能在自有数据之上产出可追溯的训练智能”。
-
-### 为什么不把计算都放到前端？
-这些计算逻辑放在后端，是因为它们属于产品合同，而不仅仅是展示逻辑。服务端计算可以保证一致性，让用户隔离更靠近数据层执行，避免不同客户端重复实现逻辑，也能让未来 AI 层或其他客户端复用同一套确定性结果。
-
-### 为什么不直接让 LLM 总结训练日志？
-LLM 未来当然可以有帮助，但它不应该成为算术和过滤逻辑的第一来源。如果直接让模型总结原始训练日志，就会更难验证准确性、更难做回归测试，也更难解释结论是如何得出的。当前设计中，LLM 是未来的解释层，而不是确定性计算层的替代品。
-
-### 未来的 Tool Calling 计划是什么？
-长期方向是让未来 AI 功能可以调用稳定的确定性接口，或者调用等价的计算服务作为工具。这样模型就可以在有 evidence 支撑的情况下解释和组织训练洞察。需要强调的是，这只是未来方向，不属于当前已交付范围。
-
-### 用户隔离是如何保证的？
-用户隔离依赖认证后的后端上下文。计算接口不会让客户端传入 `user_id`。auth middleware 会先解析出用户身份，repository 查询在聚合前按这个已认证用户过滤 workouts，从而降低跨用户数据泄露的风险，并把访问控制牢牢放在服务端。
-
-## 当前交付状态说明
-从文档与实现范围来看，Phase 2.0 已完成：
-- 训练日志 CRUD
-- training summary API
-- exercise progress API
-- 只读 training summary UI
-- 只读 exercise progress UI
-- calculation-layer 文档
-
-但这里需要刻意避免一个过度声明：当前文档并没有确认浏览器手工 smoke closeout 已经通过。现有项目记录证明了 API 和本地环境层面的验证已经完成，但并没有明确确认 Phase 2.0.1 的完整浏览器路径清单已经成功跑完。
-
-所以在面试里，最稳妥的表达是：
-- 确定性计算层实现已完成
-- 已完成自动化和 HTTP 风格的验证
-- 浏览器完整 closeout 只能在进度文档明确记录后再宣称通过
-
-## 推荐的面试总结说法
-如果被要求一句话概括项目，可以这样说：
-
-“FitMind AI 正在被构建为一个训练日志系统，并在其下方先建立一层确定性计算能力，再为未来 AI 功能提供基础。Phase 1 完成了带认证的 workout CRUD，使产品拥有真实用户训练数据；Phase 2 增加了范围总结和单动作进展两个后端计算接口，以及会在 create/delete 后刷新的只读前端面板。这个项目最重要的设计点是：未来任何建议都应该建立在 workout ids、set ids 和 calculation rules 这样的 evidence 之上，而不是从一个不可追溯的聊天体验开始。”
+��FitMind AI is being built as a training log system with a deterministic calculation layer underneath it, before any future AI explanation is added. Phase 1 established authenticated workout CRUD so the product owns real user training data. Phase 2 added deterministic summary and exercise-progress endpoints plus readonly UI. Phase 2.1 then added a Recommendation Context Builder endpoint that packages summary, focus exercise progress, recent workouts, and evidence into one structured deterministic backend context. The most important design point is that any future recommendation should sit on top of workout ids, set ids, and calculation rules, not on top of an untraceable chat experience.��

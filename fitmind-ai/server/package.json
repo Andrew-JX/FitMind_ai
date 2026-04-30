@@ -7,6 +7,7 @@
     "db:migrate": "node-pg-migrate -m ./migrations -t pgmigrations up",
     "db:migrate:down": "node-pg-migrate -m ./migrations -t pgmigrations down",
     "dev": "tsx watch src/server.ts",
+    "smoke:recommendation-context": "tsx scripts/recommendation-context-api-smoke.ts",
     "type-check": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src pgmigrate.config.cjs",
     "test": "cd .. && vitest run"

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { AuthScreen } from "./features/auth/AuthScreen";
 import { ExercisePicker } from "./features/training/ExercisePicker";
 import { ExerciseProgressPanel } from "./features/training/ExerciseProgressPanel";
+import { RecommendationContextPanel } from "./features/training/RecommendationContextPanel";
 import { TrainingSummaryPanel } from "./features/training/TrainingSummaryPanel";
 import { WorkoutForm } from "./features/training/WorkoutForm";
 import { WorkoutsPanel } from "./features/training/WorkoutsPanel";
@@ -46,6 +47,8 @@ export function App() {
     string | null
   >(null);
   const [progressRefreshSignal, setProgressRefreshSignal] = useState(0);
+  const [recommendationContextRefreshSignal, setRecommendationContextRefreshSignal] =
+    useState(0);
 
   useEffect(() => {
     if (!import.meta.env.DEV) {
@@ -93,6 +96,10 @@ export function App() {
             Use the tools below to search exercises, save workouts, review your recent
             log, and inspect a deterministic 30-day training summary.
           </p>
+          <RecommendationContextPanel
+            refreshSignal={recommendationContextRefreshSignal}
+            token={auth.token}
+          />
           <TrainingSummaryPanel
             errorMessage={trainingSummary.errorMessage}
             isLoading={trainingSummary.isLoading}
@@ -121,6 +128,9 @@ export function App() {
                 workouts.refreshWorkouts(),
                 trainingSummary.refresh(),
               ]);
+              setRecommendationContextRefreshSignal(
+                (currentValue) => currentValue + 1,
+              );
 
               if (selectedProgressExerciseId !== null) {
                 setProgressRefreshSignal((currentValue) => currentValue + 1);
@@ -166,6 +176,7 @@ export function App() {
 
     if (wasDeleted) {
       await trainingSummary.refresh();
+      setRecommendationContextRefreshSignal((currentValue) => currentValue + 1);
 
       if (selectedProgressExerciseId !== null) {
         setProgressRefreshSignal((currentValue) => currentValue + 1);

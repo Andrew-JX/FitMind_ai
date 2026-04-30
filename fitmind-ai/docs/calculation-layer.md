@@ -116,3 +116,40 @@ Explicit non-goals for this phase:
 - introducing complex routing
 - introducing a large UI library
 - sharing these DTOs through broader cross-package type expansion when the file-cap constraint would be violated
+
+## `GET /api/training/recommendation-context`
+Returns an authenticated user's deterministic recommendation context package for one readonly date range.
+
+Primary response groups:
+- `range`
+- `summary`
+- `focus_exercises`
+- `recent_workouts`
+- `evidence`
+
+Evidence returned today:
+- `evidence.source`
+- `evidence.workout_ids`
+- `evidence.set_ids`
+- `evidence.calculation_rules`
+
+This endpoint aggregates:
+- summary totals from the existing training summary calculation
+- focus exercise progress from the existing exercise-progress calculation
+- the latest recent workouts in range
+- evidence ids and calculation rules that explain what was included
+
+This endpoint is intentionally deterministic:
+- it does not call an LLM
+- it does not generate coaching recommendations
+- it is designed as a future Tool Calling context package
+- it keeps user isolation and date range filtering identical to the existing calculation endpoints
+- `evidence.source` is always `deterministic_calculation_layer`
+
+The current assembly rules are:
+- `summary` reuses the existing summary output and reshapes it into the context package
+- `focus_exercises` uses the top 3 rows from `summary.by_exercise` based on the current summary ordering by `total_volume DESC`
+- each focus exercise reuses the existing exercise-progress totals, max weight, and estimated 1RM
+- `recent_workouts` returns the latest 5 workouts in range ordered by `performed_at DESC, workout_id DESC`
+- `evidence.workout_ids` and `evidence.set_ids` are unions of the included deterministic evidence
+- empty ranges still return a valid zero/empty context package rather than an error

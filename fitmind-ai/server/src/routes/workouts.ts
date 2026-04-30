@@ -6,6 +6,7 @@ import {
   deleteSetController,
   deleteWorkoutController,
   getExerciseProgressController,
+  getRecommendationContextController,
   getWorkoutController,
   getTrainingSummaryController,
   listWorkoutsController,
@@ -20,6 +21,10 @@ workoutsRouter.use(authMiddleware);
 
 workoutsRouter.get("/workouts", listWorkoutsController);
 workoutsRouter.get("/training/exercise-progress", getExerciseProgressController);
+workoutsRouter.get(
+  "/training/recommendation-context",
+  getRecommendationContextController,
+);
 workoutsRouter.get("/training/summary", getTrainingSummaryController);
 workoutsRouter.get("/workouts/:id", getWorkoutController);
 workoutsRouter.post("/workouts", createWorkoutController);

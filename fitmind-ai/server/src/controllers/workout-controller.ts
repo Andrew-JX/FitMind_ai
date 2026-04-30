@@ -19,6 +19,7 @@ import {
   updateUserWorkoutSet,
 } from "../services/training/workout-service.js";
 import { getUserExerciseProgress } from "../services/training/exercise-progress-service.js";
+import { getUserRecommendationContext } from "../services/training/recommendation-context-service.js";
 import { getUserTrainingSummary } from "../services/training/training-summary-service.js";
 import { createSuccessResponse } from "../utils/api-response.js";
 
@@ -145,6 +146,27 @@ export async function getExerciseProgressController(
       end_date: query.end_date,
     },
   );
+
+  return res.status(200).json(createSuccessResponse(result));
+}
+
+/**
+ * Return a deterministic recommendation context package for the authenticated user.
+ *
+ * @param req - Express request with date range query params.
+ * @param res - Express response with authenticated locals.
+ * @returns JSON recommendation context response.
+ */
+export async function getRecommendationContextController(
+  req: Request,
+  res: Response<unknown, AuthLocals>,
+) {
+  const query = trainingDateRangeSchema.parse({
+    start_date:
+      typeof req.query.start_date === "string" ? req.query.start_date : "",
+    end_date: typeof req.query.end_date === "string" ? req.query.end_date : "",
+  });
+  const result = await getUserRecommendationContext(res.locals.userId, query);
 
   return res.status(200).json(createSuccessResponse(result));
 }
