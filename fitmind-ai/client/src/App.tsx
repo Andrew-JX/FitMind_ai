@@ -1,7 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { AuthScreen } from "./features/auth/AuthScreen";
 import { ExercisePicker } from "./features/training/ExercisePicker";
+import { ExerciseProgressPanel } from "./features/training/ExerciseProgressPanel";
+import { TrainingSummaryPanel } from "./features/training/TrainingSummaryPanel";
 import { WorkoutForm } from "./features/training/WorkoutForm";
 import { WorkoutsPanel } from "./features/training/WorkoutsPanel";
 import {
@@ -13,6 +15,7 @@ import {
   useAuth,
 } from "./features/auth/use-auth";
 import { useExerciseSearch } from "./features/training/use-exercise-search";
+import { useTrainingSummary } from "./features/training/use-training-summary";
 import { useWorkouts } from "./features/training/use-workouts";
 
 declare global {
@@ -34,9 +37,21 @@ declare global {
 export function App() {
   const auth = useAuth();
   const exerciseSearch = useExerciseSearch();
+  const trainingSummary = useTrainingSummary(auth.token);
   const workouts = useWorkouts(auth.token);
+  const [selectedProgressExerciseId, setSelectedProgressExerciseId] = useState<
+    string | null
+  >(null);
+  const [selectedProgressExerciseName, setSelectedProgressExerciseName] = useState<
+    string | null
+  >(null);
+  const [progressRefreshSignal, setProgressRefreshSignal] = useState(0);
 
   useEffect(() => {
+    if (!import.meta.env.DEV) {
+      return;
+    }
+
     window.fitmindAuthDebug = {
       clearAuth,
       login: (email, password) => login({ email, password }),
@@ -58,7 +73,7 @@ export function App() {
   return (
     <main>
       <h1>FitMind AI</h1>
-      <p>Phase 1.3 auth entry MVP is in progress.</p>
+      <p>Workout logging MVP for real training data entry.</p>
       <p>Auth status: {auth.status}</p>
       <p>
         Token storage: in-memory only. Refreshing the page clears the current session by
@@ -70,10 +85,28 @@ export function App() {
             Active user: {auth.user.email}
             {auth.user.display_name ? ` (${auth.user.display_name})` : ""}
           </p>
+          {auth.errorMessage ? <p>Error: {auth.errorMessage}</p> : null}
           <button type="button" onClick={auth.clearAuth}>
             Clear in-memory session
           </button>
-          <p>Workout form and list/detail UI will be added in later batches.</p>
+          <p>
+            Use the tools below to search exercises, save workouts, review your recent
+            log, and inspect a deterministic 30-day training summary.
+          </p>
+          <TrainingSummaryPanel
+            errorMessage={trainingSummary.errorMessage}
+            isLoading={trainingSummary.isLoading}
+            onExerciseSelect={handleExerciseSelect}
+            onRefresh={trainingSummary.refresh}
+            selectedExerciseId={selectedProgressExerciseId}
+            summary={trainingSummary.summary}
+          />
+          <ExerciseProgressPanel
+            refreshSignal={progressRefreshSignal}
+            selectedExerciseId={selectedProgressExerciseId}
+            selectedExerciseName={selectedProgressExerciseName}
+            token={auth.token}
+          />
           <ExercisePicker
             exercises={exerciseSearch.exercises}
             isLoadingExercises={exerciseSearch.isLoadingExercises}
@@ -84,15 +117,25 @@ export function App() {
           />
           <WorkoutForm
             onCreated={async () => {
-              await workouts.refreshWorkouts();
+              await Promise.all([
+                workouts.refreshWorkouts(),
+                trainingSummary.refresh(),
+              ]);
+
+              if (selectedProgressExerciseId !== null) {
+                setProgressRefreshSignal((currentValue) => currentValue + 1);
+              }
             }}
             token={auth.token}
           />
           <WorkoutsPanel
+            deleteError={workouts.deleteError}
+            deletingWorkoutId={workouts.deletingWorkoutId}
             detailError={workouts.detailError}
             isLoadingDetail={workouts.isLoadingDetail}
             isLoadingList={workouts.isLoadingList}
             listError={workouts.listError}
+            onDeleteWorkout={handleDeleteWorkout}
             onRefresh={workouts.refreshWorkouts}
             onSelectWorkout={workouts.selectWorkout}
             selectedWorkout={workouts.selectedWorkout}
@@ -108,11 +151,35 @@ export function App() {
           status={auth.status}
         />
       )}
-      <p>
-        Debug helpers are available in the browser console as
-        <code> window.fitmindAuthDebug </code>
-        for manual auth checks.
-      </p>
+      {import.meta.env.DEV ? (
+        <p>
+          Debug helpers remain available in the browser console as
+          <code> window.fitmindAuthDebug </code>
+          for local auth checks.
+        </p>
+      ) : null}
     </main>
   );
+
+  async function handleDeleteWorkout(workoutId: string): Promise<boolean> {
+    const wasDeleted = await workouts.deleteWorkoutById(workoutId);
+
+    if (wasDeleted) {
+      await trainingSummary.refresh();
+
+      if (selectedProgressExerciseId !== null) {
+        setProgressRefreshSignal((currentValue) => currentValue + 1);
+      }
+    }
+
+    return wasDeleted;
+  }
+
+  function handleExerciseSelect(
+    exerciseId: string,
+    exerciseName: string,
+  ): void {
+    setSelectedProgressExerciseId(exerciseId);
+    setSelectedProgressExerciseName(exerciseName);
+  }
 }

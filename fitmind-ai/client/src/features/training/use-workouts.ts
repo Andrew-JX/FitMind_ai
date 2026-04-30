@@ -3,10 +3,17 @@ import { useEffect, useEffectEvent, useState } from "react";
 import type { WorkoutDetailDto, WorkoutSummaryDto } from "../../../../shared/src/training";
 
 import { HttpClientError } from "../../services/http-client";
-import { getWorkoutDetail, listWorkouts } from "./workout-api";
+import {
+  deleteWorkout,
+  getWorkoutDetail,
+  listWorkouts,
+} from "./workout-api";
 
 export interface UseWorkoutsResult {
+  deleteError: string | null;
+  deleteWorkoutById: (workoutId: string) => Promise<boolean>;
   detailError: string | null;
+  deletingWorkoutId: string | null;
   isLoadingDetail: boolean;
   isLoadingList: boolean;
   listError: string | null;
@@ -31,6 +38,8 @@ export function useWorkouts(token: string | null): UseWorkoutsResult {
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deletingWorkoutId, setDeletingWorkoutId] = useState<string | null>(null);
 
   const refreshWorkoutsOnTokenChange = useEffectEvent(async () => {
     await refreshWorkouts();
@@ -43,6 +52,8 @@ export function useWorkouts(token: string | null): UseWorkoutsResult {
       setSelectedWorkout(null);
       setListError(null);
       setDetailError(null);
+      setDeleteError(null);
+      setDeletingWorkoutId(null);
       setIsLoadingList(false);
       setIsLoadingDetail(false);
       return;
@@ -59,6 +70,7 @@ export function useWorkouts(token: string | null): UseWorkoutsResult {
 
     setIsLoadingList(true);
     setListError(null);
+    setDeleteError(null);
 
     try {
       const items = await listWorkouts(token);
@@ -101,8 +113,41 @@ export function useWorkouts(token: string | null): UseWorkoutsResult {
     }
   }
 
+  async function deleteWorkoutById(workoutId: string): Promise<boolean> {
+    if (!token) {
+      setDeleteError("You must be signed in to delete workouts.");
+      return false;
+    }
+
+    setDeletingWorkoutId(workoutId);
+    setDeleteError(null);
+
+    try {
+      await deleteWorkout(token, workoutId);
+      setWorkouts((currentWorkouts) => {
+        return currentWorkouts.filter((workout) => workout.id !== workoutId);
+      });
+
+      if (selectedWorkoutId === workoutId) {
+        setSelectedWorkoutId(null);
+        setSelectedWorkout(null);
+        setDetailError(null);
+      }
+
+      return true;
+    } catch (error) {
+      setDeleteError(getReadableErrorMessage(error, "Workout deletion is unavailable right now."));
+      return false;
+    } finally {
+      setDeletingWorkoutId(null);
+    }
+  }
+
   return {
+    deleteError,
+    deleteWorkoutById,
     detailError,
+    deletingWorkoutId,
     isLoadingDetail,
     isLoadingList,
     listError,

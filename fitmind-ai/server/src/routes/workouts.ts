@@ -5,7 +5,9 @@ import {
   createWorkoutController,
   deleteSetController,
   deleteWorkoutController,
+  getExerciseProgressController,
   getWorkoutController,
+  getTrainingSummaryController,
   listWorkoutsController,
   updateSetController,
   updateWorkoutController,
@@ -17,6 +19,8 @@ export const workoutsRouter = Router();
 workoutsRouter.use(authMiddleware);
 
 workoutsRouter.get("/workouts", listWorkoutsController);
+workoutsRouter.get("/training/exercise-progress", getExerciseProgressController);
+workoutsRouter.get("/training/summary", getTrainingSummaryController);
 workoutsRouter.get("/workouts/:id", getWorkoutController);
 workoutsRouter.post("/workouts", createWorkoutController);
 workoutsRouter.patch("/workouts/:id", updateWorkoutController);

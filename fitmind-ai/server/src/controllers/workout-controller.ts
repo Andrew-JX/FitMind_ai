@@ -18,6 +18,8 @@ import {
   updateUserWorkout,
   updateUserWorkoutSet,
 } from "../services/training/workout-service.js";
+import { getUserExerciseProgress } from "../services/training/exercise-progress-service.js";
+import { getUserTrainingSummary } from "../services/training/training-summary-service.js";
 import { createSuccessResponse } from "../utils/api-response.js";
 
 type AuthLocals = {
@@ -26,6 +28,47 @@ type AuthLocals = {
 
 const idParamsSchema = z.object({
   id: z.string().uuid(),
+});
+
+function isValidDateOnly(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const [yearValue, monthValue, dayValue] = value.split("-");
+  const year = Number(yearValue);
+  const month = Number(monthValue);
+  const day = Number(dayValue);
+  const parsedDate = new Date(Date.UTC(year, month - 1, day));
+
+  return (
+    parsedDate.getUTCFullYear() === year &&
+    parsedDate.getUTCMonth() === month - 1 &&
+    parsedDate.getUTCDate() === day
+  );
+}
+
+const trainingDateRangeSchema = z
+  .object({
+    start_date: z
+      .string()
+      .refine(isValidDateOnly, "start_date must use YYYY-MM-DD."),
+    end_date: z
+      .string()
+      .refine(isValidDateOnly, "end_date must use YYYY-MM-DD."),
+  })
+  .superRefine((value, ctx) => {
+    if (value.start_date > value.end_date) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["end_date"],
+        message: "end_date must be on or after start_date.",
+      });
+    }
+  });
+
+const exerciseProgressQuerySchema = trainingDateRangeSchema.extend({
+  exercise_id: z.string().uuid(),
 });
 
 function parseIdParams(params: Request["params"]): { id: string } {
@@ -51,6 +94,57 @@ export async function listWorkoutsController(
       typeof req.query.limit === "string" ? req.query.limit : req.query.limit,
   });
   const result = await listUserWorkouts(res.locals.userId, query);
+
+  return res.status(200).json(createSuccessResponse(result));
+}
+
+/**
+ * Return a deterministic training summary for the authenticated user.
+ *
+ * @param req - Express request with date range query params.
+ * @param res - Express response with authenticated locals.
+ * @returns JSON training summary response.
+ */
+export async function getTrainingSummaryController(
+  req: Request,
+  res: Response<unknown, AuthLocals>,
+) {
+  const query = trainingDateRangeSchema.parse({
+    start_date:
+      typeof req.query.start_date === "string" ? req.query.start_date : "",
+    end_date: typeof req.query.end_date === "string" ? req.query.end_date : "",
+  });
+  const result = await getUserTrainingSummary(res.locals.userId, query);
+
+  return res.status(200).json(createSuccessResponse(result));
+}
+
+/**
+ * Return deterministic exercise progress for the authenticated user.
+ *
+ * @param req - Express request with exercise id and date range query params.
+ * @param res - Express response with authenticated locals.
+ * @returns JSON exercise progress response.
+ */
+export async function getExerciseProgressController(
+  req: Request,
+  res: Response<unknown, AuthLocals>,
+) {
+  const query = exerciseProgressQuerySchema.parse({
+    exercise_id:
+      typeof req.query.exercise_id === "string" ? req.query.exercise_id : "",
+    start_date:
+      typeof req.query.start_date === "string" ? req.query.start_date : "",
+    end_date: typeof req.query.end_date === "string" ? req.query.end_date : "",
+  });
+  const result = await getUserExerciseProgress(
+    res.locals.userId,
+    query.exercise_id,
+    {
+      start_date: query.start_date,
+      end_date: query.end_date,
+    },
+  );
 
   return res.status(200).json(createSuccessResponse(result));
 }

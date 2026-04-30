@@ -27,7 +27,7 @@ export function WorkoutForm(props: WorkoutFormProps) {
   return (
     <section>
       <h2>Create Workout</h2>
-      <p>This is the MVP workout entry form. List and detail screens land next.</p>
+      <p>Log a real workout, validate the inputs, and save it straight into your workout history.</p>
       <form onSubmit={handleSubmit}>
         <label>
           Performed at
@@ -38,6 +38,7 @@ export function WorkoutForm(props: WorkoutFormProps) {
             value={form.performedAt}
           />
         </label>
+        {form.formErrors.performedAt ? <p>{form.formErrors.performedAt}</p> : null}
         <label>
           Duration (minutes)
           <input
@@ -47,6 +48,9 @@ export function WorkoutForm(props: WorkoutFormProps) {
             value={form.workoutDurationMinutes}
           />
         </label>
+        {form.formErrors.workoutDurationMinutes ? (
+          <p>{form.formErrors.workoutDurationMinutes}</p>
+        ) : null}
         <label>
           Notes
           <textarea
@@ -79,6 +83,9 @@ export function WorkoutForm(props: WorkoutFormProps) {
               <div>
                 Selected exercise: {setDraft.exerciseName || "None"}
               </div>
+              {form.formErrors.setDrafts[index]?.exerciseId ? (
+                <p>{form.formErrors.setDrafts[index]?.exerciseId}</p>
+              ) : null}
               {setDraft.exerciseResults.length > 0 ? (
                 <ul>
                   {setDraft.exerciseResults.map((exercise) => {
@@ -105,6 +112,9 @@ export function WorkoutForm(props: WorkoutFormProps) {
                   value={setDraft.reps}
                 />
               </label>
+              {form.formErrors.setDrafts[index]?.reps ? (
+                <p>{form.formErrors.setDrafts[index]?.reps}</p>
+              ) : null}
               <label>
                 Weight (kg)
                 <input
@@ -118,6 +128,9 @@ export function WorkoutForm(props: WorkoutFormProps) {
                   value={setDraft.weightKg}
                 />
               </label>
+              {form.formErrors.setDrafts[index]?.weightKg ? (
+                <p>{form.formErrors.setDrafts[index]?.weightKg}</p>
+              ) : null}
               <label>
                 RPE
                 <input
@@ -129,6 +142,9 @@ export function WorkoutForm(props: WorkoutFormProps) {
                   value={setDraft.rpe}
                 />
               </label>
+              {form.formErrors.setDrafts[index]?.rpe ? (
+                <p>{form.formErrors.setDrafts[index]?.rpe}</p>
+              ) : null}
               <label>
                 Set notes
                 <input
@@ -165,6 +181,7 @@ export function WorkoutForm(props: WorkoutFormProps) {
         </button>
       </form>
       {form.errorMessage ? <p>Error: {form.errorMessage}</p> : null}
+      {form.successMessage ? <p>{form.successMessage}</p> : null}
       {form.createdWorkout ? (
         <section>
           <p>Created workout: {form.createdWorkout.id}</p>

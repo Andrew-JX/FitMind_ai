@@ -26,10 +26,24 @@ export interface WorkoutSetDraft {
   weightKg: string;
 }
 
+export interface WorkoutSetDraftErrors {
+  exerciseId?: string | undefined;
+  reps?: string | undefined;
+  rpe?: string | undefined;
+  weightKg?: string | undefined;
+}
+
+export interface WorkoutFormErrors {
+  performedAt?: string | undefined;
+  setDrafts: WorkoutSetDraftErrors[];
+  workoutDurationMinutes?: string | undefined;
+}
+
 export interface UseWorkoutFormResult {
   addSetDraft: () => void;
   createdWorkout: WorkoutDetailDto | null;
   errorMessage: string | null;
+  formErrors: WorkoutFormErrors;
   isSubmitting: boolean;
   performedAt: string;
   removeSetDraft: (index: number) => void;
@@ -44,6 +58,7 @@ export interface UseWorkoutFormResult {
     value: WorkoutSetDraft[TField],
   ) => void;
   setDrafts: WorkoutSetDraft[];
+  successMessage: string | null;
   submitWorkout: () => Promise<WorkoutDetailDto | null>;
   workoutNotes: string;
   workoutDurationMinutes: string;
@@ -65,11 +80,20 @@ export function useWorkoutForm(token: string | null): UseWorkoutFormResult {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [createdWorkout, setCreatedWorkout] = useState<WorkoutDetailDto | null>(null);
+  const [formErrors, setFormErrors] = useState<WorkoutFormErrors>(createEmptyFormErrors(1));
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   function addSetDraft(): void {
     setSetDrafts((currentDrafts) => {
       return [...currentDrafts, createEmptySetDraft()];
     });
+    setFormErrors((currentErrors) => {
+      return {
+        ...currentErrors,
+        setDrafts: [...currentErrors.setDrafts, {}],
+      };
+    });
+    clearFeedback();
   }
 
   function removeSetDraft(index: number): void {
@@ -80,6 +104,17 @@ export function useWorkoutForm(token: string | null): UseWorkoutFormResult {
 
       return currentDrafts.filter((_, currentIndex) => currentIndex !== index);
     });
+    setFormErrors((currentErrors) => {
+      if (currentErrors.setDrafts.length === 1) {
+        return currentErrors;
+      }
+
+      return {
+        ...currentErrors,
+        setDrafts: currentErrors.setDrafts.filter((_, currentIndex) => currentIndex !== index),
+      };
+    });
+    clearFeedback();
   }
 
   function setSetDraftField<TField extends keyof WorkoutSetDraft>(
@@ -99,6 +134,18 @@ export function useWorkoutForm(token: string | null): UseWorkoutFormResult {
         };
       });
     });
+    setFormErrors((currentErrors) => {
+      const nextErrors = [...currentErrors.setDrafts];
+      const currentSetErrors = nextErrors[index] ?? {};
+
+      nextErrors[index] = clearSetErrorForField(currentSetErrors, field);
+
+      return {
+        ...currentErrors,
+        setDrafts: nextErrors,
+      };
+    });
+    clearFeedback();
   }
 
   async function searchExercisesForSet(index: number): Promise<void> {
@@ -141,6 +188,19 @@ export function useWorkoutForm(token: string | null): UseWorkoutFormResult {
         };
       });
     });
+    setFormErrors((currentErrors) => {
+      const nextErrors = [...currentErrors.setDrafts];
+      nextErrors[index] = {
+        ...nextErrors[index],
+        exerciseId: undefined,
+      };
+
+      return {
+        ...currentErrors,
+        setDrafts: nextErrors,
+      };
+    });
+    clearFeedback();
   }
 
   async function submitWorkout(): Promise<WorkoutDetailDto | null> {
@@ -151,33 +211,40 @@ export function useWorkoutForm(token: string | null): UseWorkoutFormResult {
 
     setErrorMessage(null);
     setCreatedWorkout(null);
+    setSuccessMessage(null);
 
-    let payload: CreateWorkoutRequest;
+    const submission = buildCreateWorkoutRequest({
+      performedAt,
+      setDrafts,
+      workoutDurationMinutes,
+      workoutNotes,
+    });
 
-    try {
-      payload = buildCreateWorkoutRequest({
-        performedAt,
-        setDrafts,
-        workoutDurationMinutes,
-        workoutNotes,
-      });
-    } catch (error) {
-      setErrorMessage(getReadableErrorMessage(error));
+    setFormErrors(submission.errors);
+
+    if (!submission.payload) {
+      setErrorMessage("Please fix the highlighted workout fields and try again.");
       return null;
     }
 
     setIsSubmitting(true);
 
     try {
-      const workout = await createWorkout(token, payload);
+      const workout = await createWorkout(token, submission.payload);
 
       setCreatedWorkout(workout);
       setWorkoutFormToDefaults({
+        setFormErrors,
         setDurationMinutes,
         setNotes,
         setPerformedAt,
         setSetDrafts,
       });
+      setSuccessMessage(
+        `Saved workout with ${workout.sets.length} set${
+          workout.sets.length === 1 ? "" : "s"
+        }. The workout log has been refreshed.`,
+      );
       return workout;
     } catch (error) {
       setErrorMessage(getReadableErrorMessage(error));
@@ -191,6 +258,7 @@ export function useWorkoutForm(token: string | null): UseWorkoutFormResult {
     addSetDraft,
     createdWorkout,
     errorMessage,
+    formErrors,
     isSubmitting,
     performedAt,
     removeSetDraft,
@@ -201,10 +269,16 @@ export function useWorkoutForm(token: string | null): UseWorkoutFormResult {
     setPerformedAt,
     setSetDraftField,
     setDrafts,
+    successMessage,
     submitWorkout,
     workoutNotes,
     workoutDurationMinutes,
   };
+
+  function clearFeedback(): void {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+  }
 }
 
 function createEmptySetDraft(): WorkoutSetDraft {
@@ -223,6 +297,7 @@ function createEmptySetDraft(): WorkoutSetDraft {
 }
 
 function setWorkoutFormToDefaults(input: {
+  setFormErrors: (value: WorkoutFormErrors) => void;
   setDurationMinutes: (value: string) => void;
   setNotes: (value: string) => void;
   setPerformedAt: (value: string) => void;
@@ -232,6 +307,7 @@ function setWorkoutFormToDefaults(input: {
   input.setDurationMinutes("");
   input.setNotes("");
   input.setSetDrafts([createEmptySetDraft()]);
+  input.setFormErrors(createEmptyFormErrors(1));
 }
 
 function buildCreateWorkoutRequest(input: {
@@ -239,35 +315,93 @@ function buildCreateWorkoutRequest(input: {
   setDrafts: WorkoutSetDraft[];
   workoutDurationMinutes: string;
   workoutNotes: string;
-}): CreateWorkoutRequest {
+}): {
+  errors: WorkoutFormErrors;
+  payload: CreateWorkoutRequest | null;
+} {
+  const errors = createEmptyFormErrors(input.setDrafts.length);
+
   if (!input.performedAt) {
-    throw new Error("Workout date and time are required.");
+    errors.performedAt = "Workout date and time are required.";
+  }
+
+  const performedAtDate = new Date(input.performedAt);
+
+  if (!input.performedAt || Number.isNaN(performedAtDate.getTime())) {
+    errors.performedAt = "Workout date and time must be valid.";
   }
 
   const preparedSets = input.setDrafts.map((draft, index) => {
     if (!draft.exerciseId) {
-      throw new Error(`Set ${index + 1} is missing an exercise selection.`);
+      errors.setDrafts[index] = {
+        ...errors.setDrafts[index],
+        exerciseId: `Set ${index + 1} needs an exercise selection.`,
+      };
     }
 
     return {
       exercise_id: draft.exerciseId,
       is_warmup: draft.isWarmup,
       notes: draft.notes.trim() || undefined,
-      reps: parseIntegerField(draft.reps, `Set ${index + 1} reps`),
-      rpe: draft.rpe.trim() ? parseNumberField(draft.rpe, `Set ${index + 1} RPE`) : undefined,
-      weight_kg: parseNumberField(draft.weightKg, `Set ${index + 1} weight`),
+      reps: parseIntegerField(draft.reps, `Set ${index + 1} reps`, {
+        min: 0,
+        onError: (message) => {
+          errors.setDrafts[index] = {
+            ...errors.setDrafts[index],
+            reps: message,
+          };
+        },
+      }),
+      rpe: draft.rpe.trim()
+        ? parseNumberField(draft.rpe, `Set ${index + 1} RPE`, {
+            max: 10,
+            min: 1,
+            onError: (message) => {
+              errors.setDrafts[index] = {
+                ...errors.setDrafts[index],
+                rpe: message,
+              };
+            },
+          })
+        : undefined,
+      weight_kg: parseNumberField(draft.weightKg, `Set ${index + 1} weight`, {
+        min: 0,
+        onError: (message) => {
+          errors.setDrafts[index] = {
+            ...errors.setDrafts[index],
+            weightKg: message,
+          };
+        },
+      }),
     };
   });
+
+  const durationMinutes = input.workoutDurationMinutes.trim()
+    ? parseIntegerField(input.workoutDurationMinutes, "Workout duration", {
+        min: 0,
+        onError: (message) => {
+          errors.workoutDurationMinutes = message;
+        },
+      })
+    : undefined;
+
+  if (hasWorkoutFormErrors(errors)) {
+    return {
+      errors,
+      payload: null,
+    };
+  }
 
   const sets = assignSetIndexes(preparedSets);
 
   return {
-    duration_minutes: input.workoutDurationMinutes.trim()
-      ? parseIntegerField(input.workoutDurationMinutes, "Workout duration")
-      : undefined,
-    notes: input.workoutNotes.trim() || undefined,
-    performed_at: new Date(input.performedAt).toISOString(),
-    sets,
+    errors,
+    payload: {
+      duration_minutes: durationMinutes,
+      notes: input.workoutNotes.trim() || undefined,
+      performed_at: performedAtDate.toISOString(),
+      sets,
+    },
   };
 }
 
@@ -287,24 +421,113 @@ function assignSetIndexes(
   });
 }
 
-function parseIntegerField(value: string, label: string): number {
+function parseIntegerField(
+  value: string,
+  label: string,
+  options: {
+    min?: number | undefined;
+    onError: (message: string) => void;
+  },
+): number {
   const parsed = Number.parseInt(value, 10);
 
   if (Number.isNaN(parsed)) {
-    throw new Error(`${label} must be a valid integer.`);
+    options.onError(`${label} must be a valid integer.`);
+    return 0;
+  }
+
+  if (options.min !== undefined && parsed < options.min) {
+    options.onError(`${label} must be at least ${options.min}.`);
+    return parsed;
   }
 
   return parsed;
 }
 
-function parseNumberField(value: string, label: string): number {
+function parseNumberField(
+  value: string,
+  label: string,
+  options: {
+    max?: number | undefined;
+    min?: number | undefined;
+    onError: (message: string) => void;
+  },
+): number {
   const parsed = Number.parseFloat(value);
 
   if (Number.isNaN(parsed)) {
-    throw new Error(`${label} must be a valid number.`);
+    options.onError(`${label} must be a valid number.`);
+    return 0;
+  }
+
+  if (options.min !== undefined && parsed < options.min) {
+    options.onError(`${label} must be at least ${options.min}.`);
+    return parsed;
+  }
+
+  if (options.max !== undefined && parsed > options.max) {
+    options.onError(`${label} must be no more than ${options.max}.`);
   }
 
   return parsed;
+}
+
+function createEmptyFormErrors(setCount: number): WorkoutFormErrors {
+  return {
+    setDrafts: Array.from({ length: setCount }, () => {
+      return {};
+    }),
+  };
+}
+
+function hasWorkoutFormErrors(errors: WorkoutFormErrors): boolean {
+  if (errors.performedAt || errors.workoutDurationMinutes) {
+    return true;
+  }
+
+  return errors.setDrafts.some((setErrors) => {
+    return Boolean(
+      setErrors.exerciseId ||
+        setErrors.reps ||
+        setErrors.rpe ||
+        setErrors.weightKg,
+    );
+  });
+}
+
+function clearSetErrorForField(
+  errors: WorkoutSetDraftErrors,
+  field: keyof WorkoutSetDraft,
+): WorkoutSetDraftErrors {
+  if (field === "exerciseId" || field === "exerciseName" || field === "exerciseQuery") {
+    return {
+      ...errors,
+      exerciseId: undefined,
+    };
+  }
+
+  if (field === "reps") {
+    return {
+      ...errors,
+      reps: undefined,
+    };
+  }
+
+  if (field === "rpe") {
+    return {
+      ...errors,
+      rpe: undefined,
+    };
+  }
+
+  if (field === "weightKg") {
+    return {
+      ...errors,
+      weightKg: undefined,
+    };
+  }
+
+  return errors;
 }
 
 function getReadableErrorMessage(error: unknown): string {

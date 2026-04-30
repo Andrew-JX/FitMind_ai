@@ -1,5 +1,6 @@
 import type {
   CreateWorkoutRequest,
+  DeleteEntityResponseData,
   WorkoutDetailDto,
   WorkoutDetailResponseData,
   WorkoutListResponseData,
@@ -65,4 +66,21 @@ export async function getWorkoutDetail(
   );
 
   return response.workout;
+}
+
+/**
+ * Deletes a single workout owned by the authenticated user.
+ *
+ * @param token - In-memory auth token
+ * @param workoutId - Workout identifier
+ * @returns The deleted entity response payload
+ */
+export async function deleteWorkout(
+  token: string,
+  workoutId: string,
+): Promise<DeleteEntityResponseData> {
+  return requestJson<DeleteEntityResponseData>(`/api/workouts/${workoutId}`, {
+    method: "DELETE",
+    token,
+  });
 }
