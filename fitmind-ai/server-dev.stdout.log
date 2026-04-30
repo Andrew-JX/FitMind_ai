@@ -5,4 +5,4 @@ FitMind server listening on port 3001
 cFitMind server listening on port 3001
 12:50:30 [tsx] change in ./src\services\training\workout-service.ts Rerunning...
 c1212:50:41 [tsx] change in ./src\services\training\workout-service.ts Rerunning..cFitMind server listening on port 3001
-1212:50:48 [tsx] change in ./src\services\training\workout-service.ts Restarting.cFitFitMind server listening on port 3001
+1212:50:48 [tsx] change in ./src\services\training\workout-service.ts Restarting.cFitFitMind server listening on port 3018:18:50:39 [tsx] change in ./src\env.ts Rerunning..cFiFitMind server listening on port 3000

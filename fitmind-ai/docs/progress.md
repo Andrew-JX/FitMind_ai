@@ -924,3 +924,164 @@
 ### Phase 1.2 收口结论
 - Workout CRUD backend 的格式、测试、类型检查和真实 HTTP smoke 已全部收口。
 - 本次未进入 Phase 1.3，未写前端，未做新功能，未修改 schema。
+## 2026-04-30 Phase 1.3 - Client Auth + Workout UI MVP Batch 1
+
+### Completed work
+- Added a shared `client` HTTP helper that uses `VITE_API_BASE_URL ?? ""`, sends JSON requests, injects an optional Bearer token, and maps API/network failures to readable client errors.
+- Added `client/src/features/auth/use-auth.ts` as the Batch 1 auth skeleton: in-memory token only, no persistence, minimal auth state, and `/api/auth/me` token validation.
+- Updated the Phase 0 placeholder app into a minimal auth shell that shows current auth status and explicitly states that login/workout UI are still out of scope.
+- Updated the Vite dev server config so local `/api` requests proxy to `http://localhost:3000`, avoiding browser CORS issues during development.
+
+### Changed files
+- `client/vite.config.ts`
+- `client/src/services/http-client.ts`
+- `client/src/features/auth/use-auth.ts`
+- `client/src/App.tsx`
+- `docs/progress.md`
+
+### Validation commands
+- `pnpm --filter @fitmind/client type-check`
+- `pnpm lint`
+
+### Locked constraints
+- Token storage is memory-only for MVP Batch 1.
+- Refreshing the page clears auth state by design.
+- This batch does not add `auth-api.ts`, auth forms, workout UI, or any AI-related features.
+## 2026-04-30 Phase 1.3 - Client Auth + Workout UI MVP Batch 2
+
+### Completed work
+- Added `client/src/features/auth/auth-api.ts` to isolate auth-domain API calls for register, login, and current-user lookup on top of the shared HTTP client.
+- Upgraded `client/src/features/auth/use-auth.ts` from a validation skeleton into the active auth state manager for register/login/me flows while keeping token storage memory-only.
+- Added a minimal `AuthScreen` that supports register and login without introducing broader routing or workout UI.
+- Updated `client/src/App.tsx` so anonymous/error/authenticating users see the auth screen and authenticated users see a minimal signed-in shell.
+
+### Changed files
+- `client/src/features/auth/auth-api.ts`
+- `client/src/features/auth/use-auth.ts`
+- `client/src/features/auth/AuthScreen.tsx`
+- `client/src/App.tsx`
+- `docs/progress.md`
+
+### Validation commands
+- `pnpm --filter @fitmind/client type-check`
+- `pnpm lint`
+
+### Locked constraints
+- Token storage remains memory-only.
+- Page refresh still clears auth state by design.
+- This batch does not add workout form, workout list/detail, or AI-related UI.
+## 2026-04-30 Phase 1.3 - Client Auth + Workout UI MVP Batch 3
+
+### Completed work
+- Added a training dictionary API layer for `/api/muscle-groups` and `/api/exercises`.
+- Added a client hook that loads muscle groups and runs authenticated exercise searches with loading and error state.
+- Added a minimal `ExercisePicker` UI so signed-in users can search the action dictionary before workout creation is implemented.
+- Updated the authenticated shell in `App.tsx` to expose the dictionary search flow as the next usable training entry point.
+
+### Changed files
+- `client/src/features/training/dictionary-api.ts`
+- `client/src/features/training/use-exercise-search.ts`
+- `client/src/features/training/ExercisePicker.tsx`
+- `client/src/App.tsx`
+- `docs/progress.md`
+
+### Validation commands
+- `pnpm --filter @fitmind/client type-check`
+- `pnpm lint`
+
+### Locked constraints
+- Token storage remains memory-only.
+- This batch still does not add workout create/list/detail UI.
+- Dictionary requests stay in feature/api layers instead of components.
+## 2026-04-30 Phase 1.3 - Client Auth + Workout UI MVP Batch 4
+
+### Completed work
+- Added a workout API layer for creating workouts through `POST /api/workouts`.
+- Added a workout form hook that owns draft state, exercise lookup, client-side payload shaping, and `set_index` generation grouped by `exercise_id`.
+- Added a minimal workout creation UI with inline set editing and exercise selection.
+- Updated the authenticated shell so the signed-in user can search exercises and submit a workout from the same MVP screen.
+
+### Changed files
+- `client/src/features/training/workout-api.ts`
+- `client/src/features/training/use-workout-form.ts`
+- `client/src/features/training/WorkoutForm.tsx`
+- `client/src/App.tsx`
+- `docs/progress.md`
+
+### Validation commands
+- `pnpm --filter @fitmind/client type-check`
+- `pnpm lint`
+
+### Locked constraints
+- `set_index` is generated per exercise within a workout, not by global form order.
+- Token storage remains memory-only.
+- This batch still does not add workout list/detail UI.
+## 2026-04-30 Phase 1.3 - Client Auth + Workout UI MVP Batch 5
+
+### Completed work
+- Extended the workout API layer with authenticated workout list and workout detail reads.
+- Added a workouts hook that owns list loading, detail loading, selection state, and refresh behavior.
+- Added a minimal workout browsing panel that lets signed-in users refresh their workout list and inspect a selected workout's detail and sets.
+- Updated the authenticated app shell so dictionary search, workout creation, workout list, and workout detail now live in one MVP surface.
+
+### Changed files
+- `client/src/features/training/workout-api.ts`
+- `client/src/features/training/use-workouts.ts`
+- `client/src/features/training/WorkoutsPanel.tsx`
+- `client/src/App.tsx`
+- `docs/progress.md`
+
+### Validation commands
+- `pnpm --filter @fitmind/client type-check`
+- `pnpm lint`
+
+### Locked constraints
+- Token storage remains memory-only.
+- Workout list/detail requests stay inside training-layer API/hook files.
+- This batch does not yet do full real browser/client-server closeout verification.
+## 2026-04-30 Phase 1.3 - Client Auth + Workout UI MVP Batch 6
+
+### Completed work
+- Verified that the live local backend and frontend dev servers both respond over HTTP.
+- Ran real authenticated API flow checks for register, login, me, exercise search, workout create, workout list, and workout detail.
+- Fixed a real local-dev contract issue: the client proxy was locked to port `3000`, while the server default env port was still `3001`.
+- Updated the shared example env file to match the current client/server dev contract and the `VITE_API_BASE_URL` naming used by the client HTTP layer.
+
+### Changed files
+- `server/src/env.ts`
+- `.env.example`
+- `docs/progress.md`
+- `docs/troubleshooting.md`
+
+### Validation commands
+- `pnpm dev:server`
+- `pnpm dev:client`
+- `Invoke-WebRequest http://127.0.0.1:3000/api/health`
+- `Invoke-WebRequest http://127.0.0.1:5173`
+- Real HTTP auth + workout flow verification via `Invoke-RestMethod`
+- `pnpm --filter @fitmind/client type-check`
+- `pnpm --filter @fitmind/server type-check`
+- `pnpm lint`
+
+### Verification notes
+- Backend health endpoint returned `200`.
+- Frontend dev server returned Vite HTML on `http://127.0.0.1:5173`.
+- Auth and workout HTTP chain passed end-to-end.
+- Full interactive browser-path verification could not be automated in this environment because no runnable browser automation tool was available in the session.
+## 2026-04-30 Phase 1.3 - MVP Polish
+
+### Completed work
+- Updated workout creation flow so a successful submit can trigger follow-up UI refreshes.
+- Wired workout creation to refresh the workout list automatically after a successful save.
+- Improved workout detail display so sets show human-readable exercise names when available instead of only raw `exercise_id`.
+
+### Changed files
+- `client/src/features/training/use-workout-form.ts`
+- `client/src/features/training/WorkoutForm.tsx`
+- `client/src/features/training/WorkoutsPanel.tsx`
+- `client/src/App.tsx`
+- `docs/progress.md`
+
+### Validation commands
+- `pnpm --filter @fitmind/client type-check`
+- `pnpm lint`

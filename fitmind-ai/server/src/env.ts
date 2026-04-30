@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const DEFAULT_PORT = 3001;
+const DEFAULT_PORT = 3000;
 
 const serverEnvSchema = z.object({
   NODE_ENV: z

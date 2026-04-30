@@ -261,3 +261,39 @@ import { loadServerEnv } from "../env.ts";
 - “单测全绿 + service mock 正常”并不能替代真实 HTTP smoke，尤其是 DB driver 会把时间和数值列转成运行时特定对象时。
 - repository row 和 API DTO 之间最好显式做一次边界归一化，不要默认它们天然同形。
 - 把 `ZodError` 统一映射为 `400` 很方便，但也会掩盖“服务端回填数据形状不符”这类非请求侧问题，所以真实 smoke 很有必要。
+## [T05] [已修复] Client proxy 固定 `3000`，但 server 默认端口仍是 `3001`
+
+- **日期**：2026-04-30
+- **阶段**：Phase 1.3 - Batch 6 Closeout
+- **耗时**：约 20 分钟
+
+### 现象
+- 前端在 Batch 1 已经固定把 Vite `/api` proxy 指向 `http://localhost:3000`。
+- 但服务端 `server/src/env.ts` 的默认端口仍然是 `3001`，`.env.example` 也仍然写着 `PORT=3001` 和旧的 `VITE_API_URL`。
+- 结果是：按示例配置直接启动本地前后端，浏览器请求会默认打到没有后端监听的 `3000`。
+
+### 排查过程
+- 先按 Batch 6 要求启动真实 dev server，发现前端和后端本身都能起，但要靠运行时注入 `PORT=3000` 才能和 client proxy 对齐。
+- 随后核对了：
+  - `client/vite.config.ts`：proxy 目标是 `3000`
+  - `server/src/env.ts`：默认端口还是 `3001`
+  - `.env.example`：仍是 `PORT=3001`，并且保留了前端不再使用的 `VITE_API_URL`
+- 这确认问题不是代码运行错误，而是 repo 内部的本地开发合同已经漂移。
+
+### 根本原因
+- Batch 1 锁定了前端 proxy 到 `3000`，但没有同步收口服务端默认端口和示例环境变量。
+- 于是“客户端默认假设”和“服务端默认假设”不再一致。
+
+### 解决方案
+- 将 `server/src/env.ts` 的默认端口改为 `3000`。
+- 将 `.env.example` 更新为：
+  - `PORT=3000`
+  - `VITE_API_BASE_URL=`（允许空字符串，默认走相对路径 + Vite proxy）
+- 保持现有 client HTTP 层设计不变，不回退到直接写绝对 API URL。
+
+### 经验教训
+- 只要改了本地 proxy、默认端口或 env 变量命名，就必须同步检查服务端默认值、示例 env 和启动文档。
+- 这类问题静态检查抓不住，必须靠真实 dev 启动和 HTTP 联调才能暴露。
+
+### 面试讲点
+- 这是很典型的“前后端本地开发合同漂移”问题：功能代码没坏，但默认配置已经对不上了。定位时不要只盯接口实现，要把 proxy、默认端口、示例 env 当成同一个契约面一起核对。
