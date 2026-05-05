@@ -18,6 +18,7 @@ import {
   updateUserWorkout,
   updateUserWorkoutSet,
 } from "../services/training/workout-service.js";
+import { runMockAssistantTurn } from "../services/assistant/assistant-orchestrator-service.js";
 import { getUserExerciseProgress } from "../services/training/exercise-progress-service.js";
 import { getUserRecommendationContext } from "../services/training/recommendation-context-service.js";
 import { getUserTrainingSummary } from "../services/training/training-summary-service.js";
@@ -167,6 +168,22 @@ export async function getRecommendationContextController(
     end_date: typeof req.query.end_date === "string" ? req.query.end_date : "",
   });
   const result = await getUserRecommendationContext(res.locals.userId, query);
+
+  return res.status(200).json(createSuccessResponse(result));
+}
+
+/**
+ * Execute one deterministic mock assistant turn for the authenticated user.
+ *
+ * @param req - Express request with mock assistant turn body.
+ * @param res - Express response with authenticated locals.
+ * @returns JSON deterministic mock assistant response.
+ */
+export async function postMockAssistantTurnController(
+  req: Request,
+  res: Response<unknown, AuthLocals>,
+) {
+  const result = await runMockAssistantTurn(res.locals.userId, req.body);
 
   return res.status(200).json(createSuccessResponse(result));
 }

@@ -1,4 +1,4 @@
-## 2026-04-27 阶段 0.1 - 工程骨架 Batch 1
+﻿## 2026-04-27 阶段 0.1 - 工程骨架 Batch 1
 
 ### 完成内容
 - 建立根目录 `pnpm` workspace 基础文件。
@@ -1336,3 +1336,283 @@
 - During browser automation, direct `agent-browser` button clicks were less reliable than native in-page submit/click calls for some interactions, but the underlying product flows completed successfully once the browser executed the page-native actions.
 - A same-session `agent-browser reload` appeared to keep the authenticated shell visible once, but a fresh browser session opened immediately afterward loaded in the anonymous state and the client code still contains no token persistence via localStorage, sessionStorage, or cookies.
 - No backend contract, schema, or product feature changes were needed for this closeout.
+
+## 2026-05-02 Phase 3.0 Batch 1.1 - Tool Executor Smoke
+
+### Completed work
+- Added a backend-only AI tool type layer with authenticated execution context, strict argument validation, and typed `UNKNOWN_TOOL` / `VALIDATION_ERROR` executor errors.
+- Registered three deterministic internal training tools: `get_training_summary`, `get_exercise_progress`, and `get_recommendation_context`.
+- Added a provider-agnostic tool executor that validates args before delegating to the existing deterministic training services instead of duplicating calculation logic.
+- Added a direct smoke script that creates test users and workout data through the existing auth/workout API patterns, then exercises the internal executor without any model provider.
+- Verified injected `user_id` is rejected by strict tool schemas, so authenticated context remains authoritative for user isolation.
+
+### Changed files
+- `server/src/services/ai/tools/tool-types.ts`
+- `server/src/services/ai/tools/training-tools.ts`
+- `server/src/services/ai/tools/tool-executor.ts`
+- `server/scripts/tool-executor-smoke.ts`
+- `docs/progress.md`
+
+### Validation commands
+- `pnpm --filter @fitmind/server type-check`
+- `pnpm lint`
+- `pnpm --filter @fitmind/server exec tsx scripts/tool-executor-smoke.ts`
+
+### Verification notes
+- `pnpm --filter @fitmind/server type-check` passed.
+- `pnpm lint` passed.
+- The new tool executor smoke passed after rerunning through the established elevated path because sandboxed `tsx/esbuild` execution still hits the known `spawn EPERM` environment issue in this workspace.
+- Covered smoke scenarios:
+  - registry contains all 3 deterministic tools
+  - valid execution of `get_training_summary`
+  - valid execution of `get_exercise_progress`
+  - valid execution of `get_recommendation_context`
+  - typed unknown-tool failure
+  - typed validation failure for invalid date range
+  - strict rejection of injected `user_id`
+  - cross-user isolation via authenticated execution context
+  - workout cleanup after the smoke run
+
+### Remaining risks
+- Tool result types are currently internal to the server and not yet promoted into `shared/`, which is acceptable for this backend-only batch but worth revisiting when a real model/tool-calling surface is introduced.
+- The smoke currently verifies executor behavior through real app-backed setup data plus direct executor calls, but it does not yet cover future higher-level orchestration such as tool-call logging or provider integration, which remain intentionally out of scope.
+## 2026-05-03 Phase 3.0 Batch 2 / 2.1 - Tool Call Log Persistence + Smoke
+
+### Completed work
+- Added a dedicated tool-call-log repository for inserting and reading `tool_call_logs` rows using the existing schema without migration changes.
+- Integrated best-effort log persistence into the internal deterministic tool executor for successful runs, validation failures, unknown tools, and downstream execution failures.
+- Added a single executor-side sanitization policy so persisted log input/output stays JSON-safe and avoids obvious secret-bearing keys and token-like values.
+- Persisted compact tool output summaries instead of full deterministic payloads to keep logs smaller and safer while still making them useful for debugging.
+- Extended the existing tool executor smoke to assert persisted success and error log rows, authenticated user scoping, and absence of obvious secret material in logged payloads.
+
+### Changed files
+- `server/src/db/tool-call-log-repository.ts`
+- `server/src/services/ai/tools/tool-executor.ts`
+- `server/scripts/tool-executor-smoke.ts`
+- `docs/progress.md`
+
+### Validation commands
+- `pnpm --filter @fitmind/server type-check`
+- `pnpm lint`
+- `pnpm --filter @fitmind/server exec tsx scripts/tool-executor-smoke.ts`
+
+### Verification notes
+- Schema compatibility was confirmed against the existing `tool_call_logs` table: nullable `message_id` supports internal non-chat calls, `tool_input` and `tool_output` support JSONB payloads, and `status` supports the required `success` / `error` values for this batch.
+- The updated smoke verifies:
+  - a successful deterministic tool call persists a `success` row
+  - an unknown tool call persists an `error` row
+  - an invalid deterministic tool call persists an `error` row with compact validation metadata
+  - persisted rows are scoped to the authenticated `user_id`
+  - persisted log payloads do not contain the active JWT token, `DATABASE_URL`, bearer strings, or obvious auth/header field names
+- Logging is intentionally best-effort: log write failure does not break a successful deterministic tool result, and log write failure does not mask the original execution error path.
+
+### Remaining risks
+- The current sanitization rules are intentionally conservative and string-pattern-based; if future tool payloads become more varied, the policy may need a follow-up refinement or explicit allowlists per tool.
+- `tool_output` now stores compact summaries rather than full deterministic payloads, which is the safer choice for this batch but means some deep debugging still requires replaying the original tool call.
+## 2026-05-03 Phase 3.0 Batch 3 - Tool Calling Skeleton Docs and Interview Notes
+
+### Completed work
+- Added a dedicated `Phase 3.0 Tool Calling Skeleton` section to `docs/calculation-layer.md`.
+- Documented the current internal tool set, provider-agnostic executor shape, authenticated execution context, and high-level tool-call-log behavior without implying real model integration.
+- Expanded `docs/interview-notes.md` with a Phase 3.0 interview narrative, comparison framing, Chinese pitch, and Tool Calling Skeleton Q&A.
+- Kept this batch documentation-only with no source code, API contract, or schema changes.
+
+### Changed files
+- `docs/calculation-layer.md`
+- `docs/interview-notes.md`
+- `docs/progress.md`
+
+### Verification notes
+- Performed a docs read-through against the current tool registry, executor, and tool-call-log implementation.
+- Confirmed the documentation only claims what exists today:
+  - three internal deterministic tools
+  - authenticated execution context for `user_id`
+  - no `user_id` in tool args
+  - provider-agnostic executor
+  - execution metadata logging when implemented
+- Intentionally did not claim live model integration, chat, SSE, recommendation generation, RAG, MCP, agent orchestration, or frontend Tool Calling UI.
+## 2026-05-03 Phase 3.1 Batch 1 / 1.1 - Assistant Orchestrator Skeleton + Mock-Turn Smoke
+
+### Completed work
+- Added an authenticated backend-only `POST /api/assistant/mock-turn` endpoint that derives `userId` from auth middleware and never accepts `user_id` from the request body.
+- Added a deterministic mock assistant orchestrator service that validates `mode`, `message`, `start_date`, `end_date`, and `exercise_id` for `exercise_progress`, then dispatches exactly one internal tool through the existing tool executor.
+- Kept the controller/route thin by reusing the existing authenticated training controller/router surface and moving tool selection, templated answer assembly, and evidence shaping into the service layer.
+- Added an end-to-end smoke script that covers unauthenticated access, validation failures, populated responses for all three modes, user isolation, persisted tool-call logs, cleanup, and post-cleanup empty-state behavior.
+- Kept this batch within 5 handwritten files and did not add any model SDKs, SSE, frontend UI, schema changes, or training API contract changes.
+
+### Changed files
+- `server/src/services/assistant/assistant-orchestrator-service.ts`
+- `server/src/controllers/workout-controller.ts`
+- `server/src/routes/workouts.ts`
+- `server/scripts/assistant-mock-turn-smoke.ts`
+- `docs/progress.md`
+
+### Endpoint added
+- `POST /api/assistant/mock-turn`
+
+### Orchestration behavior
+- `mode=training_overview` runs `get_training_summary`.
+- `mode=exercise_progress` requires `exercise_id` and runs `get_exercise_progress`.
+- `mode=recommendation_context` runs `get_recommendation_context`.
+- All successful responses return `assistant_type: deterministic_mock`, one deterministic `tool_calls` item, templated `summary` + `bullets`, and evidence normalized to `source: deterministic_tool_executor`.
+- Empty ranges still return valid deterministic mock responses instead of errors.
+
+### Smoke scenarios covered
+- unauthenticated request returns `401`
+- invalid `mode` returns the existing `400 VALIDATION_ERROR` shape
+- invalid `start_date` returns the existing `400 VALIDATION_ERROR` shape
+- `end_date` earlier than `start_date` returns validation error
+- `exercise_progress` without `exercise_id` returns validation error
+- user A workout setup for populated deterministic responses
+- `training_overview` response asserts `assistant_type`, `tool_calls`, and evidence
+- `recommendation_context` response asserts executor evidence source and tool usage
+- `exercise_progress` response asserts relevant evidence including set ids
+- user B isolation through the same endpoint
+- `tool_call_logs` persistence for executed assistant tools
+- workout cleanup plus valid empty-state response after deletion
+
+### Validation commands
+- `pnpm --filter @fitmind/server type-check`
+- `pnpm lint`
+- `pnpm --filter @fitmind/server exec tsx scripts/assistant-mock-turn-smoke.ts`
+
+### Verification notes
+- `pnpm --filter @fitmind/server type-check` passed.
+- `pnpm lint` passed.
+- The first sandboxed smoke attempt hit the known `tsx/esbuild` `spawn EPERM` environment issue, so the smoke was rerun through the established elevated path.
+- The elevated rerun of `pnpm --filter @fitmind/server exec tsx scripts/assistant-mock-turn-smoke.ts` passed end-to-end.
+- A transient `POST /api/auth/register` `500` appeared during the first elevated smoke attempt, but it did not reproduce when the auth service and app-level register path were probed directly, and the full smoke passed on rerun. No confirmed assistant implementation bug remained after verification.
+
+### Remaining risks
+- The assistant response templates are intentionally narrow and deterministic for this skeleton batch; if future batches expand the mock answer surface, the response text and evidence summarization rules may need refactoring into smaller helpers or shared DTOs.
+- The current skeleton executes exactly one deterministic tool per mode, which is correct for this batch but does not yet exercise any future multi-tool orchestration, retry, timeout, or model-driven decision flow.
+## 2026-05-03 Phase 3.1 Batch 2 / 2.1 - Chat Session + Message Persistence and Smoke
+
+### Completed work
+- Confirmed the existing `chat_sessions` and `messages` schema is compatible with deterministic mock-turn persistence, so no migration changes were needed.
+- Added a dedicated chat repository for creating sessions, resolving user-owned sessions, checking existence for `403` vs `404`, inserting messages, and reading sessions/messages for smoke verification.
+- Extended `POST /api/assistant/mock-turn` input to accept optional `session_id`, creating a new user-owned chat session when absent and reusing the existing one when present and owned by the authenticated user.
+- Persisted one `user` message and one `assistant` message for each successful deterministic mock turn using app-owned JSON only: user text blocks, assistant summary/bullets content, deterministic structured output, and minimal metadata.
+- Returned `session_id` in every successful mock-turn response.
+- Left `tool_call_logs.message_id` as `null` for this batch because the current executor persists logs internally and does not accept a caller-supplied persisted assistant message id without broader architectural change.
+- Extended the existing assistant mock-turn smoke to verify session creation, message persistence, same-session append behavior, cross-user session denial, and absence of obvious auth/header/env secrets in persisted message payloads.
+
+### Changed files
+- `server/src/db/chat-repository.ts`
+- `server/src/services/assistant/assistant-orchestrator-service.ts`
+- `server/scripts/assistant-mock-turn-smoke.ts`
+- `docs/progress.md`
+
+### Schema compatibility result
+- `chat_sessions` already supports authenticated ownership, optional title, and `last_message_at`, which is sufficient for mock-turn session persistence.
+- `messages` already supports `role`, `content`, `structured_output`, `usage`, and `metadata`, which is sufficient for deterministic user/assistant message persistence.
+- `tool_call_logs.message_id` remains nullable and was intentionally left `null` in this batch.
+
+### Persistence behavior
+- Successful mock turns now persist:
+  - one `user` message with text-block `content`, `structured_output: null`, `usage: null`, and minimal date/mode metadata
+  - one `assistant` message with deterministic summary/bullets `content`, full deterministic mock `structured_output`, `usage: null`, and minimal tool/mode metadata
+- New sessions derive `title` from the first user message trimmed to the schema limit.
+- Message insertion also updates `chat_sessions.last_message_at`.
+- The persistence layer does not store JWTs, headers, env vars, or raw auth payloads as part of app-owned message metadata.
+
+### session_id behavior
+- If `session_id` is omitted, the backend creates a new session for the authenticated user and returns it.
+- If `session_id` is provided and owned by the authenticated user, the backend appends the new user/assistant message pair to that session and returns the same id.
+- If `session_id` exists but belongs to another user, the backend returns `403 FORBIDDEN` using the same ownership convention as the workout access path.
+- If `session_id` does not exist, the backend returns `404 NOT_FOUND`.
+
+### Validation commands
+- `pnpm --filter @fitmind/server type-check`
+- `pnpm lint`
+- `pnpm --filter @fitmind/server exec tsx scripts/assistant-mock-turn-smoke.ts`
+
+### Verification notes
+- `pnpm --filter @fitmind/server type-check` passed.
+- `pnpm lint` passed.
+- The sandboxed smoke attempt hit the known `tsx/esbuild` `spawn EPERM` environment issue, so the smoke was rerun through the established elevated path.
+- The first elevated smoke rerun again hit the previously observed transient `POST /api/auth/register` `500`, but the immediate rerun passed end-to-end.
+- The passing smoke verified:
+  - response includes `session_id`
+  - one chat session is created for the first authenticated turn
+  - persisted `user` and `assistant` messages exist for that session
+  - a second turn with the same `session_id` appends to the existing session
+  - a second user cannot reuse the first user鈥檚 `session_id`
+  - persisted message payloads do not contain the active JWT token, `DATABASE_URL`, bearer strings, or `authorization` fields
+
+### Remaining risks
+- Message persistence currently happens after deterministic tool execution and is not wrapped together with tool-call logging in one transaction, so future batches may want a broader orchestration persistence boundary if stronger atomicity becomes important.
+- `tool_call_logs` still cannot be linked to the persisted assistant `message_id` without reshaping the current executor API, so chat/message history and tool logs remain only indirectly related in this batch.
+## 2026-05-03 Phase 3.1 Batch 3 - Assistant Orchestration Docs and Interview Notes
+
+### Completed work
+- Added a `Phase 3.1 Assistant Orchestration Skeleton` section to `docs/calculation-layer.md`.
+- Documented that `POST /api/assistant/mock-turn` exists as a deterministic mock assistant endpoint, not a real AI-generated or streaming chat feature.
+- Explained the current mode-based orchestration path, template answer construction, and optional chat session/message persistence behavior.
+- Expanded `docs/interview-notes.md` with Phase 3.1 interview framing, comparison language for executor/orchestrator/provider/streaming chat, a Chinese pitch, and new deep-dive Q&A.
+- Kept this batch documentation-only with no source code, API contract, or schema changes.
+
+### Changed files
+- `docs/calculation-layer.md`
+- `docs/interview-notes.md`
+- `docs/progress.md`
+
+### Verification notes
+- Performed a docs read-through against the current assistant orchestrator and chat persistence implementation.
+- Confirmed the documentation only claims what exists today:
+  - `POST /api/assistant/mock-turn`
+  - deterministic mode-based tool selection
+  - template answers from deterministic tool results
+  - optional `session_id` chat persistence using `chat_sessions` and `messages`
+  - no model provider calls
+  - no streaming
+  - no coaching recommendation generation
+  - no `tool_call_logs.message_id` linkage yet
+- Intentionally did not claim real provider integration, frontend assistant UI, SSE chat, multi-step tool loops, or recommendation generation.
+
+## 2026-05-05 Phase 3.2 Batch 1 - Provider Adapter Interface + Mock Provider
+
+### Completed work
+- Added a provider-agnostic, non-streaming assistant provider boundary in the backend service layer.
+- Added a deterministic mock provider implementation that can simulate a normal tool-call intent, a plain text provider message, or a provider error without calling any real model API.
+- Wired the existing assistant orchestrator through the new provider adapter while keeping `POST /api/assistant/mock-turn` unchanged.
+- Kept tool execution, evidence shaping, and chat session/message persistence owned by the assistant orchestrator rather than exposing provider-specific details to controllers.
+- Preserved the existing internal tool executor and left `tool_call_logs.message_id` behavior unchanged.
+
+### Changed files
+- `server/src/services/assistant/provider-types.ts`
+- `server/src/services/assistant/mock-provider.ts`
+- `server/src/services/assistant/provider-adapter.ts`
+- `server/src/services/assistant/assistant-orchestrator-service.ts`
+- `docs/progress.md`
+
+### Adapter interface added
+- The new provider layer uses project-owned request and response types rather than any provider SDK payload shape.
+- The request carries conversation text, validated assistant context, allowed tool definitions, and an internal simulation hint.
+- The response supports exactly three deterministic outcomes:
+  - `tool_call`
+  - `message`
+  - `error`
+
+### Mock provider behavior
+- Default behavior returns one deterministic `tool_call` mapped from the validated assistant mode.
+- Reserved message prefixes are handled internally for simulation only:
+  - `[mock:text]` returns a deterministic non-tool provider message
+  - `[mock:error]` returns a deterministic provider error
+- Normal requests still stay on the tool-call path so existing endpoint behavior remains stable.
+
+### Validation commands
+- `pnpm --filter @fitmind/server type-check`
+- `pnpm lint`
+
+### Verification notes
+- The implementation keeps the public mock-turn request schema unchanged.
+- Successful tool-backed turns still return `assistant_type: deterministic_mock`, include tool execution metadata, and persist chat messages.
+- Provider-generated text fallbacks now return an assistant-shaped deterministic response without executing a tool.
+- Provider-generated errors are converted into the existing `AI_PROVIDER_ERROR` convention.
+
+### Remaining risks
+- The current provider adapter only supports one non-streaming provider response and at most one tool call per run.
+- Plain-text provider fallbacks now use backend-defined empty evidence rather than deterministic tool evidence, so future real-provider batches should decide whether to formalize that response shape more broadly.
+- No real provider selection, env-flag routing, streaming, or multi-step model/tool loop exists yet in this batch.
+

@@ -153,3 +153,74 @@ The current assembly rules are:
 - `recent_workouts` returns the latest 5 workouts in range ordered by `performed_at DESC, workout_id DESC`
 - `evidence.workout_ids` and `evidence.set_ids` are unions of the included deterministic evidence
 - empty ranges still return a valid zero/empty context package rather than an error
+
+## Phase 3.0 Tool Calling Skeleton
+Phase 3.0 adds a backend-only Tool Calling Skeleton on top of the deterministic calculation layer.
+
+Current internal tools:
+- `get_training_summary`
+- `get_exercise_progress`
+- `get_recommendation_context`
+
+These tools wrap existing deterministic backend services rather than duplicating calculation logic:
+- `get_training_summary` wraps the training summary service
+- `get_exercise_progress` wraps the exercise progress service
+- `get_recommendation_context` wraps the recommendation context service
+
+The current tool layer is intentionally still not a real model integration:
+- it does not call any LLM or model provider
+- it does not add AI chat
+- it does not add SSE
+- it does not generate coaching recommendations
+
+User isolation stays aligned with the rest of the backend:
+- authenticated `user_id` comes from tool execution context
+- tool argument schemas never accept `user_id`
+- the wrapped deterministic services still enforce user-scoped data access on the backend
+
+The executor is provider-agnostic:
+- it looks up tools by name
+- it validates tool args before execution
+- it runs internal backend capabilities without depending on a specific model SDK or provider protocol
+
+This means the current tool layer is a preparation step for future Tool Calling, not a finished AI feature.
+
+If tool call logging is implemented, `tool_call_logs` records execution metadata for internal tool runs. The architectural point is that the backend can persist which internal tool ran, whether it succeeded, and compact execution details without exposing a model-facing Tool Calling product flow yet.
+
+## Phase 3.1 Assistant Orchestration Skeleton
+Phase 3.1 adds a deterministic assistant orchestration layer on top of the existing internal tool executor.
+
+Current assistant endpoint:
+- `POST /api/assistant/mock-turn`
+
+This endpoint is intentionally still not a real AI assistant:
+- responses are labeled `assistant_type: deterministic_mock`
+- answers are template-based, not AI-generated
+- it does not call any model provider
+- it does not stream
+- it does not generate coaching recommendations
+
+The current orchestration pattern is mode-based:
+- `training_overview` invokes `get_training_summary`
+- `exercise_progress` requires `exercise_id` and invokes `get_exercise_progress`
+- `recommendation_context` invokes `get_recommendation_context`
+
+This means the current assistant layer is not deciding with a model which tool to use. The backend chooses one deterministic path based on validated request input, executes the existing tool through the executor, and then formats a template response from the returned structured data.
+
+The current response shape proves several future-chat building blocks without introducing real AI behavior:
+- authenticated user scoping still comes from backend auth context
+- one assistant endpoint can orchestrate multiple internal deterministic tools
+- tool execution metadata can be surfaced in `tool_calls`
+- answer `summary`, `bullets`, and `evidence` can be assembled from tool results instead of raw table reads
+
+If chat persistence is enabled, the assistant layer also stores the turn in the existing chat tables:
+- when `session_id` is omitted, a new `chat_session` is created for the authenticated user
+- when `session_id` is provided, ownership is verified before appending messages
+- one `user` message is stored with compact text-block content and minimal request metadata
+- one `assistant` message is stored with deterministic summary/bullets content plus structured deterministic output
+- `chat_sessions.last_message_at` advances as messages are inserted
+
+The current persistence is still intentionally limited:
+- persisted messages contain deterministic app-owned data only
+- no JWT, headers, raw auth payloads, or env vars are stored as message content or metadata
+- `tool_call_logs.message_id` remains `null` because the current executor persists logs internally and is not yet wired to the persisted assistant message row
