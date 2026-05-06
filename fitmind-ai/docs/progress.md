@@ -1762,3 +1762,171 @@
 - The smoke was rerun successfully through the established elevated execution path using the package-local `tsx.cmd`.
 - The passing smoke verified exact SSE event order for tool-backed, `[mock:text]`, `[mock:error]`, and cross-user isolation paths.
 
+## 2026-05-07 Phase 3.4 Batch 1-2 - Frontend Assistant SSE Client and Minimal Chat Panel
+
+### Completed work
+- Added a feature-scoped frontend assistant layer under `client/src/features/assistant`.
+- Added project-owned frontend assistant types for chat status, stream events, request payloads, message state, and tool-call state.
+- Added a low-level SSE client that sends `POST /api/assistant/stream-turn` with the in-memory auth token, parses `text/event-stream` frames, and normalizes non-stream responses through the existing HTTP error convention.
+- Added a `useAssistantChat` hook that owns message state, chat status, active tool call, error message, stream lifecycle, abort handling, and retry behavior.
+- Added a minimal authenticated assistant panel to `App.tsx` with:
+  - input
+  - send
+  - stop
+  - retry
+  - status badge
+  - tool-call card
+  - progressively streamed plain-text message list
+- Kept the existing deterministic training panels intact and added the assistant panel as a demo surface rather than a new app shell.
+
+### Changed files
+- `client/src/features/assistant/assistant-types.ts`
+- `client/src/features/assistant/assistant-stream-api.ts`
+- `client/src/features/assistant/use-assistant-chat.ts`
+- `client/src/features/assistant/AssistantChatPanel.tsx`
+- `client/src/features/assistant/AssistantMessageList.tsx`
+- `client/src/features/assistant/AssistantToolCallCard.tsx`
+- `client/src/App.tsx`
+- `docs/progress.md`
+
+### Frontend behavior
+- The frontend chat state machine supports:
+  - `idle`
+  - `thinking`
+  - `tool_calling`
+  - `answering`
+  - `done`
+  - `error`
+- User messages are appended immediately, and the assistant message is built incrementally from `answer_delta` events.
+- `tool_call_started` and `tool_call_finished` drive a visible tool status card for:
+  - `get_training_summary`
+  - `get_exercise_progress`
+  - `get_recommendation_context`
+- `abort()` cancels the in-flight request and preserves already rendered messages.
+- `retryLast()` resends the last assistant payload if a previous send already occurred.
+
+### Compatibility notes
+- The assistant demo panel currently fixes requests to `training_overview` and uses the same rolling 30-day range convention as the deterministic summary panels.
+- No markdown rendering, session sidebar, chat-history hydration, RAG, MCP, or agent features were added in this batch.
+- The current backend SSE stream does not emit `session_id`, so the frontend keeps a nullable `sessionId` slot ready for future backend expansion but cannot yet persist multi-turn server-side chat continuity from the stream path alone.
+
+### Validation commands
+- `pnpm --filter @fitmind/client type-check`
+- `pnpm lint`
+- `pnpm --filter @fitmind/client exec vite build`
+
+### Verification notes
+- `pnpm --filter @fitmind/client type-check` passed.
+- `pnpm lint` passed.
+- `pnpm --filter @fitmind/client exec vite build` did not resolve `vite` in this environment.
+- A direct package-local `vite.cmd build` attempt hit the known `esbuild` `spawn EPERM` sandbox issue.
+- The client build was rerun successfully through the established elevated execution path using the package-local `vite.cmd`.
+
+## 2026-05-07 Phase 3.4.1-3.4.2 - Assistant Session Continuity and Minimal UX Hardening
+
+### Completed work
+- Added SSE session metadata propagation so the streaming assistant path can preserve multi-turn continuity on the frontend.
+- Added a new stream event shape `{ type: "session", session_id }` and included `session_id` again in the final `done` event as a fallback.
+- Updated the frontend assistant hook to parse `session` events, store the returned `sessionId`, and automatically send it on later turns.
+- Kept the existing `POST /api/assistant/mock-turn` response contract unchanged.
+- Hardened the minimal assistant panel for demo use with:
+  - quick prompt buttons for training overview, exercise progress, and recommendation context
+  - clear conversation
+  - retry after failures
+  - stop/abort generation
+  - visible state machine status
+  - visible active tool-call card while tool execution is happening
+- Reused the currently selected exercise from the existing deterministic training UI to support the exercise-progress quick prompt without adding a new picker or sidebar.
+
+### Changed files
+- `server/src/services/assistant/assistant-stream-types.ts`
+- `server/src/services/assistant/assistant-orchestrator-service.ts`
+- `server/scripts/assistant-stream-smoke.ts`
+- `client/src/features/assistant/assistant-types.ts`
+- `client/src/features/assistant/use-assistant-chat.ts`
+- `client/src/features/assistant/AssistantChatPanel.tsx`
+- `client/src/App.tsx`
+- `docs/progress.md`
+
+### Session continuity behavior
+- The backend emits `session` immediately after resolving or creating the chat session.
+- Tool-backed streams, `[mock:text]`, and `[mock:error]` now all preserve authenticated session context when a valid `session_id` is supplied.
+- The frontend hook updates local `sessionId` from either the early `session` event or the `done.session_id` fallback.
+- The current debug panel surfaces the active `sessionId` in a lightweight text row so continuity is visible during demos.
+
+### Verification notes
+- `pnpm --filter @fitmind/server type-check` passed.
+- `pnpm --filter @fitmind/client type-check` passed.
+- `pnpm lint` passed.
+- `pnpm --filter @fitmind/server exec tsx scripts/assistant-stream-smoke.ts` did not resolve `tsx` in this environment.
+- The direct package-local `tsx.cmd` smoke attempt hit the known `tsx/esbuild` `spawn EPERM` sandbox issue.
+- The assistant stream smoke was rerun successfully through the established elevated package-local `tsx.cmd` path.
+- `pnpm --filter @fitmind/client exec vite build` did not resolve `vite` in this environment.
+- The direct package-local `vite.cmd build` attempt hit the known `vite/esbuild` `spawn EPERM` sandbox issue.
+- The client build was rerun successfully through the established elevated package-local `vite.cmd` path.
+
+## 2026-05-07 Phase 3.5 - Assistant SSE and Frontend State Machine Documentation Closeout
+
+### Completed work
+- Updated `docs/calculation-layer.md` to describe the current assistant chain from deterministic calculation layer through tool execution, provider adapter, SSE streaming, and frontend state machine.
+- Added explicit explanation of why the provider does not query the database directly and why `user_id` always comes from auth context.
+- Documented the current frontend state machine and why SSE improves UX compared with a single blocking assistant response.
+- Added explicit current limits so the project does not overclaim real-provider streaming, multi-step tool loops, RAG, MCP, agent behavior, or coaching generation.
+- Expanded `docs/interview-notes.md` with a current-state assistant architecture framing, deep-dive Q&A, and a Chinese 60-second interview pitch.
+- Kept this batch docs-only and appended progress history rather than rewriting earlier entries.
+
+### Changed files
+- `docs/calculation-layer.md`
+- `docs/interview-notes.md`
+- `docs/progress.md`
+
+### Verification notes
+- Docs-only batch.
+- No code changes or type-check requirements were needed for this phase.
+
+## 2026-05-07 Phase 3.6 Batch 1 - Assistant Demo Workspace UI
+
+### Completed work
+- Added a new frontend-only `AssistantWorkspace` wrapper on the authenticated page to make the current assistant pipeline easier to understand during demos.
+- Reframed the assistant area around visible architecture cards for:
+  - `Training logs`
+  - `Deterministic tools`
+  - `Provider adapter`
+  - `SSE stream`
+  - `Assistant answer`
+- Kept the current deterministic panels intact while making the assistant flow more legible with separate cards for tool inventory, state machine status, and session continuity.
+- Updated the frontend assistant hook to surface the already-existing `provider_selected` stream event so the active provider adapter is visible without changing the SSE contract.
+- Refactored the assistant chat panel into the workspace control area while preserving the existing SSE hook, quick prompts, stop, retry, clear conversation, status visibility, streamed answer rendering, and tool-call visibility.
+- Kept the exercise-progress quick prompt wired to the currently selected exercise from the existing deterministic training UI and made that dependency clearer in the panel copy.
+
+### Changed files
+- `client/src/features/assistant/AssistantWorkspace.tsx`
+- `client/src/features/assistant/AssistantChatPanel.tsx`
+- `client/src/features/assistant/AssistantToolCallCard.tsx`
+- `client/src/features/assistant/assistant-types.ts`
+- `client/src/features/assistant/use-assistant-chat.ts`
+- `client/src/App.tsx`
+- `docs/progress.md`
+
+### Demo UX notes
+- The workspace now shows the three deterministic tools explicitly:
+  - `get_training_summary`
+  - `get_exercise_progress`
+  - `get_recommendation_context`
+- The assistant state machine is now visible as explicit status chips for:
+  - `idle`
+  - `thinking`
+  - `tool_calling`
+  - `answering`
+  - `done`
+  - `error`
+- The workspace surfaces the current `sessionId` with a clear empty state before the first streamed turn.
+- The active tool card now phrases the idle state as waiting for a deterministic tool call and shows tool status plus duration when available.
+
+### Verification notes
+- `pnpm --filter @fitmind/client type-check` passed.
+- `pnpm lint` passed.
+- `pnpm --filter @fitmind/client exec vite build` did not resolve `vite` in this environment.
+- The direct package-local `vite.cmd build` attempt hit the known `vite/esbuild` `spawn EPERM` sandbox issue.
+- The client build was rerun successfully through the elevated package-local `vite.cmd` path.
+

@@ -613,6 +613,10 @@ export async function runMockAssistantTurn(
     input.session_id,
     input.message,
   );
+  await emitEvent(options, {
+    type: "session",
+    session_id: resolvedSession.sessionId,
+  });
   const providerRequest = buildProviderRequest(input);
 
   await emitEvent(options, {
@@ -716,6 +720,7 @@ export async function runMockAssistantTurn(
 
   await emitEvent(options, {
     type: "done",
+    session_id: resolvedSession.sessionId,
   });
 
   return response;

@@ -1,5 +1,6 @@
 export type AssistantStreamEvent =
   | { type: "state"; state: "thinking" | "tool_calling" | "answering" }
+  | { type: "session"; session_id: string }
   | { type: "provider_selected"; provider: "mock" | "anthropic" }
   | { type: "tool_call_started"; tool_name: string }
   | {
@@ -9,7 +10,11 @@ export type AssistantStreamEvent =
       duration_ms: number;
     }
   | { type: "answer_delta"; text: string }
-  | { type: "done"; message_id?: string | undefined }
+  | {
+      type: "done";
+      message_id?: string | undefined;
+      session_id?: string | undefined;
+    }
   | { type: "error"; code: string; message: string };
 
 export interface AssistantStreamOptions {

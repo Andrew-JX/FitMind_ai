@@ -58,6 +58,7 @@ interface DeleteResponseData {
 
 type AssistantStreamEvent =
   | { type: "state"; state: "thinking" | "tool_calling" | "answering" }
+  | { type: "session"; session_id: string }
   | { type: "provider_selected"; provider: "mock" | "anthropic" }
   | { type: "tool_call_started"; tool_name: string }
   | {
@@ -67,7 +68,11 @@ type AssistantStreamEvent =
       duration_ms: number;
     }
   | { type: "answer_delta"; text: string }
-  | { type: "done"; message_id?: string | undefined }
+  | {
+      type: "done";
+      message_id?: string | undefined;
+      session_id?: string | undefined;
+    }
   | { type: "error"; code: string; message: string };
 
 const SMOKE_JWT_SECRET = "fitmind-smoke-secret";
@@ -370,6 +375,68 @@ function assertDoneExists(events: AssistantStreamEvent[], label: string): void {
   );
 }
 
+function assertSessionEvent(
+  events: AssistantStreamEvent[],
+  expectedSessionId: string | null,
+  label: string,
+): string {
+  const sessionEvent = events.find(
+    (event): event is Extract<AssistantStreamEvent, { type: "session" }> =>
+      event.type === "session",
+  );
+
+  assert(sessionEvent !== undefined, `${label} should include a session event.`);
+  assert(
+    sessionEvent.session_id.length > 0,
+    `${label} session event should include a non-empty session_id.`,
+  );
+
+  if (expectedSessionId !== null) {
+    assert(
+      sessionEvent.session_id === expectedSessionId,
+      `${label} should reuse session_id ${expectedSessionId}.`,
+    );
+  }
+
+  return sessionEvent.session_id;
+}
+
+function assertDoneSessionId(
+  events: AssistantStreamEvent[],
+  expectedSessionId: string,
+  label: string,
+): void {
+  const doneEvent = events.find(
+    (event): event is Extract<AssistantStreamEvent, { type: "done" }> =>
+      event.type === "done",
+  );
+
+  assert(doneEvent !== undefined, `${label} should include a done event.`);
+  assert(
+    doneEvent.session_id === expectedSessionId,
+    `${label} done event should include session_id ${expectedSessionId}.`,
+  );
+}
+
+function assertSessionBeforeAnswer(
+  events: AssistantStreamEvent[],
+  label: string,
+): void {
+  const sessionIndex = events.findIndex((event) => event.type === "session");
+  const firstAnswerDeltaIndex = events.findIndex(
+    (event) => event.type === "answer_delta",
+  );
+
+  assert(sessionIndex >= 0, `${label} should include a session event.`);
+
+  if (firstAnswerDeltaIndex >= 0) {
+    assert(
+      sessionIndex <= firstAnswerDeltaIndex,
+      `${label} should emit session_id before or no later than the first answer_delta.`,
+    );
+  }
+}
+
 function assertErrorExists(events: AssistantStreamEvent[], label: string): void {
   assert(
     events.some((event) => event.type === "error"),
@@ -601,10 +668,17 @@ async function main(): Promise<void> {
       "Normal stream should use text/event-stream content type.",
     );
     assertProviderSelected(normalStream.events, "Normal stream");
+    const normalSessionId = assertSessionEvent(
+      normalStream.events,
+      null,
+      "Normal stream",
+    );
+    assertSessionBeforeAnswer(normalStream.events, "Normal stream");
     assertEventOrder(
       normalStream.events,
       [
         "state:thinking",
+        "session",
         "provider_selected",
         "state:tool_calling",
         "tool_call_started",
@@ -618,6 +692,7 @@ async function main(): Promise<void> {
       "Normal tool-backed stream",
     );
     assertDoneExists(normalStream.events, "Normal stream");
+    assertDoneSessionId(normalStream.events, normalSessionId, "Normal stream");
     assert(
       normalStream.events.filter((event) => event.type === "answer_delta").length > 0,
       "Normal stream should include answer_delta chunks.",
@@ -655,6 +730,10 @@ async function main(): Promise<void> {
       typeof primarySessionId === "string" && primarySessionId.length > 0,
       "Normal stream should create a usable session id.",
     );
+    assert(
+      normalSessionId === primarySessionId,
+      "Normal stream session event should match the persisted primary session id.",
+    );
     const normalMessages = await listMessagesForSession(
       primarySessionId,
       primaryAuth.user.id,
@@ -681,10 +760,17 @@ async function main(): Promise<void> {
       `Text stream expected HTTP 200, got ${textStream.status}.`,
     );
     assertProviderSelected(textStream.events, "Text stream");
+    const textSessionId = assertSessionEvent(
+      textStream.events,
+      primarySessionId,
+      "Text stream",
+    );
+    assertSessionBeforeAnswer(textStream.events, "Text stream");
     assertEventOrder(
       textStream.events,
       [
         "state:thinking",
+        "session",
         "provider_selected",
         "state:answering",
         ...textStream.events
@@ -695,6 +781,7 @@ async function main(): Promise<void> {
       "[mock:text] stream",
     );
     assertDoneExists(textStream.events, "[mock:text] stream");
+    assertDoneSessionId(textStream.events, textSessionId, "[mock:text] stream");
     assert(
       !textStream.events.some((event) => event.type === "tool_call_started"),
       "[mock:text] stream should not start a tool call.",
@@ -728,9 +815,10 @@ async function main(): Promise<void> {
       `Error stream expected HTTP 200, got ${errorStream.status}.`,
     );
     assertProviderSelected(errorStream.events, "Error stream");
+    assertSessionEvent(errorStream.events, primarySessionId, "Error stream");
     assertEventOrder(
       errorStream.events,
-      ["state:thinking", "provider_selected", "error"],
+      ["state:thinking", "session", "provider_selected", "error"],
       "[mock:error] stream",
     );
     assertErrorExists(errorStream.events, "[mock:error] stream");

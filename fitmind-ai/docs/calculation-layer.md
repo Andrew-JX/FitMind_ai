@@ -292,3 +292,148 @@ Phase 3.2 smoke now covers:
 - persistence and user isolation checks for successful runs
 
 If `ANTHROPIC_API_KEY` is absent, the real-provider smoke is skipped rather than treated as a product failure.
+
+## Phase 3.3-3.4 Assistant SSE and Frontend State Machine
+Phases 3.3 and 3.4 turn the earlier deterministic assistant architecture into a demoable AI application flow without giving up backend control.
+
+The current end-to-end path is:
+- user message
+- frontend assistant chat state machine
+- `POST /api/assistant/stream-turn`
+- assistant orchestrator
+- provider adapter
+- optional internal tool execution
+- deterministic evidence assembly
+- SSE answer stream back to the frontend
+
+This is the current system story:
+- FitMind AI is not just a chat box
+- real workout logs remain the source of truth
+- deterministic calculations remain the source of numeric facts
+- the model stays inside a controlled decision boundary
+- the frontend exposes the tool-backed reasoning flow through explicit stream states
+
+### Current assistant chain
+The current assistant chain can be described as:
+- real training logs
+- deterministic calculation layer
+- tool registry and executor
+- provider adapter
+- SSE assistant stream
+- frontend chat state machine
+
+That ordering matters because the model is not trusted to:
+- read raw workout tables directly
+- invent aggregation rules
+- choose cross-user data scope
+- generate evidence on its own
+
+Instead, the backend owns:
+- request validation
+- authenticated user scoping
+- session ownership checks
+- tool name and arg validation
+- deterministic evidence generation
+- final streamed event policy
+
+### Why the provider does not query the database directly
+The provider does not query the database directly because data access and language generation are intentionally separated.
+
+If the provider could query raw tables directly, the system would become:
+- harder to test
+- harder to audit
+- harder to reason about during interviews
+- more vulnerable to cross-user leakage or accidental over-fetching
+
+The current boundary is:
+- the provider may return `message`, `tool_call`, or `error`
+- if a tool is requested, the backend executor validates the tool name and args schema
+- the executor runs deterministic backend services using authenticated backend context
+- the tool returns evidence-backed structured data
+
+### Why `user_id` always comes from auth context
+`user_id` always comes from auth middleware because ownership must remain authoritative on the server.
+
+Current rules:
+- the frontend never sends `user_id`
+- the provider never chooses `user_id`
+- tool schemas never accept `user_id`
+- the orchestrator and tool executor receive authenticated user context from the backend only
+
+This protects against:
+- cross-user data leakage
+- prompt-level attempts to impersonate another user
+- model-generated tool args that try to override ownership
+
+### Evidence stays deterministic
+The assistant layer still depends on deterministic evidence rather than provider-generated explanation alone.
+
+Current evidence fields include:
+- `workout_ids`
+- `set_ids` where relevant
+- `calculation_rules`
+- tool execution metadata such as tool name, status, and duration
+
+This means the assistant can explain what it used instead of asking the user to trust an opaque answer.
+
+### Current SSE UX contract
+The backend SSE layer emits project-owned events rather than raw provider stream payloads.
+
+Current event families include:
+- `state`
+- `session`
+- `provider_selected`
+- `tool_call_started`
+- `tool_call_finished`
+- `answer_delta`
+- `done`
+- `error`
+
+The frontend state machine currently exposes:
+- `thinking`
+- `tool_calling`
+- `answering`
+- `done`
+- `error`
+
+This improves UX over one blocking response because the user can see:
+- that the request was accepted
+- whether the backend is still deciding or actually running a tool
+- when the answer begins streaming
+- whether the turn completed or failed
+
+That makes the AI behavior feel inspectable rather than magical.
+
+### Session continuity
+The streaming assistant path is now session-aware.
+
+Current behavior:
+- the orchestrator resolves or creates a chat session early
+- the backend emits a `session` SSE event as soon as the session id is known
+- `done` includes `session_id` again as a frontend fallback
+- the frontend stores `sessionId` and sends it on later turns
+
+This keeps multi-turn continuity in the streaming path without changing the public non-streaming `mock-turn` contract.
+
+### Current limits
+The current architecture is intentionally narrower than a full agentic assistant.
+
+Still intentionally limited:
+- the real Anthropic provider path is still non-streaming at the provider layer
+- at most one tool call is allowed per assistant turn
+- no second provider call is made after tool execution
+- no repeated model/tool loop
+- no RAG
+- no MCP
+- no autonomous agent behavior
+- no coaching recommendation generation beyond deterministic, evidence-backed explanation
+
+The important architecture point is that the current system already demonstrates:
+- deterministic backend tools
+- provider isolation
+- tool validation
+- auth-scoped execution
+- SSE event streaming
+- frontend streaming state handling
+
+without claiming that it is already a full autonomous AI coaching product.

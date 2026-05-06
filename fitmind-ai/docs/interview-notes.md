@@ -372,3 +372,189 @@ Because the product surface is still intentionally limited. Even with a real pro
 
 #### What is the biggest boundary to defend in this phase?
 The most important boundary is that the provider may influence tool selection, but the backend still owns tool execution, data access, validation, persistence, and final response policy.
+
+## Phase 3.5 Assistant Closeout Framing
+At this point, the project can be explained as a full AI application pipeline instead of a collection of isolated features.
+
+The clearest high-level framing is:
+- FitMind AI is not a simple chat box
+- it starts from real first-party training logs
+- deterministic calculations and evidence are computed on the backend first
+- the model operates inside a constrained provider boundary
+- the frontend exposes the assistant workflow through streamed state transitions
+
+The current architecture chain is:
+- real training logs
+- deterministic calculation layer
+- tool registry and executor
+- provider adapter
+- SSE assistant stream
+- frontend chat state machine
+
+That is the line to emphasize in interviews.
+
+## Full Assistant Flow
+The current end-to-end assistant flow is:
+- user enters a message in the frontend assistant panel
+- the frontend hook enters `thinking`
+- the frontend opens `POST /api/assistant/stream-turn` using `fetch` plus `ReadableStream`
+- the backend assistant orchestrator validates the request and resolves authenticated session ownership
+- the provider adapter returns one normalized outcome: `message`, `tool_call`, or `error`
+- if the provider requests a tool, the backend executor validates the tool name, validates args schema, and injects authenticated user context
+- the deterministic tool returns structured evidence-backed data
+- the orchestrator shapes a final assistant response and emits project-owned SSE events
+- the frontend hook consumes those events and transitions through `tool_calling`, `answering`, `done`, or `error`
+
+The important interview point is that the user can see the assistant query tools before answering. The system does not present tool-backed reasoning as if it appeared from nowhere.
+
+## Why The Provider Does Not Query The DB
+The provider does not query the database directly because FitMind AI treats the model as a constrained language or selection layer, not as the owner of data access.
+
+This separation gives:
+- auditable permission boundaries
+- deterministic calculations that can be tested without model behavior
+- stable backend contracts even if providers change
+- lower hallucination risk because the provider consumes structured tool outputs instead of improvising on raw tables
+
+The current provider is allowed to return:
+- `message`
+- `tool_call`
+- `error`
+
+The provider is not allowed to:
+- read the database directly
+- bypass authenticated backend services
+- decide user ownership
+- execute tools itself
+
+## Why `user_id` Always Comes From Auth Context
+One of the most important safety and architecture points is that `user_id` never comes from frontend input or provider output.
+
+Current rule set:
+- auth middleware resolves the authenticated user
+- controllers pass only auth-scoped data into the assistant service
+- tool schemas never accept `user_id`
+- the executor uses authenticated backend context when calling deterministic services
+
+This prevents:
+- cross-user leakage from malformed client requests
+- model-generated attempts to override ownership
+- accidental coupling between prompt content and authorization
+
+If asked how cross-user leakage is prevented, the short answer is:
+"Ownership is enforced on the backend before calculation or tool execution, and `user_id` is never a model-controlled or client-controlled argument."
+
+## Frontend Streaming State Machine
+The frontend is now strong enough to be discussed as a real AI UX system rather than a placeholder panel.
+
+Current states:
+- `thinking`
+- `tool_calling`
+- `answering`
+- `done`
+- `error`
+
+Current frontend responsibilities:
+- open the authenticated SSE request
+- parse project-owned SSE events
+- append assistant `answer_delta` text progressively
+- surface active tool execution
+- support stop/abort
+- support retry
+- preserve streaming session continuity through `session_id`
+
+This is a strong interview point because it shows the frontend is not just rendering one loading spinner. It is exposing the assistant's execution phases in a way users can understand.
+
+## Why SSE Improves UX
+SSE improves UX because the assistant no longer behaves like one blocking request that suddenly resolves all at once.
+
+Compared with a single blocking response, SSE lets the UI show:
+- that the request has started
+- whether the backend is still deciding or already running a tool
+- when the answer begins streaming
+- whether the request completed successfully or failed
+
+This matters in AI applications because users otherwise cannot distinguish:
+- "the model is thinking"
+- "the tool call is still running"
+- "the answer is being generated"
+- "the request is stuck or failed"
+
+The current frontend makes those states explicit.
+
+## Current Limits
+Be explicit about what is still not implemented. That makes the architecture sound credible instead of overclaimed.
+
+Current limits:
+- the real Anthropic provider path is still non-streaming at the provider layer
+- at most one tool call is allowed per assistant turn
+- there is no second provider call after tool execution
+- there is no repeated tool loop
+- there is no RAG
+- there is no MCP
+- there is no autonomous agent behavior
+- there is no coaching recommendation generation beyond deterministic, evidence-backed explanation
+
+The right framing is:
+"This is already a full AI application chain, but it is still a controlled single-turn, single-tool, evidence-first assistant rather than a full agentic coaching system."
+
+## 60-Second Chinese Pitch
+“FitMind AI 不是一个简单聊天框，而是一个围绕真实训练日志构建的 AI 应用链路。它的核心路径是：真实训练日志先进入后端 deterministic calculation layer，产出可验证的训练汇总、单动作进展和 recommendation context；这些能力再被封装成内部 tools，通过 tool registry 和 executor 暴露给 assistant orchestrator。模型层并不能直接查数据库，它只能在 provider adapter 这个受控边界内返回 `message`、`tool_call` 或 `error`。如果模型请求工具，后端会校验 tool name、args schema，并且把 authenticated user context 注入执行过程，`user_id` 永远来自 auth middleware，不允许前端或模型传入。工具结果会返回 `workout_ids`、`set_ids`、`calculation_rules` 这些 evidence。最后后端通过 SSE 把 `thinking`、`tool_calling`、`answering`、`done`、`error` 状态流式推给前端，前端 chat state machine 会把这些状态和增量答案实时展示出来。所以这个项目的重点不是‘让模型随便聊’，而是把 deterministic data、tool execution、provider boundary、streaming UX 和权限隔离完整串成一条可解释的 AI 应用链路。”
+
+## Deep-Dive Q&A
+
+### Why Tool Calling instead of putting all data in the prompt?
+Because raw workout logs are not the right abstraction for a model prompt.
+
+Tool Calling lets the backend:
+- choose stable, testable capability boundaries
+- keep aggregation logic deterministic
+- return structured evidence instead of verbose raw records
+- reduce token waste and prompt noise
+
+The model should receive prepared facts, not invent the data pipeline from raw logs.
+
+### Why a deterministic calculation layer?
+Because the most important training numbers should be reproducible without model involvement.
+
+That gives:
+- easier testing
+- clearer debugging
+- stronger user trust
+- evidence that can be traced back to workouts and sets
+
+The model becomes an explanation layer on top of stable facts rather than the source of those facts.
+
+### How do you prevent cross-user data leakage?
+By enforcing ownership on the backend before any calculation or tool execution happens.
+
+Concrete protections:
+- `user_id` comes only from auth middleware
+- neither the client nor the provider passes `user_id`
+- tool schemas do not accept `user_id`
+- session ownership is checked before assistant message persistence or stream reuse
+- deterministic services still filter by authenticated user context
+
+### How does the frontend handle streaming state?
+The frontend opens an authenticated SSE request, parses project-owned events, and updates a small state machine:
+- `thinking`
+- `tool_calling`
+- `answering`
+- `done`
+- `error`
+
+It also:
+- tracks the active tool call
+- appends streamed answer deltas progressively
+- supports stop and retry
+- preserves `session_id` for later turns
+
+### What would you add next?
+The next logical steps would be:
+- real provider streaming integration so the provider layer is also stream-aware
+- a second provider call after tool execution so the model can turn tool output into a final provider-authored answer
+- a bounded multi-step tool loop
+- chat history hydration and session browsing
+- only after that, optional RAG, MCP, or more agent-like workflows
+
+The key is that each next step should preserve the existing boundaries around deterministic data, auth-scoped execution, and evidence visibility.

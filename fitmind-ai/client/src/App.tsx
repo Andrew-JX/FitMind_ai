@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { AssistantWorkspace } from "./features/assistant/AssistantWorkspace";
 import { AuthScreen } from "./features/auth/AuthScreen";
 import { ExercisePicker } from "./features/training/ExercisePicker";
 import { ExerciseProgressPanel } from "./features/training/ExerciseProgressPanel";
@@ -96,6 +97,11 @@ export function App() {
             Use the tools below to search exercises, save workouts, review your recent
             log, and inspect a deterministic 30-day training summary.
           </p>
+          <AssistantWorkspace
+            selectedExerciseId={selectedProgressExerciseId}
+            selectedExerciseName={selectedProgressExerciseName}
+            token={auth.token}
+          />
           <RecommendationContextPanel
             refreshSignal={recommendationContextRefreshSignal}
             token={auth.token}
