@@ -1708,3 +1708,57 @@
 - Documentation claims were kept intentionally narrower than a full AI chat story.
 - No claim is made that Phase 3.2 implements streaming, multi-step loops, coaching recommendation generation, or a finished frontend assistant product.
 
+## 2026-05-07 Phase 3.3 Batch 1-2 - Evented Assistant Orchestrator + SSE Stream Smoke
+
+### Completed work
+- Added a backend-only `POST /api/assistant/stream-turn` SSE endpoint without changing frontend UI.
+- Added project-owned assistant stream event types for state transitions, provider selection, tool lifecycle, answer deltas, done, and error.
+- Refactored the assistant orchestrator to optionally emit execution events while preserving the existing non-streaming `POST /api/assistant/mock-turn` response contract.
+- Kept validation, provider selection, tool permission checks, answer shaping, and chat persistence inside the orchestrator so the SSE controller stays provider-agnostic.
+- Emitted real tool lifecycle events around the actual `executeAiTool` call and simulated streaming output by chunking the final answer text into deterministic `answer_delta` slices.
+- Added a dedicated assistant router and moved assistant endpoints out of the workouts router without changing public paths.
+- Added a backend smoke for SSE that verifies unauthenticated access, tool-backed streaming, `[mock:text]`, `[mock:error]`, second-user isolation, event order, `done` presence, `error` presence, and absence of obvious raw provider payload leakage.
+
+### Changed files
+- `server/src/services/assistant/assistant-stream-types.ts`
+- `server/src/services/assistant/assistant-orchestrator-service.ts`
+- `server/src/controllers/assistant-stream-controller.ts`
+- `server/src/routes/assistant.ts`
+- `server/src/routes/workouts.ts`
+- `server/src/controllers/workout-controller.ts`
+- `server/src/app.ts`
+- `server/scripts/assistant-stream-smoke.ts`
+- `docs/progress.md`
+
+### Stream behavior
+- Tool-backed runs emit:
+  - `state: thinking`
+  - `provider_selected`
+  - `state: tool_calling`
+  - `tool_call_started`
+  - `tool_call_finished`
+  - `state: answering`
+  - one or more `answer_delta`
+  - `done`
+- `[mock:text]` emits thinking, provider selection, answering, delta chunks, and done without any tool lifecycle events.
+- `[mock:error]` emits thinking, provider selection, and one SSE `error` event using the project error convention.
+- The SSE payloads remain project-owned and do not expose raw Anthropic response blocks or transport metadata.
+
+### Compatibility notes
+- `POST /api/assistant/mock-turn` remains unchanged at the public contract level and still returns `assistant_type: deterministic_mock`.
+- User identity for both assistant endpoints remains derived only from auth middleware locals.
+- Chat session and message persistence still occur once per successful assistant turn using the same final deterministic response payload.
+
+### Validation commands
+- `pnpm --filter @fitmind/server type-check`
+- `pnpm lint`
+- `pnpm --filter @fitmind/server exec tsx scripts/assistant-stream-smoke.ts`
+
+### Verification notes
+- `pnpm --filter @fitmind/server type-check` passed.
+- `pnpm lint` passed.
+- The initial smoke attempt using `pnpm --filter @fitmind/server exec tsx scripts/assistant-stream-smoke.ts` failed because `tsx` was not resolved in this environment.
+- The fallback attempt surfaced the known `tsx/esbuild` `spawn EPERM` issue.
+- The smoke was rerun successfully through the established elevated execution path using the package-local `tsx.cmd`.
+- The passing smoke verified exact SSE event order for tool-backed, `[mock:text]`, `[mock:error]`, and cross-user isolation paths.
+

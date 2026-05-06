@@ -8,7 +8,6 @@ import {
   getExerciseProgressController,
   getRecommendationContextController,
   getWorkoutController,
-  postMockAssistantTurnController,
   getTrainingSummaryController,
   listWorkoutsController,
   updateSetController,
@@ -27,7 +26,6 @@ workoutsRouter.get(
   getRecommendationContextController,
 );
 workoutsRouter.get("/training/summary", getTrainingSummaryController);
-workoutsRouter.post("/assistant/mock-turn", postMockAssistantTurnController);
 workoutsRouter.get("/workouts/:id", getWorkoutController);
 workoutsRouter.post("/workouts", createWorkoutController);
 workoutsRouter.patch("/workouts/:id", updateWorkoutController);

@@ -6,13 +6,18 @@ import {
   findChatSessionByIdForUser,
   hasChatSessionById,
 } from "../../db/chat-repository.js";
+import { HttpError } from "../../utils/http-error.js";
 import { executeAiTool } from "../ai/tools/tool-executor.js";
 import {
   AiToolValidationError,
   isValidDateOnly,
 } from "../ai/tools/tool-types.js";
-import { HttpError } from "../../utils/http-error.js";
 import { runAssistantProvider } from "./provider-adapter.js";
+import { getConfiguredAssistantProvider } from "./provider-config.js";
+import type {
+  AssistantStreamEvent,
+  AssistantStreamOptions,
+} from "./assistant-stream-types.js";
 import type {
   AssistantProviderRequest,
   AssistantProviderResponse,
@@ -177,6 +182,8 @@ interface ProviderSimulationResult {
   scenario: "default" | "message" | "error";
   normalizedMessage: string;
 }
+
+const ANSWER_DELTA_CHUNK_SIZE = 24;
 
 function uniqueStrings(values: string[]): string[] {
   return [...new Set(values)];
@@ -511,17 +518,95 @@ async function persistMockTurnMessages(input: {
   });
 }
 
+async function emitEvent(
+  options: AssistantStreamOptions | undefined,
+  event: AssistantStreamEvent,
+): Promise<void> {
+  await options?.onEvent?.(event);
+}
+
+function formatAnswerText(answer: MockAssistantTurnResponseData["answer"]): string {
+  const bulletLines = answer.bullets.map((bullet) => `- ${bullet}`);
+
+  return bulletLines.length === 0
+    ? answer.summary
+    : `${answer.summary}\n${bulletLines.join("\n")}`;
+}
+
+function buildAnswerDeltas(
+  answer: MockAssistantTurnResponseData["answer"],
+): string[] {
+  const formattedAnswer = formatAnswerText(answer);
+
+  if (formattedAnswer.length === 0) {
+    return [];
+  }
+
+  const chunks: string[] = [];
+
+  for (
+    let startIndex = 0;
+    startIndex < formattedAnswer.length;
+    startIndex += ANSWER_DELTA_CHUNK_SIZE
+  ) {
+    chunks.push(
+      formattedAnswer.slice(startIndex, startIndex + ANSWER_DELTA_CHUNK_SIZE),
+    );
+  }
+
+  return chunks;
+}
+
+async function emitAnswerEvents(
+  answer: MockAssistantTurnResponseData["answer"],
+  options: AssistantStreamOptions | undefined,
+): Promise<void> {
+  await emitEvent(options, {
+    type: "state",
+    state: "answering",
+  });
+
+  for (const chunk of buildAnswerDeltas(answer)) {
+    await emitEvent(options, {
+      type: "answer_delta",
+      text: chunk,
+    });
+  }
+}
+
+function buildModeAnswer(
+  mode: MockAssistantTurnInput["mode"],
+  result: unknown,
+): MockAssistantTurnResponseData["answer"] {
+  if (mode === "training_overview") {
+    return buildTrainingOverviewAnswer(result as TrainingOverviewResult);
+  }
+
+  if (mode === "exercise_progress") {
+    return buildExerciseProgressAnswer(result as ExerciseProgressResult);
+  }
+
+  return buildRecommendationContextAnswer(result as RecommendationContextResult);
+}
+
 /**
  * Execute one deterministic mock assistant turn through the internal tool executor.
  *
  * @param userId - Authenticated user id from middleware context.
  * @param rawInput - Raw request body for the mock assistant turn.
+ * @param options - Optional stream event sink for SSE responses.
  * @returns Deterministic mock assistant response assembled from tool output.
  */
 export async function runMockAssistantTurn(
   userId: string,
   rawInput: unknown,
+  options?: AssistantStreamOptions,
 ): Promise<MockAssistantTurnResponseData> {
+  await emitEvent(options, {
+    type: "state",
+    state: "thinking",
+  });
+
   const input = mockAssistantTurnSchema.parse(rawInput);
   const resolvedSession = await resolveSession(
     userId,
@@ -529,12 +614,26 @@ export async function runMockAssistantTurn(
     input.message,
   );
   const providerRequest = buildProviderRequest(input);
+
+  await emitEvent(options, {
+    type: "provider_selected",
+    provider: getConfiguredAssistantProvider(),
+  });
+
   const providerResponse = await runAssistantProvider(providerRequest);
 
   if (providerResponse.kind === "error") {
-    throw new HttpError(502, "AI_PROVIDER_ERROR", providerResponse.message, {
+    const error = new HttpError(502, "AI_PROVIDER_ERROR", providerResponse.message, {
       provider_error_code: providerResponse.error_code,
     });
+
+    await emitEvent(options, {
+      type: "error",
+      code: error.code,
+      message: error.message,
+    });
+
+    throw error;
   }
 
   const toolCalls: MockAssistantTurnResponseData["tool_calls"] = [];
@@ -542,8 +641,18 @@ export async function runMockAssistantTurn(
 
   if (providerResponse.kind === "message") {
     answer = buildProviderMessageAnswer(input.mode, providerResponse.message);
+    await emitAnswerEvents(answer, options);
   } else {
     ensureAllowedProviderTool(providerResponse, providerRequest.allowed_tools);
+    await emitEvent(options, {
+      type: "state",
+      state: "tool_calling",
+    });
+    await emitEvent(options, {
+      type: "tool_call_started",
+      tool_name: providerResponse.tool_name,
+    });
+
     const startedAt = Date.now();
     let result: unknown;
 
@@ -553,16 +662,31 @@ export async function runMockAssistantTurn(
         providerResponse.tool_name,
         providerResponse.tool_args,
       );
+
+      const durationMs = Math.max(0, Date.now() - startedAt);
       toolCalls.push({
         tool_name: providerResponse.tool_name,
         status: "success",
-        duration_ms: Math.max(0, Date.now() - startedAt),
+        duration_ms: durationMs,
+      });
+      await emitEvent(options, {
+        type: "tool_call_finished",
+        tool_name: providerResponse.tool_name,
+        status: "success",
+        duration_ms: durationMs,
       });
     } catch (error) {
+      const durationMs = Math.max(0, Date.now() - startedAt);
       toolCalls.push({
         tool_name: providerResponse.tool_name,
         status: "error",
-        duration_ms: Math.max(0, Date.now() - startedAt),
+        duration_ms: durationMs,
+      });
+      await emitEvent(options, {
+        type: "tool_call_finished",
+        tool_name: providerResponse.tool_name,
+        status: "error",
+        duration_ms: durationMs,
       });
 
       if (error instanceof AiToolValidationError) {
@@ -572,15 +696,10 @@ export async function runMockAssistantTurn(
       throw error;
     }
 
-    answer =
-      input.mode === "training_overview"
-        ? buildTrainingOverviewAnswer(result as TrainingOverviewResult)
-        : input.mode === "exercise_progress"
-          ? buildExerciseProgressAnswer(result as ExerciseProgressResult)
-          : buildRecommendationContextAnswer(
-              result as RecommendationContextResult,
-            );
+    answer = buildModeAnswer(input.mode, result);
+    await emitAnswerEvents(answer, options);
   }
+
   const response: MockAssistantTurnResponseData = {
     session_id: resolvedSession.sessionId,
     mode: input.mode,
@@ -593,6 +712,10 @@ export async function runMockAssistantTurn(
     sessionId: resolvedSession.sessionId,
     request: input,
     response,
+  });
+
+  await emitEvent(options, {
+    type: "done",
   });
 
   return response;
