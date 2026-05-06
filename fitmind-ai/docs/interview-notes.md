@@ -301,3 +301,74 @@ The key architectural point is that real model integration should replace only t
 A concise version is:
 
 “FitMind AI is being built as a training log system with a deterministic calculation layer underneath it, before any future AI explanation is added. Phase 1 established authenticated workout CRUD so the product owns real user training data. Phase 2 added deterministic summary and exercise-progress endpoints plus readonly UI. Phase 2.1 then added a Recommendation Context Builder endpoint that packages summary, focus exercise progress, recent workouts, and evidence into one structured deterministic backend context. The most important design point is that any future recommendation should sit on top of workout ids, set ids, and calculation rules, not on top of an untraceable chat experience.”
+
+## Phase 3.2 Provider Adapter
+Phase 3.2 is the point where the backend stops being only a deterministic mock assistant seam and starts proving that a real provider can be plugged in without giving up backend control.
+
+### How to explain Phase 3.2 in interviews
+A clean framing is:
+- first we built deterministic calculations
+- then we wrapped them as internal tools
+- then we added an assistant orchestrator with deterministic mock behavior
+- then we inserted a provider adapter so the provider can be swapped by env while the backend still owns business flow
+
+The important point is that provider integration is not the same thing as "AI chat is done". It only proves that the orchestration contract is strong enough to accept a real model dependency without breaking user isolation or tool boundaries.
+
+### Why the provider should not appear in controllers
+Controllers should remain thin and unaware of provider specifics because:
+- SDK request/response details are infrastructure concerns, not HTTP surface concerns
+- swapping providers should not require controller rewrites
+- provider failures should already be normalized before anything reaches the route/controller layer
+
+In this design, controllers still only pass auth-scoped request data into the assistant service and return the normalized result.
+
+### Why a real provider still cannot query the database directly
+Even after Phase 3.2, the provider is still not trusted with direct data access.
+
+That boundary matters because:
+- auth and ownership checks stay on the backend
+- deterministic calculations remain testable and auditable
+- the model is prevented from inventing its own query plan against raw workout tables
+
+The provider may ask for one allowed tool. The backend still decides what that tool means, how it validates input, and what data it returns.
+
+### Tool selection vs tool execution vs provider integration vs future tool loop
+- tool selection: deciding whether to answer directly or request one allowed tool
+- tool execution: backend-only execution of a validated internal capability through the tool executor
+- provider integration: plugging a real external model into the adapter boundary while preserving project-owned contracts
+- future tool loop orchestration: a later phase that would add repeated model/tool turns, streaming states, and more agent-like coordination
+
+### Why the mock provider came before the real provider
+The mock provider is valuable because it verifies the orchestration contract before cost, latency, and model behavior enter the picture.
+
+It proves:
+- the assistant service can build a provider-neutral request
+- the backend can normalize `message | tool_call | error`
+- persistence and evidence behavior still work
+- provider swapping is a real architectural seam, not an empty abstraction
+
+### What Phase 3.2 still does not implement
+Still intentionally not implemented:
+- no SSE streaming
+- no frontend chat state machine
+- no multi-step model/tool loop
+- no second provider call after tool execution
+- no coaching recommendation generation
+- no RAG, MCP, or agent orchestration
+
+### 30-Second Chinese Pitch For Phase 3.2
+"Phase 3.2 我做的是把真实 model provider 通过 Provider Adapter 接进后端，但不是直接做成聊天产品。现在后端可以通过 `ASSISTANT_PROVIDER` 在 `mock` 和 `anthropic` 之间切换，assistant orchestrator 仍然负责验证请求、决定允许哪些内部工具、执行工具、组装最终响应、以及持久化消息。Provider 本身只能返回 `message`、`tool_call` 或 `error` 这三种规范化结果，不能直接查库，也不能绕过 tool executor。这样面试时可以清楚说明：我们不是把模型 SDK 散落到 controller 里，而是先把 provider 边界、数据权限边界、和 tool execution 边界都收紧，再逐步往 streaming chat 演进。"
+
+### Deep-Dive Q&A For Phase 3.2
+
+#### Why add a Provider Adapter instead of calling Anthropic directly in the assistant service?
+Because the adapter keeps provider-specific payload shapes and transport rules isolated. The assistant service should own product behavior, not SDK ceremony.
+
+#### What does the env switch prove?
+It proves the abstraction is real. `ASSISTANT_PROVIDER=mock` and `ASSISTANT_PROVIDER=anthropic` exercise the same orchestrator surface, which means provider swapping is no longer theoretical.
+
+#### Why keep `assistant_type` as `deterministic_mock` for now?
+Because the product surface is still intentionally limited. Even with a real provider plugged in, this phase is still non-streaming, single-response, and at most one tool call. It is not yet a finished chat assistant experience.
+
+#### What is the biggest boundary to defend in this phase?
+The most important boundary is that the provider may influence tool selection, but the backend still owns tool execution, data access, validation, persistence, and final response policy.

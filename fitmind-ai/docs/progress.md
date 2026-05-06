@@ -1616,3 +1616,95 @@
 - Plain-text provider fallbacks now use backend-defined empty evidence rather than deterministic tool evidence, so future real-provider batches should decide whether to formalize that response shape more broadly.
 - No real provider selection, env-flag routing, streaming, or multi-step model/tool loop exists yet in this batch.
 
+## 2026-05-06 Phase 3.2 Batch 1.1 - Provider Adapter Smoke
+
+### Completed work
+- Added a standalone backend smoke for the provider adapter path at `server/scripts/assistant-provider-adapter-smoke.ts`.
+- Covered the normal tool-backed mock provider path, the `[mock:text]` plain-text fallback path, and the `[mock:error]` provider-failure path.
+- Verified successful normal/text runs still persist user and assistant messages through the existing Phase 3.1 chat persistence layer.
+- Verified provider-path user isolation still holds: a second user cannot reuse the first user's session and only sees their own workout evidence.
+- Kept this batch backend-only with no controller, route, request-schema, deterministic calculation, or real provider SDK changes.
+
+### Changed files
+- `server/scripts/assistant-provider-adapter-smoke.ts`
+- `docs/progress.md`
+
+### Validation commands
+- `pnpm --filter @fitmind/server type-check`
+- `pnpm lint`
+- `pnpm --filter @fitmind/server exec tsx scripts/assistant-provider-adapter-smoke.ts`
+
+### Verification notes
+- The normal provider path still returns `assistant_type: deterministic_mock`, executes one tool call, and exposes `deterministic_tool_executor` evidence.
+- The `[mock:text]` path succeeds without tool execution, returns `tool_calls: []`, and exposes `deterministic_mock_provider` evidence without falsely claiming tool-derived ids or rules.
+- The `[mock:error]` path is mapped into the existing backend error convention using `AI_PROVIDER_ERROR`.
+- No real LLM integration, streaming, or multi-step tool loop is claimed in this batch.
+
+## 2026-05-06 Phase 3.2 Batch 2 - Real Provider Adapter Behind Env Flag
+
+### Completed work
+- Added `ASSISTANT_PROVIDER` to the strict server env loader with `mock` and `anthropic` support, defaulting to `mock`.
+- Added provider selection/config helpers so the adapter can choose the active provider without exposing env wiring to controllers.
+- Added a real Anthropic non-streaming provider implementation using the Messages API over direct HTTP, without adding a provider SDK.
+- Kept the assistant orchestrator and public `POST /api/assistant/mock-turn` contract unchanged while routing provider calls through the adapter boundary.
+- Kept the provider layer limited to returning normalized `message`, `tool_call`, or `error` results and at most one tool call per run.
+
+### Changed files
+- `server/src/env.ts`
+- `server/src/services/assistant/provider-config.ts`
+- `server/src/services/assistant/anthropic-provider.ts`
+- `server/src/services/assistant/provider-adapter.ts`
+- `docs/progress.md`
+
+### Verification notes
+- `ASSISTANT_PROVIDER=mock` remains the default when no env override is present.
+- Unsupported provider-requested tool names are normalized into provider errors instead of leaking raw provider details.
+- The Anthropic path remains non-streaming and single-response only.
+- No second provider call after tool execution was added in this batch.
+
+## 2026-05-06 Phase 3.2 Batch 2.1 - Non-streaming Assistant Run Smoke
+
+### Completed work
+- Added `server/scripts/assistant-provider-run-smoke.ts` to cover both mock-provider and env-gated real-provider execution paths.
+- Kept stable mock-provider smoke coverage for:
+  - normal tool-backed path
+  - `[mock:text]` plain-text path
+  - `[mock:error]` provider-error path
+- Added optional real-provider smoke coverage for `ASSISTANT_PROVIDER=anthropic` when `ANTHROPIC_API_KEY` is available.
+- Verified successful runs still preserve `session_id` behavior, persist messages, and keep user isolation intact.
+
+### Changed files
+- `server/scripts/assistant-provider-run-smoke.ts`
+- `docs/progress.md`
+
+### Validation commands
+- `pnpm --filter @fitmind/server type-check`
+- `pnpm lint`
+- `pnpm --filter @fitmind/server exec tsx scripts/assistant-provider-run-smoke.ts`
+
+### Verification notes
+- Mock-provider smoke is expected to run reliably in local development.
+- Real-provider smoke prints a clear skip message when `ANTHROPIC_API_KEY` is absent instead of failing.
+- No raw provider payloads are expected to reach the controller response in either path.
+
+## 2026-05-06 Phase 3.2 Batch 3 - Provider Adapter Docs and Interview Notes
+
+### Completed work
+- Documented the provider adapter layer and its current non-streaming, single-response, single-tool-call limits in `docs/calculation-layer.md`.
+- Expanded `docs/interview-notes.md` with Phase 3.2 architecture framing, provider boundary explanations, and a Chinese pitch.
+- Kept the documentation aligned with current implementation limits:
+  - provider adapter exists
+  - mock and Anthropic provider modes are env-switchable
+  - orchestrator still owns business flow
+  - provider still cannot query the database directly
+  - SSE, frontend chat state machine, and multi-step tool loops are not implemented
+
+### Changed files
+- `docs/calculation-layer.md`
+- `docs/interview-notes.md`
+- `docs/progress.md`
+
+### Verification notes
+- Documentation claims were kept intentionally narrower than a full AI chat story.
+- No claim is made that Phase 3.2 implements streaming, multi-step loops, coaching recommendation generation, or a finished frontend assistant product.
+

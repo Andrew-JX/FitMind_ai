@@ -9,6 +9,7 @@ const serverEnvSchema = z.object({
   PORT: z.coerce.number().int().positive().default(DEFAULT_PORT),
   DATABASE_URL: z.string().min(1).optional(),
   JWT_SECRET: z.string().min(1).optional(),
+  ASSISTANT_PROVIDER: z.enum(["mock", "anthropic"]).default("mock"),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
 });
 
@@ -17,6 +18,7 @@ export interface ServerEnv {
   port: number;
   databaseUrl?: string | undefined;
   jwtSecret?: string | undefined;
+  assistantProvider: "mock" | "anthropic";
   anthropicApiKey?: string | undefined;
 }
 
@@ -30,6 +32,7 @@ export function loadServerEnv(
     port: parsed.PORT,
     databaseUrl: parsed.DATABASE_URL,
     jwtSecret: parsed.JWT_SECRET,
+    assistantProvider: parsed.ASSISTANT_PROVIDER,
     anthropicApiKey: parsed.ANTHROPIC_API_KEY,
   };
 }

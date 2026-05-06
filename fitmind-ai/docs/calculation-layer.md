@@ -224,3 +224,71 @@ The current persistence is still intentionally limited:
 - persisted messages contain deterministic app-owned data only
 - no JWT, headers, raw auth payloads, or env vars are stored as message content or metadata
 - `tool_call_logs.message_id` remains `null` because the current executor persists logs internally and is not yet wired to the persisted assistant message row
+
+## Phase 3.2 Provider Adapter Path
+Phase 3.2 adds a provider adapter layer between the assistant orchestrator and any real model provider.
+
+The current architecture is:
+- assistant orchestrator
+- provider adapter
+- normalized provider response
+- optional internal tool execution
+- final non-streaming assistant response
+
+This phase is intentionally still limited:
+- no SSE
+- no frontend chat UI
+- no multi-step tool loop
+- no second provider call after tool execution
+- no coaching recommendation generation
+
+### Why the provider adapter exists
+The provider adapter exists so the backend speaks in project-owned request and response shapes instead of provider-owned SDK payloads.
+
+That gives the system:
+- one stable assistant contract even if providers change later
+- testable mock-provider behavior before real provider wiring
+- a clean separation between provider selection and backend business flow
+
+### What the provider is allowed to do
+The provider layer may return exactly one of:
+- a plain-text `message`
+- one `tool_call`
+- an `error`
+
+The provider does not:
+- access the database directly
+- bypass auth-scoped backend services
+- execute tools itself
+- own message persistence
+
+### What the orchestrator still owns
+The assistant orchestrator remains the owner of business flow:
+- request validation
+- auth-scoped session resolution
+- provider request construction
+- tool execution through the internal executor
+- final response shaping
+- chat message persistence
+
+This means even a real provider does not become the owner of data access or orchestration policy. It is only one pluggable decision and language layer inside a backend-controlled workflow.
+
+### Current provider modes
+The adapter currently supports:
+- `ASSISTANT_PROVIDER=mock`
+- `ASSISTANT_PROVIDER=anthropic`
+
+`mock` remains the default so local behavior is stable when no provider flag is set.
+
+The Anthropic path is still intentionally narrow:
+- one non-streaming Messages API call
+- at most one provider-requested tool call
+- normalized response mapping back into the existing assistant flow
+
+### Current smoke coverage
+Phase 3.2 smoke now covers:
+- stable mock-provider runs for normal tool-backed, plain-text, and provider-error paths
+- env-gated real-provider verification when `ANTHROPIC_API_KEY` is available
+- persistence and user isolation checks for successful runs
+
+If `ANTHROPIC_API_KEY` is absent, the real-provider smoke is skipped rather than treated as a product failure.
