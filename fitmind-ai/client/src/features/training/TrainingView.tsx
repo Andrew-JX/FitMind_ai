@@ -68,6 +68,7 @@ export function TrainingView(props: TrainingViewProps) {
       </Card>
 
       <TrainingSessionComposer
+        exerciseLibraryProps={props.exercisePickerProps}
         isOpen={isComposerOpen}
         onCancel={() => setIsComposerOpen(false)}
         onCreated={async () => {

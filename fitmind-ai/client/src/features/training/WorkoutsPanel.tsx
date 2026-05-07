@@ -20,8 +20,10 @@ export interface WorkoutsPanelProps {
   onDeleteWorkout: (workoutId: string) => Promise<boolean>;
   onRefresh: () => Promise<void>;
   onSelectWorkout: (workoutId: string) => Promise<void>;
+  onWorkoutEdited?: (() => Promise<void>) | undefined;
   selectedWorkout: WorkoutDetailDto | null;
   selectedWorkoutId: string | null;
+  token: string | null;
   workouts: WorkoutSummaryDto[];
 }
 
@@ -112,7 +114,9 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
                 isLoadingDetail={props.isLoadingDetail}
                 key={workout.id}
                 onDelete={() => handleDeleteWorkout(workout.id)}
+                onEdited={() => handleWorkoutEdited(workout.id)}
                 onToggle={() => handleToggleWorkout(workout.id, isExpanded)}
+                token={props.token}
                 workout={workout}
               />
             );
@@ -146,6 +150,12 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
 
     setCollapsedWorkoutId(null);
     await props.onSelectWorkout(workoutId);
+  }
+
+  async function handleWorkoutEdited(workoutId: string): Promise<void> {
+    await props.onRefresh();
+    await props.onSelectWorkout(workoutId);
+    await props.onWorkoutEdited?.();
   }
 }
 

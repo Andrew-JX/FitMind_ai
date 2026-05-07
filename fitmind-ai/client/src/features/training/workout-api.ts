@@ -1,11 +1,15 @@
 import type {
+  AddWorkoutSetRequest,
   CreateWorkoutRequest,
   DeleteEntityResponseData,
   WorkoutDetailDto,
   WorkoutDetailResponseData,
   WorkoutListResponseData,
+  WorkoutSetDto,
   WorkoutSummaryDto,
   WorkoutMutationResponseData,
+  UpdateWorkoutRequest,
+  UpdateWorkoutSetRequest,
 } from "../../../../shared/src/training";
 
 import { requestJson } from "../../services/http-client";
@@ -31,6 +35,10 @@ export async function createWorkout(
   });
 
   return response.workout;
+}
+
+interface WorkoutSetMutationResponseData {
+  set: WorkoutSetDto;
 }
 
 /**
@@ -80,6 +88,67 @@ export async function deleteWorkout(
   workoutId: string,
 ): Promise<DeleteEntityResponseData> {
   return requestJson<DeleteEntityResponseData>(`/api/workouts/${workoutId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+export async function updateWorkout(
+  token: string,
+  workoutId: string,
+  input: UpdateWorkoutRequest,
+): Promise<WorkoutDetailDto> {
+  const response = await requestJson<
+    WorkoutMutationResponseData,
+    UpdateWorkoutRequest
+  >(`/api/workouts/${workoutId}`, {
+    method: "PATCH",
+    body: input,
+    token,
+  });
+
+  return response.workout;
+}
+
+export async function addWorkoutSet(
+  token: string,
+  workoutId: string,
+  input: AddWorkoutSetRequest,
+): Promise<WorkoutDetailDto> {
+  const response = await requestJson<
+    WorkoutMutationResponseData,
+    AddWorkoutSetRequest
+  >(`/api/workouts/${workoutId}/sets`, {
+    method: "POST",
+    body: input,
+    token,
+  });
+
+  return response.workout;
+}
+
+export async function updateWorkoutSet(
+  token: string,
+  setId: string,
+  input: UpdateWorkoutSetRequest,
+): Promise<WorkoutSetDto> {
+  const response = await requestJson<
+    WorkoutSetMutationResponseData,
+    UpdateWorkoutSetRequest
+  >(`/api/sets/${setId}`, {
+    method: "PATCH",
+    body: input,
+    token,
+  });
+
+  return response.set;
+}
+
+export async function deleteWorkoutSet(
+  token: string,
+  setId: string,
+): Promise<DeleteEntityResponseData> {
+  return requestJson<DeleteEntityResponseData>(`/api/sets/${setId}`, {
     method: "DELETE",
     token,
   });

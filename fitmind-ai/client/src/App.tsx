@@ -116,10 +116,12 @@ export function App() {
               isLoadingList: workouts.isLoadingList,
               listError: workouts.listError,
               onDeleteWorkout: handleDeleteWorkout,
+              onWorkoutEdited: handleWorkoutCreated,
               onRefresh: workouts.refreshWorkouts,
               onSelectWorkout: workouts.selectWorkout,
               selectedWorkout: workouts.selectedWorkout,
               selectedWorkoutId: workouts.selectedWorkoutId,
+              token: auth.token,
               workouts: workouts.workouts,
             }}
           />

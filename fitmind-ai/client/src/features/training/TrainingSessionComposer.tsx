@@ -1,14 +1,28 @@
 import { useEffect, useState } from "react";
 
+import type { ExercisePickerProps } from "./ExercisePicker";
+import type { DictionaryExercise } from "./dictionary-api";
+
 import { Button } from "../../components/Button";
 import { Icon } from "../../components/Icon";
 import { StateNotice } from "../../components/StateNotice";
 import { useTheme } from "../../theme/ThemeContext";
+import { ExerciseLibraryScreen } from "./ExerciseLibraryScreen";
 import { TrainingSessionEmptyState } from "./TrainingSessionEmptyState";
+import { TrainingSessionExerciseCard } from "./TrainingSessionExerciseCard";
 import { TrainingSessionTimer } from "./TrainingSessionTimer";
-import { useWorkoutForm } from "./use-workout-form";
+import { createWorkout } from "./workout-api";
+import {
+  buildWorkoutRequestFromDraft,
+  createDraftExercise,
+  createDraftSet,
+  getCompletedValidSetCount,
+  type DraftExercise,
+  type DraftSet,
+} from "./training-session-draft";
 
 export interface TrainingSessionComposerProps {
+  exerciseLibraryProps: ExercisePickerProps;
   isOpen: boolean;
   onCancel: () => void;
   onCreated?: (() => Promise<void>) | undefined;
@@ -17,9 +31,13 @@ export interface TrainingSessionComposerProps {
 
 export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
   const { theme } = useTheme();
-  const form = useWorkoutForm(props.token);
+  const [draftExercises, setDraftExercises] = useState<DraftExercise[]>([]);
+  const [duplicateNotice, setDuplicateNotice] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!props.isOpen || !isRunning) {
@@ -37,8 +55,7 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
 
   useEffect(() => {
     if (!props.isOpen) {
-      setElapsedSeconds(0);
-      setIsRunning(false);
+      resetComposerState();
     }
   }, [props.isOpen]);
 
@@ -46,13 +63,7 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
     return null;
   }
 
-  const hasValidSetDraft = form.setDrafts.some((setDraft) => {
-    return Boolean(
-      setDraft.exerciseId.trim() &&
-        setDraft.reps.trim() &&
-        setDraft.weightKg.trim(),
-    );
-  });
+  const completedValidSetCount = getCompletedValidSetCount(draftExercises);
 
   return (
     <section style={composerStyle}>
@@ -60,15 +71,15 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
       <div style={panelStyle(theme)}>
         <header style={headerStyle}>
           <div style={headerTopRowStyle}>
-            <Button onClick={handleCancel} type="button" variant="secondary">
+            <Button disabled={isSubmitting} onClick={handleCancel} type="button" variant="secondary">
               取消
             </Button>
             <Button
-              disabled={!hasValidSetDraft || form.isSubmitting}
+              disabled={completedValidSetCount === 0 || isSubmitting}
               onClick={() => void handleComplete()}
               type="button"
             >
-              {form.isSubmitting ? "保存中..." : "完成"}
+              {isSubmitting ? "保存中..." : "完成"}
             </Button>
           </div>
 
@@ -84,75 +95,381 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
                 <Icon name={isRunning ? "clock" : "stop"} size={14} />
                 <span>{isRunning ? "训练进行中" : "等待开始"}</span>
               </div>
-              {!hasValidSetDraft ? (
-                <p style={statusCopyStyle(theme)}>请先添加至少一个动作和训练组。</p>
-              ) : null}
+              <p style={statusCopyStyle(theme)}>
+                {completedValidSetCount > 0
+                  ? `已完成 ${completedValidSetCount} 组，可保存训练`
+                  : "请先添加至少一个动作和训练组。"}
+              </p>
             </div>
           </div>
         </header>
 
         <main style={bodyStyle}>
-          <TrainingSessionEmptyState />
-
-          <div style={placeholderBlockStyle(theme)}>
-            <strong style={{ fontSize: 14 }}>Batch 1 说明</strong>
-            <p style={placeholderCopyStyle(theme)}>
-              本批先切换为全屏训练会话壳层，添加动作入口会在后续批次接入真实动作库与训练组编辑。
-            </p>
-          </div>
-
-          {form.errorMessage ? (
+          {duplicateNotice ? (
             <StateNotice
-              description={translateMessage(form.errorMessage)}
+              description={duplicateNotice}
+              title="动作已存在"
+              tone="warning"
+            />
+          ) : null}
+
+          {errorMessage ? (
+            <StateNotice
+              description={translateErrorMessage(errorMessage)}
               title="训练保存失败"
               tone="error"
             />
           ) : null}
+
+          {draftExercises.length === 0 ? (
+            <TrainingSessionEmptyState />
+          ) : (
+            <div style={exerciseListStyle}>
+              {draftExercises.map((draftExercise) => (
+                <TrainingSessionExerciseCard
+                  draftExercise={draftExercise}
+                  key={draftExercise.id}
+                  onAddSet={() => handleAddSet(draftExercise.id)}
+                  onCopySet={(setId) => handleCopySet(draftExercise.id, setId)}
+                  onDeleteSet={(setId) => handleDeleteSet(draftExercise.id, setId)}
+                  onToggleExpanded={() => handleToggleExpanded(draftExercise.id)}
+                  onToggleSetCompleted={(setId) =>
+                    handleToggleSetCompleted(draftExercise.id, setId)
+                  }
+                  onUpdateSet={(setId, field, value) =>
+                    handleUpdateSet(draftExercise.id, setId, field, value)
+                  }
+                />
+              ))}
+            </div>
+          )}
         </main>
 
         <div style={fabWrapStyle}>
           <button
-            aria-label="添加动作（即将上线）"
-            disabled
+            aria-label="添加动作"
+            onClick={() => void handleOpenLibrary()}
             style={fabStyle(theme)}
             type="button"
           >
             <Icon name="plus" size={24} />
           </button>
         </div>
+
+        {isLibraryOpen ? (
+          <ExerciseLibraryScreen
+            isOpen={isLibraryOpen}
+            onClose={() => setIsLibraryOpen(false)}
+            onSelectExercise={handleSelectExercise}
+            {...props.exerciseLibraryProps}
+          />
+        ) : null}
       </div>
     </section>
   );
 
   function handleCancel(): void {
-    setElapsedSeconds(0);
-    setIsRunning(false);
-    props.onCancel();
-  }
-
-  async function handleComplete(): Promise<void> {
-    if (!hasValidSetDraft) {
+    if (isSubmitting) {
       return;
     }
 
-    form.setDurationMinutes(`${Math.floor(elapsedSeconds / 60)}`);
-    const createdWorkout = await form.submitWorkout();
+    resetComposerState();
+    props.onCancel();
+  }
 
-    if (createdWorkout && props.onCreated) {
-      setElapsedSeconds(0);
-      setIsRunning(false);
-      await props.onCreated();
+  async function handleOpenLibrary(): Promise<void> {
+    setDuplicateNotice(null);
+    setErrorMessage(null);
+    setIsLibraryOpen(true);
+  }
+
+  function handleSelectExercise(exercise: DictionaryExercise): void {
+    setDraftExercises((currentValue) => {
+      const alreadyExists = currentValue.some((item) => item.exerciseId === exercise.id);
+
+      if (alreadyExists) {
+        setDuplicateNotice("这个动作已经在本次训练中");
+        return currentValue;
+      }
+
+      setDuplicateNotice(null);
+      return [...currentValue, createDraftExercise(exercise, getExerciseCategoryLabel(exercise))];
+    });
+    setIsLibraryOpen(false);
+  }
+
+  function handleToggleExpanded(exerciseId: string): void {
+    setDraftExercises((currentValue) => {
+      return currentValue.map((draftExercise) => {
+        if (draftExercise.id !== exerciseId) {
+          return draftExercise;
+        }
+
+        return {
+          ...draftExercise,
+          isExpanded: !draftExercise.isExpanded,
+        };
+      });
+    });
+  }
+
+  function handleAddSet(exerciseId: string): void {
+    setDraftExercises((currentValue) => {
+      return currentValue.map((draftExercise) => {
+        if (draftExercise.id !== exerciseId) {
+          return draftExercise;
+        }
+
+        return {
+          ...draftExercise,
+          isExpanded: true,
+          sets: [...draftExercise.sets, createDraftSet(draftExercise.sets.at(-1))],
+        };
+      });
+    });
+  }
+
+  function handleCopySet(exerciseId: string, setId: string): void {
+    setDraftExercises((currentValue) => {
+      return currentValue.map((draftExercise) => {
+        if (draftExercise.id !== exerciseId) {
+          return draftExercise;
+        }
+
+        const sourceSet = draftExercise.sets.find((setDraft) => setDraft.id === setId);
+
+        if (!sourceSet) {
+          return draftExercise;
+        }
+
+        return {
+          ...draftExercise,
+          sets: [...draftExercise.sets, createDraftSet(sourceSet)],
+        };
+      });
+    });
+  }
+
+  function handleDeleteSet(exerciseId: string, setId: string): void {
+    setDraftExercises((currentValue) => {
+      return currentValue.map((draftExercise) => {
+        if (draftExercise.id !== exerciseId) {
+          return draftExercise;
+        }
+
+        if (draftExercise.sets.length <= 1) {
+          return draftExercise;
+        }
+
+        return {
+          ...draftExercise,
+          sets: draftExercise.sets.filter((setDraft) => setDraft.id !== setId),
+        };
+      });
+    });
+  }
+
+  function handleUpdateSet<TField extends keyof DraftSet>(
+    exerciseId: string,
+    setId: string,
+    field: TField,
+    value: DraftSet[TField],
+  ): void {
+    setDraftExercises((currentValue) => {
+      return currentValue.map((draftExercise) => {
+        if (draftExercise.id !== exerciseId) {
+          return draftExercise;
+        }
+
+        return {
+          ...draftExercise,
+          sets: draftExercise.sets.map((setDraft) => {
+            if (setDraft.id !== setId) {
+              return setDraft;
+            }
+
+            return {
+              ...setDraft,
+              completed:
+                field === "weightKg" || field === "reps" ? false : setDraft.completed,
+              [field]: value,
+            };
+          }),
+        };
+      });
+    });
+  }
+
+  function handleToggleSetCompleted(exerciseId: string, setId: string): void {
+    setDraftExercises((currentValue) => {
+      return currentValue.map((draftExercise) => {
+        if (draftExercise.id !== exerciseId) {
+          return draftExercise;
+        }
+
+        return {
+          ...draftExercise,
+          sets: draftExercise.sets.map((setDraft) => {
+            if (setDraft.id !== setId) {
+              return setDraft;
+            }
+
+            if (!canCompleteSet(setDraft)) {
+              return {
+                ...setDraft,
+                completed: false,
+              };
+            }
+
+            return {
+              ...setDraft,
+              completed: !setDraft.completed,
+            };
+          }),
+        };
+      });
+    });
+  }
+
+  async function handleComplete(): Promise<void> {
+    if (!props.token) {
+      setErrorMessage("You must be signed in to create a workout.");
+      return;
     }
+
+    const payload = buildWorkoutRequestFromDraft({
+      draftExercises,
+      elapsedSeconds,
+      performedAt: new Date(),
+    });
+
+    if (!payload) {
+      setErrorMessage("Please fix the highlighted workout fields and try again.");
+      return;
+    }
+
+    setDuplicateNotice(null);
+    setErrorMessage(null);
+    setIsSubmitting(true);
+
+    try {
+      await createWorkout(props.token, payload);
+      resetComposerState();
+      await props.onCreated?.();
+    } catch (error) {
+      setErrorMessage(getReadableErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function resetComposerState(): void {
+    setDraftExercises([]);
+    setDuplicateNotice(null);
+    setElapsedSeconds(0);
+    setErrorMessage(null);
+    setIsLibraryOpen(false);
+    setIsRunning(false);
   }
 }
 
-function translateMessage(message: string): string {
+function canCompleteSet(setDraft: DraftSet): boolean {
+  const weightKg = Number.parseFloat(setDraft.weightKg);
+  const reps = Number.parseInt(setDraft.reps, 10);
+
+  return Number.isFinite(weightKg) && weightKg > 0 && Number.isInteger(reps) && reps > 0;
+}
+
+function getExerciseCategoryLabel(exercise: DictionaryExercise): string {
+  const primaryCodes = exercise.muscles
+    .filter((muscle) => muscle.is_primary)
+    .map((muscle) => muscle.code.toLowerCase());
+  const movementPattern = exercise.movement_pattern?.toLowerCase() ?? "";
+  const searchable = `${exercise.name_en} ${exercise.name_zh} ${movementPattern}`.toLowerCase();
+
+  if (primaryCodes.some((code) => code.includes("chest") || code === "pecs")) {
+    return "胸";
+  }
+
+  if (primaryCodes.some((code) => code.includes("back") || code.includes("lat"))) {
+    return "背";
+  }
+
+  if (
+    primaryCodes.some((code) => {
+      return code.includes("quad") || code.includes("hamstring") || code.includes("leg");
+    })
+  ) {
+    return "腿";
+  }
+
+  if (primaryCodes.some((code) => code.includes("shoulder") || code.includes("delt"))) {
+    return "肩";
+  }
+
+  if (primaryCodes.some((code) => code.includes("bicep"))) {
+    return "二头";
+  }
+
+  if (primaryCodes.some((code) => code.includes("tricep"))) {
+    return "三头";
+  }
+
+  if (primaryCodes.some((code) => code.includes("calf"))) {
+    return "小腿";
+  }
+
+  if (primaryCodes.some((code) => code.includes("forearm") || code.includes("grip"))) {
+    return "前臂";
+  }
+
+  if (primaryCodes.some((code) => code.includes("neck"))) {
+    return "颈部";
+  }
+
+  if (primaryCodes.some((code) => code.includes("glute"))) {
+    return "臀部";
+  }
+
+  if (primaryCodes.some((code) => code.includes("core") || code.includes("ab"))) {
+    return "核心";
+  }
+
+  if (searchable.includes("warm") || searchable.includes("activation")) {
+    return "热身";
+  }
+
+  if (searchable.includes("stretch") || searchable.includes("mobility")) {
+    return "拉伸";
+  }
+
+  if (
+    movementPattern.includes("carry") ||
+    movementPattern.includes("rotation") ||
+    movementPattern.includes("gait") ||
+    searchable.includes("sled")
+  ) {
+    return "功能性";
+  }
+
+  return "其他";
+}
+
+function getReadableErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Workout creation is unavailable right now.";
+}
+
+function translateErrorMessage(message: string): string {
   if (message === "You must be signed in to create a workout.") {
     return "请先登录后再创建训练。";
   }
 
   if (message === "Please fix the highlighted workout fields and try again.") {
-    return "请先修正训练内容后再保存。";
+    return "请先完成至少一组有效训练数据后再保存。";
   }
 
   if (message === "Workout creation is unavailable right now.") {
@@ -189,7 +506,7 @@ function panelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPrope
         : "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(244,247,252,0.98) 100%)",
     color: theme.colors.tx,
     display: "grid",
-    gridTemplateRows: "auto 1fr",
+    gridTemplateRows: "auto minmax(0, 1fr)",
     inset: 0,
     overflow: "hidden",
     padding:
@@ -219,9 +536,18 @@ const headerBodyStyle: React.CSSProperties = {
 };
 
 const bodyStyle: React.CSSProperties = {
-  alignContent: "center",
+  alignContent: "start",
   display: "grid",
   gap: 16,
+  minHeight: 0,
+  overflowY: "auto",
+  paddingBottom: 96,
+};
+
+const exerciseListStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 12,
+  paddingBottom: 8,
 };
 
 const statusWrapStyle: React.CSSProperties = {
@@ -251,32 +577,8 @@ function statusCopyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSS
     fontSize: 12,
     lineHeight: 1.6,
     margin: 0,
-    maxWidth: 160,
+    maxWidth: 180,
     textAlign: "right",
-  };
-}
-
-function placeholderBlockStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-): React.CSSProperties {
-  return {
-    backgroundColor: theme.colors.surf2,
-    border: `1px solid ${theme.colors.bdr}`,
-    borderRadius: theme.radius.card,
-    display: "grid",
-    gap: 8,
-    padding: 16,
-  };
-}
-
-function placeholderCopyStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-): React.CSSProperties {
-  return {
-    color: theme.colors.tx2,
-    fontSize: 12,
-    lineHeight: 1.7,
-    margin: 0,
   };
 }
 
@@ -294,11 +596,10 @@ function fabStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPropert
     borderRadius: 999,
     boxShadow: theme.shadows.card,
     color: theme.colors.acText,
-    cursor: "not-allowed",
+    cursor: "pointer",
     display: "inline-flex",
     height: 56,
     justifyContent: "center",
-    opacity: 0.56,
     width: 56,
   };
 }

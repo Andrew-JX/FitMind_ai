@@ -2312,3 +2312,145 @@
 - 当前 sandbox 下 `esbuild spawn EPERM` 仍会影响标准构建与 package-local fallback，需要提权复核。
 - 本批未接入真实动作库和训练组编辑，这些能力留待后续 Batch 实现。
 
+## 2026-05-07 Phase 4.0 Batch 2 - Fullscreen Exercise Library
+
+### why this batch exists
+- Phase 4.0 Batch 1 只建立了全屏训练会话壳层和 `+` 占位入口，还不能把真实动作加入当前训练 draft。
+- 本批继续把“记录训练”交互推进到真实训练 App 更接近的形态：在 composer 内打开全屏动作库，并把选中的动作回填成 draft exercise card。
+
+### files changed
+- `client/src/features/training/TrainingView.tsx`
+- `client/src/features/training/TrainingSessionComposer.tsx`
+- `client/src/features/training/ExerciseLibraryScreen.tsx`
+- `client/src/features/training/TrainingSessionExerciseCard.tsx`
+- `docs/progress.md`
+
+### exercise library behavior
+- composer 右下角 `+` 已从 disabled placeholder 改为可点击入口。
+- 点击 `+` 会在 composer 内打开 `ExerciseLibraryScreen` 全屏 overlay，而不是跳出训练页路由。
+- 动作库顶部提供 `×`、`选择动作` 标题、`从动作库添加本次训练动作` 副标题和 `搜索动作` 输入框。
+- 动作库会复用现有 exercise dictionary 数据源，在打开时拉取一次真实动作列表，再在前端进行关键字和分类过滤。
+- 分类 rail 支持：`全部`、`胸`、`背`、`腿`、`肩`、`二头`、`三头`、`小腿`、`前臂`、`颈部`、`臀部`、`功能性`、`核心`、`热身`、`拉伸`、`其他`。
+- 无结果时显示：`没有找到动作` / `换个关键词试试，或切换到“全部”分类。`
+
+### composer draft exercise behavior
+- 点击动作卡后会关闭动作库，并把所选动作加入当前 composer draft。
+- composer 空态会切换为 draft exercise card 列表，每张卡当前显示动作名和占位统计：`0 组 · 总容量 0 kg`。
+- 若重复选择同一个动作，不会生成重复卡片，并显示中文提示：`这个动作已经在本次训练中`。
+- 点击 `取消` 关闭 composer 时，会同时重置 draft exercises、timer 和动作库打开状态。
+- 由于本批仍未接入训练组编辑，`完成` 继续保持 disabled，不会创建仅含动作卡的空 workout。
+
+### preserved backend and api contracts
+- 未修改 server 文件、数据库 schema、training API contract、workout CRUD semantics、`set_index` 逻辑、assistant 文件、SSE contract 或 auth token 逻辑。
+- 未新增 endpoint、未变更 exercise dictionary schema、未修改已有 workout list 展开 / 收起 / 删除行为。
+- analysis 页 selected exercise 行为保持不变。
+
+### verification results
+- `pnpm --filter @fitmind/client type-check` 通过。
+- `pnpm lint` 通过。
+- `pnpm --filter @fitmind/client exec vite build` 复现当前环境的 `vite` 命令解析问题和 `esbuild spawn EPERM`。
+- `client\\.\\node_modules\\.bin\\vite.cmd build` 在 sandbox 内仍复现 `esbuild spawn EPERM`。
+- 提权后的 package-local `vite.cmd build` 最终通过，确认本批前端改动可生产构建。
+- 本批未运行浏览器手工 smoke，手工检查步骤已留给后续交互验证。
+
+### known environment issues
+- 当前 Windows 环境下，标准 `pnpm exec vite build` 仍可能出现 `vite` 命令解析问题。
+- 当前 sandbox 下 `esbuild spawn EPERM` 仍会影响标准构建与 package-local fallback，需要提权复核。
+- 当前中文文案在部分 Windows shell 输出里仍可能出现编码显示异常，但不影响 TypeScript / lint / build 通过。
+
+## 2026-05-07 Phase 4.0 Batch 3B - Composer Scroll Fix & Workout Log Grouped Editing
+
+### why this batch exists
+- 训练 composer 在同一动作下新增多组后，卡片内容会把底部 `新增一组` 挤出屏幕，影响核心记录流程。
+- 训练日志详情此前仍是按 set 平铺展示，无法按动作卡片查看，也缺少前端编辑入口。
+
+### files changed
+- `client/src/features/training/TrainingSessionComposer.tsx`
+- `client/src/features/training/TrainingSessionSetRow.tsx`
+- `client/src/features/training/WorkoutCard.tsx`
+- `client/src/features/training/WorkoutsPanel.tsx`
+- `client/src/features/training/workout-api.ts`
+- `client/src/App.tsx`
+- `docs/progress.md`
+
+### composer scroll behavior
+- 将 composer 主体滚动区域改为 `minmax(0, 1fr)` 布局，修正动作卡展开后底部操作区被裁切的问题。
+- 增加 body 底部留白，避免浮动 `+` 挡住动作卡内的 `新增一组`。
+
+### workout log grouped editing behavior
+- 训练日志详情现在改为按动作分组卡片展示，而不是把全部 sets 平铺在一个列表里。
+- 点击动作卡片后，才会展开该动作下的具体组列表，交互模型与记录训练 composer 对齐。
+- 新增最小可用的训练日志编辑能力：
+  - 进入 `编辑训练`
+  - 在每个动作卡内编辑重量 / 次数 / 体感
+  - 复制本组 / 删除本组
+  - 为该动作新增一组
+  - 点击 `保存修改`
+- 编辑保存时会复用现有后端能力：
+  - `POST /api/workouts/:id/sets`
+  - `PATCH /api/sets/:id`
+  - `DELETE /api/sets/:id`
+- 保存后会刷新 workout list、当前 workout detail、training summary、recommendation context 和已选动作进展。
+
+### preserved backend and api contracts
+- 未修改 server 文件、数据库 schema、training API contract、assistant 文件、SSE contract 或 auth token 逻辑。
+- 仅补齐前端对既有 workout / set mutation API 的调用，不新增 endpoint。
+
+### verification results
+- `pnpm --filter @fitmind/client type-check` 通过。
+- `pnpm lint` 通过。
+- `pnpm --filter @fitmind/client exec vite build` 复现当前环境的 `vite` 命令解析问题和 `esbuild spawn EPERM`。
+- `client\\.\\node_modules\\.bin\\vite.cmd build` 在 sandbox 内仍复现 `esbuild spawn EPERM`。
+- 提权后的 package-local `vite.cmd build` 最终通过，确认本批前端改动可生产构建。
+
+## 2026-05-07 Phase 4.0 Batch 3 - Exercise Card Set Draft Editor
+
+### why this batch exists
+- Phase 4.0 Batch 2 已经把全屏动作库和 draft exercise card 接上，但还不能在 composer 内真正记录训练组并创建 workout。
+- 本批的目标是先打通训练记录最核心的闭环：展开动作卡、编辑训练组、完成勾选、映射现有 API payload、提交 create workout。
+
+### files changed
+- `client/src/features/training/TrainingSessionComposer.tsx`
+- `client/src/features/training/TrainingSessionExerciseCard.tsx`
+- `client/src/features/training/TrainingSessionSetRow.tsx`
+- `client/src/features/training/training-session-draft.ts`
+- `client/src/features/training/ExerciseLibraryScreen.tsx`
+- `docs/progress.md`
+
+### set draft editor behavior
+- 已添加动作卡现在支持摘要态和展开态切换，摘要态显示：`X 组 · 总容量 Y kg`。
+- 点击卡片头部或卡片空白区可以展开 / 收起动作编辑区。
+- 展开后可以在卡内 `+ 新增一组`，若上一组存在则默认复制上一组的重量、次数和体感，但 `completed` 总是重置为 `false`。
+- 每组支持输入 `重量 kg`、`次数`，并提供三档中文体感：
+  - `简单` -> `rpe: 6`
+  - `正常` -> `rpe: 8`
+  - `困难` -> `rpe: 9`
+- 每组支持 `复制本组` 和 `删除本组`，未引入热身组、组备注或休息倒计时。
+- 只有 `weight_kg > 0` 且 `reps > 0` 时，才允许把该组勾选为完成。
+- 保存时只会提交 `completed === true` 且重量 / 次数有效的组；未完成组不会进入 payload。
+
+### create workout flow reconnected
+- composer 的 `完成` 按钮现在会在至少存在 1 个 completed valid set 时启用。
+- 点击 `完成` 后会把 draft exercises flatten 成现有 `createWorkout` payload，并继续复用现有 frontend `createWorkout` API 数据流。
+- 本批未修改 backend schema 或 API contract，仍然使用现有 `performed_at`、`duration_minutes`、`sets[]` 结构。
+- `set_index` 语义保持不变：按 `exercise_id` 分别编号，而不是全局编号。
+- 创建成功后会关闭 composer，并继续走现有 `onCreated` 刷新链路，从而刷新 workout list、training summary、recommendation context 和已选动作进展。
+
+### preserved backend and api contracts
+- 未修改 server 文件、数据库 schema、training API contracts、workout CRUD semantics、assistant 文件、SSE contract 或 auth token 逻辑。
+- 未新增 endpoint、未变更 exercise dictionary schema、未修改现有 workout list 行为。
+- 本批仍未引入 warmup set persistence、set notes persistence、rest timer persistence、started_at / ended_at persistence 或迁移脚本。
+
+### verification results
+- `pnpm --filter @fitmind/client type-check` 通过。
+- `pnpm lint` 通过。
+- `pnpm --filter @fitmind/client exec vite build` 复现当前环境的 `vite` 命令解析问题和 `esbuild spawn EPERM`。
+- `client\\.\\node_modules\\.bin\\vite.cmd build` 在 sandbox 内仍复现 `esbuild spawn EPERM`。
+- 提权后的 package-local `vite.cmd build` 最终通过，确认本批前端改动可生产构建。
+- 本批未运行浏览器手工 smoke，训练会话交互仍建议在本地浏览器路径下做一次完整手测。
+
+### known environment issues
+- 当前 Windows 环境下，标准 `pnpm exec vite build` 仍可能出现 `vite` 命令解析问题。
+- 当前 sandbox 下 `esbuild spawn EPERM` 仍会影响标准构建与 package-local fallback，需要提权复核。
+- 当前中文文案在部分 Windows shell 输出里仍可能出现编码显示异常，但不影响 TypeScript / lint / build 通过。
+
