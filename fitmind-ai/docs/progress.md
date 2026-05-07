@@ -2269,3 +2269,46 @@
 - `client\\.\\node_modules\\.bin\\vite.cmd build` 在 sandbox 内仍复现 `esbuild spawn EPERM`。
 - 提权后的 package-local `vite.cmd build` 最终通过，确认本批前端改动可生产构建。
 
+## 2026-05-07 Phase 4.0 Batch 1 - Fullscreen Training Session Composer Shell
+
+### why this batch exists
+- 旧的展开式 `WorkoutForm` 更像一次性表单，不像真实训练记录 App 的会话流。
+- 本批先把“记录训练”的交互模型切到全屏训练会话壳层，建立后续 Batch 2/3 可继续扩展的产品骨架。
+
+### files changed
+- `client/src/features/training/TrainingView.tsx`
+- `client/src/features/training/TrainingSessionComposer.tsx`
+- `client/src/features/training/TrainingSessionTimer.tsx`
+- `client/src/features/training/TrainingSessionEmptyState.tsx`
+- `docs/progress.md`
+
+### new composer shell behavior
+- 训练 Tab 点击“记录训练”后，不再展开旧的内联 `WorkoutForm`，而是打开覆盖整个 app shell 的全屏 composer。
+- composer 顶部提供 `取消`、训练计时显示、`开始 / 暂停` 控制和 `完成` 按钮。
+- 主体默认显示空态：`还没有添加动作` / `点击右下角 + 从动作库添加本次训练动作。`
+- 右下角保留 `+` 浮动入口占位，但本批仍为 disabled placeholder，不进入真实动作库。
+- `完成` 采用 Option A 策略：在没有有效训练组时保持禁用，避免创建空 workout。
+
+### timer behavior
+- timer 为纯前端状态，初始为暂停和 `00:00:00`。
+- 点击 `开始` 后每秒累加，点击 `暂停` 后停止。
+- 关闭 composer 会重置本次 draft timer，不做后端持久化。
+- 如后续接入真实训练组提交流程，当前实现会将 elapsed seconds 按分钟向下取整映射到现有 `duration_minutes` 提交字段。
+
+### preserved backend and api contracts
+- 未修改 server 文件、数据库 schema、training API contract、workout CRUD semantics 或 `set_index` 逻辑。
+- 现有 `useWorkoutForm` / `createWorkout` 数据流保持原样，未引入新的 endpoint 或 payload 字段。
+- assistant、SSE contract、auth token 逻辑均未改动。
+
+### verification results
+- `pnpm --filter @fitmind/client type-check` 通过。
+- `pnpm lint` 通过。
+- `pnpm --filter @fitmind/client exec vite build` 复现当前环境的 `vite` 命令解析问题和 `esbuild spawn EPERM`。
+- `client\\.\\node_modules\\.bin\\vite.cmd build` 在 sandbox 内仍复现 `esbuild spawn EPERM`。
+- 提权后的 package-local `vite.cmd build` 最终通过，确认本批前端改动可生产构建。
+
+### known environment issues
+- 当前 Windows 环境下，标准 `pnpm exec vite build` 仍可能出现 `vite` 命令解析问题。
+- 当前 sandbox 下 `esbuild spawn EPERM` 仍会影响标准构建与 package-local fallback，需要提权复核。
+- 本批未接入真实动作库和训练组编辑，这些能力留待后续 Batch 实现。
+

@@ -1,15 +1,15 @@
 import { useState } from "react";
 
-import type { TrainingSummary } from "./training-summary-api";
 import type { ExercisePickerProps } from "./ExercisePicker";
 import type { WorkoutFormProps } from "./WorkoutForm";
 import type { WorkoutsPanelProps } from "./WorkoutsPanel";
+import type { TrainingSummary } from "./training-summary-api";
 
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { ExercisePicker } from "./ExercisePicker";
+import { TrainingSessionComposer } from "./TrainingSessionComposer";
 import { TrainingStatsStrip } from "./TrainingStatsStrip";
-import { WorkoutForm } from "./WorkoutForm";
 import { WorkoutsPanel } from "./WorkoutsPanel";
 
 export interface TrainingViewProps {
@@ -21,7 +21,7 @@ export interface TrainingViewProps {
 }
 
 export function TrainingView(props: TrainingViewProps) {
-  const [isWorkoutFormOpen, setIsWorkoutFormOpen] = useState(false);
+  const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [isDictionaryOpen, setIsDictionaryOpen] = useState(false);
 
   return (
@@ -31,25 +31,14 @@ export function TrainingView(props: TrainingViewProps) {
         summaryLoading={props.summaryLoading}
       />
 
-      {!isWorkoutFormOpen ? (
+      {!isComposerOpen ? (
         <Button
-          onClick={() => setIsWorkoutFormOpen(true)}
+          onClick={() => setIsComposerOpen(true)}
           style={{ width: "100%" }}
           type="button"
         >
           + 记录训练
         </Button>
-      ) : null}
-
-      {isWorkoutFormOpen ? (
-        <WorkoutForm
-          {...props.workoutFormProps}
-          onCancel={() => setIsWorkoutFormOpen(false)}
-          onCreated={async () => {
-            await props.workoutFormProps.onCreated?.();
-            setIsWorkoutFormOpen(false);
-          }}
-        />
       ) : null}
 
       <WorkoutsPanel {...props.workoutsProps} />
@@ -77,6 +66,16 @@ export function TrainingView(props: TrainingViewProps) {
           </div>
         ) : null}
       </Card>
+
+      <TrainingSessionComposer
+        isOpen={isComposerOpen}
+        onCancel={() => setIsComposerOpen(false)}
+        onCreated={async () => {
+          await props.workoutFormProps.onCreated?.();
+          setIsComposerOpen(false);
+        }}
+        token={props.workoutFormProps.token}
+      />
     </section>
   );
 }
