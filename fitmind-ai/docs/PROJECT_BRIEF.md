@@ -2,6 +2,12 @@
 
 > 这是 FitMind AI 项目的源头文档。所有后续的架构、API、数据库、AI 决策文档都基于这一份。 每次开新的 AI 协作对话，让 AI 先读这份文档，再读相关的子文档。
 
+> For latest demo and interview preparation, see:
+>
+> - `docs/demo-script.md`
+> - `docs/project-study-guide.md`
+> - `docs/local-run-guide.md`
+
 ------
 
 ## 1. 项目一句话定位

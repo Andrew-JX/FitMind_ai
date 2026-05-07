@@ -2221,3 +2221,23 @@
 - Neon 连接仍会打印 `sslmode=require` 相关 warning，但本次 mock-turn smoke 最终执行通过。
 - 当前仓库根目录仍可能触发 Git `dubious ownership` 提示，这属于本地环境配置问题，不是本批逻辑回归。
 
+## 2026-05-07 Phase 3.9 Batch 1 - Demo Script & Project Study Guide
+
+### Completed work
+- 新增 `docs/demo-script.md`，整理本地演示定位、启动方式、逐步 demo flow、中文讲稿、预期结果、已知本地问题和恢复手册。
+- 新增 `docs/project-study-guide.md`，整理项目定位、架构链路、deterministic calculation layer、tool executor、provider adapter、SSE stream、前端状态机、安全边界、当前限制和面试问答。
+- 更新 `docs/progress.md`。
+- 本批仅文档改动，没有 source code changes。
+
+### Verification notes
+- 本批未运行 type-check / lint / test / build。
+- 仅执行了只读代码与文档核对，用于确认真实脚本、SSE 事件、tool names、provider 切换方式和当前能力边界。
+
+## 2026-05-07 Phase 3.9 Batch 2 - Documentation Consolidation & README Entry
+
+- README.md added or updated
+- docs/project-study-guide.md consolidated
+- no new standalone docs added
+- no source code changes
+- documentation overlap reduced
+
