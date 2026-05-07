@@ -2530,3 +2530,128 @@
 - Windows 环境下标准 `pnpm exec vite build` 仍可能出现 `Command "vite" not found` 和 `esbuild spawn EPERM`；需要提权后的 package-local `vite.cmd build` 复核。
 - server/client 相关 `tsx`、`vite`、`esbuild` 命令在 sandbox 下仍受既有 `EPERM` 限制。
 
+## 2026-05-07 Phase 4.1 Batch 1 - Exercise Card Actions Menu
+
+### why this batch exists
+- Phase 4.0 已经打通 fullscreen composer、动作库、动作卡、draft set 编辑和 create workout 提交闭环。
+- 本批补齐动作卡右上角的动作级设置菜单，让训练记录体验更接近真实健身 App，同时不扩大 backend/API 范围。
+
+### files changed
+- `client/src/features/training/TrainingSessionComposer.tsx`
+- `client/src/features/training/TrainingSessionExerciseCard.tsx`
+- `client/src/features/training/ExerciseLibraryScreen.tsx`
+- `client/src/features/training/TrainingSessionExerciseActions.tsx`
+- `docs/progress.md`
+
+### exercise actions added
+- 每张 composer 动作卡右上角新增 `⋯` 动作设置按钮。
+- 菜单包含：`查看动作详情`、`替换动作`、`上移`、`下移`、`移除动作`。
+- 菜单点击和详情弹层点击会阻止事件冒泡，避免误触发动作卡展开 / 收起。
+
+### replace behavior
+- `替换动作` 会以 replace mode 打开现有 `ExerciseLibraryScreen`。
+- 选择新动作后替换当前 draft exercise 的 `exerciseId`、`name`、`categoryLabel` 和 dictionary exercise 引用。
+- 替换会保留原动作下已有 draft sets。
+- 如果替换目标已存在于本次训练的其他动作卡中，会阻止替换并显示：`这个动作已经在本次训练中，不能替换为重复动作。`
+
+### reorder behavior
+- `上移` / `下移` 只调整前端 `draftExercises` 顺序。
+- 第一个动作禁用 `上移`，最后一个动作禁用 `下移`。
+- 保存时仍复用现有 draft flatten 流程，`set_index` 仍按 `exercise_id` 分组递增。
+
+### remove behavior
+- 没有 draft sets 的动作会直接移除。
+- 有 draft sets 的动作会先弹出确认：`移除这个动作？` / `该动作下的训练组也会一起移除。`
+- 确认后移除该动作及其 draft sets，`完成` 按钮状态会根据剩余 completed valid sets 重新计算。
+
+### preserved backend/API/set_index contracts
+- 未修改 server 文件、数据库 schema、training API contracts、workout CRUD semantics、assistant 文件、SSE contract 或 auth token 逻辑。
+- 未新增 endpoint、未引入 warmup set persistence、set notes persistence、rest timer persistence、kg/lb persistence 或动作历史图表。
+- `set_index` 规则保持按 `exercise_id` 分组编号。
+
+### verification results
+- `pnpm --filter @fitmind/client type-check` 通过。
+- `pnpm lint` 通过。
+- `pnpm --filter @fitmind/client exec vite build` 通过。
+- 本批未完成真实浏览器手工 smoke；当前环境此前已确认缺少稳定可用的 browser 控制器，因此不声明手工路径已完成。
+
+### known environment issues
+- 既有 Windows shell 中文输出仍可能出现编码显示异常，但本批 source code、type-check、lint 和 build 均通过。
+- 之前记录过的 browser manual smoke 能力缺失仍未在本轮解决。
+
+## 2026-05-07 Phase 4.1 Interaction Stabilization Follow-up
+
+### bugs addressed
+- 修复 composer 里休息倒计时入口只在 completed 状态可点的问题；现在有效组即可打开休息倒计时，若尚未标记完成会先标记完成再启动休息。
+- 修复动作卡右上角 `⋯` 菜单在滚动列表中被下方动作卡或底部 `+` 浮动按钮遮挡的问题。
+- 修复动作卡多组编辑时新增组后卡内滚动位置不稳定、底部操作容易被浮动层遮挡的问题。
+- 修复训练日志删除和 composer 动作移除使用浏览器原生 confirm 导致页面看起来卡住的问题，改为 app 内确认。
+
+### files changed
+- `client/src/features/training/TrainingSessionComposer.tsx`
+- `client/src/features/training/TrainingSessionExerciseCard.tsx`
+- `client/src/features/training/TrainingSessionExerciseActions.tsx`
+- `client/src/features/training/TrainingSessionSetRow.tsx`
+- `client/src/features/training/WorkoutsPanel.tsx`
+- `docs/progress.md`
+
+### behavior notes
+- 动作菜单改为 fixed 高层级定位，并在打开时提升当前动作卡层级，避免被后续动作卡的按钮覆盖。
+- composer 底部滚动留白增加，rest timer / FAB 出现时不再压住最后的组编辑区域。
+- 训练日志删除现在先展示页面内确认块，再调用既有 `onDeleteWorkout`，不改变 workout CRUD contract。
+- composer 动作移除现在展示页面内确认弹层，确认后仅删除当前 draft exercise 和 draft sets。
+- rest timer 替换确认也改为页面内确认弹层，不再使用 `window.confirm`。
+
+### verification results
+- `pnpm --filter @fitmind/client type-check` 通过。
+- `pnpm lint` 通过。
+- `pnpm --filter @fitmind/client exec vite build` 通过。
+- `rg "window\\.confirm|confirm\\(" client/src/features/training -n` 无匹配。
+
+### known environment issues
+- `client-smoke-4173.out.log` 仍被正在运行的 Vite dev server 锁住并写入 HMR 输出，`git restore` 当前报 `unable to unlink ... Invalid argument`。该日志污染不是本轮功能改动。
+
+## 2026-05-07 Phase 4.1 Batch 2 - Local Rest Timer Interaction
+
+### why this batch exists
+- 组间休息倒计时是健身记录 App 的高频现场交互，能明显提升训练 composer 的产品质感。
+- 本批只做前端本地状态，不扩大数据库、API 或 workout 提交契约，风险低于 rest timer persistence / warmup sets / set notes 等 schema 扩展。
+
+### files changed
+- `client/src/features/training/TrainingSessionComposer.tsx`
+- `client/src/features/training/TrainingSessionExerciseCard.tsx`
+- `client/src/features/training/TrainingSessionSetRow.tsx`
+- `client/src/features/training/TrainingSessionRestTimer.tsx`
+- `docs/progress.md`
+
+### rest timer entry
+- 在 composer 的 `TrainingSessionSetRow` 顶部操作区新增 `休息倒计时`。
+- 该入口只有在当前 draft set 已完成后可用，避免未完成组直接启动休息。
+- 点击后展示快捷选项：`30 秒`、`60 秒`、`90 秒`、`120 秒`，并提供一个本地自定义秒数输入。
+
+### active timer behavior
+- 选择时长后，composer 内显示一个底部浮动倒计时条，滚动动作卡时仍保持可见。
+- running 状态显示：`休息中 MM:SS`，并提供 `暂停` / `跳过`。
+- paused 状态显示：`休息已暂停 MM:SS`，并提供 `继续` / `跳过`。
+- 倒计时归零后显示：`休息结束，可以开始下一组了`，并提供 `关闭`。
+- 同一时间只存在一个 active rest timer；若已有倒计时运行或暂停，再启动新的倒计时会确认：`已有休息倒计时正在进行，是否替换？`
+
+### reset behavior
+- 关闭 composer、取消 workout、保存 workout 成功后都会清空本地 rest timer。
+- 切换动作卡、滚动 composer、展开 / 收起动作卡不会清空 rest timer。
+
+### preserved contracts
+- 未修改 server 文件、数据库 schema、training API contracts、workout CRUD semantics、assistant 文件、SSE contract、auth token 逻辑或 analysis selected exercise 行为。
+- 未新增 endpoint、未引入 rest timer persistence、系统通知、声音提醒、后台 timer service、warmup set persistence 或 set notes persistence。
+- `set_index` 规则保持按 `exercise_id` 分组编号。
+
+### verification results
+- `pnpm --filter @fitmind/client type-check` 通过。
+- `pnpm lint` 通过。
+- `pnpm --filter @fitmind/client exec vite build` 通过。
+- 本批未完成真实浏览器手工 smoke；当前环境仍缺少稳定可用的 browser 控制器，因此不声明手工路径已完成。
+
+### known environment issues
+- 既有 Windows shell 中文输出仍可能出现编码显示异常，但本批 source code、type-check、lint 和 build 均通过。
+- 之前记录过的 browser manual smoke 能力缺失仍未在本轮解决。
+

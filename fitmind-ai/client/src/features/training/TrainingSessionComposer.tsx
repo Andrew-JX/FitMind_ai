@@ -10,6 +10,10 @@ import { useTheme } from "../../theme/ThemeContext";
 import { ExerciseLibraryScreen } from "./ExerciseLibraryScreen";
 import { TrainingSessionEmptyState } from "./TrainingSessionEmptyState";
 import { TrainingSessionExerciseCard } from "./TrainingSessionExerciseCard";
+import {
+  TrainingSessionRestTimer,
+  type RestTimerState,
+} from "./TrainingSessionRestTimer";
 import { TrainingSessionTimer } from "./TrainingSessionTimer";
 import { createWorkout } from "./workout-api";
 import {
@@ -39,6 +43,17 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingExerciseRemovalId, setPendingExerciseRemovalId] = useState<string | null>(
+    null,
+  );
+  const [pendingRestTimerRequest, setPendingRestTimerRequest] = useState<{
+    seconds: number;
+    setId: string;
+  } | null>(null);
+  const [replacingDraftExerciseId, setReplacingDraftExerciseId] = useState<string | null>(
+    null,
+  );
+  const [restTimer, setRestTimer] = useState<RestTimerState | null>(null);
 
   useEffect(() => {
     if (!props.isOpen || !isRunning) {
@@ -59,6 +74,40 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
       resetComposerState();
     }
   }, [props.isOpen]);
+
+  useEffect(() => {
+    if (!props.isOpen || restTimer?.status !== "running") {
+      return;
+    }
+
+    const timerId = window.setInterval(() => {
+      setRestTimer((currentValue) => {
+        if (!currentValue || currentValue.status !== "running") {
+          return currentValue;
+        }
+
+        const nextRemainingSeconds = currentValue.remainingSeconds - 1;
+
+        if (nextRemainingSeconds <= 0) {
+          return {
+            ...currentValue,
+            isRunning: false,
+            remainingSeconds: 0,
+            status: "finished",
+          };
+        }
+
+        return {
+          ...currentValue,
+          remainingSeconds: nextRemainingSeconds,
+        };
+      });
+    }, 1000);
+
+    return () => {
+      window.clearInterval(timerId);
+    };
+  }, [props.isOpen, restTimer?.status]);
 
   if (!props.isOpen) {
     return null;
@@ -105,7 +154,7 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
           </div>
         </header>
 
-        <main ref={bodyRef} style={bodyStyle}>
+        <main ref={bodyRef} style={bodyStyle(Boolean(restTimer))}>
           {duplicateNotice ? (
             <StateNotice
               description={duplicateNotice}
@@ -126,13 +175,22 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
             <TrainingSessionEmptyState />
           ) : (
             <div style={exerciseListStyle}>
-              {draftExercises.map((draftExercise) => (
+              {draftExercises.map((draftExercise, index) => (
                 <TrainingSessionExerciseCard
+                  canMoveDown={index < draftExercises.length - 1}
+                  canMoveUp={index > 0}
                   draftExercise={draftExercise}
                   key={draftExercise.id}
                   onAddSet={() => handleAddSet(draftExercise.id)}
                   onCopySet={(setId) => handleCopySet(draftExercise.id, setId)}
                   onDeleteSet={(setId) => handleDeleteSet(draftExercise.id, setId)}
+                  onMoveDown={() => handleMoveExercise(draftExercise.id, "down")}
+                  onMoveUp={() => handleMoveExercise(draftExercise.id, "up")}
+                  onRemove={() => handleRemoveExercise(draftExercise.id)}
+                  onReplace={() => handleStartReplaceExercise(draftExercise.id)}
+                  onStartRestTimer={(setId, seconds) =>
+                    handleStartRestTimer(setId, seconds)
+                  }
                   onToggleExpanded={() => handleToggleExpanded(draftExercise.id)}
                   onToggleSetCompleted={(setId) =>
                     handleToggleSetCompleted(draftExercise.id, setId)
@@ -157,10 +215,77 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
           </button>
         </div>
 
+        {restTimer ? (
+          <TrainingSessionRestTimer
+            onClose={() => setRestTimer(null)}
+            onSkip={() => setRestTimer(null)}
+            onToggleRunning={handleToggleRestTimerRunning}
+            timer={restTimer}
+          />
+        ) : null}
+
+        {pendingExerciseRemovalId ? (
+          <div style={confirmBackdropStyle(theme)}>
+            <section style={confirmCardStyle(theme)}>
+              <strong style={confirmTitleStyle(theme)}>移除这个动作？</strong>
+              <p style={confirmCopyStyle(theme)}>该动作下的训练组也会一起移除。</p>
+              <div style={confirmActionRowStyle}>
+                <Button
+                  onClick={() => setPendingExerciseRemovalId(null)}
+                  type="button"
+                  variant="secondary"
+                >
+                  取消
+                </Button>
+                <Button
+                  onClick={() => confirmRemoveExercise(pendingExerciseRemovalId)}
+                  style={dangerConfirmButtonStyle(theme)}
+                  type="button"
+                  variant="secondary"
+                >
+                  移除
+                </Button>
+              </div>
+            </section>
+          </div>
+        ) : null}
+
+        {pendingRestTimerRequest ? (
+          <div style={confirmBackdropStyle(theme)}>
+            <section style={confirmCardStyle(theme)}>
+              <strong style={confirmTitleStyle(theme)}>
+                已有休息倒计时正在进行，是否替换？
+              </strong>
+              <div style={confirmActionRowStyle}>
+                <Button
+                  onClick={() => setPendingRestTimerRequest(null)}
+                  type="button"
+                  variant="secondary"
+                >
+                  取消
+                </Button>
+                <Button
+                  onClick={() => {
+                    startRestTimer(pendingRestTimerRequest.setId, pendingRestTimerRequest.seconds);
+                    setPendingRestTimerRequest(null);
+                  }}
+                  type="button"
+                >
+                  替换
+                </Button>
+              </div>
+            </section>
+          </div>
+        ) : null}
+
         {isLibraryOpen ? (
           <ExerciseLibraryScreen
             isOpen={isLibraryOpen}
-            onClose={() => setIsLibraryOpen(false)}
+            mode={replacingDraftExerciseId ? "replace" : "add"}
+            onClose={() => {
+              setIsLibraryOpen(false);
+              setReplacingDraftExerciseId(null);
+            }}
             onSelectExercise={handleSelectExercise}
             {...props.exerciseLibraryProps}
           />
@@ -181,11 +306,38 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
   async function handleOpenLibrary(): Promise<void> {
     setDuplicateNotice(null);
     setErrorMessage(null);
+    setReplacingDraftExerciseId(null);
     setIsLibraryOpen(true);
   }
 
   function handleSelectExercise(exercise: DictionaryExercise): void {
     setDraftExercises((currentValue) => {
+      if (replacingDraftExerciseId) {
+        const alreadyExists = currentValue.some((item) => {
+          return item.id !== replacingDraftExerciseId && item.exerciseId === exercise.id;
+        });
+
+        if (alreadyExists) {
+          setDuplicateNotice("这个动作已经在本次训练中，不能替换为重复动作。");
+          return currentValue;
+        }
+
+        setDuplicateNotice(null);
+        return currentValue.map((draftExercise) => {
+          if (draftExercise.id !== replacingDraftExerciseId) {
+            return draftExercise;
+          }
+
+          return {
+            ...draftExercise,
+            categoryLabel: getExerciseCategoryLabel(exercise),
+            exercise,
+            exerciseId: exercise.id,
+            name: exercise.name_en,
+          };
+        });
+      }
+
       const alreadyExists = currentValue.some((item) => item.exerciseId === exercise.id);
 
       if (alreadyExists) {
@@ -197,6 +349,7 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
       return [...currentValue, createDraftExercise(exercise, getExerciseCategoryLabel(exercise))];
     });
     setIsLibraryOpen(false);
+    setReplacingDraftExerciseId(null);
   }
 
   function handleToggleExpanded(exerciseId: string): void {
@@ -212,6 +365,67 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
         };
       });
     });
+  }
+
+  function handleStartReplaceExercise(exerciseId: string): void {
+    setDuplicateNotice(null);
+    setErrorMessage(null);
+    setReplacingDraftExerciseId(exerciseId);
+    setIsLibraryOpen(true);
+  }
+
+  function handleMoveExercise(exerciseId: string, direction: "up" | "down"): void {
+    setDraftExercises((currentValue) => {
+      const sourceIndex = currentValue.findIndex((draftExercise) => {
+        return draftExercise.id === exerciseId;
+      });
+
+      if (sourceIndex < 0) {
+        return currentValue;
+      }
+
+      const targetIndex = direction === "up" ? sourceIndex - 1 : sourceIndex + 1;
+
+      if (targetIndex < 0 || targetIndex >= currentValue.length) {
+        return currentValue;
+      }
+
+      const nextValue = [...currentValue];
+      const [movedExercise] = nextValue.splice(sourceIndex, 1);
+
+      if (!movedExercise) {
+        return currentValue;
+      }
+
+      nextValue.splice(targetIndex, 0, movedExercise);
+      return nextValue;
+    });
+  }
+
+  function handleRemoveExercise(exerciseId: string): void {
+    const targetExercise = draftExercises.find((draftExercise) => {
+      return draftExercise.id === exerciseId;
+    });
+
+    if (!targetExercise) {
+      return;
+    }
+
+    if (targetExercise.sets.length > 0) {
+      setPendingExerciseRemovalId(exerciseId);
+      return;
+    }
+
+    setDraftExercises((currentValue) => {
+      return currentValue.filter((draftExercise) => draftExercise.id !== exerciseId);
+    });
+  }
+
+  function confirmRemoveExercise(exerciseId: string): void {
+    setDraftExercises((currentValue) => {
+      return currentValue.filter((draftExercise) => draftExercise.id !== exerciseId);
+    });
+    setPendingExerciseRemovalId(null);
   }
 
   function handleAddSet(exerciseId: string): void {
@@ -333,6 +547,56 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
     });
   }
 
+  function handleStartRestTimer(setId: string, seconds: number): void {
+    const safeSeconds = Math.max(1, Math.floor(seconds));
+
+    if (
+      restTimer &&
+      (restTimer.status === "running" || restTimer.status === "paused") &&
+      restTimer.remainingSeconds > 0
+    ) {
+      setPendingRestTimerRequest({
+        seconds: safeSeconds,
+        setId,
+      });
+      return;
+    }
+
+    startRestTimer(setId, safeSeconds);
+  }
+
+  function startRestTimer(setId: string, seconds: number): void {
+    setRestTimer({
+      isRunning: true,
+      remainingSeconds: seconds,
+      sourceSetId: setId,
+      status: "running",
+      totalSeconds: seconds,
+    });
+  }
+
+  function handleToggleRestTimerRunning(): void {
+    setRestTimer((currentValue) => {
+      if (!currentValue || currentValue.status === "finished") {
+        return currentValue;
+      }
+
+      if (currentValue.status === "paused") {
+        return {
+          ...currentValue,
+          isRunning: true,
+          status: "running",
+        };
+      }
+
+      return {
+        ...currentValue,
+        isRunning: false,
+        status: "paused",
+      };
+    });
+  }
+
   async function handleComplete(): Promise<void> {
     if (!props.token) {
       setErrorMessage("You must be signed in to create a workout.");
@@ -372,6 +636,10 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
     setErrorMessage(null);
     setIsLibraryOpen(false);
     setIsRunning(false);
+    setPendingExerciseRemovalId(null);
+    setPendingRestTimerRequest(null);
+    setReplacingDraftExerciseId(null);
+    setRestTimer(null);
   }
 
   function scrollComposerBodyToBottom(): void {
@@ -550,18 +818,20 @@ const headerBodyStyle: React.CSSProperties = {
   gridTemplateColumns: "minmax(0, 1fr) auto",
 };
 
-const bodyStyle: React.CSSProperties = {
-  alignContent: "start",
-  display: "grid",
-  flex: 1,
-  gap: 16,
-  minHeight: 0,
-  overflowY: "auto",
-  overscrollBehavior: "contain",
-  paddingBottom: 96,
-  touchAction: "pan-y",
-  WebkitOverflowScrolling: "touch",
-};
+function bodyStyle(hasRestTimer: boolean): React.CSSProperties {
+  return {
+    alignContent: "start",
+    display: "grid",
+    flex: 1,
+    gap: 16,
+    minHeight: 0,
+    overflowY: "auto",
+    overscrollBehavior: "contain",
+    paddingBottom: hasRestTimer ? 236 : 180,
+    touchAction: "pan-y",
+    WebkitOverflowScrolling: "touch",
+  };
+}
 
 const exerciseListStyle: React.CSSProperties = {
   display: "grid",
@@ -605,6 +875,7 @@ const fabWrapStyle: React.CSSProperties = {
   bottom: "calc(24px + env(safe-area-inset-bottom, 0px))",
   position: "absolute",
   right: 16,
+  zIndex: 4,
 };
 
 function fabStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
@@ -620,5 +891,61 @@ function fabStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPropert
     height: 56,
     justifyContent: "center",
     width: 56,
+  };
+}
+
+function confirmBackdropStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    alignItems: "end",
+    backgroundColor: theme.isDark ? "rgba(0,0,0,0.42)" : "rgba(0,0,0,0.24)",
+    display: "flex",
+    inset: 0,
+    padding: "16px 16px calc(24px + env(safe-area-inset-bottom, 0px))",
+    position: "absolute",
+    zIndex: 230,
+  };
+}
+
+function confirmCardStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.surf,
+    border: `1px solid ${theme.colors.bdr2}`,
+    borderRadius: theme.radius.card,
+    boxShadow: theme.shadows.card,
+    display: "grid",
+    gap: 12,
+    padding: 16,
+    width: "100%",
+  };
+}
+
+function confirmTitleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    color: theme.colors.tx,
+    fontSize: 15,
+  };
+}
+
+function confirmCopyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    color: theme.colors.tx2,
+    fontSize: 12,
+    lineHeight: 1.6,
+    margin: 0,
+  };
+}
+
+const confirmActionRowStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 10,
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+};
+
+function dangerConfirmButtonStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    borderColor: theme.colors.red,
+    color: theme.colors.red,
   };
 }

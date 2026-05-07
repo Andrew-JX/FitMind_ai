@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { DraftExercise, DraftSet } from "./training-session-draft";
 
@@ -8,13 +8,21 @@ import {
   getExerciseSummary,
   isDraftSetValid,
 } from "./training-session-draft";
+import { TrainingSessionExerciseActions } from "./TrainingSessionExerciseActions";
 import { TrainingSessionSetRow } from "./TrainingSessionSetRow";
 
 export interface TrainingSessionExerciseCardProps {
   draftExercise: DraftExercise;
+  canMoveDown: boolean;
+  canMoveUp: boolean;
   onAddSet: () => void;
   onCopySet: (setId: string) => void;
   onDeleteSet: (setId: string) => void;
+  onMoveDown: () => void;
+  onMoveUp: () => void;
+  onRemove: () => void;
+  onReplace: () => void;
+  onStartRestTimer: (setId: string, seconds: number) => void;
   onToggleExpanded: () => void;
   onToggleSetCompleted: (setId: string) => void;
   onUpdateSet: <TField extends keyof DraftSet>(
@@ -32,11 +40,24 @@ export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardPr
     .slice(0, 2)
     .map((muscle) => muscle.code);
   const [activeSetId, setActiveSetId] = useState<string | null>(null);
+  const [isActionLayerOpen, setIsActionLayerOpen] = useState(false);
+  const editorScrollerRef = useRef<HTMLDivElement | null>(null);
   const visibleActiveSetId = props.draftExercise.sets.some((setDraft) => {
     return setDraft.id === activeSetId;
   })
     ? activeSetId
     : (props.draftExercise.sets.at(-1)?.id ?? null);
+
+  useEffect(() => {
+    if (!props.draftExercise.isExpanded || !editorScrollerRef.current) {
+      return;
+    }
+
+    editorScrollerRef.current.scrollTo({
+      behavior: "smooth",
+      top: editorScrollerRef.current.scrollHeight,
+    });
+  }, [props.draftExercise.isExpanded, props.draftExercise.sets.length]);
 
   return (
     <section
@@ -45,8 +66,19 @@ export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardPr
           props.onToggleExpanded();
         }
       }}
-      style={cardStyle(theme, props.draftExercise.isExpanded)}
+      style={cardStyle(theme, props.draftExercise.isExpanded, isActionLayerOpen)}
     >
+      <TrainingSessionExerciseActions
+        canMoveDown={props.canMoveDown}
+        canMoveUp={props.canMoveUp}
+        draftExercise={props.draftExercise}
+        onMoveDown={props.onMoveDown}
+        onMoveUp={props.onMoveUp}
+        onOpenChange={setIsActionLayerOpen}
+        onRemove={props.onRemove}
+        onReplace={props.onReplace}
+      />
+
       <button onClick={props.onToggleExpanded} style={headerButtonStyle} type="button">
         <div style={titleRowStyle}>
           <div>
@@ -83,7 +115,7 @@ export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardPr
 
       {props.draftExercise.isExpanded ? (
         <div onClick={(event) => event.stopPropagation()} style={editorShellStyle}>
-          <div style={editorScrollerStyle()}>
+          <div ref={editorScrollerRef} style={editorScrollerStyle()}>
             {props.draftExercise.sets.map((setDraft, index) => {
               const isActive = setDraft.id === visibleActiveSetId;
 
@@ -116,6 +148,7 @@ export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardPr
                   key={setDraft.id}
                   onCopy={() => props.onCopySet(setDraft.id)}
                   onDelete={() => props.onDeleteSet(setDraft.id)}
+                  onStartRestTimer={(seconds) => props.onStartRestTimer(setDraft.id, seconds)}
                   onToggleCompleted={() => props.onToggleSetCompleted(setDraft.id)}
                   onUpdate={(field, value) => props.onUpdateSet(setDraft.id, field, value)}
                   setDraft={setDraft}
@@ -151,6 +184,7 @@ function formatVolume(totalVolumeKg: number): string {
 function cardStyle(
   theme: ReturnType<typeof useTheme>["theme"],
   isExpanded: boolean,
+  isActionLayerOpen: boolean,
 ): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf,
@@ -159,7 +193,9 @@ function cardStyle(
     display: "grid",
     gap: 14,
     padding: 16,
+    position: "relative",
     transition: "border-color 150ms ease, transform 150ms ease",
+    zIndex: isActionLayerOpen ? 30 : "auto",
   };
 }
 
@@ -169,7 +205,7 @@ const headerButtonStyle: React.CSSProperties = {
   cursor: "pointer",
   display: "grid",
   gap: 10,
-  padding: 0,
+  padding: "0 42px 0 0",
   textAlign: "left",
   width: "100%",
 };

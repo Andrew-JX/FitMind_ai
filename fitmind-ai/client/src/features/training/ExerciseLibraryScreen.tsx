@@ -32,6 +32,7 @@ type ExerciseCategory = (typeof CATEGORY_LABELS)[number];
 
 export interface ExerciseLibraryScreenProps extends ExercisePickerProps {
   isOpen: boolean;
+  mode?: "add" | "replace" | undefined;
   onClose: () => void;
   onSelectExercise: (exercise: DictionaryExercise) => void;
 }
@@ -42,6 +43,7 @@ export function ExerciseLibraryScreen(props: ExerciseLibraryScreenProps) {
     exercises,
     isLoadingExercises,
     isOpen,
+    mode = "add",
     onClose,
     onSearch,
     onSelectExercise,
@@ -100,7 +102,9 @@ export function ExerciseLibraryScreen(props: ExerciseLibraryScreenProps) {
           <IconButton icon="x" label="关闭动作库" onClick={onClose} />
           <div style={{ flex: 1 }}>
             <h2 style={titleStyle}>选择动作</h2>
-            <p style={subtitleStyle(theme)}>从动作库添加本次训练动作</p>
+            <p style={subtitleStyle(theme)}>
+              {mode === "replace" ? "选择一个新动作替换当前动作" : "从动作库添加本次训练动作"}
+            </p>
           </div>
         </div>
 

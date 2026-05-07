@@ -31,6 +31,9 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
   const { theme } = useTheme();
   const exerciseNames = useExerciseNames();
   const [collapsedWorkoutId, setCollapsedWorkoutId] = useState<string | null>(null);
+  const [pendingDeleteWorkoutId, setPendingDeleteWorkoutId] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     if (props.selectedWorkoutId !== collapsedWorkoutId) {
@@ -84,6 +87,32 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
         </div>
       ) : null}
 
+      {pendingDeleteWorkoutId ? (
+        <div style={confirmBoxStyle(theme)}>
+          <strong style={confirmTitleStyle(theme)}>确认删除这条训练记录？</strong>
+          <p style={confirmCopyStyle(theme)}>该训练记录下的所有动作组也会一起删除。</p>
+          <div style={confirmActionRowStyle}>
+            <Button
+              disabled={props.deletingWorkoutId === pendingDeleteWorkoutId}
+              onClick={() => setPendingDeleteWorkoutId(null)}
+              type="button"
+              variant="secondary"
+            >
+              取消
+            </Button>
+            <Button
+              disabled={props.deletingWorkoutId === pendingDeleteWorkoutId}
+              onClick={() => void confirmDeleteWorkout(pendingDeleteWorkoutId)}
+              style={dangerConfirmButtonStyle(theme)}
+              type="button"
+              variant="secondary"
+            >
+              {props.deletingWorkoutId === pendingDeleteWorkoutId ? "删除中..." : "删除"}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       {props.isLoadingList && !props.listError ? (
         <p style={copyStyle(theme)}>正在加载训练日志...</p>
       ) : null}
@@ -127,11 +156,15 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
   );
 
   async function handleDeleteWorkout(workoutId: string): Promise<void> {
-    if (!window.confirm("确认删除这条训练记录及其所有动作组吗？")) {
-      return;
-    }
+    setPendingDeleteWorkoutId(workoutId);
+  }
 
-    await props.onDeleteWorkout(workoutId);
+  async function confirmDeleteWorkout(workoutId: string): Promise<void> {
+    const didDelete = await props.onDeleteWorkout(workoutId);
+
+    if (didDelete) {
+      setPendingDeleteWorkoutId(null);
+    }
   }
 
   async function handleToggleWorkout(
@@ -237,5 +270,48 @@ function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProper
     fontSize: 12,
     lineHeight: 1.6,
     margin: "6px 0 0",
+  };
+}
+
+function confirmBoxStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.surf2,
+    border: `1px solid ${theme.colors.bdr2}`,
+    borderRadius: theme.radius.card,
+    display: "grid",
+    gap: 10,
+    marginTop: 12,
+    padding: 14,
+  };
+}
+
+function confirmTitleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    color: theme.colors.tx,
+    fontSize: 14,
+  };
+}
+
+function confirmCopyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    color: theme.colors.tx2,
+    fontSize: 12,
+    lineHeight: 1.6,
+    margin: 0,
+  };
+}
+
+const confirmActionRowStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 8,
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+};
+
+function dangerConfirmButtonStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    borderColor: theme.colors.red,
+    color: theme.colors.red,
   };
 }
