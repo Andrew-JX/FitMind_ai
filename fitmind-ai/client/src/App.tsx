@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 
 import { AppShell, type AppTabKey } from "./components/AppShell";
-import { Card } from "./components/Card";
 import { AssistantWorkspace } from "./features/assistant/AssistantWorkspace";
 import { AuthScreen } from "./features/auth/AuthScreen";
 import {
@@ -17,7 +16,6 @@ import { TrainingView } from "./features/training/TrainingView";
 import { useExerciseSearch } from "./features/training/use-exercise-search";
 import { useTrainingSummary } from "./features/training/use-training-summary";
 import { useWorkouts } from "./features/training/use-workouts";
-import { useTheme } from "./theme/ThemeContext";
 
 declare global {
   interface Window {
@@ -40,7 +38,6 @@ export function App() {
   const exerciseSearch = useExerciseSearch();
   const trainingSummary = useTrainingSummary(auth.token);
   const workouts = useWorkouts(auth.token);
-  const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState<AppTabKey>("training");
   const [selectedProgressExerciseId, setSelectedProgressExerciseId] = useState<
     string | null
@@ -94,12 +91,6 @@ export function App() {
       subtitle="基于真实训练日志的可追溯 AI 训练分析助手"
       userLabel={auth.user.display_name ?? auth.user.email}
     >
-      {auth.errorMessage ? (
-        <p style={{ color: theme.colors.orange, marginTop: 0 }}>
-          错误：{auth.errorMessage}
-        </p>
-      ) : null}
-
       {activeTab === "training" ? (
         <section style={tabSectionStyle}>
           <TrainingView
@@ -113,6 +104,10 @@ export function App() {
             }}
             summary={trainingSummary.summary}
             summaryLoading={trainingSummary.isLoading}
+            workoutFormProps={{
+              onCreated: handleWorkoutCreated,
+              token: auth.token,
+            }}
             workoutsProps={{
               deleteError: workouts.deleteError,
               deletingWorkoutId: workouts.deletingWorkoutId,
@@ -126,10 +121,6 @@ export function App() {
               selectedWorkout: workouts.selectedWorkout,
               selectedWorkoutId: workouts.selectedWorkoutId,
               workouts: workouts.workouts,
-            }}
-            workoutFormProps={{
-              onCreated: handleWorkoutCreated,
-              token: auth.token,
             }}
           />
         </section>
@@ -170,16 +161,6 @@ export function App() {
           />
         </section>
       ) : null}
-
-      {import.meta.env.DEV ? (
-        <Card padding="12px 16px">
-          <p style={devCopyStyle(theme)}>
-            开发调试：浏览器控制台仍可使用
-            <code style={devCodeStyle(theme)}> window.fitmindAuthDebug </code>
-            进行本地认证检查。
-          </p>
-        </Card>
-      ) : null}
     </AppShell>
   );
 
@@ -219,17 +200,3 @@ const tabSectionStyle: React.CSSProperties = {
   gap: 16,
   paddingBottom: 16,
 };
-
-function devCopyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return {
-    color: theme.colors.tx2,
-    fontSize: 12,
-    margin: 0,
-  };
-}
-
-function devCodeStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return {
-    fontFamily: theme.fonts.mono,
-  };
-}

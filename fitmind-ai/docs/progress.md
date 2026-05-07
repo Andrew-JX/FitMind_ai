@@ -2059,3 +2059,112 @@
 - `pnpm --filter @fitmind/client exec vite build` 在当前环境先遇到 `vite` 命令解析问题，并复现已知 Windows / sandbox `spawn EPERM` 问题。
 - 构建最终通过提权后的 package-local `vite.cmd build` 在 `client` 目录下完成验证。
 
+## 2026-05-07 Phase 3.8 Batch 4 - AI Assistant Tab Product UI Refactor
+
+### Changed files
+- `client/src/features/assistant/AssistantWorkspace.tsx`
+- `client/src/features/assistant/AssistantChatPanel.tsx`
+- `client/src/features/assistant/AssistantToolCallCard.tsx`
+- `client/src/features/assistant/AssistantMessageList.tsx`
+- `client/src/features/assistant/AssistantIntroCard.tsx`
+- `client/src/features/assistant/AssistantQuickPrompts.tsx`
+- `client/src/features/assistant/AssistantMessageBubble.tsx`
+- `client/src/features/assistant/AssistantComposer.tsx`
+- `client/src/features/assistant/AssistantStatusRail.tsx`
+- `docs/progress.md`
+
+### What changed
+- 将 AI 助手 Tab 从“调试工作台”重构为中文、移动端优先的产品化训练助手界面。
+- 新增顶部说明卡，明确这是基于 SSE、Tool Calling 和 evidence 的训练助手，而不是普通聊天壳。
+- 将 quick prompts 重构为中文产品卡片，保留 `training_overview`、`exercise_progress`、`recommendation_context` 三种 mode 语义不变，并继续在未选择动作时禁用“动作进展”。
+- 新增中文状态栏，展示当前状态、`provider_selected` 和紧凑样式的 `sessionId`。
+- 将消息区改为移动端聊天气泡和空状态文案，不再使用 raw JSON 或调试式消息盒。
+- 将工具调用区改为清晰的产品状态卡，继续展示 `activeToolCall` 的工具名、状态和耗时，不暴露 token、header、env、secrets 或 raw provider payload。
+- 将输入区改为移动端友好的底部提问体验，保留发送、停止、重试、清空四个入口。
+
+### Preserved logic
+- 未修改 server、assistant SSE endpoint contract、provider adapter、tool executor、training APIs 或 auth token 逻辑。
+- 保留 `sendMessage`、`retryLast`、`abort`、`clearConversation` 的现有行为。
+- 保留 `sessionId` 复用、`provider_selected` 展示、`activeToolCall` 展示和现有错误处理语义。
+- 保留 `thinking` / `tool_calling` / `answering` / `done` / `error` 状态机。
+- 保留 `answer_delta` 增量拼接逻辑。
+- 未新增重复 assistant hook，也未改 SSE 解析逻辑或 quick prompt payload 结构。
+
+### Validation commands
+- `pnpm --filter @fitmind/client type-check`
+- `pnpm lint`
+- `pnpm --filter @fitmind/client exec vite build`
+- `.\node_modules\.bin\vite.cmd build`（`client` 目录）
+
+### Verification results
+- `pnpm --filter @fitmind/client type-check` 通过。
+- `pnpm lint` 通过。
+- `pnpm --filter @fitmind/client exec vite build` 先遇到当前环境的 `vite` 命令解析问题，并复现已知 Windows / sandbox `esbuild spawn EPERM`。
+- 构建最终通过提权后的 package-local `vite.cmd build` 在 `client` 目录下完成验证。
+
+### Known environment issues
+- 当前 Windows 环境下，标准 `pnpm --filter @fitmind/client exec vite build` 仍会受到 `vite` 命令解析和 `esbuild spawn EPERM` 影响。
+- 已按既有验证路径使用 package-local `vite.cmd build` 完成等价构建验证。
+
+## 2026-05-07 Phase 3.8 Batch 5 - Overall Polish & Local Run Guide
+
+### Files changed
+- `client/src/App.tsx`
+- `client/src/index.css`
+- `client/src/components/AppShell.tsx`
+- `client/src/components/Button.tsx`
+- `client/src/components/IconButton.tsx`
+- `client/src/components/Input.tsx`
+- `client/src/components/StateNotice.tsx`
+- `client/src/features/auth/AuthScreen.tsx`
+- `client/src/features/training/TrainingView.tsx`
+- `client/src/features/training/ExercisePicker.tsx`
+- `client/src/features/training/WorkoutForm.tsx`
+- `client/src/features/training/WorkoutsPanel.tsx`
+- `client/src/features/training/AnalysisView.tsx`
+- `client/src/features/training/TrainingSummaryPanel.tsx`
+- `client/src/features/training/ExerciseProgressPanel.tsx`
+- `client/src/features/training/RecommendationContextPanel.tsx`
+- `client/src/features/assistant/AssistantChatPanel.tsx`
+- `client/src/features/assistant/AssistantComposer.tsx`
+- `client/src/features/assistant/AssistantMessageList.tsx`
+- `client/src/features/assistant/AssistantQuickPrompts.tsx`
+- `client/src/features/assistant/AssistantStatusRail.tsx`
+- `client/src/features/assistant/AssistantToolCallCard.tsx`
+- `docs/local-run-guide.md`
+- `docs/progress.md`
+
+### UI polish summary
+- 为训练、分析、AI 助手三大 Tab 补了统一的轻量状态组件 `StateNotice`，统一空态、错误态和提示态的视觉层级。
+- 统一了训练日志、动作词典、训练表单、分析总览、动作进展、推荐上下文和助手面板的中文文案、卡片间距、按钮禁用态和说明文案。
+- 清理了登录后页面残留的开发味调试提示，不再默认向用户展示开发调试文案。
+- 保留 `provider`、`sessionId`、`SSE`、`Tool Calling`、`evidence`、`calculation_rules` 等必要技术标识，但不默认展示 raw debug JSON。
+- 收紧了全局基础样式，包括 disabled opacity、按钮交互、输入占位文案和移动端 390px 密度。
+
+### Local run guide summary
+- 新增 `docs/local-run-guide.md`，基于仓库真实脚本和配置整理本地启动说明。
+- 文档明确记录了项目结构、环境变量、端口、Vite proxy、安装与验证命令、migration / rollback / seed 方式、前后端启动命令、构建命令和 Windows fallback。
+- 文档按当前仓库代码说明前端端口为 `5173`，没有把 `vite.config.ts` 改到 `5174`。
+
+### Preserved logic
+- 未修改 server 文件、training API contract、assistant API contract、SSE event names、provider adapter、tool executor、auth token 逻辑、训练 CRUD、selected exercise 行为、quick prompt mode/payload 和 `set_index` 逻辑。
+- 保留 create / delete workout 后的现有 refresh 链路。
+- 保留 `training_overview`、`exercise_progress`、`recommendation_context` 三种 quick prompt mode。
+
+### Verification commands and results
+- `pnpm --filter @fitmind/client type-check`
+- `pnpm lint`
+- `pnpm --filter @fitmind/client exec vite build`
+- 若标准构建命令复现已知 Windows `EPERM`，补记 package-local `vite.cmd build` fallback 结果。
+
+### Verification notes
+- `pnpm --filter @fitmind/client type-check` 通过。
+- `pnpm lint` 通过。
+- `pnpm --filter @fitmind/client exec vite build` 先遇到当前环境的 `vite` 命令解析问题，并复现已知 Windows / sandbox `esbuild spawn EPERM`。
+- 构建最终通过提权后的 package-local `vite.cmd build` 在 `client` 目录下完成验证。
+
+### Known environment issues
+- 当前 Windows 环境下，`vite/esbuild spawn EPERM` 和 `tsx/esbuild spawn EPERM` 仍可能影响构建与脚本执行。
+- Git 仍可能在部分目录映射下提示 `dubious ownership`。
+- Neon 连接串仍可能打印 `sslmode=require` 警告，但不一定影响真实连接结果。
+

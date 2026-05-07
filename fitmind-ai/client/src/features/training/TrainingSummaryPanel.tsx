@@ -1,6 +1,7 @@
 import { Badge } from "../../components/Badge";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
+import { StateNotice } from "../../components/StateNotice";
 import { useTheme } from "../../theme/ThemeContext";
 import { AnalysisStatsGrid } from "./AnalysisStatsGrid";
 import { ExerciseInsightCard } from "./ExerciseInsightCard";
@@ -45,7 +46,7 @@ export function TrainingSummaryPanel(props: TrainingSummaryPanelProps) {
               : "范围：最近 30 天"}
           </p>
           <p style={subtleStyle(theme)}>
-            统计结果来自训练日志的规则计算，可继续点击动作查看确定性进展。
+            统计结果来自训练日志的确定性计算，可继续点击动作查看进展。
           </p>
         </div>
 
@@ -59,12 +60,23 @@ export function TrainingSummaryPanel(props: TrainingSummaryPanelProps) {
         </Button>
       </div>
 
-      {errorMessage ? <p style={errorStyle(theme)}>{translateSummaryError(errorMessage)}</p> : null}
-      {isLoading && !summary ? <p style={copyStyle(theme)}>正在加载确定性分析...</p> : null}
+      {errorMessage ? (
+        <StateNotice
+          description="请确认后端服务已启动，或稍后重试。"
+          icon="chart"
+          title="数据加载失败"
+          tone="error"
+        />
+      ) : null}
+
+      {isLoading && !summary ? <p style={copyStyle(theme)}>正在加载分析数据...</p> : null}
+
       {hasEmptyState ? (
-        <p style={copyStyle(theme)}>
-          最近 30 天还没有训练记录。先去训练页记录 workout，再回来查看确定性分析。
-        </p>
+        <StateNotice
+          description="完成训练记录后，这里会展示总容量、动作排行和进展趋势。"
+          icon="chart"
+          title="暂无分析数据"
+        />
       ) : null}
 
       {summary ? (
@@ -73,7 +85,7 @@ export function TrainingSummaryPanel(props: TrainingSummaryPanelProps) {
 
           <div style={exerciseSectionStyle(theme)}>
             <div style={sectionIntroStyle}>
-              <h3 style={subheadingStyle}>主要训练动作</h3>
+              <h3 style={subheadingStyle}>重点动作</h3>
               <p style={sectionCopyStyle(theme)}>按总容量排序，点击动作可查看进展。</p>
             </div>
 
@@ -97,13 +109,6 @@ export function TrainingSummaryPanel(props: TrainingSummaryPanelProps) {
         </>
       ) : null}
     </Card>
-  );
-}
-
-function translateSummaryError(message: string): string {
-  return message.replaceAll(
-    "Training summary is unavailable right now.",
-    "训练总结加载失败",
   );
 }
 
@@ -174,14 +179,6 @@ function subtleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProp
     fontSize: 11,
     lineHeight: 1.6,
     margin: "8px 0 0",
-  };
-}
-
-function errorStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return {
-    color: theme.colors.orange,
-    fontSize: 12,
-    marginBottom: 16,
   };
 }
 

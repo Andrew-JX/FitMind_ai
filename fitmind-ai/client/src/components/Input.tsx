@@ -26,6 +26,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
         borderRadius: theme.radius.control,
         color: theme.colors.tx,
         padding: "10px 12px",
+        transition: "border-color 150ms ease, opacity 150ms ease",
         width: "100%",
         ...(props.style ?? {}),
       }}

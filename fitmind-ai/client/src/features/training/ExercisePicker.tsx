@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Button } from "../../components/Button";
 import { Input } from "../../components/Input";
 import { Pill } from "../../components/Pill";
+import { StateNotice } from "../../components/StateNotice";
 import { useTheme } from "../../theme/ThemeContext";
 import {
   type DictionaryExercise,
@@ -75,10 +76,29 @@ export function ExercisePicker(props: ExercisePickerProps) {
         </Button>
       </form>
 
-      {searchError ? <p style={errorStyle(theme)}>{searchError}</p> : null}
-      {isLoadingMuscleGroups ? <p style={copyStyle(theme)}>正在加载肌群词典...</p> : null}
-      {!isLoadingExercises && exercises.length === 0 ? (
-        <p style={copyStyle(theme)}>输入关键词后即可查询系统内置动作。</p>
+      {searchError ? (
+        <div style={{ marginTop: 12 }}>
+          <StateNotice
+            description="请确认后端服务已启动，或稍后重试。"
+            icon="search"
+            title="动作词典加载失败"
+            tone="error"
+          />
+        </div>
+      ) : null}
+
+      {isLoadingMuscleGroups ? (
+        <p style={copyStyle(theme)}>正在加载肌群词典...</p>
+      ) : null}
+
+      {!searchError && !isLoadingExercises && exercises.length === 0 ? (
+        <div style={{ marginTop: 12 }}>
+          <StateNotice
+            description="输入关键词或选择肌群后，即可查看系统内置动作。"
+            icon="search"
+            title="暂无搜索结果"
+          />
+        </div>
       ) : null}
 
       {exercises.length > 0 ? (
@@ -93,13 +113,17 @@ export function ExercisePicker(props: ExercisePickerProps) {
               <li key={exercise.id} style={resultCardStyle(theme)}>
                 <div style={titleRowStyle}>
                   <strong style={{ fontSize: 13 }}>{exercise.name_en}</strong>
-                  {exercise.name_zh?.trim() ? <Pill tone="info">{exercise.name_zh}</Pill> : null}
+                  {exercise.name_zh?.trim() ? (
+                    <Pill tone="info">{exercise.name_zh}</Pill>
+                  ) : null}
                 </div>
                 <div style={pillRowStyle}>
                   {exercise.movement_pattern ? (
                     <Pill tone="analysis">{exercise.movement_pattern}</Pill>
                   ) : null}
-                  {exercise.equipment ? <Pill tone="neutral">{exercise.equipment}</Pill> : null}
+                  {exercise.equipment ? (
+                    <Pill tone="neutral">{exercise.equipment}</Pill>
+                  ) : null}
                   {primaryMuscles.map((muscleCode) => (
                     <Pill key={muscleCode} tone="accent">
                       {muscleCode}
@@ -168,15 +192,6 @@ function selectStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProp
     borderRadius: 12,
     color: theme.colors.tx,
     padding: "10px 12px",
-  };
-}
-
-function errorStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return {
-    color: theme.colors.orange,
-    fontSize: 12,
-    marginBottom: 0,
-    marginTop: 12,
   };
 }
 

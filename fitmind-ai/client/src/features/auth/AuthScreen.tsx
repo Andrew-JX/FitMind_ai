@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import type { LoginRequest, RegisterRequest } from "../../../../shared/src/auth";
 
+import { StateNotice } from "../../components/StateNotice";
 import { useTheme } from "../../theme/ThemeContext";
 import type { AuthStatus } from "./use-auth";
 
@@ -189,9 +190,13 @@ export function AuthScreen(props: AuthScreenProps) {
         </form>
 
         {errorMessage ? (
-          <p style={{ color: theme.colors.orange, fontSize: 12, marginBottom: 0, marginTop: 14 }}>
-            错误：{errorMessage}
-          </p>
+          <div style={{ marginTop: 14 }}>
+            <StateNotice
+              description={errorMessage}
+              title="登录失败"
+              tone="error"
+            />
+          </div>
         ) : null}
 
         <p

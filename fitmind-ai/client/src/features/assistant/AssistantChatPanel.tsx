@@ -1,12 +1,11 @@
 import { useState } from "react";
 
-import { Badge } from "../../components/Badge";
-import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
-import { IconButton } from "../../components/IconButton";
-import { StatusPill } from "../../components/StatusPill";
+import { StateNotice } from "../../components/StateNotice";
 import { useTheme } from "../../theme/ThemeContext";
+import { AssistantComposer } from "./AssistantComposer";
 import { AssistantMessageList } from "./AssistantMessageList";
+import { AssistantQuickPrompts } from "./AssistantQuickPrompts";
 import { AssistantToolCallCard } from "./AssistantToolCallCard";
 import type { AssistantChatRequestPayload, AssistantMode } from "./assistant-types";
 import type { UseAssistantChatResult } from "./use-assistant-chat";
@@ -21,7 +20,7 @@ export interface AssistantChatPanelProps {
 export function AssistantChatPanel(props: AssistantChatPanelProps) {
   const { chat } = props;
   const { theme } = useTheme();
-  const [message, setMessage] = useState("展示我的训练总览");
+  const [message, setMessage] = useState("看看我最近的训练总览。");
   const [mode, setMode] = useState<AssistantMode>("training_overview");
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
@@ -31,11 +30,12 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
       return;
     }
 
+    const range = createDefaultRange();
     const payload: AssistantChatRequestPayload = {
       mode,
       message,
-      start_date: createDefaultRange().start_date,
-      end_date: createDefaultRange().end_date,
+      start_date: range.start_date,
+      end_date: range.end_date,
       exercise_id:
         mode === "exercise_progress"
           ? props.selectedExerciseId ?? undefined
@@ -50,137 +50,69 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
     setMode(nextMode);
     setMessage(
       nextMode === "training_overview"
-        ? "展示我的训练总览"
+        ? "看看我最近的训练总览。"
         : nextMode === "exercise_progress"
-          ? `展示 ${props.selectedExerciseName?.trim() || "当前动作"} 的进展`
-          : "构建推荐上下文预览",
+          ? `分析一下 ${props.selectedExerciseName?.trim() || "当前动作"} 的进展。`
+          : "预览这次回答会读取哪些推荐上下文。",
     );
   }
 
   return (
-    <section style={{ display: "grid", gap: 12 }}>
-      <Card padding="14px">
-        <div style={statusBarStyle}>
-          <StatusPill status={chat.status} />
-          <div style={{ alignItems: "center", display: "flex", gap: 8 }}>
-            {chat.activeToolCall ? (
-              <Badge tone="info">{chat.activeToolCall.toolName}</Badge>
-            ) : null}
-            <IconButton
-              disabled={chat.isStreaming || chat.messages.length === 0}
-              icon="x"
-              label="清空对话"
-              onClick={chat.clearConversation}
-            />
-          </div>
-        </div>
-      </Card>
-
-      <Card padding="14px">
-        <h3 style={{ margin: 0 }}>快捷指令</h3>
-        <p style={copyStyle(theme)}>
-          当前会按固定 mode 触发对应确定性工具，再通过 SSE 流式返回回答。
-        </p>
-        <div style={quickPromptRowStyle}>
-          <Button onClick={() => applyQuickPrompt("training_overview")} type="button" variant="secondary">
-            训练总览
-          </Button>
-          <Button
-            disabled={!props.selectedExerciseId}
-            onClick={() => applyQuickPrompt("exercise_progress")}
-            type="button"
-            variant="secondary"
-          >
-            动作进展
-          </Button>
-          <Button
-            onClick={() => applyQuickPrompt("recommendation_context")}
-            type="button"
-            variant="secondary"
-          >
-            推荐上下文
-          </Button>
-        </div>
-
-        {props.selectedExerciseId ? (
-          <p style={helperTextStyle(theme)}>
-            当前动作进展目标：
-            <strong>{props.selectedExerciseName ?? props.selectedExerciseId}</strong>
-          </p>
-        ) : (
-          <p style={helperTextStyle(theme)}>
-            需要先在“分析”页选中一个动作，才能使用“动作进展”快捷指令。
-          </p>
-        )}
-      </Card>
+    <section style={panelStyle}>
+      <AssistantQuickPrompts
+        activeMode={mode}
+        onSelectMode={applyQuickPrompt}
+        selectedExerciseId={props.selectedExerciseId}
+        selectedExerciseName={props.selectedExerciseName}
+      />
 
       <Card padding="14px">
         <div style={sectionStyle}>
-          <h4 style={{ margin: 0 }}>当前工具调用</h4>
+          <h3 style={{ margin: 0 }}>工具调用状态</h3>
           <AssistantToolCallCard toolCall={chat.activeToolCall} />
         </div>
       </Card>
 
       {!props.selectedExerciseId ? (
-        <div
-          style={{
-            backgroundColor: theme.isDark
-              ? "rgba(255,155,66,0.18)"
-              : "rgba(192,96,16,0.12)",
-            border: `1px solid ${theme.isDark ? "rgba(255,155,66,0.28)" : "rgba(192,96,16,0.24)"}`,
-            borderRadius: 12,
-            color: theme.colors.orange,
-            fontSize: 11,
-            padding: "10px 12px",
-          }}
-        >
-          前往“分析”页选择动作后，可以使用“动作进展”快捷指令。
-        </div>
+        <StateNotice
+          description="前往“分析”选择动作后，可使用“动作进展”快捷问题。"
+          icon="target"
+          title="动作进展暂未就绪"
+          tone="warning"
+        />
       ) : null}
 
       <Card padding="14px">
         <section style={sectionStyle}>
-          <h4 style={{ margin: 0 }}>对话记录</h4>
+          <div>
+            <h3 style={{ margin: 0 }}>对话消息</h3>
+            <p style={copyStyle(theme)}>
+              仅展示提问、工具阶段和增量回答，不默认显示 raw debug JSON。
+            </p>
+          </div>
           <AssistantMessageList messages={chat.messages} />
         </section>
       </Card>
 
-      <Card padding="12px 14px">
-        <form onSubmit={(event) => void handleSubmit(event)} style={inputBarStyle}>
-          <div style={{ flex: 1 }}>
-            <div style={modeLabelStyle(theme)}>当前模式：{formatMode(mode)}</div>
-            <textarea
-              onChange={(event) => setMessage(event.target.value)}
-              rows={3}
-              style={textareaStyle(theme)}
-              value={message}
-            />
-          </div>
-          <div style={inputActionColumnStyle}>
-            <IconButton
-              disabled={!chat.isStreaming}
-              icon="stop"
-              label="停止"
-              onClick={chat.abort}
-              tone="danger"
-            />
-            <Button disabled={!props.token || chat.isStreaming} style={{ width: "100%" }} type="submit">
-              发送
-            </Button>
-            <Button
-              disabled={chat.isStreaming || chat.messages.length === 0}
-              onClick={() => void chat.retryLast()}
-              type="button"
-              variant="secondary"
-            >
-              重试
-            </Button>
-          </div>
-        </form>
-      </Card>
+      <div style={modeMetaStyle(theme)}>当前模式：{formatMode(mode)}</div>
+
+      <AssistantComposer
+        canRetry={chat.messages.length > 0}
+        isStreaming={chat.isStreaming}
+        message={message}
+        onChangeMessage={setMessage}
+        onClear={chat.clearConversation}
+        onRetry={() => void chat.retryLast()}
+        onStop={chat.abort}
+        onSubmit={(event) => void handleSubmit(event)}
+      />
 
       {chat.errorMessage ? (
-        <p style={{ color: theme.colors.orange, margin: 0 }}>错误：{chat.errorMessage}</p>
+        <StateNotice
+          description="可以重试本次问题，或检查 assistant provider 配置。"
+          title="助手响应失败"
+          tone="error"
+        />
       ) : null}
     </section>
   );
@@ -218,17 +150,9 @@ function formatMode(mode: AssistantMode): string {
   return "recommendation_context";
 }
 
-const statusBarStyle: React.CSSProperties = {
-  alignItems: "center",
-  display: "flex",
-  justifyContent: "space-between",
-};
-
-const quickPromptRowStyle: React.CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: 8,
-  marginTop: 12,
+const panelStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 12,
 };
 
 const sectionStyle: React.CSSProperties = {
@@ -236,57 +160,19 @@ const sectionStyle: React.CSSProperties = {
   gap: 10,
 };
 
-const inputBarStyle: React.CSSProperties = {
-  alignItems: "flex-end",
-  display: "flex",
-  gap: 12,
-};
-
-const inputActionColumnStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 8,
-  width: 88,
-};
-
 function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 13,
     lineHeight: 1.6,
-    marginBottom: 0,
-    marginTop: 8,
+    margin: "8px 0 0",
   };
 }
 
-function helperTextStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return {
-    color: theme.colors.tx2,
-    fontSize: 12,
-    lineHeight: 1.6,
-    marginBottom: 0,
-    marginTop: 10,
-  };
-}
-
-function modeLabelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function modeMetaStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
   return {
     color: theme.colors.tx3,
     fontSize: 11,
-    marginBottom: 8,
-  };
-}
-
-function textareaStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-): React.CSSProperties {
-  return {
-    backgroundColor: theme.colors.surf2,
-    border: `1px solid ${theme.colors.bdr}`,
-    borderRadius: 12,
-    color: theme.colors.tx,
-    font: "inherit",
-    padding: 12,
-    resize: "vertical",
-    width: "100%",
+    marginTop: -2,
   };
 }

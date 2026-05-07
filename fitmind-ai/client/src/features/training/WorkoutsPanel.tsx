@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 
 import type { WorkoutDetailDto, WorkoutSummaryDto } from "../../../../shared/src/training";
 
+import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
+import { StateNotice } from "../../components/StateNotice";
 import { HttpClientError } from "../../services/http-client";
 import { useTheme } from "../../theme/ThemeContext";
 import { searchExercises } from "./dictionary-api";
@@ -34,28 +36,56 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
           <h2 style={titleStyle}>训练日志</h2>
           <p style={copyStyle(theme)}>共 {props.workouts.length} 条</p>
         </div>
-        <button
+        <Button
+          disabled={props.isLoadingList}
           onClick={() => void props.onRefresh()}
-          style={refreshButtonStyle(theme)}
           type="button"
+          variant="secondary"
         >
-          刷新
-        </button>
+          {props.isLoadingList ? "刷新中..." : "刷新"}
+        </Button>
       </div>
 
-      {props.listError ? <p style={errorStyle(theme)}>{translateError(props.listError)}</p> : null}
-      {props.deleteError ? (
-        <p style={errorStyle(theme)}>{translateError(props.deleteError)}</p>
-      ) : null}
-      {props.detailError ? (
-        <p style={errorStyle(theme)}>{translateError(props.detailError)}</p>
+      {props.listError ? (
+        <StateNotice
+          description="请确认后端服务已启动，或稍后重试。"
+          icon="dumbbell"
+          title="数据加载失败"
+          tone="error"
+        />
       ) : null}
 
-      {props.isLoadingList ? <p style={copyStyle(theme)}>正在加载训练日志...</p> : null}
-      {!props.isLoadingList && props.workouts.length === 0 ? (
-        <div style={emptyStateStyle(theme)}>
-          <strong style={{ fontSize: 14 }}>还没有训练记录</strong>
-          <p style={emptyCopyStyle(theme)}>点击上方「记录训练」添加第一条训练日志</p>
+      {!props.listError && props.deleteError ? (
+        <div style={{ marginTop: 12 }}>
+          <StateNotice
+            description={translateError(props.deleteError)}
+            title="删除训练失败"
+            tone="error"
+          />
+        </div>
+      ) : null}
+
+      {!props.listError && props.detailError ? (
+        <div style={{ marginTop: 12 }}>
+          <StateNotice
+            description={translateError(props.detailError)}
+            title="训练详情加载失败"
+            tone="error"
+          />
+        </div>
+      ) : null}
+
+      {props.isLoadingList && !props.listError ? (
+        <p style={copyStyle(theme)}>正在加载训练日志...</p>
+      ) : null}
+
+      {!props.isLoadingList && !props.listError && props.workouts.length === 0 ? (
+        <div style={{ marginTop: 14 }}>
+          <StateNotice
+            description="先记录一次训练，系统会自动生成训练统计和 AI 可用上下文。"
+            icon="dumbbell"
+            title="暂无训练记录"
+          />
         </div>
       ) : null}
 
@@ -95,12 +125,12 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
 
 function translateError(message: string): string {
   return message
-    .replaceAll("Workout list is unavailable right now.", "训练日志加载失败")
-    .replaceAll("Workout detail is unavailable right now.", "训练详情加载失败")
-    .replaceAll("Workout deletion is unavailable right now.", "删除训练失败")
-    .replaceAll("You must be signed in to view workouts.", "请先登录后查看训练日志。")
-    .replaceAll("You must be signed in to view workout details.", "请先登录后查看训练详情。")
-    .replaceAll("You must be signed in to delete workouts.", "请先登录后删除训练。");
+    .replaceAll("Workout list is unavailable right now.", "数据加载失败，请稍后重试。")
+    .replaceAll("Workout detail is unavailable right now.", "数据加载失败，请稍后重试。")
+    .replaceAll("Workout deletion is unavailable right now.", "请稍后重试。")
+    .replaceAll("You must be signed in to view workouts.", "请先登录后再查看训练日志。")
+    .replaceAll("You must be signed in to view workout details.", "请先登录后再查看训练详情。")
+    .replaceAll("You must be signed in to delete workouts.", "请先登录后再删除训练记录。");
 }
 
 function useExerciseNames(): Map<string, string> {
@@ -171,47 +201,5 @@ function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProper
     fontSize: 12,
     lineHeight: 1.6,
     margin: "6px 0 0",
-  };
-}
-
-function refreshButtonStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return {
-    backgroundColor: theme.colors.surf2,
-    border: `1px solid ${theme.colors.bdr}`,
-    borderRadius: theme.radius.control,
-    color: theme.colors.tx2,
-    cursor: "pointer",
-    fontSize: 12,
-    fontWeight: 700,
-    padding: "10px 12px",
-  };
-}
-
-function errorStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return {
-    color: theme.colors.orange,
-    fontSize: 12,
-    margin: "12px 0 0",
-  };
-}
-
-function emptyStateStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return {
-    backgroundColor: theme.colors.surf2,
-    border: `1px solid ${theme.colors.bdr}`,
-    borderRadius: theme.radius.card,
-    display: "grid",
-    gap: 6,
-    marginTop: 14,
-    padding: 14,
-  };
-}
-
-function emptyCopyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return {
-    color: theme.colors.tx2,
-    fontSize: 12,
-    lineHeight: 1.6,
-    margin: 0,
   };
 }

@@ -16,6 +16,8 @@ body,
 body {
   font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
   background: #0f0f0f;
+  color: #f0f0f0;
+  line-height: 1.5;
 }
 
 button,
@@ -27,23 +29,35 @@ textarea {
 
 button {
   appearance: none;
+  transition: opacity 150ms ease, transform 150ms ease, border-color 150ms ease;
 }
 
 button:disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: 0.56;
 }
 
 input,
 textarea,
 select {
   min-width: 0;
+  transition: border-color 150ms ease, opacity 150ms ease;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #777777;
 }
 
 summary {
+  cursor: pointer;
   list-style: none;
 }
 
 summary::-webkit-details-marker {
   display: none;
+}
+
+textarea {
+  resize: vertical;
 }

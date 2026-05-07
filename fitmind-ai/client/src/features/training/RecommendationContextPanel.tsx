@@ -4,6 +4,7 @@ import { Badge } from "../../components/Badge";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { Pill } from "../../components/Pill";
+import { StateNotice } from "../../components/StateNotice";
 import { HttpClientError } from "../../services/http-client";
 import { useTheme } from "../../theme/ThemeContext";
 import { AnalysisStatsGrid } from "./AnalysisStatsGrid";
@@ -95,7 +96,7 @@ export function RecommendationContextPanel(props: RecommendationContextPanelProp
               : `范围：${formatRangeLabel(range.start_date, range.end_date)}`}
           </p>
           <p style={subtleStyle(theme)}>
-            这是后端为 AI 助手准备的确定性上下文，不是模型生成的训练建议。
+            这里展示的是后端提供给 AI 助手的确定性上下文，不是模型直接生成的建议。
           </p>
         </div>
 
@@ -109,10 +110,23 @@ export function RecommendationContextPanel(props: RecommendationContextPanelProp
         </Button>
       </div>
 
-      {errorMessage ? <p style={errorStyle(theme)}>{translateContextError(errorMessage)}</p> : null}
-      {isLoading && !context ? <p style={copyStyle(theme)}>正在加载上下文预览...</p> : null}
+      {errorMessage ? (
+        <StateNotice
+          description="请确认后端服务已启动，或稍后重试。"
+          icon="tool"
+          title="数据加载失败"
+          tone="error"
+        />
+      ) : null}
+
+      {isLoading && !context ? <p style={copyStyle(theme)}>正在加载分析数据...</p> : null}
+
       {hasEmptyState ? (
-        <p style={copyStyle(theme)}>最近 30 天还没有训练记录，因此当前上下文预览为空。</p>
+        <StateNotice
+          description="完成训练记录后，这里会展示总容量、动作排行和进展趋势。"
+          icon="tool"
+          title="暂无分析数据"
+        />
       ) : null}
 
       {context ? (
@@ -234,12 +248,6 @@ export function RecommendationContextPanel(props: RecommendationContextPanelProp
       ) : null}
     </Card>
   );
-}
-
-function translateContextError(message: string): string {
-  return message
-    .replaceAll("你必须先登录才能查看推荐上下文。", "请先登录后查看上下文预览。")
-    .replaceAll("推荐上下文暂时不可用。", "上下文预览加载失败");
 }
 
 function getReadableErrorMessage(error: unknown): string {
@@ -387,16 +395,13 @@ function subtleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProp
   return { color: theme.colors.tx3, fontSize: 11, lineHeight: 1.6, margin: "0.35rem 0 0" };
 }
 
-function errorStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return { color: theme.colors.orange, fontSize: 12, marginBottom: 16 };
-}
-
 function sectionCardStyle(
   theme: ReturnType<typeof useTheme>["theme"],
 ): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf2,
     borderRadius: 14,
+    marginTop: 16,
     padding: 14,
   };
 }
@@ -415,7 +420,7 @@ function itemMetaStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPr
 }
 
 function summaryStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return { color: theme.colors.ac, cursor: "pointer", fontSize: 12, fontWeight: 700 };
+  return { color: theme.colors.ac, fontSize: 12, fontWeight: 700 };
 }
 
 function rulesListStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {

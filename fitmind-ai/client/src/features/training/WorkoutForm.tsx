@@ -1,5 +1,6 @@
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
+import { StateNotice } from "../../components/StateNotice";
 import { useTheme } from "../../theme/ThemeContext";
 import { SetEditor } from "./SetEditor";
 import { useWorkoutForm } from "./use-workout-form";
@@ -29,7 +30,7 @@ export function WorkoutForm(props: WorkoutFormProps) {
       <div style={headerStyle}>
         <div>
           <h2 style={titleStyle}>记录训练</h2>
-          <p style={copyStyle(theme)}>添加本次训练动作、重量、次数与 RPE</p>
+          <p style={copyStyle(theme)}>添加本次训练的动作、重量、次数与 RPE。</p>
         </div>
       </div>
 
@@ -69,7 +70,7 @@ export function WorkoutForm(props: WorkoutFormProps) {
           备注
           <textarea
             onChange={(event) => form.setNotes(event.target.value)}
-            placeholder="记录训练状态、当天感受或动作备注"
+            placeholder="记录训练状态、动作备注或当天体感"
             style={textareaStyle(theme)}
             value={form.workoutNotes}
           />
@@ -78,7 +79,9 @@ export function WorkoutForm(props: WorkoutFormProps) {
         <div style={setsHeaderStyle}>
           <div>
             <strong style={{ fontSize: 14 }}>训练组</strong>
-            <p style={subCopyStyle(theme)}>每一组都会按动作独立计算提交顺序</p>
+            <p style={subCopyStyle(theme)}>
+              每个动作会保留现有的 set_index 提交逻辑，不改数据语义。
+            </p>
           </div>
           <Button onClick={form.addSetDraft} type="button" variant="secondary">
             添加一组
@@ -117,7 +120,16 @@ export function WorkoutForm(props: WorkoutFormProps) {
         </div>
       </form>
 
-      {form.errorMessage ? <p style={errorStyle(theme)}>{translateMessage(form.errorMessage)}</p> : null}
+      {form.errorMessage ? (
+        <div style={{ marginTop: 12 }}>
+          <StateNotice
+            description={translateMessage(form.errorMessage)}
+            title="训练保存失败"
+            tone="error"
+          />
+        </div>
+      ) : null}
+
       {form.successMessage ? (
         <p style={successStyle(theme)}>{translateMessage(form.successMessage)}</p>
       ) : null}
@@ -135,11 +147,11 @@ function translateMessage(message: string): string {
   }
 
   if (message === "Workout creation is unavailable right now.") {
-    return "当前暂时无法创建训练，请稍后再试。";
+    return "请确认后端服务已启动，或稍后重试。";
   }
 
   if (message.startsWith("Saved workout with ")) {
-    return "训练创建成功，训练日志已刷新。";
+    return "训练创建成功，训练日志、分析数据和 AI 可用上下文已刷新。";
   }
 
   return message
@@ -243,7 +255,6 @@ function textareaStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPr
     font: "inherit",
     minHeight: 88,
     padding: 12,
-    resize: "vertical",
   };
 }
 
@@ -259,6 +270,7 @@ function successStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPro
   return {
     color: theme.colors.green,
     fontSize: 12,
-    margin: 0,
+    lineHeight: 1.6,
+    margin: "12px 0 0",
   };
 }

@@ -31,10 +31,11 @@ export function IconButton(props: IconButtonProps) {
         border: `1px solid ${theme.colors.bdr}`,
         borderRadius: 10,
         color,
-        cursor: "pointer",
+        cursor: props.disabled ? "not-allowed" : "pointer",
         display: "inline-flex",
         height: 32,
         justifyContent: "center",
+        opacity: props.disabled ? 0.56 : 1,
         width: 32,
       }}
       type={props.type ?? "button"}

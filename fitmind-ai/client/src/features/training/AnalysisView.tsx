@@ -27,13 +27,15 @@ export function AnalysisView(props: AnalysisViewProps) {
           <div>
             <h2 style={titleStyle}>确定性分析</h2>
             <p style={copyStyle(theme)}>
-              基于你的训练日志进行规则计算，所有结论都可追溯到原始 workout 与 set。
+              基于你的训练日志进行规则计算，所有结论都可以追溯到原始 workout 和
+              set。
             </p>
           </div>
           <Badge tone="info">Deterministic</Badge>
         </div>
         <p style={subtleStyle(theme)}>
-          这里展示的是后端 calculation layer 的确定性结果，不是 AI 生成建议。
+          这里展示的是后端 calculation layer 的结构化结果，不是 AI
+          生成建议，后续会被助手通过 Tool Calling 读取。
         </p>
       </Card>
 

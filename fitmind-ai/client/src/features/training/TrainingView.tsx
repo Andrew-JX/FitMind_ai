@@ -59,7 +59,7 @@ export function TrainingView(props: TrainingViewProps) {
           <div>
             <h2 style={dictionaryTitleStyle}>动作词典</h2>
             <p style={dictionaryCopyStyle}>
-              用于查询系统内置动作，不影响训练记录
+              用于查询系统内置动作名称和肌群标签，不影响当前训练记录。
             </p>
           </div>
           <Button
@@ -100,6 +100,7 @@ const dictionaryTitleStyle: React.CSSProperties = {
 
 const dictionaryCopyStyle: React.CSSProperties = {
   fontSize: 12,
+  lineHeight: 1.6,
   margin: "6px 0 0",
-  opacity: 0.8,
+  opacity: 0.82,
 };
