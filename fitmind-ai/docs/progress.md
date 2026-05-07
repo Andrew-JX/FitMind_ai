@@ -2454,3 +2454,79 @@
 - 当前 sandbox 下 `esbuild spawn EPERM` 仍会影响标准构建与 package-local fallback，需要提权复核。
 - 当前中文文案在部分 Windows shell 输出里仍可能出现编码显示异常，但不影响 TypeScript / lint / build 通过。
 
+## 2026-05-07 Phase 4.0 Batch 4 - Training Flow Manual Smoke & Stabilization
+
+### manual smoke paths completed
+- 已完成本地 client/server 启动检查：
+  - backend `http://127.0.0.1:3000/api/health` 返回正常
+  - frontend `http://127.0.0.1:4173/` 可访问
+- 已完成现有 backend regression smoke：
+  - `server/scripts/workout-api-smoke.ts`
+  - `server/scripts/training-summary-api-smoke.ts`
+  - `server/scripts/recommendation-context-api-smoke.ts`
+- 已完成前端静态验证：
+  - `pnpm --filter @fitmind/client type-check`
+  - `pnpm lint`
+  - 提权后的 package-local `vite.cmd build`
+- 已尝试接入浏览器手工 smoke，但当前会话没有可调用的 `node_repl js` / in-app browser 控制器；同时 shell fallback `npx agent-browser` 在当前环境下无法直接安装/运行，因此不能诚实地把 Path A-E 记为已完成的真实浏览器手测。
+
+### bugs found
+- 记录训练 composer 在动作卡展开并连续新增多组后，底部 `新增一组` 和新加组内容容易被外层视口挤出可视区。
+- 训练日志编辑此前缺少训练时间、时长和备注的修改入口。
+
+### files changed
+- `client/src/features/training/TrainingSessionComposer.tsx`
+- `client/src/features/training/TrainingSessionExerciseCard.tsx`
+- `client/src/features/training/WorkoutCard.tsx`
+- `client/src/features/training/workout-api.ts`
+- `docs/progress.md`
+
+### create workout behavior
+- composer 继续复用现有 `createWorkout` 数据流，没有修改 backend contract。
+- composer 主体改为更稳的纵向弹性布局，主滚动区显式使用 `flex: 1`、`min-height: 0` 和 `overflow-y: auto`。
+- 新增训练组后会自动把 composer 主体滚到更靠下的位置，降低新组被裁切的概率。
+- 动作卡展开后增加了卡内独立滚动区，并把非当前编辑组缩成摘要条，减少一口气展开多组时的垂直占用。
+
+### edit workout behavior
+- 训练日志详情继续保持“一个动作一个卡片”的展示方式，点击动作后才展开该动作下的组。
+- 训练日志编辑模式新增：
+  - `训练时间`
+  - `时长`
+  - `备注`
+- 组编辑仍然走既有 set mutation API：
+  - 复制本组
+  - 删除本组
+  - 新增一组
+  - 修改重量 / 次数 / 体感
+
+### set_index behavior
+- 本批未修改 `set_index` 规则，也未修改 workout / set CRUD semantics。
+- 现有 create 和 edit 路径仍按 `exercise_id` 分组分别编号，不改成全局递增。
+- backend `workout-api-smoke`、`training-summary-api-smoke`、`recommendation-context-api-smoke` 均通过，说明相关训练数据 contract 未被这轮前端稳定性修复破坏。
+
+### scroll and layout behavior
+- composer 打开时仍覆盖训练页和底部 tab，保持 fullscreen shell 交互模型。
+- composer 主体滚动和动作卡内部滚动已分层处理，重点缓解“新增两组后下方内容不可达”的问题。
+- 动作卡中未聚焦的组会缩成摘要矩形，只保留组数、重量和次数，已完成组会显示更明确的完成态。
+- 本批没有做新的 UI 重设计，只在最小范围内修复滚动与可达性问题。
+
+### contracts preserved
+- 未修改 server 文件、数据库 schema、API contract、SSE event names、provider adapter、auth token logic、analysis selected exercise behavior、assistant quick prompt semantics、workout CRUD semantics 或 `set_index` 规则。
+- 未新增 backend endpoint、migration、warmup set persistence、set notes persistence、rest timer persistence 或 started/ended_at persistence。
+
+### verification results
+- `pnpm --filter @fitmind/server exec tsx scripts/workout-api-smoke.ts` 通过。
+- `pnpm --filter @fitmind/server exec .\\node_modules\\.bin\\tsx.cmd scripts/training-summary-api-smoke.ts` 通过。
+- `pnpm --filter @fitmind/server exec tsx scripts/recommendation-context-api-smoke.ts` 通过。
+- `pnpm --filter @fitmind/client type-check` 通过。
+- `pnpm lint` 通过。
+- `pnpm --filter @fitmind/client exec vite build` 继续复现当前环境的 `vite` 解析问题和 `esbuild spawn EPERM`。
+- `client\\.\\node_modules\\.bin\\vite.cmd build` 在 sandbox 内仍复现 `spawn EPERM`。
+- 提权后的 package-local `vite.cmd build` 通过。
+
+### known environment issues
+- 当前会话的浏览器插件能力没有暴露可调用的 `node_repl js` 执行入口，无法在本轮中真正完成本地 in-app browser 手工烟测。
+- shell fallback `npx agent-browser` 在当前环境下也无法直接作为稳定替代，因此浏览器 Path A-E 只能记为“已尝试接入，未完成”。
+- Windows 环境下标准 `pnpm exec vite build` 仍可能出现 `Command "vite" not found` 和 `esbuild spawn EPERM`；需要提权后的 package-local `vite.cmd build` 复核。
+- server/client 相关 `tsx`、`vite`、`esbuild` 命令在 sandbox 下仍受既有 `EPERM` 限制。
+

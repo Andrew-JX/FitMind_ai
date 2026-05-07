@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import type { DraftExercise, DraftSet } from "./training-session-draft";
 
 import { Pill } from "../../components/Pill";
@@ -29,6 +31,12 @@ export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardPr
     .filter((muscle) => muscle.is_primary)
     .slice(0, 2)
     .map((muscle) => muscle.code);
+  const [activeSetId, setActiveSetId] = useState<string | null>(null);
+  const visibleActiveSetId = props.draftExercise.sets.some((setDraft) => {
+    return setDraft.id === activeSetId;
+  })
+    ? activeSetId
+    : (props.draftExercise.sets.at(-1)?.id ?? null);
 
   return (
     <section
@@ -74,22 +82,56 @@ export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardPr
       </button>
 
       {props.draftExercise.isExpanded ? (
-        <div onClick={(event) => event.stopPropagation()} style={editorStyle}>
-          {props.draftExercise.sets.map((setDraft, index) => (
-            <TrainingSessionSetRow
-              canComplete={isDraftSetValid(setDraft)}
-              canDelete={props.draftExercise.sets.length > 1}
-              index={index}
-              key={setDraft.id}
-              onCopy={() => props.onCopySet(setDraft.id)}
-              onDelete={() => props.onDeleteSet(setDraft.id)}
-              onToggleCompleted={() => props.onToggleSetCompleted(setDraft.id)}
-              onUpdate={(field, value) => props.onUpdateSet(setDraft.id, field, value)}
-              setDraft={setDraft}
-            />
-          ))}
+        <div onClick={(event) => event.stopPropagation()} style={editorShellStyle}>
+          <div style={editorScrollerStyle()}>
+            {props.draftExercise.sets.map((setDraft, index) => {
+              const isActive = setDraft.id === visibleActiveSetId;
 
-          <button onClick={props.onAddSet} style={addSetButtonStyle(theme)} type="button">
+              if (!isActive) {
+                return (
+                  <button
+                    key={setDraft.id}
+                    onClick={() => setActiveSetId(setDraft.id)}
+                    style={collapsedSetStyle(theme, setDraft.completed)}
+                    type="button"
+                  >
+                    <strong style={{ fontSize: 12 }}>第 {index + 1} 组</strong>
+                    <span style={collapsedMetaStyle(theme)}>
+                      {setDraft.weightKg || "--"} kg · {setDraft.reps || "--"} 次
+                    </span>
+                    {setDraft.completed ? (
+                      <span style={completedBadgeStyle(theme)}>已完成</span>
+                    ) : (
+                      <span style={collapsedHintStyle(theme)}>点击展开</span>
+                    )}
+                  </button>
+                );
+              }
+
+              return (
+                <TrainingSessionSetRow
+                  canComplete={isDraftSetValid(setDraft)}
+                  canDelete={props.draftExercise.sets.length > 1}
+                  index={index}
+                  key={setDraft.id}
+                  onCopy={() => props.onCopySet(setDraft.id)}
+                  onDelete={() => props.onDeleteSet(setDraft.id)}
+                  onToggleCompleted={() => props.onToggleSetCompleted(setDraft.id)}
+                  onUpdate={(field, value) => props.onUpdateSet(setDraft.id, field, value)}
+                  setDraft={setDraft}
+                />
+              );
+            })}
+          </div>
+
+          <button
+            onClick={() => {
+              props.onAddSet();
+              setActiveSetId(null);
+            }}
+            style={addSetButtonStyle(theme)}
+            type="button"
+          >
             + 新增一组
           </button>
         </div>
@@ -163,10 +205,68 @@ const metaRowStyle: React.CSSProperties = {
   gap: 6,
 };
 
-const editorStyle: React.CSSProperties = {
+const editorShellStyle: React.CSSProperties = {
   display: "grid",
   gap: 12,
 };
+
+function editorScrollerStyle(): React.CSSProperties {
+  return {
+    display: "grid",
+    gap: 10,
+    maxHeight: "min(48vh, 420px)",
+    overflowY: "auto",
+    overscrollBehavior: "contain",
+    paddingRight: 4,
+    WebkitOverflowScrolling: "touch",
+  };
+}
+
+function collapsedSetStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+  isCompleted: boolean,
+): React.CSSProperties {
+  return {
+    alignItems: "center",
+    backgroundColor: isCompleted
+      ? theme.isDark
+        ? "rgba(200, 240, 53, 0.12)"
+        : "rgba(74, 140, 0, 0.12)"
+      : theme.colors.surf2,
+    border: `1px solid ${isCompleted ? theme.colors.ac : theme.colors.bdr}`,
+    borderRadius: theme.radius.control,
+    color: theme.colors.tx,
+    cursor: "pointer",
+    display: "grid",
+    gap: 6,
+    gridTemplateColumns: "80px 1fr auto",
+    padding: "10px 12px",
+    textAlign: "left",
+    width: "100%",
+  };
+}
+
+function collapsedMetaStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    color: theme.colors.tx2,
+    fontSize: 12,
+  };
+}
+
+function completedBadgeStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    color: theme.colors.ac,
+    fontSize: 11,
+    fontWeight: 700,
+  };
+}
+
+function collapsedHintStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    color: theme.colors.tx3,
+    fontSize: 11,
+  };
+}
 
 function addSetButtonStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
   return {

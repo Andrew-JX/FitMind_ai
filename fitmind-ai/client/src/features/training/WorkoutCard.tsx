@@ -22,6 +22,7 @@ import {
 import {
   addWorkoutSet,
   deleteWorkoutSet,
+  updateWorkout,
   updateWorkoutSet,
 } from "./workout-api";
 
@@ -63,7 +64,10 @@ export function WorkoutCard(props: WorkoutCardProps) {
   }, [props.detail, props.exerciseNames]);
   const [expandedExerciseId, setExpandedExerciseId] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
+  const [editingDurationMinutes, setEditingDurationMinutes] = useState("");
   const [editingGroups, setEditingGroups] = useState<WorkoutExerciseDraftGroup[]>([]);
+  const [editingNotes, setEditingNotes] = useState("");
+  const [editingPerformedAt, setEditingPerformedAt] = useState("");
   const [isEditMode, setIsEditMode] = useState(false);
   const [isSavingEdits, setIsSavingEdits] = useState(false);
 
@@ -71,7 +75,10 @@ export function WorkoutCard(props: WorkoutCardProps) {
     if (!props.isExpanded) {
       setExpandedExerciseId(null);
       setEditError(null);
+      setEditingDurationMinutes("");
       setEditingGroups([]);
+      setEditingNotes("");
+      setEditingPerformedAt("");
       setIsEditMode(false);
       setIsSavingEdits(false);
     }
@@ -185,6 +192,40 @@ export function WorkoutCard(props: WorkoutCardProps) {
 
               {isEditMode ? (
                 <div style={groupListStyle}>
+                  <div style={groupCardStyle(theme, true)}>
+                    <strong style={{ color: theme.colors.tx, fontSize: 14 }}>训练信息</strong>
+                    <div style={detailMetaGridStyle}>
+                      <label style={editLabelStyle(theme)}>
+                        训练时间
+                        <input
+                          onChange={(event) => setEditingPerformedAt(event.target.value)}
+                          style={editInputStyle(theme)}
+                          type="datetime-local"
+                          value={editingPerformedAt}
+                        />
+                      </label>
+                      <label style={editLabelStyle(theme)}>
+                        时长
+                        <input
+                          min="1"
+                          onChange={(event) => setEditingDurationMinutes(event.target.value)}
+                          placeholder="分钟"
+                          style={editInputStyle(theme)}
+                          type="number"
+                          value={editingDurationMinutes}
+                        />
+                      </label>
+                    </div>
+                    <label style={editLabelStyle(theme)}>
+                      备注
+                      <textarea
+                        onChange={(event) => setEditingNotes(event.target.value)}
+                        style={editTextareaStyle(theme)}
+                        value={editingNotes}
+                      />
+                    </label>
+                  </div>
+
                   {editingGroups.map((group) => {
                     const summary = summarizeDraftGroup(group);
                     const isGroupExpanded = expandedExerciseId === group.exerciseId;
@@ -332,6 +373,11 @@ export function WorkoutCard(props: WorkoutCardProps) {
     }
 
     const draftGroups = buildDraftGroups(props.detail.sets, props.exerciseNames);
+    setEditingPerformedAt(formatDateTimeLocalValue(props.detail.performed_at));
+    setEditingDurationMinutes(
+      props.detail.duration_minutes !== null ? `${props.detail.duration_minutes}` : "",
+    );
+    setEditingNotes(props.detail.notes ?? "");
     setEditingGroups(draftGroups);
     setExpandedExerciseId(draftGroups[0]?.exerciseId ?? null);
     setEditError(null);
@@ -457,6 +503,19 @@ export function WorkoutCard(props: WorkoutCardProps) {
       const originalSetById = new Map(
         props.detail.sets.map((setItem) => [setItem.id, setItem] as const),
       );
+      const workoutPatch = buildWorkoutPatch({
+        currentDurationMinutes: props.detail.duration_minutes,
+        currentNotes: props.detail.notes,
+        currentPerformedAt: props.detail.performed_at,
+        editingDurationMinutes,
+        editingNotes,
+        editingPerformedAt,
+      });
+
+      if (workoutPatch) {
+        await updateWorkout(props.token, props.detail.id, workoutPatch);
+      }
+
       const currentPersistedIds = new Set(
         editingGroups.flatMap((group) => {
           return group.sets
@@ -704,6 +763,70 @@ function getReadableErrorMessage(error: unknown): string {
   return "训练日志更新暂时不可用，请稍后重试。";
 }
 
+function buildWorkoutPatch(input: {
+  currentDurationMinutes: number | null;
+  currentNotes: string | null;
+  currentPerformedAt: string;
+  editingDurationMinutes: string;
+  editingNotes: string;
+  editingPerformedAt: string;
+}): {
+  duration_minutes?: number | undefined;
+  notes?: string | undefined;
+  performed_at?: string | undefined;
+} | null {
+  const patch: {
+    duration_minutes?: number | undefined;
+    notes?: string | undefined;
+    performed_at?: string | undefined;
+  } = {};
+
+  const nextPerformedAt = input.editingPerformedAt
+    ? new Date(input.editingPerformedAt).toISOString()
+    : input.currentPerformedAt;
+
+  if (nextPerformedAt !== input.currentPerformedAt) {
+    patch.performed_at = nextPerformedAt;
+  }
+
+  const trimmedNotes = input.editingNotes.trim();
+  const currentNotes = input.currentNotes?.trim() ?? "";
+
+  if (trimmedNotes !== currentNotes) {
+    patch.notes = trimmedNotes;
+  }
+
+  if (input.editingDurationMinutes.trim()) {
+    const parsedDuration = Number.parseInt(input.editingDurationMinutes, 10);
+
+    if (
+      Number.isInteger(parsedDuration) &&
+      parsedDuration > 0 &&
+      parsedDuration !== input.currentDurationMinutes
+    ) {
+      patch.duration_minutes = parsedDuration;
+    }
+  }
+
+  return Object.keys(patch).length > 0 ? patch : null;
+}
+
+function formatDateTimeLocalValue(value: string): string {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  const hours = `${date.getHours()}`.padStart(2, "0");
+  const minutes = `${date.getMinutes()}`.padStart(2, "0");
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
 const detailContainerStyle: React.CSSProperties = {
   display: "grid",
   gap: 12,
@@ -895,6 +1018,35 @@ function addSetButtonStyle(theme: ReturnType<typeof useTheme>["theme"]): React.C
     fontSize: 13,
     fontWeight: 700,
     padding: "12px 14px",
+  };
+}
+
+function editLabelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    color: theme.colors.tx2,
+    display: "grid",
+    fontSize: 12,
+    gap: 8,
+  };
+}
+
+function editInputStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.surf2,
+    border: `1px solid ${theme.colors.bdr}`,
+    borderRadius: theme.radius.control,
+    color: theme.colors.tx,
+    padding: "10px 12px",
+    width: "100%",
+  };
+}
+
+function editTextareaStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    ...editInputStyle(theme),
+    font: "inherit",
+    minHeight: 84,
+    resize: "vertical",
   };
 }
 

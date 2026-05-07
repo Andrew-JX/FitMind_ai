@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { ExercisePickerProps } from "./ExercisePicker";
 import type { DictionaryExercise } from "./dictionary-api";
@@ -31,6 +31,7 @@ export interface TrainingSessionComposerProps {
 
 export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
   const { theme } = useTheme();
+  const bodyRef = useRef<HTMLElement | null>(null);
   const [draftExercises, setDraftExercises] = useState<DraftExercise[]>([]);
   const [duplicateNotice, setDuplicateNotice] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -104,7 +105,7 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
           </div>
         </header>
 
-        <main style={bodyStyle}>
+        <main ref={bodyRef} style={bodyStyle}>
           {duplicateNotice ? (
             <StateNotice
               description={duplicateNotice}
@@ -227,6 +228,7 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
         };
       });
     });
+    scrollComposerBodyToBottom();
   }
 
   function handleCopySet(exerciseId: string, setId: string): void {
@@ -371,6 +373,19 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
     setIsLibraryOpen(false);
     setIsRunning(false);
   }
+
+  function scrollComposerBodyToBottom(): void {
+    requestAnimationFrame(() => {
+      if (!bodyRef.current) {
+        return;
+      }
+
+      bodyRef.current.scrollTo({
+        behavior: "smooth",
+        top: bodyRef.current.scrollHeight,
+      });
+    });
+  }
 }
 
 function canCompleteSet(setDraft: DraftSet): boolean {
@@ -505,8 +520,8 @@ function panelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPrope
         ? "linear-gradient(180deg, rgba(17,21,34,0.98) 0%, rgba(10,13,22,0.98) 100%)"
         : "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(244,247,252,0.98) 100%)",
     color: theme.colors.tx,
-    display: "grid",
-    gridTemplateRows: "auto minmax(0, 1fr)",
+    display: "flex",
+    flexDirection: "column",
     inset: 0,
     overflow: "hidden",
     padding:
@@ -538,10 +553,14 @@ const headerBodyStyle: React.CSSProperties = {
 const bodyStyle: React.CSSProperties = {
   alignContent: "start",
   display: "grid",
+  flex: 1,
   gap: 16,
   minHeight: 0,
   overflowY: "auto",
+  overscrollBehavior: "contain",
   paddingBottom: 96,
+  touchAction: "pan-y",
+  WebkitOverflowScrolling: "touch",
 };
 
 const exerciseListStyle: React.CSSProperties = {
