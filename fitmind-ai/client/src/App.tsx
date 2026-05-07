@@ -1,13 +1,11 @@
 import { useEffect, useState } from "react";
 
+import { AppShell, type AppTabKey } from "./components/AppShell";
+import { Badge } from "./components/Badge";
+import { Card } from "./components/Card";
+import { StatCell } from "./components/StatCell";
 import { AssistantWorkspace } from "./features/assistant/AssistantWorkspace";
 import { AuthScreen } from "./features/auth/AuthScreen";
-import { ExercisePicker } from "./features/training/ExercisePicker";
-import { ExerciseProgressPanel } from "./features/training/ExerciseProgressPanel";
-import { RecommendationContextPanel } from "./features/training/RecommendationContextPanel";
-import { TrainingSummaryPanel } from "./features/training/TrainingSummaryPanel";
-import { WorkoutForm } from "./features/training/WorkoutForm";
-import { WorkoutsPanel } from "./features/training/WorkoutsPanel";
 import {
   clearAuth,
   login,
@@ -16,9 +14,16 @@ import {
   setToken,
   useAuth,
 } from "./features/auth/use-auth";
+import { ExercisePicker } from "./features/training/ExercisePicker";
+import { ExerciseProgressPanel } from "./features/training/ExerciseProgressPanel";
+import { RecommendationContextPanel } from "./features/training/RecommendationContextPanel";
+import { TrainingSummaryPanel } from "./features/training/TrainingSummaryPanel";
+import { WorkoutForm } from "./features/training/WorkoutForm";
+import { WorkoutsPanel } from "./features/training/WorkoutsPanel";
 import { useExerciseSearch } from "./features/training/use-exercise-search";
 import { useTrainingSummary } from "./features/training/use-training-summary";
 import { useWorkouts } from "./features/training/use-workouts";
+import { useTheme } from "./theme/ThemeContext";
 
 declare global {
   interface Window {
@@ -41,6 +46,9 @@ export function App() {
   const exerciseSearch = useExerciseSearch();
   const trainingSummary = useTrainingSummary(auth.token);
   const workouts = useWorkouts(auth.token);
+  const { theme } = useTheme();
+  const [activeTab, setActiveTab] = useState<AppTabKey>("training");
+  const [isDictionaryOpen, setIsDictionaryOpen] = useState(false);
   const [selectedProgressExerciseId, setSelectedProgressExerciseId] = useState<
     string | null
   >(null);
@@ -74,69 +82,72 @@ export function App() {
     };
   }, []);
 
+  if (!(auth.status === "authenticated" && auth.user)) {
+    return (
+      <AuthScreen
+        errorMessage={auth.errorMessage}
+        onLogin={auth.login}
+        onRegister={auth.register}
+        status={auth.status}
+      />
+    );
+  }
+
   return (
-    <main>
-      <h1>FitMind AI</h1>
-      <p>Workout logging MVP for real training data entry.</p>
-      <p>Auth status: {auth.status}</p>
-      <p>
-        Token storage: in-memory only. Refreshing the page clears the current session by
-        design.
-      </p>
-      {auth.status === "authenticated" && auth.user ? (
-        <section>
-          <p>
-            Active user: {auth.user.email}
-            {auth.user.display_name ? ` (${auth.user.display_name})` : ""}
-          </p>
-          {auth.errorMessage ? <p>Error: {auth.errorMessage}</p> : null}
-          <button type="button" onClick={auth.clearAuth}>
-            Clear in-memory session
-          </button>
-          <p>
-            Use the tools below to search exercises, save workouts, review your recent
-            log, and inspect a deterministic 30-day training summary.
-          </p>
-          <AssistantWorkspace
-            selectedExerciseId={selectedProgressExerciseId}
-            selectedExerciseName={selectedProgressExerciseName}
-            token={auth.token}
-          />
-          <RecommendationContextPanel
-            refreshSignal={recommendationContextRefreshSignal}
-            token={auth.token}
-          />
-          <TrainingSummaryPanel
-            errorMessage={trainingSummary.errorMessage}
-            isLoading={trainingSummary.isLoading}
-            onExerciseSelect={handleExerciseSelect}
-            onRefresh={trainingSummary.refresh}
-            selectedExerciseId={selectedProgressExerciseId}
-            summary={trainingSummary.summary}
-          />
-          <ExerciseProgressPanel
-            refreshSignal={progressRefreshSignal}
-            selectedExerciseId={selectedProgressExerciseId}
-            selectedExerciseName={selectedProgressExerciseName}
-            token={auth.token}
-          />
-          <ExercisePicker
-            exercises={exerciseSearch.exercises}
-            isLoadingExercises={exerciseSearch.isLoadingExercises}
-            isLoadingMuscleGroups={exerciseSearch.isLoadingMuscleGroups}
-            muscleGroups={exerciseSearch.muscleGroups}
-            onSearch={exerciseSearch.searchExercises}
-            searchError={exerciseSearch.searchError}
-          />
+    <AppShell
+      activeTab={activeTab}
+      onClearAuth={auth.clearAuth}
+      onSelectTab={setActiveTab}
+      subtitle="基于真实训练日志的可追溯 AI 训练分析助手"
+      userLabel={auth.user.display_name ?? auth.user.email}
+    >
+      {auth.errorMessage ? (
+        <p style={{ color: theme.colors.orange, marginTop: 0 }}>
+          错误：{auth.errorMessage}
+        </p>
+      ) : null}
+
+      {activeTab === "training" ? (
+        <section style={tabSectionStyle}>
+          <Card>
+            <div style={sectionHeadingRowStyle}>
+              <div>
+                <h2 style={{ margin: 0 }}>训练记录</h2>
+                <p style={sectionCopyStyle(theme)}>
+                  记录真实训练日志，作为后续确定性分析和 AI 助手回答的事实基础。
+                </p>
+              </div>
+              <Badge tone="accent">Training</Badge>
+            </div>
+            <div style={statsGridStyle}>
+              <StatCell
+                label="近 30 天训练次数"
+                tone="accent"
+                value={`${trainingSummary.summary?.totals.workout_count ?? 0}`}
+              />
+              <StatCell
+                label="近 30 天总组数"
+                tone="info"
+                value={`${trainingSummary.summary?.totals.set_count ?? 0}`}
+              />
+              <StatCell
+                label="近 30 天总容量"
+                tone="success"
+                unit="kg"
+                value={`${
+                  trainingSummary.summary?.totals.total_volume.toLocaleString() ?? "0"
+                }`}
+              />
+            </div>
+          </Card>
+
           <WorkoutForm
             onCreated={async () => {
               await Promise.all([
                 workouts.refreshWorkouts(),
                 trainingSummary.refresh(),
               ]);
-              setRecommendationContextRefreshSignal(
-                (currentValue) => currentValue + 1,
-              );
+              setRecommendationContextRefreshSignal((currentValue) => currentValue + 1);
 
               if (selectedProgressExerciseId !== null) {
                 setProgressRefreshSignal((currentValue) => currentValue + 1);
@@ -144,6 +155,7 @@ export function App() {
             }}
             token={auth.token}
           />
+
           <WorkoutsPanel
             deleteError={workouts.deleteError}
             deletingWorkoutId={workouts.deletingWorkoutId}
@@ -158,23 +170,79 @@ export function App() {
             selectedWorkoutId={workouts.selectedWorkoutId}
             workouts={workouts.workouts}
           />
+
+          <Card>
+            <button
+              onClick={() => setIsDictionaryOpen((currentValue) => !currentValue)}
+              style={collapseButtonStyle(theme)}
+              type="button"
+            >
+              <span>动作词典</span>
+              <span>{isDictionaryOpen ? "收起" : "展开"}</span>
+            </button>
+            {isDictionaryOpen ? (
+              <div style={{ marginTop: 16 }}>
+                <ExercisePicker
+                  exercises={exerciseSearch.exercises}
+                  isLoadingExercises={exerciseSearch.isLoadingExercises}
+                  isLoadingMuscleGroups={exerciseSearch.isLoadingMuscleGroups}
+                  muscleGroups={exerciseSearch.muscleGroups}
+                  onSearch={exerciseSearch.searchExercises}
+                  searchError={exerciseSearch.searchError}
+                />
+              </div>
+            ) : (
+              <p style={collapsedCopyStyle(theme)}>
+                用于查询动作中英文名、肌群和基础词典信息。默认收起，避免打断训练记录主流程。
+              </p>
+            )}
+          </Card>
         </section>
-      ) : (
-        <AuthScreen
-          errorMessage={auth.errorMessage}
-          onLogin={auth.login}
-          onRegister={auth.register}
-          status={auth.status}
-        />
-      )}
-      {import.meta.env.DEV ? (
-        <p>
-          Debug helpers remain available in the browser console as
-          <code> window.fitmindAuthDebug </code>
-          for local auth checks.
-        </p>
       ) : null}
-    </main>
+
+      {activeTab === "analysis" ? (
+        <section style={tabSectionStyle}>
+          <TrainingSummaryPanel
+            errorMessage={trainingSummary.errorMessage}
+            isLoading={trainingSummary.isLoading}
+            onExerciseSelect={handleExerciseSelect}
+            onRefresh={trainingSummary.refresh}
+            selectedExerciseId={selectedProgressExerciseId}
+            summary={trainingSummary.summary}
+          />
+          <ExerciseProgressPanel
+            refreshSignal={progressRefreshSignal}
+            selectedExerciseId={selectedProgressExerciseId}
+            selectedExerciseName={selectedProgressExerciseName}
+            token={auth.token}
+          />
+          <RecommendationContextPanel
+            refreshSignal={recommendationContextRefreshSignal}
+            token={auth.token}
+          />
+        </section>
+      ) : null}
+
+      {activeTab === "assistant" ? (
+        <section style={tabSectionStyle}>
+          <AssistantWorkspace
+            selectedExerciseId={selectedProgressExerciseId}
+            selectedExerciseName={selectedProgressExerciseName}
+            token={auth.token}
+          />
+        </section>
+      ) : null}
+
+      {import.meta.env.DEV ? (
+        <Card padding="12px 16px">
+          <p style={devCopyStyle(theme)}>
+            开发调试：浏览器控制台仍可使用
+            <code style={devCodeStyle(theme)}> window.fitmindAuthDebug </code>
+            进行本地认证检查。
+          </p>
+        </Card>
+      ) : null}
+    </AppShell>
   );
 
   async function handleDeleteWorkout(workoutId: string): Promise<boolean> {
@@ -192,11 +260,83 @@ export function App() {
     return wasDeleted;
   }
 
-  function handleExerciseSelect(
-    exerciseId: string,
-    exerciseName: string,
-  ): void {
+  function handleExerciseSelect(exerciseId: string, exerciseName: string): void {
     setSelectedProgressExerciseId(exerciseId);
     setSelectedProgressExerciseName(exerciseName);
+    setActiveTab("analysis");
   }
+}
+
+const tabSectionStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 16,
+  paddingBottom: 16,
+};
+
+const sectionHeadingRowStyle: React.CSSProperties = {
+  alignItems: "flex-start",
+  display: "flex",
+  gap: 12,
+  justifyContent: "space-between",
+  marginBottom: 16,
+};
+
+const statsGridStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 8,
+  gridTemplateColumns: "repeat(3, 1fr)",
+};
+
+function sectionCopyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    color: theme.colors.tx2,
+    fontSize: 13,
+    lineHeight: 1.6,
+    marginBottom: 0,
+    marginTop: 6,
+  };
+}
+
+function collapseButtonStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    alignItems: "center",
+    background: "transparent",
+    border: "none",
+    color: theme.colors.tx,
+    cursor: "pointer",
+    display: "flex",
+    fontSize: 15,
+    fontWeight: 700,
+    justifyContent: "space-between",
+    padding: 0,
+    width: "100%",
+  };
+}
+
+function collapsedCopyStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    color: theme.colors.tx2,
+    fontSize: 12,
+    lineHeight: 1.6,
+    marginBottom: 0,
+    marginTop: 12,
+  };
+}
+
+function devCopyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    color: theme.colors.tx2,
+    fontSize: 12,
+    margin: 0,
+  };
+}
+
+function devCodeStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    fontFamily: theme.fonts.mono,
+  };
 }

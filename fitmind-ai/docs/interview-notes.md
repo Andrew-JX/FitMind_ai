@@ -1,560 +1,559 @@
-# Interview Notes
+# 项目访谈笔记
 
-## Project Positioning
-FitMind AI is positioned as a training log product plus a deterministic calculation layer, with room reserved for future explainable AI guidance.
+## 项目定位
+FitMind AI 定位为一个训练日志产品加确定性计算层，同时为未来可解释 AI 建议预留空间。
 
-The important framing is:
-- it is not just a generic chat shell
-- it starts from real first-party workout data
-- every future recommendation should be traceable back to workout evidence and calculation rules
+重要的框架是：
+- 它不只是一个通用聊天框
+- 它从真实的第一方训练数据出发
+- 每一个未来的建议都应该能追溯到训练数据证据和计算规则
 
-## Why The Project Does Not Start With AI Chat
-The project intentionally does not start with AI chat because a chat-first product is weak if it cannot deterministically answer basic training questions.
+## 为什么项目不从 AI 聊天开始
+项目有意不从 AI 聊天开始，因为如果不能确定性地回答基本训练问题，聊天优先的产品就是软弱的。
 
-Before any future model explanation, the system should already be able to answer:
-- what the user trained
-- how much total work was done
-- which exercises contributed the most
-- whether one exercise is progressing or stalling
+在任何未来的模型解释之前，系统应该已经能够回答：
+- 用户训练了什么
+- 总共完成了多少训练量
+- 哪些动作贡献最多
+- 某个动作是在进步还是在停滞
 
-That is why the project narrative is "deterministic first, generative later".
+这就是为什么项目叙事是"确定性优先，生成式在后"。
 
-## Phase 1 Value: Workout Log CRUD
-Phase 1 established the base product loop:
-- register and login
-- memory-only MVP auth
-- search and choose exercises
-- create workouts with sets
-- browse workout list and detail
-- delete workouts
+## Phase 1 的价值：训练日志 CRUD
+Phase 1 建立了基础产品闭环：
+- 注册和登录
+- 纯内存 MVP 认证
+- 搜索和选择动作
+- 创建带组数的训练
+- 浏览训练列表和详情
+- 删除训练
 
-The value of Phase 1 is not CRUD by itself. The value is that the product now owns real user training data with clear user boundaries.
+Phase 1 的价值不在于 CRUD 本身。价值在于产品现在拥有了真实的用户训练数据，并有清晰的用户边界。
 
-## Phase 2 Value: Deterministic Calculation Layer
-Phase 2 added deterministic readonly calculation APIs without changing workout CRUD contracts or database schema.
+## Phase 2 的价值：确定性计算层
+Phase 2 在不改变训练 CRUD 契约或数据库 schema 的前提下，新增了确定性只读计算 API。
 
 ### `GET /api/training/summary`
-This endpoint answers:
-- how many workouts are in a range
-- how many sets are in a range
-- how many reps were accumulated
-- how much total volume was accumulated
-- which exercises contributed the most volume
+这个端点回答：
+- 某个时间范围内有多少次训练
+- 某个时间范围内有多少组
+- 累计了多少次数
+- 累计了多少总训练量
+- 哪些动作贡献了最多训练量
 
 ### `GET /api/training/exercise-progress`
-This endpoint answers:
-- how many workouts included one exercise
-- how many matching sets were included
-- that exercise's total reps and total volume
-- the max observed weight
-- the approximate best estimated 1RM
-- per-session rollups
+这个端点回答：
+- 某个动作出现在多少次训练中
+- 包含多少组匹配的组
+- 该动作的总次数和总训练量
+- 观测到的最大重量
+- 近似估算的最大单次力量（1RM）
+- 按训练场次的汇总数据
 
-## Evidence Design
-One of the strongest interview points is the evidence model.
+## 证据设计
+最有力的访谈亮点之一是证据模型。
 
-Current deterministic outputs include:
-- `workout_ids`: which workouts contributed to the result
-- `set_ids`: which sets contributed when relevant
-- `calculation_rules`: plain-language rules describing how the values were calculated
+当前确定性输出包含：
+- `workout_ids`：哪些训练贡献了结果
+- `set_ids`：相关时哪些组贡献了结果
+- `calculation_rules`：用简明语言描述数值如何计算
 
-This matters because future explanations should be auditable rather than black-box claims.
+这很重要，因为未来的解释应该是可审计的，而不是黑盒断言。
 
-## Why The Date Filter Uses A Half-Open Interval
-API input uses calendar dates like `start_date=YYYY-MM-DD` and `end_date=YYYY-MM-DD`, but internal filtering uses:
+## 为什么日期过滤使用半开区间
+API 输入使用日历日期格式如 `start_date=YYYY-MM-DD` 和 `end_date=YYYY-MM-DD`，但内部过滤使用：
 - `performed_at >= start_date::date`
 - `performed_at < (end_date::date + interval '1 day')`
 
-This avoids end-of-day off-by-one issues while preserving the user's calendar mental model.
+这避免了一天结束时的差一错误，同时保持了用户的日历心理模型。
 
-## Why `estimated_1rm` Is Only An Approximation
-The current progress signal uses the Epley formula:
+## 为什么 `estimated_1rm` 只是近似值
+当前进步信号使用 Epley 公式：
 
 `estimated_1rm_kg = weight_kg * (1 + reps / 30)`
 
-In interviews, describe it as an approximate training signal, not a prescription and not a guaranteed true max.
+在访谈中，将其描述为近似训练信号，而非处方，也不是保证的真实最大值。
 
-## Why The Phase 2 Panels Are Readonly
-The Phase 2 frontend panels are intentionally readonly. The focus is calculation correctness and stable display, not complex analytics UI.
+## 为什么 Phase 2 面板是只读的
+Phase 2 前端面板有意设计为只读。重点是计算正确性和稳定显示，而非复杂的分析 UI。
 
-That keeps responsibilities clear:
-- backend owns calculation logic
-- frontend owns readonly rendering and refresh behavior
-- data mutation still happens through workout CRUD
+这使职责清晰：
+- 后端拥有计算逻辑
+- 前端拥有只读渲染和刷新行为
+- 数据修改仍然通过训练 CRUD 进行
 
-## Refresh Behavior After Create/Delete
-Current behavior is deliberately simple and explicit.
+## 创建/删除后的刷新行为
+当前行为有意保持简单和明确。
 
-After workout create:
-- workout list refreshes
-- summary refreshes
-- exercise progress refreshes when an exercise is selected
-- recommendation context preview refreshes
+创建训练后：
+- 训练列表刷新
+- 总览刷新
+- 选中动作时，动作进展刷新
+- 推荐上下文预览刷新
 
-After workout delete:
-- workout list refreshes
-- summary refreshes
-- exercise progress refreshes when an exercise is selected
-- recommendation context preview refreshes
+删除训练后：
+- 训练列表刷新
+- 总览刷新
+- 选中动作时，动作进展刷新
+- 推荐上下文预览刷新
 
-## Recommendation Context Builder
-Recommendation Context Builder is the key Phase 2.1 story. It is not an AI recommendation feature. It is a deterministic backend context package builder for future Tool Calling or LLM explanation.
+## 推荐上下文构建器
+推荐上下文构建器是 Phase 2.1 的核心故事。它不是 AI 推荐功能。它是一个确定性的后端上下文包构建器，用于未来的 Tool Calling 或 LLM 解释。
 
-A clean interview framing is:
-- raw workout logs answer whether we have real data
-- calculation endpoints answer whether we can deterministically compute the right numbers
-- recommendation context answers whether we can assemble the right backend context before any AI explanation
-- future LLM explanation should consume that context package instead of querying tables directly
+清晰的访谈框架：
+- 原始训练日志回答我们是否有真实数据
+- 计算端点回答我们是否能确定性地计算正确数字
+- 推荐上下文回答我们是否能在任何 AI 解释之前组装正确的后端上下文
+- 未来 LLM 解释应该消费那个上下文包，而不是直接查询数据库表
 
-## Why This Still Comes Before AI Chat
-If recommendation context does not exist first, then a future LLM would need to decide which tables to read, what to aggregate, which workouts matter, and how to interpret the range boundaries.
+## 为什么这仍然在 AI 聊天之前
+如果推荐上下文不先存在，未来的 LLM 就需要自己决定读哪些表、如何聚合、哪些训练重要、以及如何解释时间范围边界。
 
-That makes the system harder to test, harder to audit, and more likely to hallucinate. Phase 2.1 removes that ambiguity before any model layer is introduced.
+这使系统更难测试、更难审计、更容易幻觉。Phase 2.1 在引入任何模型层之前消除了这种歧义。
 
-## Raw Logs vs Calculation Endpoints vs Recommendation Context vs Future LLM
-- raw logs: original `workouts` and `sets` facts
-- calculation endpoints: deterministic answers to one focused question
-- recommendation context: one structured package combining multiple deterministic outputs for future AI consumption
-- future LLM explanation: language-layer interpretation on top of that package, not a replacement for the deterministic layer
+## 原始日志 vs 计算端点 vs 推荐上下文 vs 未来 LLM
+- 原始日志：原始的 `workouts` 和 `sets` 事实
+- 计算端点：对一个具体问题的确定性回答
+- 推荐上下文：一个结构化包，组合多个确定性输出供未来 AI 使用
+- 未来 LLM 解释：在该包之上的语言层解释，而非确定性层的替代品
 
-## 30-Second Chinese Pitch For Phase 2.1
-“Phase 2.1 我做的不是 AI 推荐生成，而是 Recommendation Context Builder。它新增了一个后端 API，把某个日期范围内的总训练量、重点动作进展、最近 workout 摘要、evidence 和 calculation rules 组装成一个结构化 context package。它是确定性的，不调 LLM，不生成建议，主要目的是为未来 Tool Calling 和 AI 解释提供一个已经整理好、可验证、可回溯的后端上下文。”
+## Phase 2.1 的30秒中文介绍
+"Phase 2.1 我做的不是 AI 推荐生成，而是 Recommendation Context Builder。它新增了一个后端 API，把某个日期范围内的总训练量、重点动作进展、最近 workout 摘要、evidence 和 calculation rules 组装成一个结构化 context package。它是确定性的，不调 LLM，不生成建议，主要目的是为未来 Tool Calling 和 AI 解释提供一个已经整理好、可验证、可回溯的后端上下文。"
 
-## Deep-Dive Q&A
+## 深度问答
 
-### Why not let the LLM query all tables directly?
-Because that mixes data access, aggregation logic, calculation rules, and language generation into one place. It becomes harder to test, harder to audit, and more likely to leak across user boundaries or hallucinate.
+### 为什么不让 LLM 直接查询所有表？
+因为那会把数据访问、聚合逻辑、计算规则和语言生成混在一起。这让系统更难测试、更难审计，更容易跨用户泄露或产生幻觉。
 
-### Why build context before Tool Calling?
-Because the first question is not “can the model call tools?” The first question is “what exact backend context should exist before the model says anything?” Recommendation Context Builder locks that down first.
+### 为什么在 Tool Calling 之前先构建上下文？
+因为第一个问题不是"模型能调工具吗？"第一个问题是"在模型说任何话之前，应该存在什么精确的后端上下文？"推荐上下文构建器首先锁定了这一点。
 
-### What does context include?
-Right now it includes:
-- summary
-- focus_exercises
-- recent_workouts
-- evidence
+### 上下文包含什么？
+目前包含：
+- summary（总览）
+- focus_exercises（重点动作）
+- recent_workouts（最近训练）
+- evidence（证据）
 
-### How does this reduce hallucination?
-Because the future model receives a prepared deterministic package instead of messy raw tables. The numbers, evidence ids, and calculation rules are already assembled on the backend.
+### 这如何减少幻觉？
+因为未来模型接收的是一个准备好的确定性包，而不是杂乱的原始表。数字、证据 ID 和计算规则已经在后端组装好了。
 
-### What is still not implemented?
-Still intentionally not implemented:
-- AI chat
+### 什么还没实现？
+有意尚未实现的：
+- AI 聊天
 - Tool Calling
 - SSE
-- recommendation generation
-- charts or reports
-- RAG, MCP, or agent orchestration
+- 推荐生成
+- 图表或报告
+- RAG、MCP 或 Agent 编排
 
-## Phase 3.0 Tool Calling Skeleton
-Phase 3.0 adds a Tool Calling Skeleton, but it is still a backend architecture step rather than a finished AI capability.
+## Phase 3.0 Tool Calling 骨架
+Phase 3.0 新增了一个 Tool Calling 骨架，但它仍然是后端架构步骤，而不是完成的 AI 能力。
 
-### How to explain the Tool Calling Skeleton
-A clean interview framing is:
-- first we built deterministic calculation endpoints
-- then we built recommendation context as a deterministic context package
-- then we wrapped those deterministic services as internal tools behind one provider-agnostic executor
-- only after that would a future model layer be allowed to call those tools
+### 如何解释 Tool Calling 骨架
+清晰的访谈框架：
+- 首先我们构建了确定性计算端点
+- 然后我们把这些能力封装为内部工具，放在一个提供商无关的执行器后面
+- 只有在那之后，未来的模型层才被允许调用这些工具
 
-The key point is that the current tool layer is internal backend infrastructure. It is not yet a real chat product, not a model integration, and not a user-facing Tool Calling experience.
+关键点是当前工具层是内部后端基础设施。它还不是真正的聊天产品、不是模型集成，也不是面向用户的 Tool Calling 体验。
 
-### Why the provider-agnostic tool layer comes before real model integration
-This order matters because it locks down the hard backend decisions first:
-- tool names and input contracts become stable before any model SDK is introduced
-- deterministic behavior can be tested without blaming model behavior
-- user isolation and argument validation are solved before a model is allowed to request anything
-- future provider swapping is easier because the executor already speaks in project-owned tool interfaces instead of provider-owned tool formats
+### 为什么提供商无关的工具层在真实模型集成之前
+这个顺序很重要，因为它首先锁定了困难的后端决策：
+- 工具名称和输入契约在引入任何模型 SDK 之前就变得稳定
+- 确定性行为可以在不归咎于模型行为的情况下进行测试
+- 用户隔离和参数验证在允许模型请求任何内容之前就已解决
+- 未来切换提供商更容易，因为执行器已经用项目自己的工具接口而非提供商的工具格式进行通信
 
-### How tools reduce hallucination
-The tool layer reduces hallucination because a future model would consume prepared deterministic outputs instead of:
-- querying raw tables directly
-- inventing its own aggregation rules
-- guessing date filtering behavior
-- mixing user identity with caller-provided input
+### 工具如何减少幻觉
+工具层减少幻觉，因为未来模型将消费准备好的确定性输出，而不是：
+- 直接查询原始表
+- 自行发明聚合规则
+- 猜测日期过滤行为
+- 混淆用户身份与调用者提供的输入
 
-In this design, the backend decides what the tool means and how the numbers are computed. The future model should only explain tool results, not manufacture the data pipeline.
+在这个设计中，后端决定工具的含义和数字的计算方式。未来模型应该只解释工具结果，而不是自己制造数据管道。
 
-### Calculation Endpoint vs Recommendation Context vs Tool Wrapper vs Future LLM Explanation
-- calculation endpoint: a deterministic HTTP API that answers one focused question for an authenticated user
-- recommendation context: a deterministic backend package that combines multiple calculation outputs into one explanation-ready context object
-- tool wrapper: an internal callable backend capability that exposes an existing deterministic service through a validated tool interface
-- future LLM explanation: a later language layer that may call those tools and turn their outputs into natural-language guidance, but is not implemented now
+### 计算端点 vs 推荐上下文 vs 工具包装器 vs 未来 LLM 解释
+- 计算端点：为认证用户回答一个具体问题的确定性 HTTP API
+- 推荐上下文：将多个计算输出组合成一个可解释上下文对象的确定性后端包
+- 工具包装器：通过经过验证的工具接口将现有确定性服务暴露为内部可调用后端能力
+- 未来 LLM 解释：可能调用这些工具并将其输出转化为自然语言指导的后续语言层，但目前尚未实现
 
-### 30-Second Chinese Pitch For Phase 3.0
-“Phase 3.0 我做的不是把大模型真正接进来，而是先把 Tool Calling 的后端骨架搭好。现在后端已经有三个内部工具：训练总览、单动作进展、推荐上下文。它们本质上都是对现有确定性服务的包装，不调 LLM，不做聊天，也不生成建议。工具执行时的 user_id 来自认证上下文，不允许从参数里传，参数也会先校验。这样未来无论接哪个模型提供商，模型调用的都是一层已经稳定、可测试、可审计的内部工具接口，而不是直接碰数据库。”
+### Phase 3.0 的30秒中文介绍
+"Phase 3.0 我做的不是把大模型真正接进来，而是先把 Tool Calling 的后端骨架搭好。现在后端已经有三个内部工具：训练总览、单动作进展、推荐上下文。它们本质上都是对现有确定性服务的包装，不调 LLM，不做聊天，也不生成建议。工具执行时的 user_id 来自认证上下文，不允许从参数里传，参数也会先校验。这样未来无论接哪个模型提供商，模型调用的都是一层已经稳定、可测试、可审计的内部工具接口，而不是直接碰数据库。"
 
-## Phase 3.0 Deep-Dive Q&A
+## Phase 3.0 深度问答
 
-### Why not let the model call the database directly?
-Because that would mix data access, permission boundaries, aggregation rules, and language generation into one place. It becomes harder to test, harder to audit, easier to leak across users, and more likely to hallucinate because the model would be deciding both what to query and how to interpret it.
+### 为什么不让模型直接调用数据库？
+因为那会把数据访问、权限边界、聚合规则和语言生成混在一起。这让系统更难测试、更难审计、更容易跨用户泄露，更容易幻觉——因为模型要同时决定查什么和如何解释它。
 
-### Why validate tool args?
-Because model-generated or caller-provided tool input is not trustworthy by default. Validation makes sure the tool receives only the expected fields and formats, such as `YYYY-MM-DD` dates and a valid `exercise_id` where required. That protects both correctness and safety before any future provider integration.
+### 为什么要验证工具参数？
+因为模型生成的或调用者提供的工具输入默认不可信。验证确保工具只接收预期的字段和格式，比如 `YYYY-MM-DD` 日期和需要时的有效 `exercise_id`。这在允许未来提供商集成之前同时保护了正确性和安全性。
 
-### Why not include `user_id` in args?
-Because ownership should come from authenticated backend context, not caller input. If `user_id` were allowed in args, a future model or client could accidentally or maliciously ask for another user's data. The current design keeps user isolation authoritative on the server side.
+### 为什么不在参数里包含 `user_id`？
+因为所有权应该来自经过认证的后端上下文，而不是调用者输入。如果 `user_id` 允许在参数中传入，未来的模型或客户端可能意外或恶意地请求另一个用户的数据。当前设计将用户隔离的权威性保留在服务器端。
 
-### What is logged in `tool_call_logs`?
-At a high level, the backend can log execution metadata such as:
-- authenticated `user_id`
-- tool name
-- sanitized input args
-- execution status
-- duration
-- compact error or output metadata when supported
+### `tool_call_logs` 中记录什么？
+概括来说，后端可以记录执行元数据，例如：
+- 认证的 `user_id`
+- 工具名称
+- 脱敏的输入参数
+- 执行状态
+- 持续时间
+- 支持时的紧凑错误或输出元数据
 
-The important interview point is not the exact storage format. The important point is that tool execution can be observed and audited without relying on a model layer.
+重要的访谈点不是精确的存储格式。重要的是工具执行可以被观察和审计，而不依赖模型层。
 
-### What is still not implemented?
-Still intentionally not implemented in Phase 3.0:
-- no LLM or model provider integration
-- no AI chat
-- no SSE streaming tool loop
-- no recommendation generation
-- no model-facing user workflow for Tool Calling
-- no RAG, MCP, or agent orchestration
-- no frontend Tool Calling UI
+### Phase 3.0 中什么还没实现？
+Phase 3.0 中有意未实现的：
+- 无 LLM 或模型提供商集成
+- 无 AI 聊天
+- 无 SSE 流式工具循环
+- 无推荐生成
+- 无面向模型用户的 Tool Calling 工作流
+- 无 RAG、MCP 或 Agent 编排
+- 无前端 Tool Calling UI
 
-The current phase is backend preparation only.
+当前阶段仅是后端准备。
 
-## Phase 3.1 Assistant Orchestration Skeleton
-Phase 3.1 adds an Assistant Orchestration Skeleton, but it is still a deterministic backend step rather than real AI generation.
+## Phase 3.1 Assistant 编排骨架
+Phase 3.1 新增了 Assistant 编排骨架，但它仍然是确定性后端步骤，而不是真正的 AI 生成。
 
-### How to explain deterministic assistant orchestration in interviews
-A clean framing is:
-- first we built deterministic calculation endpoints
-- then we wrapped those capabilities as internal tools behind one executor
-- then we added one assistant endpoint that can orchestrate those tools through a stable backend interface
-- but the selection is still deterministic and mode-based, not model-driven
+### 如何在访谈中解释确定性 assistant 编排
+清晰的框架：
+- 首先我们构建了确定性计算端点
+- 然后我们把这些能力封装为内部工具放在一个执行器后面
+- 然后我们新增了一个 assistant 端点，可以通过稳定的后端接口编排这些工具
+- 但选择仍然是确定性的、基于模式的，而非模型驱动的
 
-That makes Phase 3.1 a bridge between raw tool infrastructure and future provider-backed chat. The backend can now accept one assistant-style request, choose the correct internal tool path, execute it safely, and return an assistant-shaped response without introducing LLM behavior yet.
+这使 Phase 3.1 成为原始工具基础设施和未来提供商支持的聊天之间的桥梁。后端现在可以接受一个 assistant 风格的请求，选择正确的内部工具路径，安全执行，并返回 assistant 形状的响应，而无需引入 LLM 行为。
 
-### Why this comes before provider integration
-This order matters because it proves the product-owned orchestration contract first:
-- what the assistant endpoint looks like
-- how user-scoped input is validated
-- how one request maps to one internal capability
-- how deterministic evidence is returned
-- how optional chat persistence works
+### 为什么这在提供商集成之前
+这个顺序很重要，因为它首先证明了产品自有的编排契约：
+- assistant 端点看起来是什么样的
+- 如何验证用户范围的输入
+- 一个请求如何映射到一个内部能力
+- 如何返回确定性证据
+- 可选的聊天持久化如何工作
 
-If provider integration came first, model behavior would be mixed together with unfinished backend orchestration decisions. That would make the system harder to test, harder to explain, and easier to over-attribute to the model.
+如果提供商集成先到来，模型行为就会与未完成的后端编排决策混在一起。这会让系统更难测试、更难解释，更容易将结果过度归因于模型。
 
-### Tool Executor vs Assistant Orchestrator vs Model Provider vs Future Streaming Chat
-- tool executor: low-level internal backend layer that validates tool args and runs one named deterministic tool
-- assistant orchestrator: higher-level backend layer that accepts one assistant-style request, chooses the tool path by mode, formats a deterministic answer, and optionally persists chat messages
-- model provider: future external LLM dependency that would decide or help decide which tools to call and how to generate final language
-- future streaming chat: future user-facing interaction model that would add token/chunk streaming, intermediate state transitions, and multi-step tool/model loops
+### 工具执行器 vs Assistant 编排器 vs 模型提供商 vs 未来流式聊天
+- 工具执行器：低层内部后端层，验证工具参数并运行一个具名的确定性工具
+- assistant 编排器：高层后端层，接受一个 assistant 风格的请求，按模式选择工具路径，格式化确定性答案，并可选地持久化聊天消息
+- 模型提供商：未来的外部 LLM 依赖，将决定或帮助决定调用哪些工具以及如何生成最终语言
+- 未来流式聊天：未来面向用户的交互模型，将添加 token/chunk 流式传输、中间状态转换和多步工具/模型循环
 
-### 30-Second Chinese Pitch For Phase 3.1
-鈥淧hase 3.1 鎴戝仛鐨勬槸 Assistant Orchestration Skeleton銆傚悗绔幇鍦ㄦ湁涓€涓?`POST /api/assistant/mock-turn` 锛屼絾瀹冧笉鏄湡姝ｇ殑 AI 瀵硅瘽锛屼篃涓嶈皟澶фā鍨嬨€傚畠鏄竴涓‘瀹氭€х殑 assistant 灞傦細鍏堟牴鎹?mode 閫夋嫨瑕佽皟鐨勫唴閮?tool锛屾瘮濡傝缁冩€昏銆佸崟鍔ㄤ綔杩涘睍銆佹帹鑽愪笂涓嬫枃锛岀劧鍚庡啀鐢ㄦā鏉垮寲鏂瑰紡鎶婂伐鍏风粨鏋勭粍瑁呮垚 assistant 鍥炲簲銆傚鏋滄彁渚?session_id锛岃繕浼氭妸 user message 鍜?assistant message 瀛樺埌 `chat_sessions` 鍜?`messages` 琛ㄩ噷銆傝繖涓樁娈电殑鐩爣涓嶆槸鐢熸垚 AI 鍥炵瓟锛岃€屾槸鍏堟妸 assistant 鐨勫悗绔紪鎺掋€佽瘉鎹繑鍥炪€佷細璇濇寔涔呭寲杩欎簺鍩虹鑳藉姏鍋氱ǔ銆傗€?
+### Phase 3.1 的30秒中文介绍
+"Phase 3.1 我做的是 Assistant Orchestration Skeleton。后端现在有一个 `POST /api/assistant/mock-turn`，但它不是真正的 AI 对话，也不调大模型。它是一个确定性的 assistant 层：先根据 mode 选择要调的内部 tool，比如训练总览、单动作进展、推荐上下文，然后再用模板化方式把工具结构组装成 assistant 回应。如果提供 session_id，还会把 user message 和 assistant message 存到 `chat_sessions` 和 `messages` 表里。这个阶段的目标不是生成 AI 回答，而是先把 assistant 的后端编排、证据返回、会话持久化这些基础能力做稳。"
 
-## Phase 3.1 Deep-Dive Q&A
+## Phase 3.1 深度问答
 
-### Why use deterministic mock before a real LLM?
-Because the first question is not whether the model can speak naturally. The first question is whether the backend assistant workflow is correct:
-- is the request validated correctly
-- is the right internal tool path chosen
-- is user isolation preserved
-- is evidence carried into the response
-- can the turn be persisted safely
+### 为什么在真实 LLM 之前使用确定性模拟？
+因为第一个问题不是模型能否自然地说话。第一个问题是后端 assistant 工作流是否正确：
+- 请求是否正确验证
+- 是否选择了正确的内部工具路径
+- 用户隔离是否得到保持
+- 证据是否携带进了响应
+- 轮次是否可以安全持久化
 
-Deterministic mock behavior lets the team verify those decisions without blaming or depending on model behavior.
+确定性模拟行为让团队可以验证这些决策，而不必归咎于或依赖模型行为。
 
-### How does mode-based orchestration help?
-Mode-based orchestration narrows the problem on purpose. Instead of asking a model to decide what to do, the backend exposes a small set of explicit request intents and binds each one to one deterministic tool path. That gives:
-- stable API behavior
-- simpler testing
-- easier auditability
-- lower hallucination risk during the skeleton phase
+### 基于模式的编排如何帮助？
+基于模式的编排有意缩小了问题范围。与其让模型决定做什么，后端暴露一小组明确的请求意图，并将每个意图绑定到一个确定性工具路径。这提供了：
+- 稳定的 API 行为
+- 更简单的测试
+- 更容易的可审计性
+- 骨架阶段降低幻觉风险
 
-### What does this prove?
-Phase 3.1 proves that the backend can already support an assistant-shaped product workflow:
-- one authenticated assistant endpoint exists
-- internal tools can be orchestrated behind that endpoint
-- tool results can be turned into assistant-style summaries and evidence
-- optional chat session/message persistence can capture the turn history
+### 这证明了什么？
+Phase 3.1 证明后端已经可以支持 assistant 形状的产品工作流：
+- 一个经过认证的 assistant 端点存在
+- 内部工具可以在该端点后面被编排
+- 工具结果可以转化为 assistant 风格的摘要和证据
+- 可选的聊天 session/消息持久化可以捕获轮次历史
 
-This is meaningful because it shows the assistant architecture is becoming a product surface, not just an internal tool library.
+这很有意义，因为它表明 assistant 架构正在成为产品界面，而不只是内部工具库。
 
-### What is still not implemented?
-Still intentionally not implemented in Phase 3.1:
-- no LLM or model provider calls
-- no streaming chat
-- no SSE
-- no multi-step model/tool loop
-- no coaching recommendation generation
-- no frontend assistant UI
-- no `tool_call_logs.message_id` linkage to persisted assistant messages
+### Phase 3.1 中什么还没实现？
+Phase 3.1 中有意未实现的：
+- 无 LLM 或模型提供商调用
+- 无流式聊天
+- 无 SSE
+- 无多步模型/工具循环
+- 无训练建议生成
+- 无前端 assistant UI
+- 无 `tool_call_logs.message_id` 与持久化 assistant 消息的关联
 
-### How will real model integration replace the mock selection later?
-Later, the deterministic mode switch can be replaced by a provider-backed orchestration path:
-- the request still enters through a product-owned assistant interface
-- authenticated context and validation rules still remain on the backend
-- the future model layer can decide which internal tool to call
-- the same executor can still run those tools safely
-- the final model response can replace today’s template response while keeping evidence and persistence expectations intact
+### 真实模型集成后来将如何替换模拟选择？
+后来，确定性模式切换可以被提供商支持的编排路径替换：
+- 请求仍然通过产品自有的 assistant 接口进入
+- 认证上下文和验证规则仍然保留在后端
+- 未来模型层可以决定调用哪个内部工具
+- 同一个执行器仍然可以安全运行这些工具
+- 最终模型响应可以替换今天的模板响应，同时保持证据和持久化期望不变
 
-The key architectural point is that real model integration should replace only the selection and language layer, not the deterministic data, validation, or ownership boundaries.
+关键架构点是真实模型集成应该只替换选择和语言层，而不是确定性数据、验证或所有权边界。
 
-## Recommended Interview Summary
-A concise version is:
+## 推荐访谈总结
+简洁版本：
 
-“FitMind AI is being built as a training log system with a deterministic calculation layer underneath it, before any future AI explanation is added. Phase 1 established authenticated workout CRUD so the product owns real user training data. Phase 2 added deterministic summary and exercise-progress endpoints plus readonly UI. Phase 2.1 then added a Recommendation Context Builder endpoint that packages summary, focus exercise progress, recent workouts, and evidence into one structured deterministic backend context. The most important design point is that any future recommendation should sit on top of workout ids, set ids, and calculation rules, not on top of an untraceable chat experience.”
+"FitMind AI 正在构建为一个训练日志系统，其下有确定性计算层，在添加任何未来 AI 解释之前。Phase 1 建立了经过认证的训练 CRUD，使产品拥有真实用户训练数据。Phase 2 新增了确定性总览和动作进展端点及只读 UI。Phase 2.1 然后新增了推荐上下文构建器端点，将总览、重点动作进展、最近训练和证据打包成一个结构化确定性后端上下文。最重要的设计点是任何未来的建议都应该建立在训练 ID、组 ID 和计算规则之上，而不是建立在无法追溯的聊天体验之上。"
 
-## Phase 3.2 Provider Adapter
-Phase 3.2 is the point where the backend stops being only a deterministic mock assistant seam and starts proving that a real provider can be plugged in without giving up backend control.
+## Phase 3.2 提供商适配器
+Phase 3.2 是后端从只是确定性模拟 assistant 接缝停止，开始证明真实提供商可以插入而不放弃后端控制的时刻。
 
-### How to explain Phase 3.2 in interviews
-A clean framing is:
-- first we built deterministic calculations
-- then we wrapped them as internal tools
-- then we added an assistant orchestrator with deterministic mock behavior
-- then we inserted a provider adapter so the provider can be swapped by env while the backend still owns business flow
+### 如何在访谈中解释 Phase 3.2
+清晰的框架：
+- 首先我们构建了确定性计算
+- 然后我们把它们封装为内部工具
+- 然后我们添加了一个带确定性模拟行为的 assistant 编排器
+- 然后我们插入了一个提供商适配器，使提供商可以通过环境变量切换，同时后端仍然拥有业务流程
 
-The important point is that provider integration is not the same thing as "AI chat is done". It only proves that the orchestration contract is strong enough to accept a real model dependency without breaking user isolation or tool boundaries.
+重要的是提供商集成不等于"AI 聊天完成了"。它只是证明编排契约足够强大，可以接受真实模型依赖，而不破坏用户隔离或工具边界。
 
-### Why the provider should not appear in controllers
-Controllers should remain thin and unaware of provider specifics because:
-- SDK request/response details are infrastructure concerns, not HTTP surface concerns
-- swapping providers should not require controller rewrites
-- provider failures should already be normalized before anything reaches the route/controller layer
+### 为什么提供商不应该出现在控制器中
+控制器应该保持精简且对提供商细节无感知，因为：
+- SDK 请求/响应细节是基础设施关注点，而非 HTTP 界面关注点
+- 切换提供商不应该需要重写控制器
+- 提供商失败应该在到达路由/控制器层之前就已经规范化
 
-In this design, controllers still only pass auth-scoped request data into the assistant service and return the normalized result.
+在这个设计中，控制器仍然只将认证范围的请求数据传入 assistant 服务，并返回规范化结果。
 
-### Why a real provider still cannot query the database directly
-Even after Phase 3.2, the provider is still not trusted with direct data access.
+### 为什么真实提供商仍然不能直接查询数据库
+即使在 Phase 3.2 之后，提供商仍然不被信任可以直接访问数据。
 
-That boundary matters because:
-- auth and ownership checks stay on the backend
-- deterministic calculations remain testable and auditable
-- the model is prevented from inventing its own query plan against raw workout tables
+这个边界很重要，因为：
+- 认证和所有权检查保留在后端
+- 确定性计算保持可测试和可审计
+- 模型被阻止对原始训练表发明自己的查询计划
 
-The provider may ask for one allowed tool. The backend still decides what that tool means, how it validates input, and what data it returns.
+提供商可以请求一个被允许的工具。后端仍然决定该工具的含义、如何验证输入，以及返回什么数据。
 
-### Tool selection vs tool execution vs provider integration vs future tool loop
-- tool selection: deciding whether to answer directly or request one allowed tool
-- tool execution: backend-only execution of a validated internal capability through the tool executor
-- provider integration: plugging a real external model into the adapter boundary while preserving project-owned contracts
-- future tool loop orchestration: a later phase that would add repeated model/tool turns, streaming states, and more agent-like coordination
+### 工具选择 vs 工具执行 vs 提供商集成 vs 未来工具循环
+- 工具选择：决定是直接回答还是请求一个被允许的工具
+- 工具执行：通过工具执行器对经过验证的内部能力进行纯后端执行
+- 提供商集成：将真实外部模型插入适配器边界，同时保留项目自有契约
+- 未来工具循环编排：将添加重复模型/工具轮次、流式状态和更多类 Agent 协调的后续阶段
 
-### Why the mock provider came before the real provider
-The mock provider is valuable because it verifies the orchestration contract before cost, latency, and model behavior enter the picture.
+### 为什么模拟提供商在真实提供商之前
+模拟提供商有价值，因为它在成本、延迟和模型行为进入画面之前验证了编排契约。
 
-It proves:
-- the assistant service can build a provider-neutral request
-- the backend can normalize `message | tool_call | error`
-- persistence and evidence behavior still work
-- provider swapping is a real architectural seam, not an empty abstraction
+它证明了：
+- assistant 服务可以构建提供商中立的请求
+- 后端可以规范化 `message | tool_call | error`
+- 持久化和证据行为仍然有效
+- 提供商切换是真实的架构接缝，而非空洞的抽象
 
-### What Phase 3.2 still does not implement
-Still intentionally not implemented:
-- no SSE streaming
-- no frontend chat state machine
-- no multi-step model/tool loop
-- no second provider call after tool execution
-- no coaching recommendation generation
-- no RAG, MCP, or agent orchestration
+### Phase 3.2 中什么还没实现
+有意未实现的：
+- 无 SSE 流式传输
+- 无前端聊天状态机
+- 无多步模型/工具循环
+- 工具执行后无第二次提供商调用
+- 无训练建议生成
+- 无 RAG、MCP 或 Agent 编排
 
-### 30-Second Chinese Pitch For Phase 3.2
+### Phase 3.2 的30秒中文介绍
 "Phase 3.2 我做的是把真实 model provider 通过 Provider Adapter 接进后端，但不是直接做成聊天产品。现在后端可以通过 `ASSISTANT_PROVIDER` 在 `mock` 和 `anthropic` 之间切换，assistant orchestrator 仍然负责验证请求、决定允许哪些内部工具、执行工具、组装最终响应、以及持久化消息。Provider 本身只能返回 `message`、`tool_call` 或 `error` 这三种规范化结果，不能直接查库，也不能绕过 tool executor。这样面试时可以清楚说明：我们不是把模型 SDK 散落到 controller 里，而是先把 provider 边界、数据权限边界、和 tool execution 边界都收紧，再逐步往 streaming chat 演进。"
 
-### Deep-Dive Q&A For Phase 3.2
+### Phase 3.2 深度问答
 
-#### Why add a Provider Adapter instead of calling Anthropic directly in the assistant service?
-Because the adapter keeps provider-specific payload shapes and transport rules isolated. The assistant service should own product behavior, not SDK ceremony.
+#### 为什么添加提供商适配器而不是直接在 assistant 服务中调用 Anthropic？
+因为适配器将提供商特定的载荷格式和传输规则隔离开来。assistant 服务应该拥有产品行为，而不是 SDK 繁文缛节。
 
-#### What does the env switch prove?
-It proves the abstraction is real. `ASSISTANT_PROVIDER=mock` and `ASSISTANT_PROVIDER=anthropic` exercise the same orchestrator surface, which means provider swapping is no longer theoretical.
+#### env 切换证明了什么？
+它证明了抽象是真实的。`ASSISTANT_PROVIDER=mock` 和 `ASSISTANT_PROVIDER=anthropic` 使用相同的编排器界面，这意味着提供商切换不再只是理论。
 
-#### Why keep `assistant_type` as `deterministic_mock` for now?
-Because the product surface is still intentionally limited. Even with a real provider plugged in, this phase is still non-streaming, single-response, and at most one tool call. It is not yet a finished chat assistant experience.
+#### 为什么现在仍然将 `assistant_type` 保持为 `deterministic_mock`？
+因为产品界面仍然有意受限。即使接入了真实提供商，这个阶段仍然是非流式的、单响应的，最多一次工具调用。它还不是完成的聊天 assistant 体验。
 
-#### What is the biggest boundary to defend in this phase?
-The most important boundary is that the provider may influence tool selection, but the backend still owns tool execution, data access, validation, persistence, and final response policy.
+#### 这个阶段最重要的边界是什么？
+最重要的边界是提供商可以影响工具选择，但后端仍然拥有工具执行、数据访问、验证、持久化和最终响应策略。
 
-## Phase 3.5 Assistant Closeout Framing
-At this point, the project can be explained as a full AI application pipeline instead of a collection of isolated features.
+## Phase 3.5 Assistant 收尾框架
+至此，项目可以被解释为完整的 AI 应用管道，而非孤立功能的集合。
 
-The clearest high-level framing is:
-- FitMind AI is not a simple chat box
-- it starts from real first-party training logs
-- deterministic calculations and evidence are computed on the backend first
-- the model operates inside a constrained provider boundary
-- the frontend exposes the assistant workflow through streamed state transitions
+最清晰的高层框架是：
+- FitMind AI 不是一个简单的聊天框
+- 它从真实的第一方训练日志出发
+- 确定性计算和证据首先在后端计算
+- 模型在受约束的提供商边界内运行
+- 前端通过流式状态转换暴露 assistant 工作流
 
-The current architecture chain is:
-- real training logs
-- deterministic calculation layer
-- tool registry and executor
-- provider adapter
-- SSE assistant stream
-- frontend chat state machine
+当前架构链路是：
+- 真实训练日志
+- 确定性计算层
+- 工具注册表和执行器
+- 提供商适配器
+- SSE assistant 流
+- 前端聊天状态机
 
-That is the line to emphasize in interviews.
+这是访谈中应该强调的那条线。
 
-## Full Assistant Flow
-The current end-to-end assistant flow is:
-- user enters a message in the frontend assistant panel
-- the frontend hook enters `thinking`
-- the frontend opens `POST /api/assistant/stream-turn` using `fetch` plus `ReadableStream`
-- the backend assistant orchestrator validates the request and resolves authenticated session ownership
-- the provider adapter returns one normalized outcome: `message`, `tool_call`, or `error`
-- if the provider requests a tool, the backend executor validates the tool name, validates args schema, and injects authenticated user context
-- the deterministic tool returns structured evidence-backed data
-- the orchestrator shapes a final assistant response and emits project-owned SSE events
-- the frontend hook consumes those events and transitions through `tool_calling`, `answering`, `done`, or `error`
+## 完整 Assistant 流程
+当前端到端的 assistant 流程是：
+- 用户在前端 assistant 面板中输入消息
+- 前端 hook 进入 `thinking` 状态
+- 前端使用 `fetch` 加 `ReadableStream` 打开 `POST /api/assistant/stream-turn`
+- 后端 assistant 编排器验证请求并解析经过认证的 session 所有权
+- 提供商适配器返回一个规范化结果：`message`、`tool_call` 或 `error`
+- 如果提供商请求工具，后端执行器验证工具名称、验证参数 schema，并注入认证的用户上下文
+- 确定性工具返回带证据支持的结构化数据
+- 编排器塑造最终 assistant 响应并发出项目自有的 SSE 事件
+- 前端 hook 消费这些事件并在 `tool_calling`、`answering`、`done` 或 `error` 之间转换状态
 
-The important interview point is that the user can see the assistant query tools before answering. The system does not present tool-backed reasoning as if it appeared from nowhere.
+重要的访谈点是用户可以看到 assistant 在回答之前查询工具。系统不会把工具支持的推理呈现得好像凭空而来。
 
-## Why The Provider Does Not Query The DB
-The provider does not query the database directly because FitMind AI treats the model as a constrained language or selection layer, not as the owner of data access.
+## 为什么提供商不查询数据库
+提供商不直接查询数据库，因为 FitMind AI 将模型视为受约束的语言或选择层，而非数据访问的拥有者。
 
-This separation gives:
-- auditable permission boundaries
-- deterministic calculations that can be tested without model behavior
-- stable backend contracts even if providers change
-- lower hallucination risk because the provider consumes structured tool outputs instead of improvising on raw tables
+这种分离提供了：
+- 可审计的权限边界
+- 可在不涉及模型行为的情况下测试的确定性计算
+- 即使提供商更换，后端契约仍然稳定
+- 更低的幻觉风险，因为提供商消费结构化工具输出而非即兴应对原始表
 
-The current provider is allowed to return:
+当前提供商被允许返回：
 - `message`
 - `tool_call`
 - `error`
 
-The provider is not allowed to:
-- read the database directly
-- bypass authenticated backend services
-- decide user ownership
-- execute tools itself
+提供商不被允许：
+- 直接读取数据库
+- 绕过经过认证的后端服务
+- 决定用户所有权
+- 自行执行工具
 
-## Why `user_id` Always Comes From Auth Context
-One of the most important safety and architecture points is that `user_id` never comes from frontend input or provider output.
+## 为什么 `user_id` 始终来自认证上下文
+最重要的安全和架构点之一是 `user_id` 永远不来自前端输入或提供商输出。
 
-Current rule set:
-- auth middleware resolves the authenticated user
-- controllers pass only auth-scoped data into the assistant service
-- tool schemas never accept `user_id`
-- the executor uses authenticated backend context when calling deterministic services
+当前规则集：
+- 认证中间件解析已认证的用户
+- 控制器只将认证范围的数据传入 assistant 服务
+- 工具 schema 从不接受 `user_id`
+- 执行器在调用确定性服务时使用认证的后端上下文
 
-This prevents:
-- cross-user leakage from malformed client requests
-- model-generated attempts to override ownership
-- accidental coupling between prompt content and authorization
+这防止了：
+- 来自格式错误的客户端请求的跨用户泄露
+- 模型生成的覆盖所有权的尝试
+- 提示内容与授权之间的意外耦合
 
-If asked how cross-user leakage is prevented, the short answer is:
-"Ownership is enforced on the backend before calculation or tool execution, and `user_id` is never a model-controlled or client-controlled argument."
+如果被问及如何防止跨用户数据泄露，简短的回答是：
+"所有权在计算或工具执行之前在后端强制执行，`user_id` 永远不是模型控制或客户端控制的参数。"
 
-## Frontend Streaming State Machine
-The frontend is now strong enough to be discussed as a real AI UX system rather than a placeholder panel.
+## 前端流式状态机
+前端现在足够强大，可以作为真正的 AI UX 系统来讨论，而不是占位面板。
 
-Current states:
+当前状态：
+- `thinking`（思考中）
+- `tool_calling`（调用工具中）
+- `answering`（回答中）
+- `done`（完成）
+- `error`（错误）
+
+当前前端职责：
+- 打开经过认证的 SSE 请求
+- 解析项目自有的 SSE 事件
+- 逐步追加 assistant `answer_delta` 文本
+- 显示活跃的工具执行
+- 支持停止/中断
+- 支持重试
+- 通过 `session_id` 保持流式 session 连续性
+
+这是一个有力的访谈点，因为它表明前端不只是在渲染一个加载旋转器。它以用户可以理解的方式暴露了 assistant 的执行阶段。
+
+## 为什么 SSE 改善了用户体验
+SSE 改善了用户体验，因为 assistant 不再像一个突然整体解决的阻塞请求那样行为。
+
+与单个阻塞响应相比，SSE 让 UI 显示：
+- 请求已开始
+- 后端是否还在决策或已经在运行工具
+- 回答何时开始流式传输
+- 请求是否成功完成或失败
+
+这在 AI 应用中很重要，因为否则用户无法区分：
+- "模型正在思考"
+- "工具调用还在运行"
+- "答案正在生成"
+- "请求卡住了或失败了"
+
+当前前端使这些状态变得明确。
+
+## 当前限制
+明确说明什么仍然未实现。这使架构听起来可信而非夸大其词。
+
+当前限制：
+- 真实 Anthropic 提供商路径在提供商层仍然是非流式的
+- 每个 assistant 轮次最多允许一次工具调用
+- 工具执行后没有第二次提供商调用
+- 没有重复的工具循环
+- 没有 RAG
+- 没有 MCP
+- 没有自主 Agent 行为
+- 除确定性、基于证据的解释之外，没有训练建议生成
+
+正确的框架是：
+"这已经是一个完整的 AI 应用链路，但它仍然是受控的单轮、单工具、证据优先的 assistant，而不是完整的类 Agent 训练系统。"
+
+## 60秒中文介绍
+"FitMind AI 不是一个简单聊天框，而是一个围绕真实训练日志构建的 AI 应用链路。它的核心路径是：真实训练日志先进入后端 deterministic calculation layer，产出可验证的训练汇总、单动作进展和 recommendation context；这些能力再被封装成内部 tools，通过 tool registry 和 executor 暴露给 assistant orchestrator。模型层并不能直接查数据库，它只能在 provider adapter 这个受控边界内返回 `message`、`tool_call` 或 `error`。如果模型请求工具，后端会校验 tool name、args schema，并且把 authenticated user context 注入执行过程，`user_id` 永远来自 auth middleware，不允许前端或模型传入。工具结果会返回 `workout_ids`、`set_ids`、`calculation_rules` 这些 evidence。最后后端通过 SSE 把 `thinking`、`tool_calling`、`answering`、`done`、`error` 状态流式推给前端，前端 chat state machine 会把这些状态和增量答案实时展示出来。所以这个项目的重点不是'让模型随便聊'，而是把 deterministic data、tool execution、provider boundary、streaming UX 和权限隔离完整串成一条可解释的 AI 应用链路。"
+
+## 深度问答
+
+### 为什么用 Tool Calling 而不是把所有数据放进提示词？
+因为原始训练日志不是模型提示词的正确抽象。
+
+Tool Calling 让后端可以：
+- 选择稳定、可测试的能力边界
+- 保持聚合逻辑确定性
+- 返回结构化证据而非冗长的原始记录
+- 减少 token 浪费和提示噪声
+
+模型应该接收准备好的事实，而不是从原始日志中发明数据管道。
+
+### 为什么要有确定性计算层？
+因为最重要的训练数字应该在不涉及模型的情况下是可重现的。
+
+这提供了：
+- 更容易的测试
+- 更清晰的调试
+- 更强的用户信任
+- 可以追溯回训练和组数的证据
+
+模型成为建立在稳定事实之上的解释层，而不是这些事实的来源。
+
+### 如何防止跨用户数据泄露？
+通过在任何计算或工具执行发生之前在后端强制执行所有权。
+
+具体保护：
+- `user_id` 只来自认证中间件
+- 客户端和提供商都不传递 `user_id`
+- 工具 schema 不接受 `user_id`
+- 在 assistant 消息持久化或流复用之前检查 session 所有权
+- 确定性服务仍然按认证用户上下文过滤
+
+### 前端如何处理流式状态？
+前端打开经过认证的 SSE 请求，解析项目自有事件，并更新一个小状态机：
 - `thinking`
 - `tool_calling`
 - `answering`
 - `done`
 - `error`
 
-Current frontend responsibilities:
-- open the authenticated SSE request
-- parse project-owned SSE events
-- append assistant `answer_delta` text progressively
-- surface active tool execution
-- support stop/abort
-- support retry
-- preserve streaming session continuity through `session_id`
+它还：
+- 跟踪活跃的工具调用
+- 逐步追加流式回答增量
+- 支持停止和重试
+- 为后续轮次保留 `session_id`
 
-This is a strong interview point because it shows the frontend is not just rendering one loading spinner. It is exposing the assistant's execution phases in a way users can understand.
+### 下一步你会加什么？
+逻辑上的下一步是：
+- 真实提供商流式集成，使提供商层也具有流感知
+- 工具执行后的第二次提供商调用，使模型可以将工具输出转化为提供商生成的最终答案
+- 有界的多步工具循环
+- 聊天历史补充和 session 浏览
+- 只有在那之后，才是可选的 RAG、MCP 或更多类 Agent 工作流
 
-## Why SSE Improves UX
-SSE improves UX because the assistant no longer behaves like one blocking request that suddenly resolves all at once.
-
-Compared with a single blocking response, SSE lets the UI show:
-- that the request has started
-- whether the backend is still deciding or already running a tool
-- when the answer begins streaming
-- whether the request completed successfully or failed
-
-This matters in AI applications because users otherwise cannot distinguish:
-- "the model is thinking"
-- "the tool call is still running"
-- "the answer is being generated"
-- "the request is stuck or failed"
-
-The current frontend makes those states explicit.
-
-## Current Limits
-Be explicit about what is still not implemented. That makes the architecture sound credible instead of overclaimed.
-
-Current limits:
-- the real Anthropic provider path is still non-streaming at the provider layer
-- at most one tool call is allowed per assistant turn
-- there is no second provider call after tool execution
-- there is no repeated tool loop
-- there is no RAG
-- there is no MCP
-- there is no autonomous agent behavior
-- there is no coaching recommendation generation beyond deterministic, evidence-backed explanation
-
-The right framing is:
-"This is already a full AI application chain, but it is still a controlled single-turn, single-tool, evidence-first assistant rather than a full agentic coaching system."
-
-## 60-Second Chinese Pitch
-“FitMind AI 不是一个简单聊天框，而是一个围绕真实训练日志构建的 AI 应用链路。它的核心路径是：真实训练日志先进入后端 deterministic calculation layer，产出可验证的训练汇总、单动作进展和 recommendation context；这些能力再被封装成内部 tools，通过 tool registry 和 executor 暴露给 assistant orchestrator。模型层并不能直接查数据库，它只能在 provider adapter 这个受控边界内返回 `message`、`tool_call` 或 `error`。如果模型请求工具，后端会校验 tool name、args schema，并且把 authenticated user context 注入执行过程，`user_id` 永远来自 auth middleware，不允许前端或模型传入。工具结果会返回 `workout_ids`、`set_ids`、`calculation_rules` 这些 evidence。最后后端通过 SSE 把 `thinking`、`tool_calling`、`answering`、`done`、`error` 状态流式推给前端，前端 chat state machine 会把这些状态和增量答案实时展示出来。所以这个项目的重点不是‘让模型随便聊’，而是把 deterministic data、tool execution、provider boundary、streaming UX 和权限隔离完整串成一条可解释的 AI 应用链路。”
-
-## Deep-Dive Q&A
-
-### Why Tool Calling instead of putting all data in the prompt?
-Because raw workout logs are not the right abstraction for a model prompt.
-
-Tool Calling lets the backend:
-- choose stable, testable capability boundaries
-- keep aggregation logic deterministic
-- return structured evidence instead of verbose raw records
-- reduce token waste and prompt noise
-
-The model should receive prepared facts, not invent the data pipeline from raw logs.
-
-### Why a deterministic calculation layer?
-Because the most important training numbers should be reproducible without model involvement.
-
-That gives:
-- easier testing
-- clearer debugging
-- stronger user trust
-- evidence that can be traced back to workouts and sets
-
-The model becomes an explanation layer on top of stable facts rather than the source of those facts.
-
-### How do you prevent cross-user data leakage?
-By enforcing ownership on the backend before any calculation or tool execution happens.
-
-Concrete protections:
-- `user_id` comes only from auth middleware
-- neither the client nor the provider passes `user_id`
-- tool schemas do not accept `user_id`
-- session ownership is checked before assistant message persistence or stream reuse
-- deterministic services still filter by authenticated user context
-
-### How does the frontend handle streaming state?
-The frontend opens an authenticated SSE request, parses project-owned events, and updates a small state machine:
-- `thinking`
-- `tool_calling`
-- `answering`
-- `done`
-- `error`
-
-It also:
-- tracks the active tool call
-- appends streamed answer deltas progressively
-- supports stop and retry
-- preserves `session_id` for later turns
-
-### What would you add next?
-The next logical steps would be:
-- real provider streaming integration so the provider layer is also stream-aware
-- a second provider call after tool execution so the model can turn tool output into a final provider-authored answer
-- a bounded multi-step tool loop
-- chat history hydration and session browsing
-- only after that, optional RAG, MCP, or more agent-like workflows
-
-The key is that each next step should preserve the existing boundaries around deterministic data, auth-scoped execution, and evidence visibility.
+关键是每个下一步都应该保留围绕确定性数据、认证范围执行和证据可见性的现有边界。

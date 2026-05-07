@@ -1,11 +1,14 @@
 import { useState } from "react";
 
+import { Badge } from "../../components/Badge";
+import { Button } from "../../components/Button";
+import { Card } from "../../components/Card";
+import { IconButton } from "../../components/IconButton";
+import { StatusPill } from "../../components/StatusPill";
+import { useTheme } from "../../theme/ThemeContext";
 import { AssistantMessageList } from "./AssistantMessageList";
 import { AssistantToolCallCard } from "./AssistantToolCallCard";
-import type {
-  AssistantChatRequestPayload,
-  AssistantMode,
-} from "./assistant-types";
+import type { AssistantChatRequestPayload, AssistantMode } from "./assistant-types";
 import type { UseAssistantChatResult } from "./use-assistant-chat";
 
 export interface AssistantChatPanelProps {
@@ -15,15 +18,10 @@ export interface AssistantChatPanelProps {
   token: string | null;
 }
 
-/**
- * Renders the assistant controls and streamed conversation inside the workspace.
- *
- * @param props - Assistant state, auth token, and current selected exercise context.
- * @returns Chat controls plus streamed assistant output.
- */
 export function AssistantChatPanel(props: AssistantChatPanelProps) {
   const { chat } = props;
-  const [message, setMessage] = useState("show me my training overview");
+  const { theme } = useTheme();
+  const [message, setMessage] = useState("展示我的训练总览");
   const [mode, setMode] = useState<AssistantMode>("training_overview");
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
@@ -48,144 +46,150 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
     await chat.sendMessage(payload);
   }
 
-  return (
-    <section style={panelStyle}>
-      <div style={headerStyle}>
-        <div>
-          <h3 style={titleStyle}>Assistant Controls</h3>
-          <p style={copyStyle}>
-            Use these demo prompts to stream a deterministic assistant answer through
-            the current SSE pipeline.
-          </p>
-        </div>
-        <div style={statusPillStyle(chat.status)}>{formatStatus(chat.status)}</div>
-      </div>
-      <p style={subtleStyle}>
-        Requests use the same rolling 30-day window as the existing deterministic
-        training panels.
-      </p>
-      <div style={quickPromptSectionStyle}>
-        <div style={quickPromptHeaderStyle}>
-          <h4 style={subsectionTitleStyle}>Quick Prompts</h4>
-          <p style={helperTextStyle}>Pick a demo path that maps to a deterministic tool.</p>
-        </div>
-        <div style={quickPromptRowStyle}>
-          <button
-            onClick={() => applyQuickPrompt("training_overview")}
-            style={quickPromptButtonStyle}
-            type="button"
-          >
-            Training overview
-          </button>
-          <button
-            disabled={!props.selectedExerciseId}
-            onClick={() => applyQuickPrompt("exercise_progress")}
-            style={quickPromptButtonStyle}
-            type="button"
-          >
-            Exercise progress
-          </button>
-          <button
-            onClick={() => applyQuickPrompt("recommendation_context")}
-            style={quickPromptButtonStyle}
-            type="button"
-          >
-            Recommendation context
-          </button>
-        </div>
-        {props.selectedExerciseId ? (
-          <p style={helperTextStyle}>
-            Exercise progress prompt target:{" "}
-            <strong>{props.selectedExerciseName ?? props.selectedExerciseId}</strong>
-          </p>
-        ) : (
-          <p style={helperTextStyle}>
-            Exercise progress stays disabled until you select an exercise from the
-            existing training summary panel.
-          </p>
-        )}
-      </div>
-      <form onSubmit={(event) => void handleSubmit(event)} style={formStyle}>
-        <label style={labelStyle}>
-          Ask the assistant ({mode})
-          <textarea
-            onChange={(event) => setMessage(event.target.value)}
-            rows={4}
-            style={textareaStyle}
-            value={message}
-          />
-        </label>
-        <div style={buttonRowStyle}>
-          <button
-            disabled={!props.token || chat.isStreaming}
-            style={primaryButtonStyle}
-            type="submit"
-          >
-            {chat.isStreaming ? "Streaming..." : "Send"}
-          </button>
-          <button
-            disabled={!chat.isStreaming}
-            onClick={chat.abort}
-            style={secondaryButtonStyle}
-            type="button"
-          >
-            Stop
-          </button>
-          <button
-            disabled={chat.isStreaming || chat.messages.length === 0}
-            onClick={() => void chat.retryLast()}
-            style={secondaryButtonStyle}
-            type="button"
-          >
-            Retry
-          </button>
-          <button
-            disabled={chat.isStreaming || chat.messages.length === 0}
-            onClick={chat.clearConversation}
-            style={secondaryButtonStyle}
-            type="button"
-          >
-            Clear conversation
-          </button>
-        </div>
-      </form>
-      {chat.errorMessage ? <p style={errorStyle}>Error: {chat.errorMessage}</p> : null}
-      <div style={contentGridStyle}>
-        <section style={sectionStyle}>
-          <h4 style={subsectionTitleStyle}>Active Tool Call</h4>
-          <AssistantToolCallCard toolCall={chat.activeToolCall} />
-        </section>
-        <section style={sectionStyle}>
-          <h4 style={subsectionTitleStyle}>Assistant Answer</h4>
-          <AssistantMessageList messages={chat.messages} />
-        </section>
-      </div>
-    </section>
-  );
-
   function applyQuickPrompt(nextMode: AssistantMode): void {
     setMode(nextMode);
     setMessage(
       nextMode === "training_overview"
-        ? "show me my training overview"
+        ? "展示我的训练总览"
         : nextMode === "exercise_progress"
-          ? `show me ${
-              props.selectedExerciseName?.trim() || "this exercise"
-            } progress`
-          : "build deterministic recommendation context",
+          ? `展示 ${props.selectedExerciseName?.trim() || "当前动作"} 的进展`
+          : "构建推荐上下文预览",
     );
   }
+
+  return (
+    <section style={{ display: "grid", gap: 12 }}>
+      <Card padding="14px">
+        <div style={statusBarStyle}>
+          <StatusPill status={chat.status} />
+          <div style={{ alignItems: "center", display: "flex", gap: 8 }}>
+            {chat.activeToolCall ? (
+              <Badge tone="info">{chat.activeToolCall.toolName}</Badge>
+            ) : null}
+            <IconButton
+              disabled={chat.isStreaming || chat.messages.length === 0}
+              icon="x"
+              label="清空对话"
+              onClick={chat.clearConversation}
+            />
+          </div>
+        </div>
+      </Card>
+
+      <Card padding="14px">
+        <h3 style={{ margin: 0 }}>快捷指令</h3>
+        <p style={copyStyle(theme)}>
+          当前会按固定 mode 触发对应确定性工具，再通过 SSE 流式返回回答。
+        </p>
+        <div style={quickPromptRowStyle}>
+          <Button onClick={() => applyQuickPrompt("training_overview")} type="button" variant="secondary">
+            训练总览
+          </Button>
+          <Button
+            disabled={!props.selectedExerciseId}
+            onClick={() => applyQuickPrompt("exercise_progress")}
+            type="button"
+            variant="secondary"
+          >
+            动作进展
+          </Button>
+          <Button
+            onClick={() => applyQuickPrompt("recommendation_context")}
+            type="button"
+            variant="secondary"
+          >
+            推荐上下文
+          </Button>
+        </div>
+
+        {props.selectedExerciseId ? (
+          <p style={helperTextStyle(theme)}>
+            当前动作进展目标：
+            <strong>{props.selectedExerciseName ?? props.selectedExerciseId}</strong>
+          </p>
+        ) : (
+          <p style={helperTextStyle(theme)}>
+            需要先在“分析”页选中一个动作，才能使用“动作进展”快捷指令。
+          </p>
+        )}
+      </Card>
+
+      <Card padding="14px">
+        <div style={sectionStyle}>
+          <h4 style={{ margin: 0 }}>当前工具调用</h4>
+          <AssistantToolCallCard toolCall={chat.activeToolCall} />
+        </div>
+      </Card>
+
+      {!props.selectedExerciseId ? (
+        <div
+          style={{
+            backgroundColor: theme.isDark
+              ? "rgba(255,155,66,0.18)"
+              : "rgba(192,96,16,0.12)",
+            border: `1px solid ${theme.isDark ? "rgba(255,155,66,0.28)" : "rgba(192,96,16,0.24)"}`,
+            borderRadius: 12,
+            color: theme.colors.orange,
+            fontSize: 11,
+            padding: "10px 12px",
+          }}
+        >
+          前往“分析”页选择动作后，可以使用“动作进展”快捷指令。
+        </div>
+      ) : null}
+
+      <Card padding="14px">
+        <section style={sectionStyle}>
+          <h4 style={{ margin: 0 }}>对话记录</h4>
+          <AssistantMessageList messages={chat.messages} />
+        </section>
+      </Card>
+
+      <Card padding="12px 14px">
+        <form onSubmit={(event) => void handleSubmit(event)} style={inputBarStyle}>
+          <div style={{ flex: 1 }}>
+            <div style={modeLabelStyle(theme)}>当前模式：{formatMode(mode)}</div>
+            <textarea
+              onChange={(event) => setMessage(event.target.value)}
+              rows={3}
+              style={textareaStyle(theme)}
+              value={message}
+            />
+          </div>
+          <div style={inputActionColumnStyle}>
+            <IconButton
+              disabled={!chat.isStreaming}
+              icon="stop"
+              label="停止"
+              onClick={chat.abort}
+              tone="danger"
+            />
+            <Button disabled={!props.token || chat.isStreaming} style={{ width: "100%" }} type="submit">
+              发送
+            </Button>
+            <Button
+              disabled={chat.isStreaming || chat.messages.length === 0}
+              onClick={() => void chat.retryLast()}
+              type="button"
+              variant="secondary"
+            >
+              重试
+            </Button>
+          </div>
+        </form>
+      </Card>
+
+      {chat.errorMessage ? (
+        <p style={{ color: theme.colors.orange, margin: 0 }}>错误：{chat.errorMessage}</p>
+      ) : null}
+    </section>
+  );
 }
 
 function createDefaultRange(): { end_date: string; start_date: string } {
   const today = new Date();
-  const endDate = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate(),
-  );
+  const endDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const startDate = new Date(endDate);
-
   startDate.setDate(startDate.getDate() - 29);
 
   return {
@@ -202,132 +206,29 @@ function formatDateOnly(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function formatStatus(status: UseAssistantChatResult["status"]): string {
-  return status.replace("_", " ");
+function formatMode(mode: AssistantMode): string {
+  if (mode === "training_overview") {
+    return "training_overview";
+  }
+
+  if (mode === "exercise_progress") {
+    return "exercise_progress";
+  }
+
+  return "recommendation_context";
 }
 
-const panelStyle: React.CSSProperties = {
-  backgroundColor: "#ffffff",
-  border: "1px solid #cbd5e1",
-  borderRadius: 16,
-  padding: 20,
-};
-
-const headerStyle: React.CSSProperties = {
+const statusBarStyle: React.CSSProperties = {
   alignItems: "center",
   display: "flex",
-  gap: 16,
   justifyContent: "space-between",
-  marginBottom: 8,
-};
-
-const titleStyle: React.CSSProperties = {
-  margin: 0,
-};
-
-const copyStyle: React.CSSProperties = {
-  color: "#334155",
-  marginBottom: 0,
-  marginTop: 6,
-};
-
-const subtleStyle: React.CSSProperties = {
-  color: "#64748b",
-  marginBottom: 16,
-  marginTop: 0,
-};
-
-const quickPromptSectionStyle: React.CSSProperties = {
-  backgroundColor: "#f8fafc",
-  border: "1px solid #e2e8f0",
-  borderRadius: 14,
-  marginBottom: 16,
-  padding: 14,
-};
-
-const quickPromptHeaderStyle: React.CSSProperties = {
-  marginBottom: 10,
-};
-
-const subsectionTitleStyle: React.CSSProperties = {
-  margin: 0,
-};
-
-const formStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 12,
-  marginBottom: 16,
 };
 
 const quickPromptRowStyle: React.CSSProperties = {
   display: "flex",
   flexWrap: "wrap",
   gap: 8,
-  marginBottom: 8,
-};
-
-const quickPromptButtonStyle: React.CSSProperties = {
-  backgroundColor: "#ffffff",
-  border: "1px solid #cbd5e1",
-  borderRadius: 999,
-  color: "#0f172a",
-  cursor: "pointer",
-  padding: "8px 12px",
-};
-
-const labelStyle: React.CSSProperties = {
-  display: "grid",
-  fontWeight: 600,
-  gap: 8,
-};
-
-const textareaStyle: React.CSSProperties = {
-  border: "1px solid #94a3b8",
-  borderRadius: 12,
-  font: "inherit",
-  padding: 12,
-  resize: "vertical",
-};
-
-const buttonRowStyle: React.CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: 8,
-};
-
-const primaryButtonStyle: React.CSSProperties = {
-  backgroundColor: "#0f172a",
-  border: "none",
-  borderRadius: 10,
-  color: "#ffffff",
-  cursor: "pointer",
-  padding: "10px 14px",
-};
-
-const secondaryButtonStyle: React.CSSProperties = {
-  backgroundColor: "#e2e8f0",
-  border: "1px solid #cbd5e1",
-  borderRadius: 10,
-  color: "#0f172a",
-  cursor: "pointer",
-  padding: "10px 14px",
-};
-
-const errorStyle: React.CSSProperties = {
-  color: "#b91c1c",
-  marginBottom: 16,
-};
-
-const helperTextStyle: React.CSSProperties = {
-  color: "#64748b",
-  fontSize: 14,
-  marginBottom: 0,
-  marginTop: 0,
-};
-
-const contentGridStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 16,
+  marginTop: 12,
 };
 
 const sectionStyle: React.CSSProperties = {
@@ -335,24 +236,57 @@ const sectionStyle: React.CSSProperties = {
   gap: 10,
 };
 
-function statusPillStyle(status: UseAssistantChatResult["status"]): React.CSSProperties {
+const inputBarStyle: React.CSSProperties = {
+  alignItems: "flex-end",
+  display: "flex",
+  gap: 12,
+};
+
+const inputActionColumnStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 8,
+  width: 88,
+};
+
+function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
   return {
-    backgroundColor:
-      status === "error"
-        ? "#fee2e2"
-        : status === "done"
-          ? "#dcfce7"
-          : "#e0f2fe",
-    borderRadius: 999,
-    color:
-      status === "error"
-        ? "#991b1b"
-        : status === "done"
-          ? "#166534"
-          : "#0f172a",
+    color: theme.colors.tx2,
+    fontSize: 13,
+    lineHeight: 1.6,
+    marginBottom: 0,
+    marginTop: 8,
+  };
+}
+
+function helperTextStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    color: theme.colors.tx2,
     fontSize: 12,
-    fontWeight: 700,
-    padding: "6px 10px",
-    textTransform: "uppercase",
+    lineHeight: 1.6,
+    marginBottom: 0,
+    marginTop: 10,
+  };
+}
+
+function modeLabelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    color: theme.colors.tx3,
+    fontSize: 11,
+    marginBottom: 8,
+  };
+}
+
+function textareaStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.surf2,
+    border: `1px solid ${theme.colors.bdr}`,
+    borderRadius: 12,
+    color: theme.colors.tx,
+    font: "inherit",
+    padding: 12,
+    resize: "vertical",
+    width: "100%",
   };
 }

@@ -1,6 +1,12 @@
 import { useEffect, useEffectEvent, useState } from "react";
 
+import { Badge } from "../../components/Badge";
+import { Button } from "../../components/Button";
+import { Card } from "../../components/Card";
+import { Pill } from "../../components/Pill";
+import { StatCell } from "../../components/StatCell";
 import { HttpClientError } from "../../services/http-client";
+import { useTheme } from "../../theme/ThemeContext";
 import {
   getRecommendationContext,
   type RecommendationContext,
@@ -12,16 +18,9 @@ export interface RecommendationContextPanelProps {
   token: string | null;
 }
 
-/**
- * Renders a readonly preview of the deterministic recommendation context package.
- *
- * @param props - Auth token and external refresh signal
- * @returns The recommendation context preview panel
- */
-export function RecommendationContextPanel(
-  props: RecommendationContextPanelProps,
-) {
+export function RecommendationContextPanel(props: RecommendationContextPanelProps) {
   const { refreshSignal, token } = props;
+  const { theme } = useTheme();
   const [context, setContext] = useState<RecommendationContext | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -55,7 +54,7 @@ export function RecommendationContextPanel(
 
   async function refresh(): Promise<void> {
     if (!token) {
-      setErrorMessage("You must be signed in to view recommendation context.");
+      setErrorMessage("你必须先登录才能查看推荐上下文。");
       return;
     }
 
@@ -83,139 +82,117 @@ export function RecommendationContextPanel(
     context.recent_workouts.length === 0;
 
   return (
-    <section style={panelStyle}>
+    <Card>
       <div style={headerStyle}>
         <div>
-          <h2 style={titleStyle}>Deterministic Recommendation Context Preview</h2>
-          <p style={copyStyle}>
+          <div style={titleRowStyle}>
+            <h2 style={titleStyle}>推荐上下文预览</h2>
+            <Badge tone="info">Deterministic</Badge>
+          </div>
+          <p style={copyStyle(theme)}>
             {context
-              ? `Range: ${formatRangeLabel(context.range.start_date, context.range.end_date)}`
-              : `Range: ${formatRangeLabel(range.start_date, range.end_date)}`}
+              ? `范围：${formatRangeLabel(context.range.start_date, context.range.end_date)}`
+              : `范围：${formatRangeLabel(range.start_date, range.end_date)}`}
           </p>
-          <p style={subtleStyle}>
-            Readonly context package for future tool-calling or LLM explanation.
+          <p style={subtleStyle(theme)}>
+            这里展示的是确定性计算层输出的上下文包，不直接生成 AI 建议。
           </p>
         </div>
-        <button
-          disabled={isLoading}
-          onClick={() => void refresh()}
-          style={buttonStyle}
-          type="button"
-        >
-          {isLoading ? "Refreshing..." : "Refresh context"}
-        </button>
+
+        <Button disabled={isLoading} onClick={() => void refresh()} type="button" variant="secondary">
+          {isLoading ? "刷新中..." : "刷新"}
+        </Button>
       </div>
-      {errorMessage ? <p style={errorStyle}>Error: {errorMessage}</p> : null}
-      {isLoading && !context ? (
-        <p style={copyStyle}>Loading recommendation context...</p>
-      ) : null}
+
+      {errorMessage ? <p style={errorStyle(theme)}>错误：{errorMessage}</p> : null}
+      {isLoading && !context ? <p style={copyStyle(theme)}>正在加载推荐上下文...</p> : null}
       {hasEmptyState ? (
-        <p style={copyStyle}>
-          No workouts are available in this 30-day window yet, so the context
-          package is still empty.
-        </p>
+        <p style={copyStyle(theme)}>最近 30 天还没有训练记录，因此当前上下文包为空。</p>
       ) : null}
+
       {context ? (
         <>
           <div style={statsGridStyle}>
-            <SummaryStat
-              label="Workouts"
-              value={context.summary.workout_count.toLocaleString()}
-            />
-            <SummaryStat
-              label="Sets"
-              value={context.summary.set_count.toLocaleString()}
-            />
-            <SummaryStat
-              label="Total reps"
-              value={context.summary.total_reps.toLocaleString()}
-            />
-            <SummaryStat
-              label="Total volume"
-              value={context.summary.total_volume.toLocaleString()}
-            />
+            <StatCell label="训练次数" tone="accent" value={context.summary.workout_count.toLocaleString()} />
+            <StatCell label="总组数" tone="info" value={context.summary.set_count.toLocaleString()} />
+            <StatCell label="总次数" tone="analysis" value={context.summary.total_reps.toLocaleString()} />
+            <StatCell label="总容量" tone="warning" value={context.summary.total_volume.toLocaleString()} />
           </div>
+
           <div style={contentGridStyle}>
-            <section style={sectionCardStyle}>
-              <h3 style={subheadingStyle}>Focus Exercises</h3>
+            <section style={sectionCardStyle(theme)}>
+              <h3 style={subheadingStyle}>重点动作</h3>
               {context.focus_exercises.length === 0 ? (
-                <p style={copyStyle}>No focus exercises are available for this range.</p>
+                <p style={copyStyle(theme)}>当前范围内没有重点动作。</p>
               ) : (
                 <ul style={listStyle}>
-                  {context.focus_exercises.map((exercise) => {
-                    return (
-                      <li key={exercise.exercise_id} style={listItemStyle}>
-                        <div style={itemHeaderStyle}>
-                          <strong>{exercise.exercise_name}</strong>
-                          <span style={pillStyle}>
-                            {exercise.total_volume.toLocaleString()} volume
-                          </span>
-                        </div>
-                        <div style={itemMetaStyle}>
-                          {exercise.workout_count.toLocaleString()} workouts |{" "}
-                          {exercise.set_count.toLocaleString()} sets |{" "}
-                          {exercise.total_reps.toLocaleString()} reps
-                        </div>
-                        <div style={itemMetaStyle}>
-                          Max {formatMetric(exercise.max_weight_kg, "kg")} | Est 1RM{" "}
-                          {formatMetric(exercise.estimated_1rm_kg, "kg")}
-                        </div>
-                      </li>
-                    );
-                  })}
+                  {context.focus_exercises.map((exercise) => (
+                    <li key={exercise.exercise_id} style={listItemStyle(theme)}>
+                      <div style={itemHeaderStyle}>
+                        <strong>{exercise.exercise_name}</strong>
+                        <Pill tone="accent">
+                          {exercise.total_volume.toLocaleString()} volume
+                        </Pill>
+                      </div>
+                      <div style={itemMetaStyle(theme)}>
+                        {exercise.workout_count.toLocaleString()} 次训练 |{" "}
+                        {exercise.set_count.toLocaleString()} 组 |{" "}
+                        {exercise.total_reps.toLocaleString()} 次
+                      </div>
+                      <div style={itemMetaStyle(theme)}>
+                        最大重量 {formatMetric(exercise.max_weight_kg, "kg")} | 预计 1RM{" "}
+                        {formatMetric(exercise.estimated_1rm_kg, "kg")}
+                      </div>
+                    </li>
+                  ))}
                 </ul>
               )}
             </section>
-            <section style={sectionCardStyle}>
-              <h3 style={subheadingStyle}>Recent Workouts</h3>
+
+            <section style={sectionCardStyle(theme)}>
+              <h3 style={subheadingStyle}>最近训练</h3>
               {context.recent_workouts.length === 0 ? (
-                <p style={copyStyle}>No recent workouts are available for this range.</p>
+                <p style={copyStyle(theme)}>当前范围内没有最近训练记录。</p>
               ) : (
                 <ul style={listStyle}>
-                  {context.recent_workouts.map((workout) => {
-                    return (
-                      <li key={workout.workout_id} style={listItemStyle}>
-                        <div style={itemHeaderStyle}>
-                          <strong>{formatDisplayDateTime(workout.performed_at)}</strong>
-                          <span style={pillStyle}>
-                            {workout.total_volume.toLocaleString()} volume
-                          </span>
-                        </div>
-                        <div style={itemMetaStyle}>
-                          {workout.set_count.toLocaleString()} sets
-                        </div>
-                        <div style={itemMetaStyle}>
-                          {workout.notes?.trim() || "No notes for this workout."}
-                        </div>
-                      </li>
-                    );
-                  })}
+                  {context.recent_workouts.map((workout) => (
+                    <li key={workout.workout_id} style={listItemStyle(theme)}>
+                      <div style={itemHeaderStyle}>
+                        <strong>{formatDisplayDateTime(workout.performed_at)}</strong>
+                        <Pill tone="accent">
+                          {workout.total_volume.toLocaleString()} volume
+                        </Pill>
+                      </div>
+                      <div style={itemMetaStyle(theme)}>
+                        {workout.set_count.toLocaleString()} 组
+                      </div>
+                      <div style={itemMetaStyle(theme)}>
+                        {workout.notes?.trim() || "这次训练没有备注。"}
+                      </div>
+                    </li>
+                  ))}
                 </ul>
               )}
             </section>
           </div>
-          <section style={sectionCardStyle}>
+
+          <section style={sectionCardStyle(theme)}>
             <h3 style={subheadingStyle}>Evidence Snapshot</h3>
             <div style={statsGridStyle}>
-              <SummaryStat
-                label="Workout ids"
-                value={context.evidence.workout_ids.length.toLocaleString()}
-              />
-              <SummaryStat
-                label="Set ids"
-                value={context.evidence.set_ids.length.toLocaleString()}
-              />
-              <SummaryStat
+              <StatCell label="Workout ids" tone="info" value={context.evidence.workout_ids.length.toLocaleString()} />
+              <StatCell label="Set ids" tone="analysis" value={context.evidence.set_ids.length.toLocaleString()} />
+              <StatCell
                 label="Rule count"
+                tone="warning"
                 value={context.evidence.calculation_rules.length.toLocaleString()}
               />
             </div>
-            <p style={copyStyle}>Source: {context.evidence.source}</p>
-            <details style={detailsStyle}>
-              <summary style={summaryStyle}>Show calculation rules</summary>
-              <ul style={rulesListStyle}>
+            <p style={copyStyle(theme)}>来源：{context.evidence.source}</p>
+            <details style={{ marginTop: "0.75rem" }}>
+              <summary style={summaryStyle(theme)}>查看 calculation rules</summary>
+              <ul style={rulesListStyle(theme)}>
                 {context.evidence.calculation_rules.map((rule) => (
-                  <li key={rule} style={ruleItemStyle}>
+                  <li key={rule} style={{ marginBottom: "0.4rem" }}>
                     {rule}
                   </li>
                 ))}
@@ -224,21 +201,7 @@ export function RecommendationContextPanel(
           </section>
         </>
       ) : null}
-    </section>
-  );
-}
-
-interface SummaryStatProps {
-  label: string;
-  value: string;
-}
-
-function SummaryStat(props: SummaryStatProps) {
-  return (
-    <div style={statCardStyle}>
-      <div style={statLabelStyle}>{props.label}</div>
-      <div style={statValueStyle}>{props.value}</div>
-    </div>
+    </Card>
   );
 }
 
@@ -251,18 +214,13 @@ function getReadableErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return "Recommendation context is unavailable right now.";
+  return "推荐上下文暂时不可用。";
 }
 
 function createDefaultRange(): RecommendationContextRange {
   const today = new Date();
-  const endDate = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate(),
-  );
+  const endDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const startDate = new Date(endDate);
-
   startDate.setDate(startDate.getDate() - 29);
 
   return {
@@ -280,7 +238,7 @@ function formatDateOnly(date: Date): string {
 }
 
 function formatRangeLabel(startDate: string, endDate: string): string {
-  return `${formatDisplayDate(startDate)} to ${formatDisplayDate(endDate)}`;
+  return `${formatDisplayDate(startDate)} 至 ${formatDisplayDate(endDate)}`;
 }
 
 function formatDisplayDate(value: string): string {
@@ -293,10 +251,9 @@ function formatDisplayDate(value: string): string {
     return value;
   }
 
-  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
+  return new Date(year, month - 1, day).toLocaleDateString("zh-CN", {
     day: "numeric",
     month: "short",
-    year: "numeric",
   });
 }
 
@@ -305,7 +262,7 @@ function formatDisplayDateTime(value: string): string {
 
   return Number.isNaN(date.getTime())
     ? value
-    : date.toLocaleString(undefined, {
+    : date.toLocaleString("zh-CN", {
         day: "numeric",
         hour: "numeric",
         minute: "2-digit",
@@ -321,22 +278,19 @@ function formatMetric(value: number | null, unit: string): string {
   return `${value.toLocaleString()} ${unit}`;
 }
 
-const panelStyle: React.CSSProperties = {
-  background:
-    "linear-gradient(160deg, rgba(26,26,26,0.98) 0%, rgba(18,18,18,0.98) 100%)",
-  border: "1px solid rgba(255,255,255,0.08)",
-  borderRadius: "14px",
-  boxShadow: "0 18px 40px rgba(0,0,0,0.24)",
-  color: "#f0f0f0",
-  padding: "1rem",
-};
-
 const headerStyle: React.CSSProperties = {
   alignItems: "center",
   display: "flex",
-  gap: "1rem",
+  gap: 16,
   justifyContent: "space-between",
-  marginBottom: "1rem",
+  marginBottom: 16,
+};
+
+const titleRowStyle: React.CSSProperties = {
+  alignItems: "center",
+  display: "flex",
+  gap: 8,
+  marginBottom: 4,
 };
 
 const titleStyle: React.CSSProperties = {
@@ -349,123 +303,78 @@ const subheadingStyle: React.CSSProperties = {
   margin: "0 0 0.75rem",
 };
 
-const copyStyle: React.CSSProperties = {
-  color: "#999999",
-  margin: 0,
-};
-
-const subtleStyle: React.CSSProperties = {
-  color: "#555555",
-  margin: "0.35rem 0 0",
-};
-
-const buttonStyle: React.CSSProperties = {
-  backgroundColor: "#c8f035",
-  border: "none",
-  borderRadius: "12px",
-  color: "#0f0f0f",
-  cursor: "pointer",
-  fontWeight: 600,
-  padding: "0.75rem 1rem",
-};
-
-const errorStyle: React.CSSProperties = {
-  color: "#ff9b42",
-  marginBottom: "1rem",
-};
-
 const statsGridStyle: React.CSSProperties = {
   display: "grid",
-  gap: "0.75rem",
-  gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
-  marginBottom: "1rem",
-};
-
-const statCardStyle: React.CSSProperties = {
-  backgroundColor: "#222222",
-  border: "1px solid rgba(255,255,255,0.08)",
-  borderRadius: "14px",
-  padding: "0.85rem",
-};
-
-const statLabelStyle: React.CSSProperties = {
-  color: "#999999",
-  fontSize: "0.85rem",
-  marginBottom: "0.35rem",
-  textTransform: "uppercase",
-};
-
-const statValueStyle: React.CSSProperties = {
-  fontSize: "1.2rem",
-  fontVariantNumeric: "tabular-nums",
-  fontWeight: 700,
+  gap: 12,
+  gridTemplateColumns: "repeat(2, 1fr)",
+  marginBottom: 16,
 };
 
 const contentGridStyle: React.CSSProperties = {
   display: "grid",
-  gap: "1rem",
-  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-};
-
-const sectionCardStyle: React.CSSProperties = {
-  backgroundColor: "rgba(255,255,255,0.03)",
-  borderRadius: "14px",
-  marginTop: "1rem",
-  padding: "0.9rem",
+  gap: 16,
+  gridTemplateColumns: "1fr",
 };
 
 const listStyle: React.CSSProperties = {
   display: "grid",
-  gap: "0.75rem",
+  gap: 12,
   listStyle: "none",
   margin: 0,
   padding: 0,
 };
 
-const listItemStyle: React.CSSProperties = {
-  backgroundColor: "#1a1a1a",
-  border: "1px solid rgba(255,255,255,0.08)",
-  borderRadius: "12px",
-  padding: "0.75rem",
-};
-
 const itemHeaderStyle: React.CSSProperties = {
   alignItems: "center",
   display: "flex",
-  gap: "0.75rem",
+  gap: 12,
   justifyContent: "space-between",
-  marginBottom: "0.35rem",
+  marginBottom: 6,
 };
 
-const itemMetaStyle: React.CSSProperties = {
-  color: "#999999",
-  fontSize: "0.95rem",
-};
+function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return { color: theme.colors.tx2, margin: 0 };
+}
 
-const pillStyle: React.CSSProperties = {
-  backgroundColor: "rgba(200,240,53,0.16)",
-  borderRadius: "999px",
-  color: "#c8f035",
-  fontSize: "0.85rem",
-  padding: "0.25rem 0.6rem",
-  whiteSpace: "nowrap",
-};
+function subtleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return { color: theme.colors.tx3, margin: "0.35rem 0 0" };
+}
 
-const detailsStyle: React.CSSProperties = {
-  marginTop: "0.75rem",
-};
+function errorStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return { color: theme.colors.orange, marginBottom: 16 };
+}
 
-const summaryStyle: React.CSSProperties = {
-  color: "#c8f035",
-  cursor: "pointer",
-};
+function sectionCardStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.surf2,
+    borderRadius: 14,
+    padding: "0.9rem",
+  };
+}
 
-const rulesListStyle: React.CSSProperties = {
-  color: "#999999",
-  margin: "0.75rem 0 0",
-  paddingLeft: "1rem",
-};
+function listItemStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.surf,
+    border: `1px solid ${theme.colors.bdr}`,
+    borderRadius: 12,
+    padding: "0.75rem",
+  };
+}
 
-const ruleItemStyle: React.CSSProperties = {
-  marginBottom: "0.4rem",
-};
+function itemMetaStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return { color: theme.colors.tx2, fontSize: "0.95rem" };
+}
+
+function summaryStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return { color: theme.colors.ac, cursor: "pointer" };
+}
+
+function rulesListStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    color: theme.colors.tx2,
+    margin: "0.75rem 0 0",
+    paddingLeft: "1rem",
+  };
+}

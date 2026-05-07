@@ -1,3 +1,9 @@
+import { Badge } from "../../components/Badge";
+import { Button } from "../../components/Button";
+import { Card } from "../../components/Card";
+import { Pill } from "../../components/Pill";
+import { StatCell } from "../../components/StatCell";
+import { useTheme } from "../../theme/ThemeContext";
 import type { TrainingSummary } from "./training-summary-api";
 
 export interface TrainingSummaryPanelProps {
@@ -9,13 +15,8 @@ export interface TrainingSummaryPanelProps {
   summary: TrainingSummary | null;
 }
 
-/**
- * Renders a readonly summary snapshot for the current training range.
- *
- * @param props - Summary state and refresh action
- * @returns The summary panel
- */
 export function TrainingSummaryPanel(props: TrainingSummaryPanelProps) {
+  const { theme } = useTheme();
   const {
     errorMessage,
     isLoading,
@@ -31,96 +32,78 @@ export function TrainingSummaryPanel(props: TrainingSummaryPanelProps) {
   const topExercises = summary?.by_exercise.slice(0, 5) ?? [];
 
   return (
-    <section style={panelStyle}>
+    <Card>
       <div style={headerStyle}>
         <div>
-          <h2 style={titleStyle}>Training Summary</h2>
-          <p style={copyStyle}>
+          <div style={titleRowStyle}>
+            <h2 style={titleStyle}>近 30 天训练概览</h2>
+            <Badge tone="accent">Training Summary</Badge>
+          </div>
+          <p style={copyStyle(theme)}>
             {summary
-              ? `Range: ${formatRangeLabel(summary.range.start_date, summary.range.end_date)}`
-              : "Range: Last 30 days"}
+              ? `范围：${formatRangeLabel(summary.range.start_date, summary.range.end_date)}`
+              : "范围：最近 30 天"}
           </p>
         </div>
-        <button
-          disabled={isLoading}
-          onClick={() => void onRefresh()}
-          style={buttonStyle}
-          type="button"
-        >
-          {isLoading ? "Refreshing..." : "Refresh summary"}
-        </button>
+
+        <Button disabled={isLoading} onClick={() => void onRefresh()} type="button" variant="secondary">
+          {isLoading ? "刷新中..." : "刷新"}
+        </Button>
       </div>
-      {errorMessage ? <p style={errorStyle}>Error: {errorMessage}</p> : null}
-      {isLoading && !summary ? (
-        <p style={copyStyle}>Loading your training summary...</p>
-      ) : null}
+
+      {errorMessage ? <p style={errorStyle(theme)}>错误：{errorMessage}</p> : null}
+      {isLoading && !summary ? <p style={copyStyle(theme)}>正在加载训练概览...</p> : null}
       {hasEmptyState ? (
-        <p style={copyStyle}>
-          No workouts were recorded in this 30-day window yet. Create a workout to
-          populate your summary.
+        <p style={copyStyle(theme)}>
+          最近 30 天还没有训练记录。先在“训练”页创建一条训练，再回来看概览。
         </p>
       ) : null}
+
       {summary ? (
         <>
           <div style={statsGridStyle}>
-            <SummaryStat
-              label="Workouts"
-              value={summary.totals.workout_count.toLocaleString()}
-            />
-            <SummaryStat
-              label="Sets"
-              value={summary.totals.set_count.toLocaleString()}
-            />
-            <SummaryStat
-              label="Total reps"
-              value={summary.totals.total_reps.toLocaleString()}
-            />
-            <SummaryStat
-              label="Total volume"
-              value={summary.totals.total_volume.toLocaleString()}
-            />
+            <StatCell label="Workouts" tone="accent" value={summary.totals.workout_count.toLocaleString()} />
+            <StatCell label="Sets" tone="info" value={summary.totals.set_count.toLocaleString()} />
+            <StatCell label="Total reps" tone="analysis" value={summary.totals.total_reps.toLocaleString()} />
+            <StatCell label="Total volume" tone="warning" value={summary.totals.total_volume.toLocaleString()} />
           </div>
-          <div style={exerciseSectionStyle}>
-            <h3 style={subheadingStyle}>Top Exercises</h3>
+
+          <div style={exerciseSectionStyle(theme)}>
+            <h3 style={subheadingStyle}>重点动作</h3>
             {topExercises.length === 0 ? (
-              <p style={copyStyle}>No exercise totals are available for this range.</p>
+              <p style={copyStyle(theme)}>当前范围内还没有动作汇总数据。</p>
             ) : (
               <ul style={exerciseListStyle}>
                 {topExercises.map((exercise) => {
                   const isSelected = selectedExerciseId === exercise.exercise_id;
 
                   return (
-                    <li key={exercise.exercise_id} style={exerciseItemStyle}>
+                    <li key={exercise.exercise_id} style={{ listStyle: "none" }}>
                       <button
                         onClick={() =>
-                          onExerciseSelect?.(
-                            exercise.exercise_id,
-                            exercise.exercise_name,
-                          )
+                          onExerciseSelect?.(exercise.exercise_id, exercise.exercise_name)
                         }
                         style={{
-                          ...exerciseButtonStyle,
-                          borderColor: isSelected
-                            ? "rgba(200,240,53,0.4)"
-                            : "rgba(255,255,255,0.08)",
+                          ...exerciseButtonStyle(theme),
+                          borderColor: isSelected ? theme.colors.ac : theme.colors.bdr,
                           boxShadow: isSelected
-                            ? "0 0 0 1px rgba(200,240,53,0.2) inset"
+                            ? `0 0 0 1px ${theme.colors.ac} inset`
                             : "none",
                         }}
                         type="button"
                       >
                         <div style={exerciseHeaderStyle}>
                           <strong>{exercise.exercise_name}</strong>
-                          <span style={pillStyle}>
+                          <Pill tone="accent">
                             {exercise.total_volume.toLocaleString()} volume
-                          </span>
+                          </Pill>
                         </div>
-                        <div style={exerciseMetaStyle}>
-                          {exercise.set_count.toLocaleString()} sets |{" "}
-                          {exercise.total_reps.toLocaleString()} reps
+                        <div style={exerciseMetaStyle(theme)}>
+                          {exercise.set_count.toLocaleString()} 组 |{" "}
+                          {exercise.total_reps.toLocaleString()} 次
                         </div>
-                        <div style={exerciseActionStyle}>
-                          {isSelected ? "Selected for progress" : "View progress"}
+                        <div style={exerciseActionStyle(theme)}>
+                          {isSelected ? "已选中，查看进展中" : "点击查看动作进展"}
                         </div>
                       </button>
                     </li>
@@ -131,26 +114,12 @@ export function TrainingSummaryPanel(props: TrainingSummaryPanelProps) {
           </div>
         </>
       ) : null}
-    </section>
-  );
-}
-
-interface SummaryStatProps {
-  label: string;
-  value: string;
-}
-
-function SummaryStat(props: SummaryStatProps) {
-  return (
-    <div style={statCardStyle}>
-      <div style={statLabelStyle}>{props.label}</div>
-      <div style={statValueStyle}>{props.value}</div>
-    </div>
+    </Card>
   );
 }
 
 function formatRangeLabel(startDate: string, endDate: string): string {
-  return `${formatDisplayDate(startDate)} to ${formatDisplayDate(endDate)}`;
+  return `${formatDisplayDate(startDate)} 至 ${formatDisplayDate(endDate)}`;
 }
 
 function formatDisplayDate(value: string): string {
@@ -163,29 +132,26 @@ function formatDisplayDate(value: string): string {
     return value;
   }
 
-  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
+  return new Date(year, month - 1, day).toLocaleDateString("zh-CN", {
     day: "numeric",
     month: "short",
     year: "numeric",
   });
 }
 
-const panelStyle: React.CSSProperties = {
-  background:
-    "linear-gradient(160deg, rgba(26,26,26,0.98) 0%, rgba(18,18,18,0.98) 100%)",
-  border: "1px solid rgba(255,255,255,0.08)",
-  borderRadius: "14px",
-  boxShadow: "0 18px 40px rgba(0,0,0,0.24)",
-  color: "#f0f0f0",
-  padding: "1rem",
-};
-
 const headerStyle: React.CSSProperties = {
   alignItems: "center",
   display: "flex",
-  gap: "1rem",
+  gap: 16,
   justifyContent: "space-between",
-  marginBottom: "1rem",
+  marginBottom: 16,
+};
+
+const titleRowStyle: React.CSSProperties = {
+  alignItems: "center",
+  display: "flex",
+  gap: 8,
+  marginBottom: 4,
 };
 
 const titleStyle: React.CSSProperties = {
@@ -198,107 +164,71 @@ const subheadingStyle: React.CSSProperties = {
   margin: "0 0 0.75rem",
 };
 
-const copyStyle: React.CSSProperties = {
-  color: "#999999",
-  margin: 0,
-};
-
-const buttonStyle: React.CSSProperties = {
-  backgroundColor: "#c8f035",
-  border: "none",
-  borderRadius: "12px",
-  color: "#0f0f0f",
-  cursor: "pointer",
-  fontWeight: 600,
-  padding: "0.75rem 1rem",
-};
-
-const errorStyle: React.CSSProperties = {
-  color: "#ff9b42",
-  marginBottom: "1rem",
-};
-
 const statsGridStyle: React.CSSProperties = {
   display: "grid",
-  gap: "0.75rem",
-  gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
-  marginBottom: "1rem",
-};
-
-const statCardStyle: React.CSSProperties = {
-  backgroundColor: "#222222",
-  border: "1px solid rgba(255,255,255,0.08)",
-  borderRadius: "14px",
-  padding: "0.85rem",
-};
-
-const statLabelStyle: React.CSSProperties = {
-  color: "#999999",
-  fontSize: "0.85rem",
-  marginBottom: "0.35rem",
-  textTransform: "uppercase",
-};
-
-const statValueStyle: React.CSSProperties = {
-  fontSize: "1.4rem",
-  fontVariantNumeric: "tabular-nums",
-  fontWeight: 700,
-};
-
-const exerciseSectionStyle: React.CSSProperties = {
-  backgroundColor: "rgba(255,255,255,0.03)",
-  borderRadius: "14px",
-  padding: "0.9rem",
+  gap: 12,
+  gridTemplateColumns: "repeat(2, 1fr)",
+  marginBottom: 16,
 };
 
 const exerciseListStyle: React.CSSProperties = {
   display: "grid",
-  gap: "0.75rem",
+  gap: 12,
   listStyle: "none",
   margin: 0,
   padding: 0,
 };
 
-const exerciseItemStyle: React.CSSProperties = {
-  listStyle: "none",
-};
-
-const exerciseButtonStyle: React.CSSProperties = {
-  backgroundColor: "#1a1a1a",
-  border: "1px solid rgba(255,255,255,0.08)",
-  borderRadius: "12px",
-  color: "#f0f0f0",
-  cursor: "pointer",
-  display: "block",
-  padding: "0.75rem",
-  textAlign: "left",
-  width: "100%",
-};
-
 const exerciseHeaderStyle: React.CSSProperties = {
   alignItems: "center",
   display: "flex",
-  gap: "0.75rem",
+  gap: 12,
   justifyContent: "space-between",
-  marginBottom: "0.35rem",
+  marginBottom: 6,
 };
 
-const exerciseMetaStyle: React.CSSProperties = {
-  color: "#999999",
-  fontSize: "0.95rem",
-};
+function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return { color: theme.colors.tx2, margin: 0 };
+}
 
-const exerciseActionStyle: React.CSSProperties = {
-  color: "#c8f035",
-  fontSize: "0.85rem",
-  marginTop: "0.45rem",
-};
+function errorStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return { color: theme.colors.orange, marginBottom: 16 };
+}
 
-const pillStyle: React.CSSProperties = {
-  backgroundColor: "rgba(200,240,53,0.16)",
-  borderRadius: "999px",
-  color: "#c8f035",
-  fontSize: "0.85rem",
-  padding: "0.25rem 0.6rem",
-  whiteSpace: "nowrap",
-};
+function exerciseSectionStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.surf2,
+    borderRadius: theme.radius.card,
+    padding: "0.9rem",
+  };
+}
+
+function exerciseButtonStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.surf,
+    border: `1px solid ${theme.colors.bdr}`,
+    borderRadius: 12,
+    color: theme.colors.tx,
+    cursor: "pointer",
+    display: "block",
+    padding: "0.75rem",
+    textAlign: "left",
+    width: "100%",
+  };
+}
+
+function exerciseMetaStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return { color: theme.colors.tx2, fontSize: "0.95rem" };
+}
+
+function exerciseActionStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return { color: theme.colors.ac, fontSize: "0.85rem", marginTop: "0.45rem" };
+}

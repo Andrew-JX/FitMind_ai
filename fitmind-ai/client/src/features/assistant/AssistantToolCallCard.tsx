@@ -1,76 +1,79 @@
+import { Badge } from "../../components/Badge";
+import { Card } from "../../components/Card";
+import { useTheme } from "../../theme/ThemeContext";
 import type { AssistantActiveToolCall } from "./assistant-types";
 
 export interface AssistantToolCallCardProps {
   toolCall: AssistantActiveToolCall | null;
 }
 
-/**
- * Displays the current assistant tool execution state for demo purposes.
- *
- * @param props - Active tool call information from the chat hook.
- * @returns Minimal tool call status card.
- */
 export function AssistantToolCallCard(props: AssistantToolCallCardProps) {
+  const { theme } = useTheme();
+
   if (!props.toolCall) {
     return (
-      <div style={idleCardStyle}>
-        Waiting for a deterministic tool call. Tool-backed requests will surface the
-        selected backend tool here.
-      </div>
+      <Card padding="12px">
+        <div style={{ color: theme.colors.tx2, fontSize: 12, lineHeight: 1.6 }}>
+          当前还没有活动的确定性工具调用。发起一轮对话后，这里会显示工具名、状态和耗时。
+        </div>
+      </Card>
     );
   }
 
   return (
-    <div style={activeCardStyle}>
-      <div style={toolLabelStyle}>Active deterministic tool</div>
-      <div style={toolNameStyle}>{props.toolCall.toolName}</div>
-      <div style={toolMetaStyle}>
-        Status: {formatToolStatus(props.toolCall.status)}
+    <Card padding="12px">
+      <div style={{ color: theme.colors.tx3, fontSize: 11, marginBottom: 6 }}>
+        当前确定性工具
+      </div>
+      <div style={toolHeaderStyle}>
+        <div style={toolNameStyle(theme)}>{props.toolCall.toolName}</div>
+        <Badge
+          tone={
+            props.toolCall.status === "success"
+              ? "success"
+              : props.toolCall.status === "error"
+                ? "danger"
+                : "info"
+          }
+        >
+          {formatToolStatus(props.toolCall.status)}
+        </Badge>
+      </div>
+      <div style={{ color: theme.colors.tx2, fontSize: 12 }}>
+        状态：{formatToolStatus(props.toolCall.status)}
         {props.toolCall.durationMs !== undefined
-          ? ` | Duration: ${props.toolCall.durationMs} ms`
+          ? ` | 耗时：${props.toolCall.durationMs} ms`
           : ""}
       </div>
-    </div>
+    </Card>
   );
 }
 
-const idleCardStyle: React.CSSProperties = {
-  backgroundColor: "#f8fafc",
-  border: "1px dashed #94a3b8",
-  borderRadius: 12,
-  color: "#475569",
-  padding: 12,
-};
+function formatToolStatus(status: AssistantActiveToolCall["status"]): string {
+  if (status === "running") {
+    return "运行中";
+  }
 
-const activeCardStyle: React.CSSProperties = {
-  backgroundColor: "#eff6ff",
-  border: "1px solid #93c5fd",
-  borderRadius: 12,
-  padding: 12,
-};
+  if (status === "success") {
+    return "成功";
+  }
 
-const toolNameStyle: React.CSSProperties = {
-  color: "#1d4ed8",
-  fontFamily: "monospace",
-  fontSize: 14,
-  fontWeight: 700,
+  return "失败";
+}
+
+function toolNameStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    color: theme.colors.blue,
+    fontFamily: theme.fonts.mono,
+    fontSize: 14,
+    fontWeight: 700,
+  };
+}
+
+const toolHeaderStyle: React.CSSProperties = {
+  alignItems: "center",
+  display: "flex",
+  gap: 8,
+  justifyContent: "space-between",
   marginBottom: 4,
 };
-
-const toolLabelStyle: React.CSSProperties = {
-  color: "#475569",
-  fontSize: 12,
-  fontWeight: 700,
-  letterSpacing: "0.04em",
-  marginBottom: 6,
-  textTransform: "uppercase",
-};
-
-const toolMetaStyle: React.CSSProperties = {
-  color: "#334155",
-  fontSize: 14,
-};
-
-function formatToolStatus(status: AssistantActiveToolCall["status"]): string {
-  return status.replace("_", " ");
-}
