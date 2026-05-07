@@ -1988,3 +1988,37 @@
 - `pnpm lint` 通过。
 - `pnpm --filter @fitmind/client exec vite build` 在当前环境先遇到 `vite` 命令解析问题，随后暴露已知 `vite/esbuild spawn EPERM` 沙箱限制；如需完整构建验证，需要提权环境执行。
 
+## 2026-05-07 Phase 3.8 Batch 2 - Training Tab Product UI Refactor
+
+### Completed work
+- 重构训练 Tab 为中文移动端训练日志页，页面顺序调整为快速统计栏、记录训练主按钮、展开式 WorkoutForm、训练日志列表、动作词典折叠区。
+- 新增快速统计栏，复用现有 training summary 数据展示本月训练、总容量和总组数。
+- 新增 `TrainingView`、`TrainingStatsStrip`、`WorkoutCard`、`SetEditor`，把训练页展示层从 `App.tsx` 拆出，保留原有 create/delete 刷新链路。
+- 将 `WorkoutForm` 重构为卡片式中文训练记录表单，保留 `performed_at`、`notes`、`sets` 数据结构和现有 submit API。
+- 将 set 行产品化为独立小卡片，保留动作搜索、动作选择、热身组、组备注和至少一组的现有逻辑。
+- 将 `WorkoutsPanel` 重构为中文训练日志列表和展开详情卡，保留 list/detail/delete 数据流与 `window.confirm` 删除确认。
+- 将动作词典改为默认收起的中文查询区，保留原有搜索 API，不与 WorkoutForm 内动作选择串线。
+- 保留训练 CRUD、`set_index`、create/delete refresh 逻辑，不修改后端、训练 API、assistant SSE、分析 Tab 和 AI 助手 Tab 核心逻辑。
+
+### Changed files
+- `client/src/App.tsx`
+- `client/src/features/training/WorkoutForm.tsx`
+- `client/src/features/training/SetEditor.tsx`
+- `client/src/features/training/ExercisePicker.tsx`
+- `client/src/features/training/WorkoutsPanel.tsx`
+- `client/src/features/training/TrainingView.tsx`
+- `client/src/features/training/WorkoutCard.tsx`
+- `client/src/features/training/TrainingStatsStrip.tsx`
+- `docs/progress.md`
+
+### Validation commands
+- `pnpm --filter @fitmind/client type-check`
+- `pnpm lint`
+- `pnpm --filter @fitmind/client exec vite build`
+
+### Verification notes
+- `pnpm --filter @fitmind/client type-check` 通过。
+- `pnpm lint` 通过。
+- `pnpm --filter @fitmind/client exec vite build` 在当前环境先遇到 `vite` 命令解析问题并复现已知 `spawn EPERM` 沙箱限制。
+- 构建最终通过提权后的 package-local `vite.cmd build` 在 `client` 目录下完成验证。
+

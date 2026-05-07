@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { Button } from "../../components/Button";
 import { Input } from "../../components/Input";
+import { Pill } from "../../components/Pill";
 import { useTheme } from "../../theme/ThemeContext";
 import {
   type DictionaryExercise,
@@ -40,25 +41,20 @@ export function ExercisePicker(props: ExercisePickerProps) {
 
   return (
     <section>
-      <h2 style={{ margin: 0 }}>动作词典</h2>
-      <p style={copyStyle(theme)}>
-        搜索动作基础词典，用于辅助录入训练动作名称和肌群信息。
-      </p>
-
       <form onSubmit={handleSubmit} style={formStyle}>
         <label style={labelStyle(theme)}>
-          关键词
+          搜索动作
           <Input
             disabled={isLoadingExercises}
             onChange={(event) => setKeyword(event.target.value)}
-            placeholder="bench, squat, row..."
+            placeholder="搜索动作，例如 Bench Press / Squat"
             type="text"
             value={keyword}
           />
         </label>
 
         <label style={labelStyle(theme)}>
-          肌群
+          肌群筛选
           <select
             disabled={isLoadingExercises || isLoadingMuscleGroups}
             onChange={(event) => setSelectedMuscle(event.target.value)}
@@ -68,48 +64,51 @@ export function ExercisePicker(props: ExercisePickerProps) {
             <option value="">全部肌群</option>
             {muscleGroups.map((muscleGroup) => (
               <option key={muscleGroup.id} value={muscleGroup.code}>
-                {muscleGroup.name_zh?.trim() || muscleGroup.name_en} ({muscleGroup.code})
+                {muscleGroup.name_zh?.trim() || muscleGroup.name_en}
               </option>
             ))}
           </select>
         </label>
 
-        <Button
-          disabled={isLoadingExercises || isLoadingMuscleGroups}
-          type="submit"
-        >
-          {isLoadingExercises ? "搜索中..." : "搜索动作"}
+        <Button disabled={isLoadingExercises || isLoadingMuscleGroups} type="submit">
+          {isLoadingExercises ? "搜索中..." : "搜索"}
         </Button>
       </form>
 
-      {searchError ? <p style={errorStyle(theme)}>错误：{searchError}</p> : null}
+      {searchError ? <p style={errorStyle(theme)}>{searchError}</p> : null}
       {isLoadingMuscleGroups ? <p style={copyStyle(theme)}>正在加载肌群词典...</p> : null}
       {!isLoadingExercises && exercises.length === 0 ? (
-        <p style={copyStyle(theme)}>还没有动作结果，先执行一次搜索。</p>
+        <p style={copyStyle(theme)}>输入关键词后即可查询系统内置动作。</p>
       ) : null}
 
       {exercises.length > 0 ? (
         <ul style={resultListStyle}>
-          {exercises.map((exercise) => (
-            <li key={exercise.id} style={resultCardStyle(theme)}>
-              <strong>
-                {exercise.name_zh?.trim()
-                  ? `${exercise.name_zh} / ${exercise.name_en}`
-                  : exercise.name_en}
-              </strong>
-              <div style={metaStyle(theme)}>Code: {exercise.code}</div>
-              <div style={metaStyle(theme)}>
-                器械：{exercise.equipment ?? "未知"}
-              </div>
-              <div style={metaStyle(theme)}>
-                主要肌群：
-                {exercise.muscles
-                  .filter((muscle) => muscle.is_primary)
-                  .map((muscle) => muscle.code)
-                  .join(", ") || "未标注"}
-              </div>
-            </li>
-          ))}
+          {exercises.map((exercise) => {
+            const primaryMuscles = exercise.muscles
+              .filter((muscle) => muscle.is_primary)
+              .slice(0, 3)
+              .map((muscle) => muscle.code);
+
+            return (
+              <li key={exercise.id} style={resultCardStyle(theme)}>
+                <div style={titleRowStyle}>
+                  <strong style={{ fontSize: 13 }}>{exercise.name_en}</strong>
+                  {exercise.name_zh?.trim() ? <Pill tone="info">{exercise.name_zh}</Pill> : null}
+                </div>
+                <div style={pillRowStyle}>
+                  {exercise.movement_pattern ? (
+                    <Pill tone="analysis">{exercise.movement_pattern}</Pill>
+                  ) : null}
+                  {exercise.equipment ? <Pill tone="neutral">{exercise.equipment}</Pill> : null}
+                  {primaryMuscles.map((muscleCode) => (
+                    <Pill key={muscleCode} tone="accent">
+                      {muscleCode}
+                    </Pill>
+                  ))}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       ) : null}
     </section>
@@ -119,7 +118,6 @@ export function ExercisePicker(props: ExercisePickerProps) {
 const formStyle: React.CSSProperties = {
   display: "grid",
   gap: 12,
-  marginTop: 16,
 };
 
 const resultListStyle: React.CSSProperties = {
@@ -130,12 +128,27 @@ const resultListStyle: React.CSSProperties = {
   padding: 0,
 };
 
+const titleRowStyle: React.CSSProperties = {
+  alignItems: "center",
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 8,
+  justifyContent: "space-between",
+};
+
+const pillRowStyle: React.CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 6,
+  marginTop: 8,
+};
+
 function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
   return {
     color: theme.colors.tx2,
-    fontSize: 13,
+    fontSize: 12,
     lineHeight: 1.6,
-    margin: "8px 0 0",
+    margin: "12px 0 0",
   };
 }
 
@@ -173,14 +186,5 @@ function resultCardStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSS
     border: `1px solid ${theme.colors.bdr}`,
     borderRadius: 12,
     padding: 12,
-  };
-}
-
-function metaStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return {
-    color: theme.colors.tx2,
-    fontSize: 12,
-    lineHeight: 1.6,
-    marginTop: 4,
   };
 }

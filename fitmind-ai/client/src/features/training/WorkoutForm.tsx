@@ -1,16 +1,17 @@
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
-import { Input } from "../../components/Input";
 import { useTheme } from "../../theme/ThemeContext";
+import { SetEditor } from "./SetEditor";
 import { useWorkoutForm } from "./use-workout-form";
 
 export interface WorkoutFormProps {
+  onCancel?: (() => void) | undefined;
   onCreated?: (() => Promise<void>) | undefined;
   token: string | null;
 }
 
 export function WorkoutForm(props: WorkoutFormProps) {
-  const { onCreated, token } = props;
+  const { onCancel, onCreated, token } = props;
   const { theme } = useTheme();
   const form = useWorkoutForm(token);
 
@@ -25,34 +26,41 @@ export function WorkoutForm(props: WorkoutFormProps) {
 
   return (
     <Card>
-      <h2 style={{ margin: 0 }}>创建训练记录</h2>
-      <p style={copyStyle(theme)}>
-        填写训练时间、备注和动作组，提交后会写入真实 workout 日志。
-      </p>
+      <div style={headerStyle}>
+        <div>
+          <h2 style={titleStyle}>记录训练</h2>
+          <p style={copyStyle(theme)}>添加本次训练动作、重量、次数与 RPE</p>
+        </div>
+      </div>
 
       <form onSubmit={handleSubmit} style={formStyle}>
-        <label style={labelStyle(theme)}>
-          训练时间
-          <Input
-            onChange={(event) => form.setPerformedAt(event.target.value)}
-            required
-            type="datetime-local"
-            value={form.performedAt}
-          />
-        </label>
+        <div style={topGridStyle}>
+          <label style={labelStyle(theme)}>
+            训练时间
+            <input
+              onChange={(event) => form.setPerformedAt(event.target.value)}
+              required
+              style={inputLikeStyle(theme)}
+              type="datetime-local"
+              value={form.performedAt}
+            />
+          </label>
+
+          <label style={labelStyle(theme)}>
+            时长（分钟）
+            <input
+              min="0"
+              onChange={(event) => form.setDurationMinutes(event.target.value)}
+              style={inputLikeStyle(theme)}
+              type="number"
+              value={form.workoutDurationMinutes}
+            />
+          </label>
+        </div>
+
         {form.formErrors.performedAt ? (
           <p style={errorStyle(theme)}>{form.formErrors.performedAt}</p>
         ) : null}
-
-        <label style={labelStyle(theme)}>
-          时长（分钟）
-          <Input
-            min="0"
-            onChange={(event) => form.setDurationMinutes(event.target.value)}
-            type="number"
-            value={form.workoutDurationMinutes}
-          />
-        </label>
         {form.formErrors.workoutDurationMinutes ? (
           <p style={errorStyle(theme)}>{form.formErrors.workoutDurationMinutes}</p>
         ) : null}
@@ -61,13 +69,17 @@ export function WorkoutForm(props: WorkoutFormProps) {
           备注
           <textarea
             onChange={(event) => form.setNotes(event.target.value)}
+            placeholder="记录训练状态、当天感受或动作备注"
             style={textareaStyle(theme)}
             value={form.workoutNotes}
           />
         </label>
 
-        <div style={sectionHeaderStyle}>
-          <h3 style={{ margin: 0 }}>动作组</h3>
+        <div style={setsHeaderStyle}>
+          <div>
+            <strong style={{ fontSize: 14 }}>训练组</strong>
+            <p style={subCopyStyle(theme)}>每一组都会按动作独立计算提交顺序</p>
+          </div>
           <Button onClick={form.addSetDraft} type="button" variant="secondary">
             添加一组
           </Button>
@@ -75,169 +87,102 @@ export function WorkoutForm(props: WorkoutFormProps) {
 
         <div style={setListStyle}>
           {form.setDrafts.map((setDraft, index) => (
-            <section
+            <SetEditor
+              errors={form.formErrors.setDrafts[index]}
+              index={index}
+              isOnlySet={form.setDrafts.length === 1}
               key={`${index}-${setDraft.exerciseId || "draft"}`}
-              style={setCardStyle(theme)}
-            >
-              <div style={setHeaderStyle}>
-                <strong>第 {index + 1} 组</strong>
-                <button
-                  disabled={form.setDrafts.length === 1}
-                  onClick={() => form.removeSetDraft(index)}
-                  style={textButtonStyle(theme)}
-                  type="button"
-                >
-                  删除
-                </button>
-              </div>
-
-              <label style={labelStyle(theme)}>
-                动作搜索
-                <Input
-                  onChange={(event) =>
-                    form.setSetDraftField(index, "exerciseQuery", event.target.value)
-                  }
-                  placeholder="bench, squat, row..."
-                  type="text"
-                  value={setDraft.exerciseQuery}
-                />
-              </label>
-
-              <div style={inlineActionRowStyle}>
-                <Button
-                  onClick={() => void form.searchExercisesForSet(index)}
-                  type="button"
-                  variant="secondary"
-                >
-                  {setDraft.isSearchingExercises ? "搜索中..." : "搜索动作"}
-                </Button>
-                <span style={hintTextStyle(theme)}>
-                  当前选择：{setDraft.exerciseName || "未选择"}
-                </span>
-              </div>
-
-              {form.formErrors.setDrafts[index]?.exerciseId ? (
-                <p style={errorStyle(theme)}>{form.formErrors.setDrafts[index]?.exerciseId}</p>
-              ) : null}
-
-              {setDraft.exerciseResults.length > 0 ? (
-                <ul style={resultListStyle}>
-                  {setDraft.exerciseResults.map((exercise) => (
-                    <li key={exercise.id} style={{ listStyle: "none" }}>
-                      <button
-                        onClick={() => form.selectExerciseForSet(index, exercise)}
-                        style={resultButtonStyle(theme)}
-                        type="button"
-                      >
-                        {exercise.name_zh?.trim()
-                          ? `${exercise.name_zh} / ${exercise.name_en}`
-                          : exercise.name_en}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-
-              <div style={setMetricGridStyle}>
-                <label style={labelStyle(theme)}>
-                  次数
-                  <Input
-                    min="0"
-                    onChange={(event) => form.setSetDraftField(index, "reps", event.target.value)}
-                    required
-                    type="number"
-                    value={setDraft.reps}
-                  />
-                </label>
-
-                <label style={labelStyle(theme)}>
-                  重量（kg）
-                  <Input
-                    min="0"
-                    onChange={(event) =>
-                      form.setSetDraftField(index, "weightKg", event.target.value)
-                    }
-                    required
-                    step="0.01"
-                    type="number"
-                    value={setDraft.weightKg}
-                  />
-                </label>
-
-                <label style={labelStyle(theme)}>
-                  RPE
-                  <Input
-                    max="10"
-                    min="1"
-                    onChange={(event) => form.setSetDraftField(index, "rpe", event.target.value)}
-                    step="0.1"
-                    type="number"
-                    value={setDraft.rpe}
-                  />
-                </label>
-              </div>
-
-              {form.formErrors.setDrafts[index]?.reps ? (
-                <p style={errorStyle(theme)}>{form.formErrors.setDrafts[index]?.reps}</p>
-              ) : null}
-              {form.formErrors.setDrafts[index]?.weightKg ? (
-                <p style={errorStyle(theme)}>{form.formErrors.setDrafts[index]?.weightKg}</p>
-              ) : null}
-              {form.formErrors.setDrafts[index]?.rpe ? (
-                <p style={errorStyle(theme)}>{form.formErrors.setDrafts[index]?.rpe}</p>
-              ) : null}
-
-              <label style={labelStyle(theme)}>
-                组备注
-                <Input
-                  onChange={(event) => form.setSetDraftField(index, "notes", event.target.value)}
-                  type="text"
-                  value={setDraft.notes}
-                />
-              </label>
-
-              <label style={checkboxRowStyle(theme)}>
-                <input
-                  checked={setDraft.isWarmup}
-                  onChange={(event) =>
-                    form.setSetDraftField(index, "isWarmup", event.target.checked)
-                  }
-                  type="checkbox"
-                />
-                热身组
-              </label>
-            </section>
+              onFieldChange={(field, value) => form.setSetDraftField(index, field, value)}
+              onRemove={() => form.removeSetDraft(index)}
+              onSearch={() => form.searchExercisesForSet(index)}
+              onSelectExercise={(exercise) => form.selectExerciseForSet(index, exercise)}
+              setDraft={setDraft}
+            />
           ))}
         </div>
 
-        <Button disabled={form.isSubmitting} type="submit">
-          {form.isSubmitting ? "保存中..." : "创建训练记录"}
-        </Button>
+        <div style={actionRowStyle}>
+          {onCancel ? (
+            <Button onClick={onCancel} type="button" variant="secondary">
+              取消
+            </Button>
+          ) : null}
+          <Button
+            disabled={form.isSubmitting}
+            style={{ flex: onCancel ? 2 : 1 }}
+            type="submit"
+          >
+            {form.isSubmitting ? "创建中..." : "创建训练"}
+          </Button>
+        </div>
       </form>
 
-      {form.errorMessage ? <p style={errorStyle(theme)}>错误：{form.errorMessage}</p> : null}
+      {form.errorMessage ? <p style={errorStyle(theme)}>{translateMessage(form.errorMessage)}</p> : null}
       {form.successMessage ? (
-        <p style={successStyle(theme)}>{form.successMessage}</p>
-      ) : null}
-      {form.createdWorkout ? (
-        <section style={{ marginTop: 12 }}>
-          <p style={copyStyle(theme)}>已创建 workout：{form.createdWorkout.id}</p>
-          <p style={copyStyle(theme)}>已保存动作组：{form.createdWorkout.sets.length}</p>
-        </section>
+        <p style={successStyle(theme)}>{translateMessage(form.successMessage)}</p>
       ) : null}
     </Card>
   );
 }
 
+function translateMessage(message: string): string {
+  if (message === "You must be signed in to create a workout.") {
+    return "请先登录后再创建训练。";
+  }
+
+  if (message === "Please fix the highlighted workout fields and try again.") {
+    return "请先修正表单中的错误信息，再重新提交。";
+  }
+
+  if (message === "Workout creation is unavailable right now.") {
+    return "当前暂时无法创建训练，请稍后再试。";
+  }
+
+  if (message.startsWith("Saved workout with ")) {
+    return "训练创建成功，训练日志已刷新。";
+  }
+
+  return message
+    .replaceAll("Workout date and time are required.", "请填写训练时间。")
+    .replaceAll("Workout date and time must be valid.", "训练时间格式无效。")
+    .replaceAll("Workout duration must be a valid integer.", "训练时长必须是整数。")
+    .replaceAll("Workout duration must be at least 0.", "训练时长不能小于 0。")
+    .replaceAll("must be a valid integer.", "必须是有效整数。")
+    .replaceAll("must be a valid number.", "必须是有效数字。")
+    .replaceAll("must be at least 0.", "不能小于 0。")
+    .replaceAll("must be at least 1.", "不能小于 1。")
+    .replaceAll("must be no more than 10.", "不能大于 10。")
+    .replaceAll("Set ", "第 ")
+    .replaceAll(" reps", " 组次数")
+    .replaceAll(" weight", " 组重量")
+    .replaceAll(" RPE", " 组 RPE")
+    .replaceAll(" needs an exercise selection.", " 组需要先选择动作。");
+}
+
+const headerStyle: React.CSSProperties = {
+  marginBottom: 16,
+};
+
+const titleStyle: React.CSSProperties = {
+  fontSize: 16,
+  margin: 0,
+};
+
 const formStyle: React.CSSProperties = {
   display: "grid",
   gap: 14,
-  marginTop: 16,
 };
 
-const sectionHeaderStyle: React.CSSProperties = {
+const topGridStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 10,
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+};
+
+const setsHeaderStyle: React.CSSProperties = {
   alignItems: "center",
   display: "flex",
+  gap: 12,
   justifyContent: "space-between",
 };
 
@@ -246,31 +191,9 @@ const setListStyle: React.CSSProperties = {
   gap: 12,
 };
 
-const setHeaderStyle: React.CSSProperties = {
-  alignItems: "center",
+const actionRowStyle: React.CSSProperties = {
   display: "flex",
-  justifyContent: "space-between",
-};
-
-const setMetricGridStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 10,
-  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-};
-
-const inlineActionRowStyle: React.CSSProperties = {
-  alignItems: "center",
-  display: "flex",
-  flexWrap: "wrap",
   gap: 8,
-};
-
-const resultListStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 8,
-  listStyle: "none",
-  margin: 0,
-  padding: 0,
 };
 
 function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
@@ -278,7 +201,16 @@ function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProper
     color: theme.colors.tx2,
     fontSize: 13,
     lineHeight: 1.6,
-    margin: "8px 0 0",
+    margin: "6px 0 0",
+  };
+}
+
+function subCopyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    color: theme.colors.tx3,
+    fontSize: 11,
+    lineHeight: 1.5,
+    margin: "4px 0 0",
   };
 }
 
@@ -291,68 +223,27 @@ function labelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPrope
   };
 }
 
+function inputLikeStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.surf2,
+    border: `1px solid ${theme.colors.bdr}`,
+    borderRadius: theme.radius.control,
+    color: theme.colors.tx,
+    padding: "10px 12px",
+    width: "100%",
+  };
+}
+
 function textareaStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf2,
     border: `1px solid ${theme.colors.bdr}`,
-    borderRadius: 12,
+    borderRadius: theme.radius.control,
     color: theme.colors.tx,
     font: "inherit",
     minHeight: 88,
     padding: 12,
     resize: "vertical",
-  };
-}
-
-function setCardStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return {
-    backgroundColor: theme.colors.surf2,
-    border: `1px solid ${theme.colors.bdr}`,
-    borderRadius: 14,
-    display: "grid",
-    gap: 12,
-    padding: 12,
-  };
-}
-
-function hintTextStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return {
-    color: theme.colors.tx3,
-    fontSize: 12,
-  };
-}
-
-function textButtonStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return {
-    background: "transparent",
-    border: "none",
-    color: theme.colors.orange,
-    cursor: "pointer",
-    fontSize: 12,
-    padding: 0,
-  };
-}
-
-function resultButtonStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return {
-    backgroundColor: theme.colors.surf,
-    border: `1px solid ${theme.colors.bdr}`,
-    borderRadius: 12,
-    color: theme.colors.tx,
-    cursor: "pointer",
-    padding: "10px 12px",
-    textAlign: "left",
-    width: "100%",
-  };
-}
-
-function checkboxRowStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return {
-    alignItems: "center",
-    color: theme.colors.tx2,
-    display: "flex",
-    gap: 8,
-    fontSize: 12,
   };
 }
 
@@ -368,6 +259,6 @@ function successStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPro
   return {
     color: theme.colors.green,
     fontSize: 12,
-    marginBottom: 0,
+    margin: 0,
   };
 }

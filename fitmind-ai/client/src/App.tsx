@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { AppShell, type AppTabKey } from "./components/AppShell";
-import { Badge } from "./components/Badge";
 import { Card } from "./components/Card";
-import { StatCell } from "./components/StatCell";
 import { AssistantWorkspace } from "./features/assistant/AssistantWorkspace";
 import { AuthScreen } from "./features/auth/AuthScreen";
 import {
@@ -14,12 +12,10 @@ import {
   setToken,
   useAuth,
 } from "./features/auth/use-auth";
-import { ExercisePicker } from "./features/training/ExercisePicker";
 import { ExerciseProgressPanel } from "./features/training/ExerciseProgressPanel";
 import { RecommendationContextPanel } from "./features/training/RecommendationContextPanel";
 import { TrainingSummaryPanel } from "./features/training/TrainingSummaryPanel";
-import { WorkoutForm } from "./features/training/WorkoutForm";
-import { WorkoutsPanel } from "./features/training/WorkoutsPanel";
+import { TrainingView } from "./features/training/TrainingView";
 import { useExerciseSearch } from "./features/training/use-exercise-search";
 import { useTrainingSummary } from "./features/training/use-training-summary";
 import { useWorkouts } from "./features/training/use-workouts";
@@ -48,7 +44,6 @@ export function App() {
   const workouts = useWorkouts(auth.token);
   const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState<AppTabKey>("training");
-  const [isDictionaryOpen, setIsDictionaryOpen] = useState(false);
   const [selectedProgressExerciseId, setSelectedProgressExerciseId] = useState<
     string | null
   >(null);
@@ -109,94 +104,36 @@ export function App() {
 
       {activeTab === "training" ? (
         <section style={tabSectionStyle}>
-          <Card>
-            <div style={sectionHeadingRowStyle}>
-              <div>
-                <h2 style={{ margin: 0 }}>训练记录</h2>
-                <p style={sectionCopyStyle(theme)}>
-                  记录真实训练日志，作为后续确定性分析和 AI 助手回答的事实基础。
-                </p>
-              </div>
-              <Badge tone="accent">Training</Badge>
-            </div>
-            <div style={statsGridStyle}>
-              <StatCell
-                label="近 30 天训练次数"
-                tone="accent"
-                value={`${trainingSummary.summary?.totals.workout_count ?? 0}`}
-              />
-              <StatCell
-                label="近 30 天总组数"
-                tone="info"
-                value={`${trainingSummary.summary?.totals.set_count ?? 0}`}
-              />
-              <StatCell
-                label="近 30 天总容量"
-                tone="success"
-                unit="kg"
-                value={`${
-                  trainingSummary.summary?.totals.total_volume.toLocaleString() ?? "0"
-                }`}
-              />
-            </div>
-          </Card>
-
-          <WorkoutForm
-            onCreated={async () => {
-              await Promise.all([
-                workouts.refreshWorkouts(),
-                trainingSummary.refresh(),
-              ]);
-              setRecommendationContextRefreshSignal((currentValue) => currentValue + 1);
-
-              if (selectedProgressExerciseId !== null) {
-                setProgressRefreshSignal((currentValue) => currentValue + 1);
-              }
+          <TrainingView
+            exercisePickerProps={{
+              exercises: exerciseSearch.exercises,
+              isLoadingExercises: exerciseSearch.isLoadingExercises,
+              isLoadingMuscleGroups: exerciseSearch.isLoadingMuscleGroups,
+              muscleGroups: exerciseSearch.muscleGroups,
+              onSearch: exerciseSearch.searchExercises,
+              searchError: exerciseSearch.searchError,
             }}
-            token={auth.token}
+            summary={trainingSummary.summary}
+            summaryLoading={trainingSummary.isLoading}
+            workoutsProps={{
+              deleteError: workouts.deleteError,
+              deletingWorkoutId: workouts.deletingWorkoutId,
+              detailError: workouts.detailError,
+              isLoadingDetail: workouts.isLoadingDetail,
+              isLoadingList: workouts.isLoadingList,
+              listError: workouts.listError,
+              onDeleteWorkout: handleDeleteWorkout,
+              onRefresh: workouts.refreshWorkouts,
+              onSelectWorkout: workouts.selectWorkout,
+              selectedWorkout: workouts.selectedWorkout,
+              selectedWorkoutId: workouts.selectedWorkoutId,
+              workouts: workouts.workouts,
+            }}
+            workoutFormProps={{
+              onCreated: handleWorkoutCreated,
+              token: auth.token,
+            }}
           />
-
-          <WorkoutsPanel
-            deleteError={workouts.deleteError}
-            deletingWorkoutId={workouts.deletingWorkoutId}
-            detailError={workouts.detailError}
-            isLoadingDetail={workouts.isLoadingDetail}
-            isLoadingList={workouts.isLoadingList}
-            listError={workouts.listError}
-            onDeleteWorkout={handleDeleteWorkout}
-            onRefresh={workouts.refreshWorkouts}
-            onSelectWorkout={workouts.selectWorkout}
-            selectedWorkout={workouts.selectedWorkout}
-            selectedWorkoutId={workouts.selectedWorkoutId}
-            workouts={workouts.workouts}
-          />
-
-          <Card>
-            <button
-              onClick={() => setIsDictionaryOpen((currentValue) => !currentValue)}
-              style={collapseButtonStyle(theme)}
-              type="button"
-            >
-              <span>动作词典</span>
-              <span>{isDictionaryOpen ? "收起" : "展开"}</span>
-            </button>
-            {isDictionaryOpen ? (
-              <div style={{ marginTop: 16 }}>
-                <ExercisePicker
-                  exercises={exerciseSearch.exercises}
-                  isLoadingExercises={exerciseSearch.isLoadingExercises}
-                  isLoadingMuscleGroups={exerciseSearch.isLoadingMuscleGroups}
-                  muscleGroups={exerciseSearch.muscleGroups}
-                  onSearch={exerciseSearch.searchExercises}
-                  searchError={exerciseSearch.searchError}
-                />
-              </div>
-            ) : (
-              <p style={collapsedCopyStyle(theme)}>
-                用于查询动作中英文名、肌群和基础词典信息。默认收起，避免打断训练记录主流程。
-              </p>
-            )}
-          </Card>
         </section>
       ) : null}
 
@@ -245,6 +182,15 @@ export function App() {
     </AppShell>
   );
 
+  async function handleWorkoutCreated(): Promise<void> {
+    await Promise.all([workouts.refreshWorkouts(), trainingSummary.refresh()]);
+    setRecommendationContextRefreshSignal((currentValue) => currentValue + 1);
+
+    if (selectedProgressExerciseId !== null) {
+      setProgressRefreshSignal((currentValue) => currentValue + 1);
+    }
+  }
+
   async function handleDeleteWorkout(workoutId: string): Promise<boolean> {
     const wasDeleted = await workouts.deleteWorkoutById(workoutId);
 
@@ -272,60 +218,6 @@ const tabSectionStyle: React.CSSProperties = {
   gap: 16,
   paddingBottom: 16,
 };
-
-const sectionHeadingRowStyle: React.CSSProperties = {
-  alignItems: "flex-start",
-  display: "flex",
-  gap: 12,
-  justifyContent: "space-between",
-  marginBottom: 16,
-};
-
-const statsGridStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 8,
-  gridTemplateColumns: "repeat(3, 1fr)",
-};
-
-function sectionCopyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return {
-    color: theme.colors.tx2,
-    fontSize: 13,
-    lineHeight: 1.6,
-    marginBottom: 0,
-    marginTop: 6,
-  };
-}
-
-function collapseButtonStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-): React.CSSProperties {
-  return {
-    alignItems: "center",
-    background: "transparent",
-    border: "none",
-    color: theme.colors.tx,
-    cursor: "pointer",
-    display: "flex",
-    fontSize: 15,
-    fontWeight: 700,
-    justifyContent: "space-between",
-    padding: 0,
-    width: "100%",
-  };
-}
-
-function collapsedCopyStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-): React.CSSProperties {
-  return {
-    color: theme.colors.tx2,
-    fontSize: 12,
-    lineHeight: 1.6,
-    marginBottom: 0,
-    marginTop: 12,
-  };
-}
 
 function devCopyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
   return {

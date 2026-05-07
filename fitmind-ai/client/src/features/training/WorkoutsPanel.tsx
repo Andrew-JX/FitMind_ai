@@ -2,12 +2,11 @@ import { useEffect, useState } from "react";
 
 import type { WorkoutDetailDto, WorkoutSummaryDto } from "../../../../shared/src/training";
 
-import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
-import { Pill } from "../../components/Pill";
 import { HttpClientError } from "../../services/http-client";
 import { useTheme } from "../../theme/ThemeContext";
 import { searchExercises } from "./dictionary-api";
+import { WorkoutCard } from "./WorkoutCard";
 
 export interface WorkoutsPanelProps {
   deleteError: string | null;
@@ -25,20 +24,6 @@ export interface WorkoutsPanelProps {
 }
 
 export function WorkoutsPanel(props: WorkoutsPanelProps) {
-  const {
-    deleteError,
-    deletingWorkoutId,
-    detailError,
-    isLoadingDetail,
-    isLoadingList,
-    listError,
-    onDeleteWorkout,
-    onRefresh,
-    onSelectWorkout,
-    selectedWorkout,
-    selectedWorkoutId,
-    workouts,
-  } = props;
   const { theme } = useTheme();
   const exerciseNames = useExerciseNames();
 
@@ -46,106 +31,55 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
     <Card>
       <div style={headerStyle}>
         <div>
-          <h2 style={{ margin: 0 }}>最近训练列表</h2>
-          <p style={copyStyle(theme)}>
-            查看已保存 session，展开详情，并在需要时删除训练记录。
-          </p>
+          <h2 style={titleStyle}>训练日志</h2>
+          <p style={copyStyle(theme)}>共 {props.workouts.length} 条</p>
         </div>
-        <Button disabled={isLoadingList} onClick={() => void onRefresh()} type="button" variant="secondary">
-          {isLoadingList ? "刷新中..." : "刷新"}
-        </Button>
+        <button
+          onClick={() => void props.onRefresh()}
+          style={refreshButtonStyle(theme)}
+          type="button"
+        >
+          刷新
+        </button>
       </div>
 
-      {listError ? <p style={errorStyle(theme)}>错误：{listError}</p> : null}
-      {deleteError ? <p style={errorStyle(theme)}>错误：{deleteError}</p> : null}
-      {isLoadingList ? <p style={copyStyle(theme)}>正在加载训练列表...</p> : null}
-      {!isLoadingList && workouts.length === 0 ? (
-        <p style={copyStyle(theme)}>还没有训练记录。先在上方创建第一条训练。</p>
+      {props.listError ? <p style={errorStyle(theme)}>{translateError(props.listError)}</p> : null}
+      {props.deleteError ? (
+        <p style={errorStyle(theme)}>{translateError(props.deleteError)}</p>
+      ) : null}
+      {props.detailError ? (
+        <p style={errorStyle(theme)}>{translateError(props.detailError)}</p>
       ) : null}
 
-      {workouts.length > 0 ? (
-        <ul style={workoutListStyle}>
-          {workouts.map((workout) => {
-            const isDeleting = deletingWorkoutId === workout.id;
-            const isSelected = selectedWorkoutId === workout.id;
+      {props.isLoadingList ? <p style={copyStyle(theme)}>正在加载训练日志...</p> : null}
+      {!props.isLoadingList && props.workouts.length === 0 ? (
+        <div style={emptyStateStyle(theme)}>
+          <strong style={{ fontSize: 14 }}>还没有训练记录</strong>
+          <p style={emptyCopyStyle(theme)}>点击上方「记录训练」添加第一条训练日志</p>
+        </div>
+      ) : null}
+
+      {props.workouts.length > 0 ? (
+        <div style={listStyle}>
+          {props.workouts.map((workout) => {
+            const isExpanded = props.selectedWorkoutId === workout.id;
+            const detail = isExpanded ? props.selectedWorkout : null;
 
             return (
-              <li key={workout.id} style={workoutItemStyle(theme, isSelected)}>
-                <div style={workoutItemTopStyle}>
-                  <div>
-                    <strong>{formatDateTime(workout.performed_at)}</strong>
-                    <div style={metaStyle(theme)}>
-                      时长：{formatDuration(workout.duration_minutes)}
-                    </div>
-                  </div>
-                  <Pill tone={isSelected ? "accent" : "neutral"}>
-                    {workout.sets_count} 组
-                  </Pill>
-                </div>
-
-                <div style={metaStyle(theme)}>
-                  肌群：{workout.muscle_groups.join("、") || "未知"}
-                </div>
-                <div style={metaStyle(theme)}>
-                  备注：{workout.notes?.trim() || "无备注"}
-                </div>
-
-                <div style={actionRowStyle}>
-                  <Button onClick={() => void onSelectWorkout(workout.id)} type="button" variant="secondary">
-                    {isSelected ? "查看中" : "查看详情"}
-                  </Button>
-                  <Button
-                    disabled={isDeleting}
-                    onClick={() => void handleDeleteWorkout(workout.id)}
-                    type="button"
-                    variant="secondary"
-                  >
-                    {isDeleting ? "删除中..." : "删除"}
-                  </Button>
-                </div>
-              </li>
+              <WorkoutCard
+                detail={detail}
+                exerciseNames={exerciseNames}
+                isDeleting={props.deletingWorkoutId === workout.id}
+                isExpanded={isExpanded}
+                isLoadingDetail={props.isLoadingDetail}
+                key={workout.id}
+                onDelete={() => handleDeleteWorkout(workout.id)}
+                onToggle={() => props.onSelectWorkout(workout.id)}
+                workout={workout}
+              />
             );
           })}
-        </ul>
-      ) : null}
-
-      {detailError ? <p style={errorStyle(theme)}>错误：{detailError}</p> : null}
-      {isLoadingDetail ? <p style={copyStyle(theme)}>正在加载训练详情...</p> : null}
-      {!isLoadingDetail && !selectedWorkout && workouts.length > 0 ? (
-        <p style={copyStyle(theme)}>选择一条训练记录查看保存的动作组和备注。</p>
-      ) : null}
-
-      {selectedWorkout ? (
-        <section style={detailSectionStyle(theme)}>
-          <h3 style={{ margin: 0 }}>训练详情</h3>
-          <p style={copyStyle(theme)}>训练时间：{formatDateTime(selectedWorkout.performed_at)}</p>
-          <p style={copyStyle(theme)}>时长：{formatDuration(selectedWorkout.duration_minutes)}</p>
-          <p style={copyStyle(theme)}>备注：{selectedWorkout.notes?.trim() || "无备注"}</p>
-
-          <ul style={setListStyle}>
-            {selectedWorkout.sets.map((setItem) => {
-              const exerciseName =
-                exerciseNames.get(setItem.exercise_id) ?? `Exercise ${setItem.exercise_id}`;
-
-              return (
-                <li key={setItem.id} style={setItemStyle(theme)}>
-                  <strong>{exerciseName}</strong>
-                  <div style={metaStyle(theme)}>同动作第 {setItem.set_index} 组</div>
-                  <div style={metaStyle(theme)}>
-                    {setItem.reps} 次 × {setItem.weight_kg} kg
-                  </div>
-                  <div style={metaStyle(theme)}>RPE：{setItem.rpe ?? "未记录"}</div>
-                  <div style={metaStyle(theme)}>
-                    {setItem.is_warmup ? "热身组" : "正式组"}
-                  </div>
-                  <div style={metaStyle(theme)}>
-                    备注：{setItem.notes?.trim() || "无组备注"}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
+        </div>
       ) : null}
     </Card>
   );
@@ -155,8 +89,18 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
       return;
     }
 
-    await onDeleteWorkout(workoutId);
+    await props.onDeleteWorkout(workoutId);
   }
+}
+
+function translateError(message: string): string {
+  return message
+    .replaceAll("Workout list is unavailable right now.", "训练日志加载失败")
+    .replaceAll("Workout detail is unavailable right now.", "训练详情加载失败")
+    .replaceAll("Workout deletion is unavailable right now.", "删除训练失败")
+    .replaceAll("You must be signed in to view workouts.", "请先登录后查看训练日志。")
+    .replaceAll("You must be signed in to view workout details.", "请先登录后查看训练详情。")
+    .replaceAll("You must be signed in to delete workouts.", "请先登录后删除训练。");
 }
 
 function useExerciseNames(): Map<string, string> {
@@ -203,100 +147,71 @@ function useExerciseNames(): Map<string, string> {
   return exerciseNames;
 }
 
-function formatDateTime(value: string): string {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN");
-}
-
-function formatDuration(durationMinutes: number | null): string {
-  if (durationMinutes === null) {
-    return "未记录";
-  }
-
-  return `${durationMinutes} 分钟`;
-}
-
 const headerStyle: React.CSSProperties = {
   alignItems: "center",
   display: "flex",
-  gap: 16,
-  justifyContent: "space-between",
-};
-
-const workoutListStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 12,
-  listStyle: "none",
-  margin: "16px 0 0",
-  padding: 0,
-};
-
-const workoutItemTopStyle: React.CSSProperties = {
-  alignItems: "flex-start",
-  display: "flex",
   gap: 12,
   justifyContent: "space-between",
 };
 
-const actionRowStyle: React.CSSProperties = {
-  display: "flex",
-  gap: 8,
-  marginTop: 12,
-};
-
-const setListStyle: React.CSSProperties = {
+const listStyle: React.CSSProperties = {
   display: "grid",
   gap: 10,
-  listStyle: "none",
-  margin: "12px 0 0",
-  padding: 0,
+  marginTop: 14,
+};
+
+const titleStyle: React.CSSProperties = {
+  fontSize: 16,
+  margin: 0,
 };
 
 function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
   return {
     color: theme.colors.tx2,
-    fontSize: 13,
+    fontSize: 12,
     lineHeight: 1.6,
-    margin: "8px 0 0",
+    margin: "6px 0 0",
+  };
+}
+
+function refreshButtonStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.surf2,
+    border: `1px solid ${theme.colors.bdr}`,
+    borderRadius: theme.radius.control,
+    color: theme.colors.tx2,
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 700,
+    padding: "10px 12px",
   };
 }
 
 function errorStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return { color: theme.colors.orange, marginBottom: 0 };
-}
-
-function metaStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return { color: theme.colors.tx2, fontSize: 12, lineHeight: 1.6 };
-}
-
-function workoutItemStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-  isSelected: boolean,
-): React.CSSProperties {
   return {
-    backgroundColor: theme.colors.surf2,
-    border: `1px solid ${isSelected ? theme.colors.ac : theme.colors.bdr}`,
-    borderRadius: 14,
-    padding: 12,
+    color: theme.colors.orange,
+    fontSize: 12,
+    margin: "12px 0 0",
   };
 }
 
-function detailSectionStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-): React.CSSProperties {
+function emptyStateStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf2,
-    borderRadius: 14,
-    marginTop: 16,
-    padding: 12,
-  };
-}
-
-function setItemStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return {
-    backgroundColor: theme.colors.surf,
     border: `1px solid ${theme.colors.bdr}`,
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: theme.radius.card,
+    display: "grid",
+    gap: 6,
+    marginTop: 14,
+    padding: 14,
+  };
+}
+
+function emptyCopyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    color: theme.colors.tx2,
+    fontSize: 12,
+    lineHeight: 1.6,
+    margin: 0,
   };
 }
