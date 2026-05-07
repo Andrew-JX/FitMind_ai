@@ -52,14 +52,6 @@ const mockAssistantTurnSchema = z
         message: "end_date must be on or after start_date.",
       });
     }
-
-    if (value.mode === "exercise_progress" && value.exercise_id === undefined) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["exercise_id"],
-        message: "exercise_id is required for exercise_progress mode.",
-      });
-    }
   });
 
 interface TrainingOverviewResult {
@@ -262,24 +254,25 @@ function buildTrainingOverviewAnswer(
 
   if (result.totals.workout_count === 0) {
     return {
-      summary: `Deterministic mock summary: no workouts were found from ${result.range.start_date} to ${result.range.end_date}.`,
+      summary:
+        "最近 30 天还没有训练记录。先完成一次训练，系统就能为你生成训练总览和 AI 可用上下文。",
       bullets: [
-        "Workout count: 0",
-        "Set count: 0",
-        "Total volume: 0",
+        `统计范围：${result.range.start_date} 至 ${result.range.end_date}`,
+        "训练次数：0 次",
+        "训练容量：0 kg",
       ],
       evidence: buildEvidence("get_training_summary", result),
     };
   }
 
   return {
-    summary: `Deterministic mock summary: ${result.totals.workout_count} workouts, ${result.totals.set_count} sets, ${result.totals.total_reps} reps, and ${result.totals.total_volume} total volume were found from ${result.range.start_date} to ${result.range.end_date}.`,
+    summary: `最近 30 天你共记录了 ${result.totals.workout_count} 次训练、${result.totals.set_count} 组训练组，总次数 ${result.totals.total_reps} 次，总训练容量 ${result.totals.total_volume} kg。`,
     bullets: [
-      `Top exercise rows: ${result.by_exercise.length}`,
       topExercise === undefined
-        ? "Top exercise: none"
-        : `Top exercise: ${topExercise.exercise_name} (${topExercise.total_volume} volume)`,
-      `Evidence workouts: ${result.evidence.workout_ids.length}`,
+        ? "当前范围内还没有主要训练动作。"
+        : `当前主要训练动作是 ${topExercise.exercise_name}，总容量为 ${topExercise.total_volume} kg。`,
+      `本次分析基于 ${result.evidence.workout_ids.length} 条 workout 记录。`,
+      `统计范围：${result.range.start_date} 至 ${result.range.end_date}`,
     ],
     evidence: buildEvidence("get_training_summary", result),
   };
@@ -288,26 +281,26 @@ function buildTrainingOverviewAnswer(
 function buildExerciseProgressAnswer(
   result: ExerciseProgressResult,
 ): MockAssistantTurnResponseData["answer"] {
-  const exerciseName = result.exercise.exercise_name ?? "Unknown exercise";
+  const exerciseName = result.exercise.exercise_name ?? "当前动作";
 
   if (result.totals.workout_count === 0) {
     return {
-      summary: `Deterministic mock progress: no ${exerciseName} data was found from ${result.range.start_date} to ${result.range.end_date}.`,
+      summary: `最近 30 天里还没有 ${exerciseName} 的训练记录，暂时无法给出 1RM 或进展结果。`,
       bullets: [
-        "Workout count: 0",
-        "Set count: 0",
-        "Estimated 1RM: null",
+        `统计范围：${result.range.start_date} 至 ${result.range.end_date}`,
+        "最近训练次数：0 次",
+        "请先记录这个动作，或在分析页切换到已有数据的动作。",
       ],
       evidence: buildEvidence("get_exercise_progress", result),
     };
   }
 
   return {
-    summary: `Deterministic mock progress: ${exerciseName} appeared in ${result.totals.workout_count} workouts with ${result.totals.set_count} sets, ${result.totals.total_reps} reps, and ${result.totals.total_volume} total volume.`,
+    summary: `根据你最近的 ${exerciseName} 训练记录，当前系统预估你的 1RM 约为 ${result.totals.estimated_1rm_kg ?? "暂无结果"} kg。这个结果来自后端确定性计算规则，而不是模型猜测。`,
     bullets: [
-      `Max weight: ${result.totals.max_weight_kg ?? "null"}`,
-      `Estimated 1RM: ${result.totals.estimated_1rm_kg ?? "null"}`,
-      `Session rows: ${result.sessions.length}`,
+      `最近记录中最高训练重量为 ${result.totals.max_weight_kg ?? "暂无结果"} kg。`,
+      `最近 ${result.sessions.length} 次记录共关联 ${result.evidence.workout_ids.length} 条 workout 和 ${result.evidence.set_ids.length} 条 set。`,
+      `calculation_rules：${result.evidence.calculation_rules[0] ?? "当前未返回规则说明"}`,
     ],
     evidence: buildEvidence("get_exercise_progress", result),
   };
@@ -320,24 +313,25 @@ function buildRecommendationContextAnswer(
 
   if (result.summary.workout_count === 0) {
     return {
-      summary: `Deterministic mock context: no workouts were available from ${result.range.start_date} to ${result.range.end_date}.`,
+      summary:
+        "当前还没有可用于推荐上下文的训练记录。先完成训练记录，系统才会生成可供助手读取的确定性上下文。",
       bullets: [
-        "Focus exercises: 0",
-        "Recent workouts: 0",
-        "Evidence workouts: 0",
+        `统计范围：${result.range.start_date} 至 ${result.range.end_date}`,
+        "重点动作：0 个",
+        "最近训练：0 条",
       ],
       evidence: buildEvidence("get_recommendation_context", result),
     };
   }
 
   return {
-    summary: `Deterministic mock context: ${result.summary.workout_count} workouts, ${result.summary.set_count} sets, ${result.summary.total_reps} reps, and ${result.summary.total_volume} total volume were assembled for this range.`,
+    summary: `AI 助手当前会读取一份确定性上下文预览，其中包含 ${result.summary.workout_count} 次训练、${result.summary.set_count} 组训练组、${result.summary.total_reps} 次总次数和 ${result.summary.total_volume} kg 总容量。`,
     bullets: [
-      `Focus exercises: ${result.focus_exercises.length}`,
-      `Recent workouts: ${result.recent_workouts.length}`,
+      `这是一份 deterministic context preview，不是 AI 自动生成的训练建议。`,
+      `当前重点动作 ${result.focus_exercises.length} 个，最近训练 ${result.recent_workouts.length} 条。`,
       topExercise === undefined
-        ? "Top summary exercise: none"
-        : `Top summary exercise: ${topExercise.exercise_name} (${topExercise.total_volume} volume)`,
+        ? "当前范围内没有可展示的主要动作。"
+        : `主要动作是 ${topExercise.exercise_name}，总容量为 ${topExercise.total_volume} kg。`,
     ],
     evidence: buildEvidence("get_recommendation_context", result),
   };
@@ -347,13 +341,15 @@ function buildProviderMessageAnswer(
   mode: MockAssistantTurnInput["mode"],
   message: string,
 ): MockAssistantTurnResponseData["answer"] {
+  const isProductMessage =
+    !message.startsWith("Deterministic mock provider message:") &&
+    !message.startsWith("Deterministic mock provider error:");
+
   return {
     summary: message,
-    bullets: [
-      `Mode: ${mode}`,
-      "Provider path: message",
-      "No internal tool was executed.",
-    ],
+    bullets: isProductMessage
+      ? ["本次没有执行内部工具调用。"]
+      : [`Mode: ${mode}`, "Provider path: message", "No internal tool was executed."],
     evidence: buildMockProviderEvidence(),
   };
 }
@@ -412,6 +408,22 @@ function getToolDefinitionForMode(
   }
 }
 
+function getAllowedToolDefinitions(
+  mode: MockAssistantTurnInput["mode"],
+): AssistantProviderToolDefinition[] {
+  const prioritizedTools = [
+    getToolDefinitionForMode(mode),
+    getToolDefinitionForMode("training_overview"),
+    getToolDefinitionForMode("exercise_progress"),
+    getToolDefinitionForMode("recommendation_context"),
+  ];
+
+  return prioritizedTools.filter(
+    (tool, index, tools) =>
+      tools.findIndex((candidate) => candidate.name === tool.name) === index,
+  );
+}
+
 function buildProviderRequest(
   input: MockAssistantTurnInput,
 ): AssistantProviderRequest {
@@ -427,7 +439,7 @@ function buildProviderRequest(
       end_date: input.end_date,
       exercise_id: input.exercise_id ?? null,
     },
-    allowed_tools: [getToolDefinitionForMode(input.mode)],
+    allowed_tools: getAllowedToolDefinitions(input.mode),
     simulation: {
       scenario: simulation.scenario,
       normalized_message: simulation.normalizedMessage,
@@ -574,15 +586,15 @@ async function emitAnswerEvents(
   }
 }
 
-function buildModeAnswer(
-  mode: MockAssistantTurnInput["mode"],
+function buildToolAnswer(
+  toolName: string,
   result: unknown,
 ): MockAssistantTurnResponseData["answer"] {
-  if (mode === "training_overview") {
+  if (toolName === "get_training_summary") {
     return buildTrainingOverviewAnswer(result as TrainingOverviewResult);
   }
 
-  if (mode === "exercise_progress") {
+  if (toolName === "get_exercise_progress") {
     return buildExerciseProgressAnswer(result as ExerciseProgressResult);
   }
 
@@ -700,7 +712,7 @@ export async function runMockAssistantTurn(
       throw error;
     }
 
-    answer = buildModeAnswer(input.mode, result);
+    answer = buildToolAnswer(providerResponse.tool_name, result);
     await emitAnswerEvents(answer, options);
   }
 

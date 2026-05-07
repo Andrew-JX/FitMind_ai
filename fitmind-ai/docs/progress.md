@@ -2168,3 +2168,56 @@
 - Git 仍可能在部分目录映射下提示 `dubious ownership`。
 - Neon 连接串仍可能打印 `sslmode=require` 警告，但不一定影响真实连接结果。
 
+## 2026-05-07 Phase 3.8 Batch 6 - Assistant Intent Routing & Mock Answer Polish
+
+### Files changed
+- `server/src/services/assistant/mock-provider.ts`
+- `server/src/services/assistant/assistant-orchestrator-service.ts`
+- `server/scripts/assistant-mock-turn-smoke.ts`
+- `docs/progress.md`
+
+### Intent routing fixes
+- 将 mock provider 从“只看前端 mode”改为“结合 mode 和用户问题做意图纠偏”。
+- 新增三类 mock-mode intent 判断：
+  - 训练总览问题路由到 `get_training_summary`
+  - 1RM / 最大重量 / 卧推深蹲硬拉等动作进展问题优先路由到 `get_exercise_progress`
+  - 推荐上下文问题路由到 `get_recommendation_context`
+- 当问题明显是动作进展 / 1RM，但当前请求没有 `exercise_id` 时，不再静默回退到 `get_training_summary`，而是返回中文提示，要求用户先去分析页选择动作。
+- 保留前端 quick prompt 的现有 `mode` 语义，但允许 mock provider 在手动输入问题时纠偏到更合适的 tool。
+
+### Answer template fixes
+- 移除了 training overview 回答里的调试式英文文案，例如 `Deterministic mock summary` 和 `Top exercise rows`。
+- 将 training summary、exercise progress、recommendation context 三类工具结果都改成中文、产品化回答模板。
+- 训练总览回答现在会直接说明训练次数、组数、总次数、总容量、主要动作和 evidence workout 数量。
+- 动作进展回答现在会直接说明动作名、估算 1RM、最高训练重量、最近记录数量、evidence workout / set 数量和 `calculation_rules`。
+- 推荐上下文回答现在会明确说明这是 deterministic context preview，不是 AI 自动生成建议。
+- provider message 路径下的产品化提示不再默认附带调试味内部 bullets。
+
+### Preserved contracts
+- 未修改 training API contracts、assistant API contracts、tool executor security model、SSE event names、frontend assistant SSE parser、auth token 逻辑、workout CRUD 或数据库 schema。
+- 保留 `training_overview`、`exercise_progress`、`recommendation_context` 三种 public mode。
+- 保留 `provider_selected`、`session`、`tool_call_started`、`tool_call_finished`、`answer_delta`、`done`、`error` 事件语义不变。
+- 未引入 RAG、MCP、多 tool loop 或真实 Anthropic streaming 语义扩展。
+
+### Verification commands and results
+- `pnpm --filter @fitmind/client type-check`
+- `pnpm --filter @fitmind/server type-check`
+- `pnpm lint`
+- `pnpm --filter @fitmind/server exec tsx scripts/assistant-mock-turn-smoke.ts`
+
+### Verification notes
+- `pnpm --filter @fitmind/client type-check` 通过。
+- `pnpm --filter @fitmind/server type-check` 通过。
+- `pnpm lint` 通过。
+- `pnpm --filter @fitmind/server exec tsx scripts/assistant-mock-turn-smoke.ts` 先复现当前环境的 `tsx` 命令解析问题和已知 Windows / sandbox `esbuild spawn EPERM`。
+- smoke 最终通过提权后的 package-local `.\node_modules\.bin\tsx.cmd scripts/assistant-mock-turn-smoke.ts` 在 `server` 目录下完成验证。
+- smoke 已覆盖：
+  - `看看我最近的训练总览。`
+  - `预估我现在的卧推极限。`
+  - `AI 会看到哪些训练数据？`
+
+### Known environment issues
+- 当前 Windows 环境下，`tsx/esbuild spawn EPERM` 仍会影响标准 smoke 运行路径，需要 package-local `tsx.cmd` fallback。
+- Neon 连接仍会打印 `sslmode=require` 相关 warning，但本次 mock-turn smoke 最终执行通过。
+- 当前仓库根目录仍可能触发 Git `dubious ownership` 提示，这属于本地环境配置问题，不是本批逻辑回归。
+

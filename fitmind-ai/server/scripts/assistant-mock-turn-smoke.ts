@@ -526,7 +526,7 @@ async function main(): Promise<void> {
     );
     console.log("OK 400 end_date before start_date validation");
 
-    const missingExerciseIdResponse = await requestJson<unknown>(
+    const missingExerciseIdResponse = await requestJson<AssistantMockTurnData>(
       baseUrl,
       "/api/assistant/mock-turn",
       {
@@ -540,18 +540,20 @@ async function main(): Promise<void> {
         }),
       },
     );
-    const missingExerciseIdError = expectError(
+    const missingExerciseIdTurn = expectSuccess(
       missingExerciseIdResponse,
-      400,
-      "VALIDATION_ERROR",
+      200,
       "POST /api/assistant/mock-turn missing exercise_id",
     );
-    expectValidationIssue(
-      missingExerciseIdError,
-      "exercise_id",
-      "Missing exercise_id response",
+    assert(
+      missingExerciseIdTurn.tool_calls.length === 0,
+      "Missing exercise_id should return a product message instead of executing a tool.",
     );
-    console.log("OK 400 missing exercise_id validation");
+    assert(
+      missingExerciseIdTurn.answer.summary.includes("请先到“分析”页选择对应动作"),
+      "Missing exercise_id response should ask the user to select the exercise first.",
+    );
+    console.log("OK 200 missing exercise_id returns select-exercise guidance");
 
     const benchSearchResponse = await requestJson<ExerciseSearchData>(
       baseUrl,
@@ -719,7 +721,7 @@ async function main(): Promise<void> {
         headers: createAuthHeaders(primaryToken),
         body: JSON.stringify({
           mode: "training_overview",
-          message: "show me my training overview",
+          message: "看看我最近的训练总览。",
           start_date: "2026-04-29",
           end_date: "2026-04-30",
         }),
@@ -750,13 +752,22 @@ async function main(): Promise<void> {
       trainingOverview.answer.evidence.set_ids.length === 0,
       "training_overview should not expose set_ids when the tool result has none.",
     );
+    assert(
+      !trainingOverview.answer.summary.includes("Deterministic mock summary"),
+      "training_overview summary should not expose debug copy.",
+    );
+    assert(
+      trainingOverview.answer.summary.includes("最近 30 天你共记录了"),
+      "training_overview summary should use the new Chinese product-facing copy.",
+    );
     const primarySessionsAfterFirstTurn = await loadChatSessionsForUser(
       primaryAuth.user.id,
     );
     assert(
-      primarySessionsAfterFirstTurn.length === 1 &&
-        primarySessionsAfterFirstTurn[0]?.id === primarySessionId,
-      "First mock turn should create exactly one chat session for the authenticated user.",
+      primarySessionsAfterFirstTurn.some(
+        (session) => session.id === primarySessionId,
+      ),
+      "First training_overview turn should persist a chat session for the authenticated user.",
     );
     const messagesAfterFirstTurn = await loadMessagesForSession(
       primarySessionId,
@@ -773,7 +784,7 @@ async function main(): Promise<void> {
     );
     assert(
       JSON.stringify(messagesAfterFirstTurn[0].content).includes(
-        "show me my training overview",
+        "看看我最近的训练总览。",
       ),
       "Persisted user message should include the submitted text.",
     );
@@ -844,12 +855,19 @@ async function main(): Promise<void> {
       recommendationContext.answer.evidence.calculation_rules.length > 0,
       "recommendation_context should expose evidence rules.",
     );
+    assert(
+      recommendationContext.answer.summary.includes("确定性上下文预览") ||
+        recommendationContext.answer.summary.includes("确定性上下文"),
+      "recommendation_context summary should explain deterministic context preview in Chinese.",
+    );
     const primarySessionsAfterSecondTurn = await loadChatSessionsForUser(
       primaryAuth.user.id,
     );
     assert(
-      primarySessionsAfterSecondTurn.length === 1,
-      "Second mock turn should not create an extra session when reusing session_id.",
+      primarySessionsAfterSecondTurn.filter(
+        (session) => session.id === primarySessionId,
+      ).length === 1,
+      "Second mock turn should keep appending to the same session when reusing session_id.",
     );
     const messagesAfterSecondTurn = await loadMessagesForSession(
       primarySessionId,
@@ -912,7 +930,72 @@ async function main(): Promise<void> {
       ),
       "exercise_progress evidence should exclude unrelated squat set ids.",
     );
+    assert(
+      exerciseProgress.answer.summary.includes("系统预估你的 1RM"),
+      "exercise_progress summary should mention the estimated 1RM in Chinese.",
+    );
     console.log("OK POST /api/assistant/mock-turn exercise_progress");
+
+    const routedExerciseIntentResponse = await requestJson<AssistantMockTurnData>(
+      baseUrl,
+      "/api/assistant/mock-turn",
+      {
+        method: "POST",
+        headers: createAuthHeaders(primaryToken),
+        body: JSON.stringify({
+          mode: "training_overview",
+          session_id: primarySessionId,
+          message: "预估我现在的卧推极限。",
+          start_date: "2026-04-29",
+          end_date: "2026-04-30",
+          exercise_id: benchExercise.id,
+        }),
+      },
+    );
+    const routedExerciseIntent = expectSuccess(
+      routedExerciseIntentResponse,
+      200,
+      "POST /api/assistant/mock-turn routed bench 1RM intent",
+    );
+    expectToolCall(
+      routedExerciseIntent,
+      "get_exercise_progress",
+      "routed bench 1RM intent response",
+    );
+    assert(
+      !routedExerciseIntent.tool_calls.some(
+        (toolCall) => toolCall.tool_name === "get_training_summary",
+      ),
+      "Bench 1RM intent should not silently fall back to get_training_summary.",
+    );
+    console.log("OK POST /api/assistant/mock-turn routed bench 1RM intent");
+
+    const recommendationIntentResponse = await requestJson<AssistantMockTurnData>(
+      baseUrl,
+      "/api/assistant/mock-turn",
+      {
+        method: "POST",
+        headers: createAuthHeaders(primaryToken),
+        body: JSON.stringify({
+          mode: "training_overview",
+          session_id: primarySessionId,
+          message: "AI 会看到哪些训练数据？",
+          start_date: "2026-04-29",
+          end_date: "2026-04-30",
+        }),
+      },
+    );
+    const recommendationIntent = expectSuccess(
+      recommendationIntentResponse,
+      200,
+      "POST /api/assistant/mock-turn routed recommendation context intent",
+    );
+    expectToolCall(
+      recommendationIntent,
+      "get_recommendation_context",
+      "routed recommendation context intent response",
+    );
+    console.log("OK POST /api/assistant/mock-turn routed recommendation context intent");
 
     const secondaryOverviewResponse = await requestJson<AssistantMockTurnData>(
       baseUrl,
@@ -1038,7 +1121,7 @@ async function main(): Promise<void> {
     );
     assert(
       emptyState.answer.evidence.workout_ids.length === 0 &&
-        emptyState.answer.summary.includes("no workouts were found"),
+        emptyState.answer.summary.includes("还没有训练记录"),
       "Empty-state response should remain valid after workout cleanup.",
     );
     console.log("OK POST /api/assistant/mock-turn empty-state after cleanup");
