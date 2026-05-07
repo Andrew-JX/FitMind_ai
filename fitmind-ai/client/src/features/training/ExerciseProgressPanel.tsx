@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { Badge } from "../../components/Badge";
 import { Card } from "../../components/Card";
+import { Icon } from "../../components/Icon";
 import { Pill } from "../../components/Pill";
 import { StatCell } from "../../components/StatCell";
 import { HttpClientError } from "../../services/http-client";
@@ -78,12 +79,15 @@ export function ExerciseProgressPanel(props: ExerciseProgressPanelProps) {
     return (
       <Card>
         <div style={titleRowStyle}>
-          <h2 style={titleStyle}>当前动作进步</h2>
+          <h2 style={titleStyle}>动作进展</h2>
           <Badge tone="analysis">Exercise Progress</Badge>
         </div>
-        <p style={copyStyle(theme)}>
-          先在上方训练概览里选择一个动作，再查看它近 30 天的确定性进展。
-        </p>
+        <div style={emptyStateStyle()}>
+          <div style={emptyIconStyle(theme)}>
+            <Icon name="target" size={20} />
+          </div>
+          <p style={copyStyle(theme)}>从上方选择一个动作，查看最近训练表现。</p>
+        </div>
       </Card>
     );
   }
@@ -103,7 +107,7 @@ export function ExerciseProgressPanel(props: ExerciseProgressPanelProps) {
       <div style={headerStyle}>
         <div>
           <div style={titleRowStyle}>
-            <h2 style={titleStyle}>当前动作进步</h2>
+            <h2 style={titleStyle}>动作进展</h2>
             <Badge tone="analysis">Exercise Progress</Badge>
           </div>
           <p style={copyStyle(theme)}>{displayExerciseName}</p>
@@ -113,53 +117,94 @@ export function ExerciseProgressPanel(props: ExerciseProgressPanelProps) {
         </div>
       </div>
 
-      {errorMessage ? <p style={errorStyle(theme)}>错误：{errorMessage}</p> : null}
+      {errorMessage ? <p style={errorStyle(theme)}>{translateProgressError(errorMessage)}</p> : null}
       {isLoading && !progress ? <p style={copyStyle(theme)}>正在加载动作进展...</p> : null}
       {hasEmptyState ? (
-        <p style={copyStyle(theme)}>最近 30 天还没有这个动作的训练组数据。</p>
+        <p style={copyStyle(theme)}>最近 30 天还没有这个动作的训练记录。</p>
       ) : null}
 
       {progress ? (
         <>
           <div style={statsGridStyle}>
-            <StatCell label="训练次数" tone="accent" value={progress.totals.workout_count.toLocaleString()} />
-            <StatCell label="总组数" tone="info" value={progress.totals.set_count.toLocaleString()} />
-            <StatCell label="总次数" tone="analysis" value={progress.totals.total_reps.toLocaleString()} />
-            <StatCell label="总容量" tone="warning" value={progress.totals.total_volume.toLocaleString()} />
-            <StatCell label="最大重量" tone="success" value={formatMetric(progress.totals.max_weight_kg, "kg")} />
-            <StatCell label="预计 1RM" tone="success" value={formatMetric(progress.totals.estimated_1rm_kg, "kg")} />
+            <StatCell
+              label="最大重量"
+              tone="success"
+              unit="kg"
+              value={formatMetricValue(progress.totals.max_weight_kg)}
+            />
+            <StatCell
+              label="估算 1RM"
+              tone="accent"
+              unit="kg"
+              value={formatMetricValue(progress.totals.estimated_1rm_kg)}
+            />
+            <StatCell
+              label="训练次数"
+              tone="info"
+              unit="次"
+              value={`${progress.totals.workout_count}`}
+            />
+            <StatCell
+              label="最近记录"
+              tone="analysis"
+              unit="次"
+              value={`${recentSessions.length}`}
+            />
           </div>
 
           <div style={sessionSectionStyle(theme)}>
-            <h3 style={subheadingStyle}>最近训练记录</h3>
+            <div style={sectionHeaderStyle}>
+              <h3 style={subheadingStyle}>最近 5 次记录</h3>
+              <Pill tone="analysis">evidence</Pill>
+            </div>
             {recentSessions.length === 0 ? (
-              <p style={copyStyle(theme)}>当前范围内暂时没有最近训练记录。</p>
+              <p style={copyStyle(theme)}>当前范围内暂时没有最近记录。</p>
             ) : (
               <ul style={sessionListStyle}>
                 {recentSessions.map((session) => (
                   <li key={session.workout_id} style={sessionItemStyle(theme)}>
-                    <div style={sessionHeaderStyle}>
-                      <strong>{formatDisplayDateTime(session.performed_at)}</strong>
-                      <Pill tone="accent">
-                        {session.total_volume.toLocaleString()} volume
-                      </Pill>
+                    <strong style={{ fontSize: 14 }}>
+                      {formatDisplayDateTime(session.performed_at)}
+                    </strong>
+                    <p style={sessionTitleStyle(theme)}>
+                      {displayExerciseName} · {session.set_count} 组
+                    </p>
+                    <div style={sessionMetaStyle(theme)}>
+                      最高 {formatMetricValue(session.max_weight_kg)} kg · 估算 1RM{" "}
+                      {formatMetricValue(session.estimated_1rm_kg)} kg
                     </div>
                     <div style={sessionMetaStyle(theme)}>
-                      {session.set_count.toLocaleString()} 组 | {session.total_reps.toLocaleString()} 次
-                    </div>
-                    <div style={sessionMetaStyle(theme)}>
-                      最大重量 {formatMetric(session.max_weight_kg, "kg")} | 预计 1RM{" "}
-                      {formatMetric(session.estimated_1rm_kg, "kg")}
+                      {session.total_reps.toLocaleString()} 次 · 容量{" "}
+                      {session.total_volume.toLocaleString()} kg
                     </div>
                   </li>
                 ))}
               </ul>
             )}
           </div>
+
+          <details style={evidenceDetailsStyle(theme)}>
+            <summary style={summaryStyle(theme)}>查看 evidence</summary>
+            <div style={evidenceBodyStyle()}>
+              <p style={evidenceTextStyle(theme)}>
+                关联 workout：{progress.evidence.workout_ids.length} 条
+              </p>
+              <p style={evidenceTextStyle(theme)}>
+                关联 set：{progress.evidence.set_ids.length} 条
+              </p>
+              <p style={evidenceTextStyle(theme)}>
+                规则：{progress.evidence.calculation_rules.join(" / ") || "无"}
+              </p>
+            </div>
+          </details>
         </>
       ) : null}
     </Card>
   );
+}
+
+function translateProgressError(message: string): string {
+  return message.replaceAll("动作进展暂时不可用。", "动作进展加载失败");
 }
 
 function getReadableErrorMessage(error: unknown): string {
@@ -227,12 +272,12 @@ function formatDisplayDateTime(value: string): string {
       });
 }
 
-function formatMetric(value: number | null, unit: string): string {
+function formatMetricValue(value: number | null): string {
   if (value === null) {
-    return "N/A";
+    return "0";
   }
 
-  return `${value.toLocaleString()} ${unit}`;
+  return value.toLocaleString();
 }
 
 const headerStyle: React.CSSProperties = {
@@ -250,18 +295,18 @@ const titleRowStyle: React.CSSProperties = {
 };
 
 const titleStyle: React.CSSProperties = {
-  fontSize: "1.1rem",
-  margin: "0 0 0.25rem",
+  fontSize: 16,
+  margin: 0,
 };
 
 const subheadingStyle: React.CSSProperties = {
-  fontSize: "1rem",
-  margin: "0 0 0.75rem",
+  fontSize: 15,
+  margin: 0,
 };
 
 const statsGridStyle: React.CSSProperties = {
   display: "grid",
-  gap: 12,
+  gap: 8,
   gridTemplateColumns: "repeat(2, 1fr)",
   marginBottom: 16,
 };
@@ -274,24 +319,46 @@ const sessionListStyle: React.CSSProperties = {
   padding: 0,
 };
 
-const sessionHeaderStyle: React.CSSProperties = {
+const sectionHeaderStyle: React.CSSProperties = {
   alignItems: "center",
   display: "flex",
-  gap: 12,
   justifyContent: "space-between",
-  marginBottom: 6,
 };
 
 function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return { color: theme.colors.tx2, margin: 0 };
+  return { color: theme.colors.tx2, fontSize: 12, lineHeight: 1.6, margin: 0 };
 }
 
 function subtleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return { color: theme.colors.tx3, margin: "0.35rem 0 0" };
+  return { color: theme.colors.tx3, fontSize: 11, margin: "0.35rem 0 0" };
 }
 
 function errorStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return { color: theme.colors.orange, marginBottom: 16 };
+  return { color: theme.colors.orange, fontSize: 12, marginBottom: 16 };
+}
+
+function emptyStateStyle(): React.CSSProperties {
+  return {
+    alignItems: "center",
+    display: "grid",
+    gap: 10,
+    justifyItems: "center",
+    marginTop: 8,
+    textAlign: "center",
+  };
+}
+
+function emptyIconStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    alignItems: "center",
+    backgroundColor: theme.colors.surf2,
+    borderRadius: theme.radius.card,
+    color: theme.colors.tx3,
+    display: "inline-flex",
+    height: 40,
+    justifyContent: "center",
+    width: 40,
+  };
 }
 
 function sessionSectionStyle(
@@ -300,7 +367,7 @@ function sessionSectionStyle(
   return {
     backgroundColor: theme.colors.surf2,
     borderRadius: 14,
-    padding: "0.9rem",
+    padding: 14,
   };
 }
 
@@ -311,12 +378,58 @@ function sessionItemStyle(
     backgroundColor: theme.colors.surf,
     border: `1px solid ${theme.colors.bdr}`,
     borderRadius: 12,
-    padding: "0.75rem",
+    padding: 12,
+  };
+}
+
+function sessionTitleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    color: theme.colors.tx3,
+    fontSize: 11,
+    lineHeight: 1.5,
+    margin: "4px 0 8px",
   };
 }
 
 function sessionMetaStyle(
   theme: ReturnType<typeof useTheme>["theme"],
 ): React.CSSProperties {
-  return { color: theme.colors.tx2, fontSize: "0.95rem" };
+  return { color: theme.colors.tx2, fontSize: 12, lineHeight: 1.6 };
+}
+
+function evidenceDetailsStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.surf2,
+    borderRadius: theme.radius.control,
+    marginTop: 14,
+    padding: 12,
+  };
+}
+
+function summaryStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    color: theme.colors.purple,
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 700,
+  };
+}
+
+function evidenceBodyStyle(): React.CSSProperties {
+  return {
+    display: "grid",
+    gap: 6,
+    marginTop: 10,
+  };
+}
+
+function evidenceTextStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    color: theme.colors.tx2,
+    fontSize: 12,
+    lineHeight: 1.6,
+    margin: 0,
+  };
 }

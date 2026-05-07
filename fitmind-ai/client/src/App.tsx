@@ -12,9 +12,7 @@ import {
   setToken,
   useAuth,
 } from "./features/auth/use-auth";
-import { ExerciseProgressPanel } from "./features/training/ExerciseProgressPanel";
-import { RecommendationContextPanel } from "./features/training/RecommendationContextPanel";
-import { TrainingSummaryPanel } from "./features/training/TrainingSummaryPanel";
+import { AnalysisView } from "./features/training/AnalysisView";
 import { TrainingView } from "./features/training/TrainingView";
 import { useExerciseSearch } from "./features/training/use-exercise-search";
 import { useTrainingSummary } from "./features/training/use-training-summary";
@@ -139,23 +137,26 @@ export function App() {
 
       {activeTab === "analysis" ? (
         <section style={tabSectionStyle}>
-          <TrainingSummaryPanel
-            errorMessage={trainingSummary.errorMessage}
-            isLoading={trainingSummary.isLoading}
-            onExerciseSelect={handleExerciseSelect}
-            onRefresh={trainingSummary.refresh}
-            selectedExerciseId={selectedProgressExerciseId}
+          <AnalysisView
+            progressProps={{
+              refreshSignal: progressRefreshSignal,
+              selectedExerciseId: selectedProgressExerciseId,
+              selectedExerciseName: selectedProgressExerciseName,
+              token: auth.token,
+            }}
+            recommendationProps={{
+              refreshSignal: recommendationContextRefreshSignal,
+              token: auth.token,
+            }}
             summary={trainingSummary.summary}
-          />
-          <ExerciseProgressPanel
-            refreshSignal={progressRefreshSignal}
-            selectedExerciseId={selectedProgressExerciseId}
-            selectedExerciseName={selectedProgressExerciseName}
-            token={auth.token}
-          />
-          <RecommendationContextPanel
-            refreshSignal={recommendationContextRefreshSignal}
-            token={auth.token}
+            summaryProps={{
+              errorMessage: trainingSummary.errorMessage,
+              isLoading: trainingSummary.isLoading,
+              onExerciseSelect: handleExerciseSelect,
+              onRefresh: trainingSummary.refresh,
+              selectedExerciseId: selectedProgressExerciseId,
+              summary: trainingSummary.summary,
+            }}
           />
         </section>
       ) : null}
