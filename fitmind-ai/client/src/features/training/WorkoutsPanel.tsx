@@ -28,6 +28,13 @@ export interface WorkoutsPanelProps {
 export function WorkoutsPanel(props: WorkoutsPanelProps) {
   const { theme } = useTheme();
   const exerciseNames = useExerciseNames();
+  const [collapsedWorkoutId, setCollapsedWorkoutId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (props.selectedWorkoutId !== collapsedWorkoutId) {
+      setCollapsedWorkoutId(null);
+    }
+  }, [collapsedWorkoutId, props.selectedWorkoutId]);
 
   return (
     <Card>
@@ -92,7 +99,8 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
       {props.workouts.length > 0 ? (
         <div style={listStyle}>
           {props.workouts.map((workout) => {
-            const isExpanded = props.selectedWorkoutId === workout.id;
+            const isExpanded =
+              props.selectedWorkoutId === workout.id && collapsedWorkoutId !== workout.id;
             const detail = isExpanded ? props.selectedWorkout : null;
 
             return (
@@ -104,7 +112,7 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
                 isLoadingDetail={props.isLoadingDetail}
                 key={workout.id}
                 onDelete={() => handleDeleteWorkout(workout.id)}
-                onToggle={() => props.onSelectWorkout(workout.id)}
+                onToggle={() => handleToggleWorkout(workout.id, isExpanded)}
                 workout={workout}
               />
             );
@@ -120,6 +128,24 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
     }
 
     await props.onDeleteWorkout(workoutId);
+  }
+
+  async function handleToggleWorkout(
+    workoutId: string,
+    isExpanded: boolean,
+  ): Promise<void> {
+    if (isExpanded) {
+      setCollapsedWorkoutId(workoutId);
+      return;
+    }
+
+    if (props.selectedWorkoutId === workoutId && collapsedWorkoutId === workoutId) {
+      setCollapsedWorkoutId(null);
+      return;
+    }
+
+    setCollapsedWorkoutId(null);
+    await props.onSelectWorkout(workoutId);
   }
 }
 

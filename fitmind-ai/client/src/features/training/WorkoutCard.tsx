@@ -23,15 +23,34 @@ export function WorkoutCard(props: WorkoutCardProps) {
 
   return (
     <article style={cardStyle(theme, props.isExpanded)}>
-      <div style={topRowStyle}>
-        <div>
+      <div
+        aria-expanded={props.isExpanded}
+        onClick={() => void props.onToggle()}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            void props.onToggle();
+          }
+        }}
+        role="button"
+        style={topRowStyle(theme)}
+        tabIndex={0}
+      >
+        <div style={summaryBlockStyle}>
           <p style={dateStyle(theme)}>{formatDateTime(props.workout.performed_at)}</p>
           <p style={summaryStyle(theme)}>
             {summaryLine}
             {notes ? ` · ${truncateNotes(notes)}` : ""}
           </p>
         </div>
-        <Button onClick={() => void props.onToggle()} type="button" variant="secondary">
+        <Button
+          onClick={(event) => {
+            event.stopPropagation();
+            void props.onToggle();
+          }}
+          type="button"
+          variant="secondary"
+        >
           {props.isExpanded ? "收起" : "展开"}
         </Button>
       </div>
@@ -98,16 +117,25 @@ export function WorkoutCard(props: WorkoutCardProps) {
               </ul>
 
               <div style={deleteRowStyle}>
-                <IconButton
-                  disabled={props.isDeleting}
-                  icon="trash"
-                  label="删除训练"
-                  onClick={() => void props.onDelete()}
-                  tone="danger"
-                />
+                <div
+                  onClick={(event) => {
+                    event.stopPropagation();
+                  }}
+                >
+                  <IconButton
+                    disabled={props.isDeleting}
+                    icon="trash"
+                    label="删除训练"
+                    onClick={() => void props.onDelete()}
+                    tone="danger"
+                  />
+                </div>
                 <button
                   disabled={props.isDeleting}
-                  onClick={() => void props.onDelete()}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void props.onDelete();
+                  }}
                   style={deleteButtonStyle(theme)}
                   type="button"
                 >
@@ -160,17 +188,15 @@ function getRpeTone(rpe: number): "success" | "warning" | "danger" {
   return "success";
 }
 
-const topRowStyle: React.CSSProperties = {
-  alignItems: "flex-start",
-  display: "flex",
-  gap: 12,
-  justifyContent: "space-between",
-};
-
 const detailContainerStyle: React.CSSProperties = {
   display: "grid",
   gap: 12,
   marginTop: 14,
+};
+
+const summaryBlockStyle: React.CSSProperties = {
+  flex: 1,
+  minWidth: 0,
 };
 
 const detailMetaGridStyle: React.CSSProperties = {
@@ -210,6 +236,17 @@ function cardStyle(
     border: `1px solid ${isExpanded ? theme.colors.ac : theme.colors.bdr}`,
     borderRadius: theme.radius.card,
     padding: 14,
+  };
+}
+
+function topRowStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    alignItems: "flex-start",
+    borderRadius: theme.radius.control,
+    cursor: "pointer",
+    display: "flex",
+    gap: 12,
+    justifyContent: "space-between",
   };
 }
 

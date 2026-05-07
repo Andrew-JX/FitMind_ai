@@ -2241,3 +2241,31 @@
 - no source code changes
 - documentation overlap reduced
 
+## 2026-05-07 Phase 3.9 Batch 3A - Workout Card Collapse Bug Fix
+
+### bug found during manual smoke
+- 手工浏览器 demo smoke 发现训练页已展开的 workout card 无法再次收起，阻塞正常产品交互。
+
+### files changed
+- `client/src/features/training/WorkoutCard.tsx`
+- `client/src/features/training/WorkoutsPanel.tsx`
+- `docs/progress.md`
+
+### behavior fixed
+- collapsed card 点击头部摘要区可以展开。
+- expanded card 再次点击同一卡片头部摘要区可以收起。
+- 已展开后再次点击同一卡片可以直接重新展开，不需要改动 workout CRUD 语义。
+- 展开/收起按钮保留可用，并显式阻止事件冒泡。
+- 删除按钮不会再意外触发父级卡片 toggle。
+
+### contracts preserved
+- 未修改 server 文件、training API contracts、workout CRUD semantics、`set_index` 逻辑、assistant 文件、SSE contract 或 auth token 逻辑。
+- 本批仅修正训练日志卡片的前端交互层行为。
+
+### verification results
+- `pnpm --filter @fitmind/client type-check` 通过。
+- `pnpm lint` 通过。
+- `pnpm --filter @fitmind/client exec vite build` 复现当前环境下的 `vite` 命令解析问题和 `esbuild spawn EPERM`。
+- `client\\.\\node_modules\\.bin\\vite.cmd build` 在 sandbox 内仍复现 `esbuild spawn EPERM`。
+- 提权后的 package-local `vite.cmd build` 最终通过，确认本批前端改动可生产构建。
+
