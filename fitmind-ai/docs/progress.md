@@ -1305,7 +1305,7 @@
 - `client/src/features/training/RecommendationContextPanel.tsx`
 - `client/src/App.tsx`
 - `docs/calculation-layer.md`
-- `docs/interview-notes.md`
+- `docs/project-study-guide.md`
 - `docs/progress.md`
 
 ### Validation commands
@@ -1414,12 +1414,12 @@
 ### Completed work
 - Added a dedicated `Phase 3.0 Tool Calling Skeleton` section to `docs/calculation-layer.md`.
 - Documented the current internal tool set, provider-agnostic executor shape, authenticated execution context, and high-level tool-call-log behavior without implying real model integration.
-- Expanded `docs/interview-notes.md` with a Phase 3.0 interview narrative, comparison framing, Chinese pitch, and Tool Calling Skeleton Q&A.
+- Expanded `docs/project-study-guide.md` with a Phase 3.0 interview narrative, comparison framing, Chinese pitch, and Tool Calling Skeleton Q&A.
 - Kept this batch documentation-only with no source code, API contract, or schema changes.
 
 ### Changed files
 - `docs/calculation-layer.md`
-- `docs/interview-notes.md`
+- `docs/project-study-guide.md`
 - `docs/progress.md`
 
 ### Verification notes
@@ -1549,12 +1549,12 @@
 - Added a `Phase 3.1 Assistant Orchestration Skeleton` section to `docs/calculation-layer.md`.
 - Documented that `POST /api/assistant/mock-turn` exists as a deterministic mock assistant endpoint, not a real AI-generated or streaming chat feature.
 - Explained the current mode-based orchestration path, template answer construction, and optional chat session/message persistence behavior.
-- Expanded `docs/interview-notes.md` with Phase 3.1 interview framing, comparison language for executor/orchestrator/provider/streaming chat, a Chinese pitch, and new deep-dive Q&A.
+- Expanded `docs/project-study-guide.md` with Phase 3.1 interview framing, comparison language for executor/orchestrator/provider/streaming chat, a Chinese pitch, and new deep-dive Q&A.
 - Kept this batch documentation-only with no source code, API contract, or schema changes.
 
 ### Changed files
 - `docs/calculation-layer.md`
-- `docs/interview-notes.md`
+- `docs/project-study-guide.md`
 - `docs/progress.md`
 
 ### Verification notes
@@ -1691,7 +1691,7 @@
 
 ### Completed work
 - Documented the provider adapter layer and its current non-streaming, single-response, single-tool-call limits in `docs/calculation-layer.md`.
-- Expanded `docs/interview-notes.md` with Phase 3.2 architecture framing, provider boundary explanations, and a Chinese pitch.
+- Expanded `docs/project-study-guide.md` with Phase 3.2 architecture framing, provider boundary explanations, and a Chinese pitch.
 - Kept the documentation aligned with current implementation limits:
   - provider adapter exists
   - mock and Anthropic provider modes are env-switchable
@@ -1701,7 +1701,7 @@
 
 ### Changed files
 - `docs/calculation-layer.md`
-- `docs/interview-notes.md`
+- `docs/project-study-guide.md`
 - `docs/progress.md`
 
 ### Verification notes
@@ -1872,12 +1872,12 @@
 - Added explicit explanation of why the provider does not query the database directly and why `user_id` always comes from auth context.
 - Documented the current frontend state machine and why SSE improves UX compared with a single blocking assistant response.
 - Added explicit current limits so the project does not overclaim real-provider streaming, multi-step tool loops, RAG, MCP, agent behavior, or coaching generation.
-- Expanded `docs/interview-notes.md` with a current-state assistant architecture framing, deep-dive Q&A, and a Chinese 60-second interview pitch.
+- Expanded `docs/project-study-guide.md` with a current-state assistant architecture framing, deep-dive Q&A, and a Chinese 60-second interview pitch.
 - Kept this batch docs-only and appended progress history rather than rewriting earlier entries.
 
 ### Changed files
 - `docs/calculation-layer.md`
-- `docs/interview-notes.md`
+- `docs/project-study-guide.md`
 - `docs/progress.md`
 
 ### Verification notes
@@ -2654,4 +2654,278 @@
 ### known environment issues
 - 既有 Windows shell 中文输出仍可能出现编码显示异常，但本批 source code、type-check、lint 和 build 均通过。
 - 之前记录过的 browser manual smoke 能力缺失仍未在本轮解决。
+
+## 2026-05-07 Phase 4.1 Batch 3 - Composer Regression Manual Smoke
+
+### manual smoke areas completed
+- 已确认本地前端 `http://127.0.0.1:5173` 和后端 `http://127.0.0.1:3000` 在当前环境可访问。
+- 已完成静态回归检查：`rg "window\\.confirm|confirm\\(" client/src/features/training -n`。
+- 计划中的 fullscreen composer / workout log / rest timer / layering / delete 浏览器手工路径在本轮环境中未能真实完成，因此不把 A-G 记为已完成。
+
+### bugs found
+- 本轮未通过真实浏览器交互复现到可确认的产品 bug，因此没有修改训练相关 source code。
+
+### files changed
+- `docs/progress.md`
+
+### z-index/layering result
+- 未能在真实浏览器交互路径下完成 A/C 项视觉验证，因此本轮不宣称 layering 已人工通过。
+
+### scroll result
+- 未能在真实浏览器交互路径下完成 B 项滚动验证，因此本轮不宣称 composer / card scroll 已人工通过。
+
+### rest timer result
+- 未能在真实浏览器交互路径下完成 E 项 rest timer 交互验证，因此本轮不宣称 timer flow 已人工通过。
+
+### delete/remove result
+- 静态检查确认训练相关目录不存在 `window.confirm` 或裸 `confirm(...)` 调用。
+- 未能在真实浏览器交互路径下完成 D/G 项删除与编辑冻结验证，因此本轮不宣称 delete/remove 手测已通过。
+
+### workout edit result
+- 未能在真实浏览器交互路径下完成 F/G 项保存、刷新和 reopen persistence 验证，因此本轮不宣称 workout edit 手测已通过。
+
+### preserved contracts
+- 未修改 server 文件、数据库 schema、API contracts、SSE event names、assistant 文件、provider adapter、tool executor、auth token 逻辑或 `set_index` 规则。
+- 未新增 warmup set persistence、set notes persistence、rest timer persistence、audio alerts、browser notifications 或 backend endpoints。
+
+### verification results
+- `Invoke-WebRequest http://127.0.0.1:5173` 返回 Vite HTML，确认前端 dev server 在线。
+- `Invoke-WebRequest http://127.0.0.1:3000/api/health` 返回 `200` 与 `{"ok":true,"data":{"status":"ok"}}`，确认后端在线。
+- `rg "window\\.confirm|confirm\\(" client/src/features/training -n` 无匹配。
+
+### known environment issues
+- 当前会话仍缺少可用的 `node_repl js` browser runtime。
+- shell fallback `npx agent-browser` 在提权后可执行 `open`，但后续 `snapshot` / `get text` 命令持续超时，无法形成稳定可复用的真实浏览器控制链路。
+- 因为浏览器自动化链路仍不稳定，本批不能诚实地把 A-G manual smoke checklist 记为已完成。
+
+## 2026-05-07 Phase 4.1 Batch 4 - Local Smoke Checklist & Repo Hygiene
+
+### whether human browser smoke was completed
+- 本轮未由 assistant 在真实浏览器中完成 1-23 项人工点击 smoke，因此不能宣称 human browser smoke 已通过。
+- 当前记录只覆盖仓库卫生检查与可验证的本地环境状态，不把未实际点击的 checklist 项目记为 pass。
+
+### pass/fail items
+- `http://127.0.0.1:5173` 与 `http://127.0.0.1:3000/api/health` 在前一批已确认可访问，但本轮未实际执行登录、训练、保存、编辑、删除、分析刷新与 AI 助手问答的人为浏览器路径。
+- 因未执行真实人工点击，本轮 checklist 1-23 统一记为 `not completed in this session`，而不是 pass。
+
+### bugs found
+- 本轮未新增确认到的产品 bug。
+
+### files changed
+- `docs/progress.md`
+
+### runtime log cleanup result
+- `git ls-files client-smoke-4173.out.log` 显示 `client-smoke-4173.out.log` 为 tracked 文件，因此本轮未把 `client-smoke-*.out.log` 加入 `.gitignore`。
+- 当前未发现活跃的本地 `5173` / `3000` listener；`client-dev.pid` 与 `server-dev.pid` 指向的旧 PID 也不是活跃进程。
+- 已尝试执行 `git restore -- client-smoke-4173.out.log` 清理运行时日志噪音。
+- sandbox 路径先因 `index.lock` 权限失败；提权重试后又报 `unable to unlink old 'fitmind-ai/client-smoke-4173.out.log': Invalid argument`，因此该 tracked log 在本轮未能安全清理。
+- 因为该文件是 tracked artifact 且 restore 失败，本轮选择如实记录问题，不做强制删除或忽略规则修改。
+
+### contracts preserved
+- 未修改产品 source code、server 文件、数据库 schema、API contracts、SSE event names、assistant 文件、provider adapter、tool executor、auth token 逻辑或 `set_index` 规则。
+- 未新增 warmup set persistence、set notes persistence、rest timer persistence、backend migration、new endpoints、RAG 或 MCP 集成。
+
+## 2026-05-08 Phase 4.1 Batch 5 - Composer UX Regression Fixes
+
+### bugs addressed
+- 根据本地真实手测反馈，注册页补上了确认密码校验，避免两次密码不一致时直接发请求。
+- 根据本地真实手测反馈，注册失败提示明确映射了“重复注册邮箱”与“邮箱/密码错误”场景。
+- 修复 fullscreen composer 在动作变多时看起来继续向下无限拉长、把底部 `+` 和底部 tab bar 挤出当前屏的问题；composer 现在固定为真实一屏高度，内容区改为内部滚动。
+- 修复动作卡 `⋯` 菜单定位跑到页面右侧外面的问题，菜单现在会约束在可视区域内。
+- 修复动作卡 `⋯` 菜单点开后点击其他空白区域不消失、点别的动作菜单也不自然的问题；现在支持外部点击关闭、`Escape` 关闭，并在滚动/resize 时重新定位。
+- 修复“移除动作”点击后看起来卡在原地的问题；这次跟随 composer 高度与菜单关闭逻辑一起修正，确保移除确认层能在当前视口内正常出现。
+
+### files changed
+- `client/src/features/auth/AuthScreen.tsx`
+- `client/src/features/auth/use-auth.ts`
+- `client/src/features/training/TrainingSessionComposer.tsx`
+- `client/src/features/training/TrainingSessionExerciseActions.tsx`
+- `docs/progress.md`
+
+### behavior notes
+- “用户名重复”本批按当前现有产品契约解释为“注册邮箱重复”；未改后端 schema，也未新增 display name 唯一性约束。
+- composer 仍保持现有产品结构，没有新增 persistence、通知、后端接口或额外交互模式。
+
+### verification results
+- `pnpm --filter @fitmind/client type-check` 通过。
+- `pnpm lint` 通过。
+- `pnpm --filter @fitmind/client exec vite build` 在当前 Windows 环境下未直接解析到 `vite` 可执行文件。
+- 改用 package-local `client/.\\node_modules\\.bin\\vite.cmd build` 后构建通过。
+
+### contracts preserved
+- 未修改 server 文件、数据库 schema、API contracts、SSE event names、assistant 文件、provider adapter、tool executor、auth token 逻辑或 `set_index` 规则。
+- 未新增 warmup set persistence、set notes persistence、rest timer persistence、audio alerts、browser notifications、backend migration 或 new endpoints。
+
+## 2026-05-08 Phase 4.1 Batch 5.1 - Composer Follow-up Fixes
+
+### bugs addressed
+- 根据继续手测反馈，修复“新增一组”时把整个 composer 直接回跳到窗口最下方的问题；现在只保留动作卡内部列表的自然滚动，不再强制整页滚到底。
+- 根据继续手测反馈，进一步修正动作卡 `⋯` 菜单定位逻辑；菜单不再按整页浏览器宽度计算，而是按当前 FitMind app 容器宽度约束，减少大窗口下跑到右边外面的情况。
+
+### files changed
+- `client/src/features/training/TrainingSessionComposer.tsx`
+- `client/src/features/training/TrainingSessionExerciseActions.tsx`
+- `docs/progress.md`
+
+### verification results
+- `pnpm --filter @fitmind/client type-check` 通过。
+- `pnpm lint` 通过。
+- package-local `client/.\\node_modules\\.bin\\vite.cmd build` 通过。
+
+### contracts preserved
+- 未修改 server 文件、数据库 schema、API contracts、SSE event names、assistant 文件、provider adapter、tool executor、auth token 逻辑或 `set_index` 规则。
+- 未新增 warmup set persistence、set notes persistence、rest timer persistence、audio alerts、browser notifications、backend migration 或 new endpoints。
+
+## 2026-05-08 Phase 4.1 Batch 5.2 - Composer Interaction Polish
+
+### bugs addressed
+- 根据继续手测反馈，训练 composer 现在支持点击列表空白区域收起已展开的动作卡，不再只能点动作卡片本身的空白区域。
+- 休息倒计时不再嵌在组卡内部展开，改为居中弹框 + 背景暗化，避免组卡滚动和 composer 滚动同时出现造成双滚动条体验。
+- 休息倒计时流程改为两段式：先弹框选择时长，再进入单一倒计时弹窗；倒计时阶段仅保留暂停/继续与关闭。
+- 每组现在新增前端本地 `restSeconds` 记录；设置休息时间后，会在完成区左侧显示 `休息 MM:SS`，没有休息则不显示该标签。
+- 当重量/次数被修改或手动取消完成时，对应组的本地休息记录会清空，避免显示过期休息数据。
+
+### files changed
+- `client/src/features/training/training-session-draft.ts`
+- `client/src/features/training/TrainingSessionSetRow.tsx`
+- `client/src/features/training/TrainingSessionRestTimer.tsx`
+- `client/src/features/training/TrainingSessionExerciseCard.tsx`
+- `client/src/features/training/TrainingSessionComposer.tsx`
+- `client/src/features/training/WorkoutCard.tsx`
+- `docs/progress.md`
+
+### verification results
+- `pnpm --filter @fitmind/client type-check` 通过。
+- `pnpm lint` 通过。
+- `pnpm --filter @fitmind/client exec .\\node_modules\\.bin\\vite.cmd build` 通过。
+
+### contracts preserved
+- 未修改 server 文件、数据库 schema、API contracts、SSE event names、assistant 文件、provider adapter、tool executor、auth token 逻辑或 `set_index` 规则。
+- 未新增 warmup set persistence、set notes persistence 持久化、rest timer persistence、audio alerts、browser notifications、backend migration 或 new endpoints。
+
+### Edit Mode Display Fix
+
+During local manual smoke, workout log edit mode showed both read-only workout metadata and editable metadata fields at the same time, making the detail area feel like a mixed view/edit state.
+
+Fixed in `WorkoutCard.tsx` by hiding the read-only training time / duration / notes section while edit mode is active. The workout detail area now cleanly switches between view mode and edit mode.
+
+Verification:
+
+- `pnpm --filter @fitmind/client type-check` passed
+- `pnpm lint` passed
+- `pnpm --filter @fitmind/client exec .\node_modules\.bin\vite.cmd build` passed
+
+## 2026-05-07 Phase 4.2 Batch 1 - Assistant Insight Dashboard
+
+### why this batch exists
+- 之前的 AI 助手页过于依赖固定提问，产品体验更像“披着聊天框外壳的规则展示”。
+- 这一批把助手页改成“主动训练洞察页 + 可选追问”，让用户打开页面就能直接看到训练建议、偏科提醒、恢复提醒、重点动作进展和判断依据。
+
+### new supported question types
+- 最近训练总览
+- 我今天练什么 / 下一次训练建议练哪里
+- 我胸练得够吗 / 某类部位训练是否偏少
+- 我是不是训练偏科
+- 当前动作进展 / 预估卧推极限
+- AI 根据什么判断
+- unsupported prompt 会明确说明当前支持范围，不再默认回退到 summary
+
+### quick prompt changes
+- Assistant quick prompts 从 2 个扩到 6 个产品导向入口：
+  - `最近训练总览`
+  - `我今天练什么？`
+  - `我胸练得够吗？`
+  - `我是不是偏科？`
+  - `当前动作进展`
+  - `AI 根据什么判断？`
+- `当前动作进展` 在未选中动作时会禁用，并显示先去分析页选择动作的提示。
+
+### insight dashboard changes
+- Assistant 页新增前端 deterministic insight dashboard，不新增新的 backend snapshot endpoint。
+- 页面会并行复用既有 `training summary`、`recommendation context` 和可选 `exercise progress` 组合出主动洞察卡片。
+- 默认展示 5 张洞察卡：
+  - 今日建议
+  - 训练偏科提醒
+  - 恢复提醒
+  - 重点动作进展
+  - 判断依据
+- 底部保留聊天输入框，但定位改成“继续追问”而不是页面主功能。
+
+### routing and template changes
+- assistant mode 扩展为：
+  - `training_overview`
+  - `exercise_progress`
+  - `next_training_focus`
+  - `muscle_balance`
+  - `training_imbalance`
+  - `recovery_check`
+  - `evidence_explain`
+  - `unsupported`
+- mock provider 仍保持单次 provider decision + 单次 tool execution，不引入第二次 provider call 或多轮 agent loop。
+- `exercise_progress` 仍优先走 `get_exercise_progress`；未选动作时返回“先去分析页选动作”的产品文案，不再偷偷回退到 summary。
+- `next_training_focus` / `muscle_balance` / `training_imbalance` / `recovery_check` / `evidence_explain` 默认走 `get_recommendation_context`。
+- user-facing answer template 全部改成中文产品文案，不暴露 debug copy、provider path、tool finished、raw JSON 或 raw context rows。
+- recovery 类回答统一加入安全边界：
+  - “我只能根据训练记录做一般性提醒，不能判断疼痛、疲劳或健康风险。如果有疼痛或不适，应优先休息或咨询专业人士。”
+
+### preserved contracts
+- 未新增 `/api/training/assistant-insights` endpoint，本批洞察先在前端拼装。
+- 未修改 SSE event names、provider adapter public contract、tool executor user isolation rule、auth token 逻辑、workout CRUD contracts 或 `set_index` 规则。
+- 未加入 RAG、MCP、多轮 agent loop、second provider call、真实 Anthropic token streaming 或医疗建议。
+
+### files changed
+- `client/src/App.tsx`
+- `client/src/features/assistant/AssistantWorkspace.tsx`
+- `client/src/features/assistant/AssistantChatPanel.tsx`
+- `client/src/features/assistant/AssistantQuickPrompts.tsx`
+- `client/src/features/assistant/AssistantIntroCard.tsx`
+- `client/src/features/assistant/AssistantComposer.tsx`
+- `client/src/features/assistant/AssistantMessageList.tsx`
+- `client/src/features/assistant/AssistantMessageBubble.tsx`
+- `client/src/features/assistant/AssistantInsightDashboard.tsx`
+- `client/src/features/assistant/assistant-date-range.ts`
+- `client/src/features/assistant/assistant-insight-builder.ts`
+- `client/src/features/assistant/assistant-insight-types.ts`
+- `client/src/features/assistant/assistant-types.ts`
+- `server/src/services/assistant/provider-types.ts`
+- `server/src/services/assistant/mock-provider.ts`
+- `server/src/services/assistant/assistant-orchestrator-service.ts`
+- `server/scripts/assistant-mock-turn-smoke.ts`
+- `server/scripts/assistant-stream-smoke.ts`
+- `docs/progress.md`
+
+### verification results
+- `pnpm --filter @fitmind/server type-check` passed.
+- `pnpm --filter @fitmind/client type-check` passed.
+- `pnpm lint` passed.
+- `pnpm --filter @fitmind/client exec .\node_modules\.bin\vite.cmd build` passed.
+- `server\node_modules\.bin\tsx.CMD server\scripts\assistant-mock-turn-smoke.ts` ran, but failed before assistant assertions because `POST /api/auth/register` returned `500 INTERNAL_ERROR` in the current environment.
+
+### known limitations
+- 肌群判断暂时仍主要依赖动作名称、训练量和训练频率；如果动作字典肌群映射不完整，助手会明确说明这一点。
+- 当前 assistant 仍是受控 deterministic path，不是自由问答大模型助手。
+- assistant mock smoke 目前被现有环境中的注册接口 `500` 阻塞，因此本批不把 mock smoke 记为通过。
+
+### Assistant UX Tightening
+
+During local manual smoke, the assistant experience exposed too much internal product/debug framing to end users and also felt brittle when switching away from the assistant tab and back again.
+
+Fixed on the client side by:
+
+- keeping the training / analysis / assistant tab trees mounted so assistant conversation state is not discarded just by tab switching
+- removing user-facing tool-call / provider / session status rail content from the main assistant path
+- reducing quick prompts to two user-meaningful entry points: recent training overview and selected exercise progress
+- rewriting assistant intro / empty-state / composer copy so the UI sets a narrower and more honest expectation for what the current assistant can answer well
+
+Behavior notes:
+
+- switching tabs no longer clears the in-memory assistant conversation UI
+- previous assistant answers are still historical snapshots; if training data changes, the user still needs to ask again to get a refreshed answer
+- this batch improves assistant usability and expectation-setting, but does not expand backend assistant capability or add new answer modes
+
+Verification:
+
+- `pnpm --filter @fitmind/client type-check` passed
+- `pnpm lint` passed
+- `pnpm --filter @fitmind/client exec .\node_modules\.bin\vite.cmd build` passed
 

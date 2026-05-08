@@ -1,111 +1,111 @@
-# FitMind AI Project Study Guide
+# FitMind AI 项目学习指南
 
-## 1. One-Sentence Positioning
+## 1. 一句话定位
 
-FitMind AI is an evidence-backed AI training analysis system that connects real workout logs, deterministic calculation tools, Tool Calling, SSE streaming, and a mobile-first React assistant UI.
+FitMind AI 是一个以证据为基础的 AI 训练分析系统，将真实训练日志、确定性计算工具、Tool Calling、SSE 流式传输和移动优先的 React 助手 UI 串联为一条完整链路。
 
-## 2. Resume-Ready Project Title
+## 2. 简历标题
 
-**FitMind AI - Evidence-Backed Training Analysis Assistant**
+**FitMind AI - 以证据为基础的训练分析助手**
 
-## 3. What This Project Is / Is Not
+## 3. 项目是什么 / 不是什么
 
-### Is
+### 是
 
-- A workout logging system with authenticated user data.
-- A deterministic calculation layer for training summary, exercise progress, and recommendation context.
-- A bounded Tool Calling architecture with a backend tool executor and provider adapter boundary.
-- An SSE-based assistant streaming flow with a frontend assistant state machine.
-- A mobile-first Chinese React UI that presents evidence-backed analysis and assistant answers.
+- 带用户认证数据的训练记录系统。
+- 用于训练总览、动作进展和推荐上下文的确定性计算层。
+- 具有后端工具执行器和 provider adapter 边界的受控 Tool Calling 架构。
+- 基于 SSE 的助手流式传输流程，前端有助手状态机。
+- 移动优先的中文 React UI，呈现以证据为基础的分析和助手回答。
 
-### Is not
+### 不是
 
-- A generic chatbot.
-- A RAG system.
-- An MCP system.
-- A multi-tool agent loop.
-- A medical advice system.
-- A production-grade fitness coaching system.
+- 通用聊天机器人。
+- RAG 系统。
+- MCP 系统。
+- 多工具 agent 循环。
+- 医疗建议系统。
+- 生产级健身教练系统。
 
-## 4. 3-Bullet Resume Version
+## 4. 简历三句话版本
 
-- Built an evidence-backed AI training analysis system that combines workout logging, deterministic analytics, Tool Calling, SSE streaming, and a mobile-first React interface.
-- Designed a backend calculation layer that computes training summary, exercise progress, and recommendation context with traceable evidence instead of relying on raw LLM reasoning.
-- Implemented a bounded assistant architecture with tool validation, provider abstraction, and frontend streaming state management to reduce hallucination risk and improve explainability.
+- 构建了一个以证据为基础的 AI 训练分析系统，将训练日志、确定性分析、Tool Calling、SSE 流式传输和移动优先 React 界面整合为一条完整链路。
+- 设计了后端计算层，以可追溯的证据（而非依赖 LLM 直接推断）计算训练总览、动作进展和推荐上下文。
+- 实现了受控 assistant 架构，包含工具参数校验、provider 抽象和前端流式状态管理，以降低幻觉风险并提升可解释性。
 
-## 5. 4-Bullet Technical Resume Version
+## 5. 简历四句话技术版本
 
-- Built a full-stack training analysis product with React, TypeScript, Vite, Node.js, Express, PostgreSQL, Zod, JWT, and SSE.
-- Implemented deterministic backend services for training summary, exercise progress, and recommendation context, with evidence fields such as `workout_ids`, `set_ids`, and `calculation_rules`.
-- Added a controlled Tool Calling path with Zod-validated tool inputs, server-owned auth context, tool execution logging, and a provider adapter that supports `mock` and Anthropic-path integration.
-- Shipped an SSE-driven assistant experience with explicit lifecycle events, incremental answer rendering, session continuity, and a mobile-first Chinese UI for training, analysis, and assistant workflows.
+- 用 React、TypeScript、Vite、Node.js、Express、PostgreSQL、Zod、JWT 和 SSE 构建了全栈训练分析产品。
+- 实现了确定性后端服务，用于训练总览、动作进展和推荐上下文，并附带 `workout_ids`、`set_ids`、`calculation_rules` 等证据字段。
+- 构建了受控 Tool Calling 路径，包含 Zod 参数校验、服务端持有的认证上下文、工具执行日志记录，以及支持 `mock` 和 Anthropic 路径集成的 provider adapter。
+- 完成了 SSE 驱动的助手体验，包含明确的生命周期事件、增量答案渲染、会话连续性，以及用于训练、分析和助手工作流的移动优先中文 UI。
 
-## 6. Architecture Overview
+## 6. 架构概述
 
-The high-level chain is:
+高层链路如下：
 
-React client  
--> API client  
--> Express routes/controllers  
--> services  
--> repositories  
+React 客户端  
+-> API 客户端  
+-> Express 路由/控制器  
+-> 服务层  
+-> 仓库层  
 -> PostgreSQL  
--> deterministic tools  
--> assistant orchestrator / provider adapter  
--> SSE stream  
--> frontend assistant state machine
+-> 确定性工具  
+-> assistant 编排器 / provider adapter  
+-> SSE 流  
+-> 前端 assistant 状态机
 
-The important architectural point is that data access, deterministic calculation, tool execution, provider integration, and streaming UX are separated. They are not all mixed into one chat endpoint.
+重要的架构要点是：数据访问、确定性计算、工具执行、provider 集成和流式 UX 是分离的，不是全部混在一个聊天接口里。
 
-## 7. Core Data Flow
+## 7. 核心数据流
 
-The core product flow is:
+核心产品流程如下：
 
-Workout logs  
--> stored workouts and sets  
--> deterministic summary / progress / recommendation context APIs  
--> internal tools wrapping those deterministic capabilities  
--> assistant stream that can call those tools  
--> frontend state machine and answer rendering
+训练日志  
+-> 存储的训练和组数  
+-> 确定性总览 / 进展 / 推荐上下文 API  
+-> 封装这些确定性能力的内部工具  
+-> 可以调用这些工具的助手流  
+-> 前端状态机和答案渲染
 
-This means the AI layer is not reasoning directly over raw workout tables. It is working on structured backend outputs that are already bounded and traceable.
+这意味着 AI 层不是直接对原始训练表进行推断，而是在已经有边界、可追溯的后端结构化输出上工作。
 
-## 8. Key Modules
+## 8. 核心模块
 
-### Training Log Module
+### 训练日志模块
 
-- Supports workout CRUD, including create, list, detail, and delete flows.
-- Supports set rows with exercise selection, reps, weight, RPE, warm-up, and notes.
-- Keeps `set_index` logic grouped by `exercise_id` before submit on the client side.
-- Refreshes workout list, summary, recommendation context, and selected exercise progress after create/delete flows.
-- Keeps auth tokens in frontend memory rather than `localStorage`, `sessionStorage`, or cookies.
+- 支持训练 CRUD，包括创建、列表、详情和删除流程。
+- 支持带动作选择、次数、重量、RPE、热身和备注的组记录。
+- 提交前在客户端按 `exercise_id` 分组处理 `set_index` 逻辑。
+- 创建/删除后刷新训练列表、总览、推荐上下文和已选动作进展。
+- 将认证 token 保存在前端内存中，不写入 `localStorage`、`sessionStorage` 或 cookie。
 
-### Deterministic Calculation Layer
+### 确定性计算层
 
-This is the most important trust foundation in the project.
+这是项目最重要的信任基础。
 
-Current capabilities:
+当前能力：
 
-- `training summary`
-- `exercise progress`
-- `recommendation context`
+- `training summary`（训练总览）
+- `exercise progress`（动作进展）
+- `recommendation context`（推荐上下文）
 
-Why it matters:
+重要性：
 
-- Numeric results come from deterministic backend logic, not model inference.
-- Responses include evidence fields such as `workout_ids`, `set_ids`, and `calculation_rules`.
-- Date inputs use `YYYY-MM-DD`, with half-open interval filtering to avoid end-of-day off-by-one errors.
-- `estimated_1rm_kg` uses the Epley formula as a training signal, not medical advice.
+- 数字结果来自确定性后端逻辑，而非模型推断。
+- 响应包含 `workout_ids`、`set_ids`、`calculation_rules` 等证据字段。
+- 日期输入使用 `YYYY-MM-DD`，内部采用半开区间过滤（`performed_at >= start_date` 且 `performed_at < end_date + 1 day`），避免当天结束的差一错误，同时保持用户的日历心理模型。
+- `estimated_1rm_kg` 使用 Epley 公式（`weight × (1 + reps / 30)`）作为近似训练信号，不构成医疗建议，不是保证的真实最大值。
 
-### Tool Executor
+### 工具执行器
 
-- Registers a controlled internal tool whitelist.
-- Validates tool inputs with Zod before execution.
-- Does not accept `user_id` in tool args.
-- Always derives `userId` from authenticated backend context.
-- Logs tool execution metadata without exposing secrets or raw provider payloads.
+- 注册受控的内部工具白名单。
+- 执行前用 Zod 校验工具输入参数。
+- 不接受工具参数中的 `user_id`。
+- 始终从已认证的后端上下文中派生 `userId`。
+- 记录工具执行元数据（user_id、工具名、脱敏参数、状态、耗时），不暴露密钥或原始 provider 载荷。
 
-Current internal tools:
+当前内部工具：
 
 - `get_training_summary`
 - `get_exercise_progress`
@@ -113,27 +113,27 @@ Current internal tools:
 
 ### Provider Adapter
 
-The provider adapter does not give the model direct system ownership. It places the provider behind a controlled boundary.
+provider adapter 不让模型直接拥有系统权限，而是将 provider 置于受控边界之后。
 
-Current state:
+当前状态：
 
-- Supports `mock` provider.
-- Supports an Anthropic provider adapter path.
-- Uses `ASSISTANT_PROVIDER` for switching.
-- Keeps provider SDK details out of controllers.
-- The real provider path is still a non-streaming provider call.
+- 支持 `mock` provider。
+- 支持 Anthropic provider adapter 路径。
+- 使用 `ASSISTANT_PROVIDER` 进行切换。
+- 将 provider SDK 细节隔离在控制器之外。
+- 真实 provider 路径目前仍是非流式 provider 调用。
 
-Provider output stays normalized to:
+Provider 输出规范化为：
 
 - `message`
 - `tool_call`
 - `error`
 
-The provider does not query the database directly, bypass the tool executor, or decide user ownership.
+Provider 不直接查询数据库、不绕过工具执行器、不决定用户所有权。
 
-### SSE Assistant Stream
+### SSE 助手流
 
-Current SSE event sequence includes:
+当前 SSE 事件序列包括：
 
 - `state`
 - `provider_selected`
@@ -144,83 +144,83 @@ Current SSE event sequence includes:
 - `done`
 - `error`
 
-Why SSE matters:
+SSE 的重要性：
 
-- The user can see that a request has been accepted.
-- The UI can show whether the system is thinking, calling a tool, or answering.
-- The frontend can render `answer_delta` incrementally.
-- The flow is easier to demo and easier to explain in interviews.
+- 用户可以看到请求已被接受。
+- UI 可以显示系统是在思考、调用工具还是在回答。
+- 前端可以增量渲染 `answer_delta`。
+- 流程更易于演示，也更易于在面试中解释。
 
-### Frontend Assistant State Machine
+### 前端助手状态机
 
-Current frontend assistant states:
+当前前端助手状态：
 
-- `idle`
-- `thinking`
-- `tool_calling`
-- `answering`
-- `done`
-- `error`
+- `idle`（空闲）
+- `thinking`（思考中）
+- `tool_calling`（调用工具中）
+- `answering`（回答中）
+- `done`（完成）
+- `error`（错误）
 
-Frontend responsibilities:
+前端职责：
 
-- Incrementally render the answer from `answer_delta`.
-- Show the active tool call based on SSE lifecycle events.
-- Display the selected provider.
-- Reuse the backend `sessionId`.
-- Support retry, stop, and clear conversation behavior.
+- 从 `answer_delta` 增量渲染答案。
+- 根据 SSE 生命周期事件显示当前活动工具调用。
+- 展示已选择的 provider。
+- 复用后端的 `sessionId`。
+- 支持重试、停止和清空对话行为。
 
-## 9. UI Design
+## 9. UI 设计
 
-The current UI can be explained as three Chinese product tabs:
+当前 UI 可以用三个中文产品 Tab 来描述：
 
-- `训练`: workout logging, workout history, and base stats.
-- `分析`: deterministic analysis and evidence preview.
-- `AI 助手`: tool-backed assistant explanation with SSE streaming.
+- `训练`：训练记录、训练历史和基础统计。
+- `分析`：确定性分析和证据预览。
+- `AI 助手`：基于工具的助手解释，带 SSE 流式传输。
 
-Design characteristics:
+设计特点：
 
-- Chinese UI.
-- Mobile-first workspace design.
-- Productized cards, pills, and status surfaces instead of debug-only UI.
+- 中文 UI。
+- 移动优先的工作台设计。
+- 产品化的卡片、标签和状态面板，不是纯调试界面。
 
-## 10. Security and Boundary Design
+## 10. 安全与边界设计
 
-This section is important in interviews because it explains how the project limits hallucination and data leakage risk.
+本节在面试中很重要，因为它解释了项目如何限制幻觉和数据泄露风险。
 
-Current boundaries:
+当前边界：
 
-- Auth middleware owns authentication.
-- Frontend tokens stay in memory.
-- `user_id` is not accepted from the frontend or the model.
-- Zod validation constrains tool args.
-- A tool whitelist limits what can execute.
-- The UI does not expose secrets or raw provider payloads.
-- The model is treated as a constrained language layer, not a system owner.
+- 认证中间件拥有鉴权权限。
+- 前端 token 保存在内存中。
+- `user_id` 不接受来自前端或模型的输入。
+- Zod 校验约束工具参数。
+- 工具白名单限制可执行内容。
+- UI 不暴露密钥或原始 provider 载荷。
+- 模型被视为受约束的语言层，而非系统拥有者。
 
-## 11. Current Limitations
+## 11. 当前限制
 
-These boundaries should be stated honestly:
+这些边界应如实说明：
 
-- No RAG.
-- No MCP.
-- No multi-tool agent loop.
-- No real Anthropic token streaming.
-- No second provider call after tool execution.
-- No completed browser E2E test.
-- Recommendation context is a deterministic preview, not medical advice.
+- 无 RAG。
+- 无 MCP。
+- 无多工具 agent 循环。
+- 无真实 Anthropic token 级流式传输。
+- 工具执行后无第二次 provider 调用。
+- 无已完成的浏览器 E2E 测试。
+- 推荐上下文是确定性预览，不构成医疗建议。
 
-The current system is an AI application chain, but it is still a bounded, single-turn, single-tool-priority assistant rather than a full agent system.
+当前系统是一条 AI 应用链路，但仍然是受控的单轮、单工具优先 assistant，而非完整的 agent 系统。
 
-## 12. 30-Second Chinese Pitch
+## 12. 30秒中文介绍
 
 FitMind AI 不是一个通用聊天机器人，而是一个围绕真实训练日志构建的 AI 训练分析系统。它先通过 workout CRUD 把用户训练数据结构化存下来，再由后端 deterministic calculation layer 计算训练总览、动作进展和 recommendation context，并附带 evidence。然后这些能力被包装成内部 tools，由 tool executor 和 provider adapter 控制调用边界，最后通过 SSE 把 assistant 状态和回答流式推给前端。这个项目的重点不是让模型自由发挥，而是让 AI 回答建立在可验证、可追溯的训练数据之上。
 
-## 13. 60-Second Chinese Pitch
+## 13. 60秒中文介绍
 
-FitMind AI 的核心不是“做一个聊天框”，而是先把训练分析这件事拆成可信的工程链路。底层先有 workout CRUD，把用户真实训练记录写入数据库；然后 deterministic calculation layer 负责训练总览、单动作进展和 recommendation context，这些结果都带 evidence，比如 `workout_ids`、`set_ids` 和 `calculation_rules`。接着这些确定性能力被封装成内部 tools，由 tool executor 做参数校验和安全执行，`user_id` 只能来自认证上下文，不能从前端或模型注入。模型层被放在 provider adapter 后面，目前支持 mock provider 和 Anthropic path，但真实 provider 仍然不能直接查数据库。最后后端通过 SSE 把 `thinking`、`tool_calling`、`answering`、`done` 这些状态流式推给前端，前端再用状态机和增量渲染把整个 AI 回答过程展示出来。所以这个项目强调的是 deterministic data、tool boundary 和 streaming UX，而不是一个无边界的 AI agent。
+FitMind AI 的核心不是"做一个聊天框"，而是先把训练分析这件事拆成可信的工程链路。底层先有 workout CRUD，把用户真实训练记录写入数据库；然后 deterministic calculation layer 负责训练总览、单动作进展和 recommendation context，这些结果都带 evidence，比如 `workout_ids`、`set_ids` 和 `calculation_rules`。接着这些确定性能力被封装成内部 tools，由 tool executor 做参数校验和安全执行，`user_id` 只能来自认证上下文，不能从前端或模型注入。模型层被放在 provider adapter 后面，目前支持 mock provider 和 Anthropic path，但真实 provider 仍然不能直接查数据库。最后后端通过 SSE 把 `thinking`、`tool_calling`、`answering`、`done` 这些状态流式推给前端，前端再用状态机和增量渲染把整个 AI 回答过程展示出来。所以这个项目强调的是 deterministic data、tool boundary 和 streaming UX，而不是一个无边界的 AI agent。
 
-## 14. 2-Minute Technical Deep Dive
+## 14. 两分钟技术深度讲解
 
 如果从技术链路讲，两分钟可以这样说：
 
@@ -230,53 +230,252 @@ FitMind AI 先从真实训练日志出发，而不是从 LLM prompt 出发。第
 
 第四层是 provider adapter 和 assistant orchestration。assistant 请求进入后，后端先决定 provider 路径，再由 provider 返回规范化的 `message`、`tool_call` 或 `error`。当前已经有 mock provider，也有 Anthropic adapter path，但还没有 real token-by-token streaming，也没有 tool 执行后的第二次 provider call。第五层是 SSE streaming UX，后端会发 `state`、`provider_selected`、`tool_call_started`、`tool_call_finished`、`answer_delta`、`session`、`done`、`error` 这些事件，前端用状态机和增量渲染把 assistant 过程展示出来。
 
-所以这个项目真正证明的不是“我接了一个模型 API”，而是我把训练数据、确定性计算、工具边界、provider abstraction 和前端流式交互串成了一条可解释、可验证、可演示的 AI application chain。
+所以这个项目真正证明的不是"我接了一个模型 API"，而是我把训练数据、确定性计算、工具边界、provider abstraction 和前端流式交互串成了一条可解释、可验证、可演示的 AI application chain。
 
-## 15. Interview Q&A
+## 15. 面试问答
 
-### 1. Why not put raw workout data directly into the prompt?
+### Q1. 为什么不把原始训练数据直接放进 prompt？
 
-Raw workout tables are not the best abstraction for a model. If you dump raw workouts and sets into the prompt, the model has to decide how to aggregate them, how to filter dates, and which exercises matter. That wastes tokens and increases hallucination risk. A better design is to let the backend produce deterministic summary, progress, and context first, then let the model explain those stable results.
+原始训练表不是最适合模型处理的抽象层。如果把原始训练和组数全部塞进 prompt，模型就必须自己决定如何聚合、如何过滤日期、哪些动作重要——这既浪费 token，也增加幻觉风险。更好的设计是让后端先生成确定性的总览、进展和上下文，再让模型解释这些稳定的结果。
 
-### 2. Why deterministic calculation layer?
+### Q2. 为什么要做确定性计算层？
 
-Core training metrics should be reproducible, testable, and traceable without depending on model behavior. That gives users higher trust and makes the system easier to debug. In this design, the model is an explanation layer rather than the source of truth.
+核心训练指标应该是可复现、可测试、可追溯的，不依赖模型行为。这让用户有更高的信任感，也让系统更容易调试。在这个设计里，模型是解释层，而不是数据来源。
 
-### 3. Why Tool Calling?
+### Q3. 为什么要用 Tool Calling？
 
-Tool Calling constrains the model to request controlled backend capabilities instead of querying the database directly or inventing its own aggregation logic. That keeps boundaries clear and makes the system easier to extend to other providers later.
+Tool Calling 约束模型只能请求受控的后端能力，而不是直接查数据库或自己发明聚合逻辑。这让边界清晰，也让系统更容易扩展到其他 provider。
 
-### 4. Why must `user_id` come from auth context?
+### Q4. 为什么 `user_id` 必须来自认证上下文？
 
-User ownership must stay authoritative on the server. If `user_id` were allowed from the frontend or the model, the system would risk cross-user data leakage. In the current design, `user_id` always comes from auth middleware, and tool schemas do not accept it as input.
+用户所有权的权威性必须保留在服务端。如果允许 `user_id` 从前端或模型传入，系统就会有跨用户数据泄露的风险。在当前设计里，`user_id` 始终来自认证中间件，工具 schema 不接受它作为输入。
 
-### 5. Why SSE?
+具体保护：`user_id` 只来自认证中间件；客户端和 provider 都不传递 `user_id`；工具 schema 不接受 `user_id`；在 assistant 消息持久化或流复用之前检查 session 所有权；确定性服务仍然按认证用户上下文过滤。
 
-A single blocking HTTP response makes AI UX feel opaque. SSE lets the frontend show `thinking`, `tool_calling`, `answering`, and `done`, which improves user understanding and makes the assistant chain much easier to demo.
+### Q5. 为什么用 SSE？
 
-### 6. Why provider adapter?
+单个阻塞式 HTTP 响应会让 AI UX 感觉不透明。SSE 让前端可以显示 `thinking`、`tool_calling`、`answering`、`done`，改善用户理解，也让 assistant 链路更容易演示。用户能区分：系统在思考、工具调用还在运行、答案正在生成、还是请求卡住或失败了。
 
-Provider SDK details belong in infrastructure, not controllers or core product flow. The adapter lets the system define its own request and response contract first, then insert different providers behind that boundary.
+### Q6. 为什么要有 provider adapter？
 
-### 7. How does the frontend state machine work?
+Provider SDK 细节属于基础设施，不属于控制器或核心产品流程。adapter 让系统先定义自己的请求和响应契约，再把不同 provider 插入该边界之后。切换 provider 不需要重写控制器；provider 失败在到达路由/控制器层之前就已经规范化。
 
-The frontend sends `POST /api/assistant/stream-turn`, consumes SSE events, updates state from `state`, updates the active tool card from `tool_call_started` and `tool_call_finished`, appends assistant text from `answer_delta`, and keeps session continuity from `session` and `done`. `error` transitions the UI into a failure state.
+### Q7. 前端状态机怎么工作？
 
-### 8. How do you reduce hallucination risk?
+前端发送 `POST /api/assistant/stream-turn`，消费 SSE 事件，从 `state` 更新状态，从 `tool_call_started` 和 `tool_call_finished` 更新当前活动工具卡片，从 `answer_delta` 追加助手文本，从 `session` 和 `done` 保持会话连续性。`error` 会把 UI 切换到失败状态。前端还跟踪活动工具调用、逐步追加流式回答、支持停止和重试、为后续轮次保留 `session_id`。
 
-The project does not claim to eliminate hallucination completely. It compresses risk by using deterministic calculations, a whitelist of tools, validated tool args, server-owned user identity, and evidence-backed structured outputs instead of raw prompt improvisation.
+### Q8. 如何降低幻觉风险？
 
-### 9. What is evidence in this project?
+项目并不宣称完全消除幻觉。它通过确定性计算、工具白名单、校验后的工具参数、服务端持有的用户身份，以及以证据为基础的结构化输出（而非原始 prompt 即兴发挥）来压缩风险。
 
-Evidence is the traceable backing for a result or answer, such as `workout_ids`, `set_ids`, `calculation_rules`, and tool-call metadata. It turns an answer from “a statement” into “a statement that can be traced back to workouts and calculation rules.”
+### Q9. 这个项目里的"证据"是什么？
 
-### 10. What would you improve next?
+证据是结果或回答的可追溯支撑，比如 `workout_ids`、`set_ids`、`calculation_rules`，以及工具调用元数据。它把一条回答从"一个陈述"变成"一个可以追溯回具体训练和计算规则的陈述"。
 
-The most reasonable next steps are:
+### Q10. 下一步你会做什么改进？
 
-- Add a real provider streaming path.
-- Add the second provider call after tool execution.
-- Add a bounded multi-step tool loop inside the same controlled architecture.
-- Improve chat history and session browsing.
+最合理的后续步骤：
 
-I would only evaluate larger additions like RAG, MCP, or more agent-like workflows after those core boundaries are stable.
+- 加入真实的 provider 流式传输路径。
+- 加入工具执行后的第二次 provider 调用，使模型可以将工具输出转化为 provider 生成的最终答案。
+- 在同一个受控架构内加入有边界的多步工具循环。
+- 改善聊天历史和 session 浏览。
+
+只有在以上核心边界稳定之后，才会评估 RAG、MCP 或更多类 agent 工作流这类更大的扩展。每个下一步都应该保留围绕确定性数据、认证范围执行和证据可见性的现有边界。
+
+---
+
+## 16. 按阶段讲法（Phase-by-Phase 面试讲稿）
+
+这一节是每个构建阶段的独立讲法，适合面试官问"这个模块是怎么做出来的"时按阶段展开。
+
+---
+
+### 16.1 Phase 1 — 训练日志 CRUD
+
+#### 这一阶段的价值
+
+Phase 1 建立了基础产品闭环：注册和登录、纯内存 MVP 认证、搜索和选择动作、创建带组数的训练、浏览训练列表和详情、删除训练。
+
+Phase 1 的价值不在于 CRUD 本身。价值在于产品现在拥有了真实的用户训练数据，并有清晰的用户边界。没有这一层，后面的 summary、progress 和 AI explanation 都没有可信基础。
+
+---
+
+### 16.2 Phase 2 — 确定性计算层
+
+#### 这一阶段的价值
+
+Phase 2 在不改变训练 CRUD 契约或数据库 schema 的前提下，新增了确定性只读计算 API。
+
+**`GET /api/training/summary`** 回答：
+- 某个时间范围内有多少次训练、多少组、累计了多少次数和总训练量
+- 哪些动作贡献了最多训练量
+
+**`GET /api/training/exercise-progress`** 回答：
+- 某个动作出现在多少次训练中，包含多少组
+- 该动作的总次数、总训练量、观测到的最大重量
+- 近似估算的最大单次力量（1RM），以及按训练场次的汇总数据
+
+#### 设计细节——为什么 Phase 2 面板是只读的
+
+Phase 2 前端面板有意设计为只读。重点是计算正确性和稳定显示，而非复杂的分析 UI。这使职责清晰：后端拥有计算逻辑，前端拥有只读渲染和刷新行为，数据修改仍然通过训练 CRUD 进行。
+
+---
+
+### 16.3 Phase 2.1 — 推荐上下文构建器
+
+#### 这一阶段做了什么
+
+推荐上下文构建器是 Phase 2.1 的核心。它不是 AI 推荐功能，而是一个确定性的后端上下文包构建器，用于为未来的 Tool Calling 或 LLM 解释预先组装结构化上下文。
+
+上下文包当前包含：`summary`（总览）、`focus_exercises`（重点动作）、`recent_workouts`（最近训练）、`evidence`（证据）。
+
+#### 为什么在 AI 聊天之前先构建上下文
+
+如果推荐上下文不先存在，未来的 LLM 就需要自己决定读哪些表、如何聚合、哪些训练重要、如何解释时间范围边界——这使系统更难测试、更难审计、更容易幻觉。Phase 2.1 在引入任何模型层之前消除了这种歧义。
+
+清晰的层次划分：
+- **原始日志**：原始的 `workouts` 和 `sets` 事实
+- **计算端点**：对一个具体问题的确定性回答
+- **推荐上下文**：将多个确定性输出组合成一个可解释上下文对象的确定性后端包
+- **未来 LLM 解释**：在该包之上的语言层解释，而非确定性层的替代品
+
+#### 30秒讲法
+
+"Phase 2.1 我做的不是 AI 推荐生成，而是 Recommendation Context Builder。它新增了一个后端 API，把某个日期范围内的总训练量、重点动作进展、最近 workout 摘要、evidence 和 calculation rules 组装成一个结构化 context package。它是确定性的，不调 LLM，不生成建议，主要目的是为未来 Tool Calling 和 AI 解释提供一个已经整理好、可验证、可回溯的后端上下文。"
+
+#### Phase-specific Q&A
+
+**Q: 为什么在 Tool Calling 之前先构建上下文？**
+
+第一个问题不是"模型能调工具吗？"第一个问题是"在模型说任何话之前，应该存在什么精确的后端上下文？"推荐上下文构建器首先锁定了这一点。如果提供商集成先到来，模型行为就会与未完成的后端编排决策混在一起，让系统更难测试、更难解释。
+
+**Q: 为什么不让 LLM 直接查询所有表？**
+
+那会把数据访问、聚合逻辑、计算规则和语言生成混在一起，让系统更难测试、更难审计，更容易跨用户泄露或产生幻觉。
+
+---
+
+### 16.4 Phase 3.0 — Tool Calling 骨架
+
+#### 这一阶段做了什么
+
+Phase 3.0 新增了一个 Tool Calling 骨架，但它仍然是后端架构步骤，而不是完成的 AI 能力。工具层是内部后端基础设施，还不是真正的聊天产品、不是模型集成，也不是面向用户的 Tool Calling 体验。
+
+工具执行时的 `user_id` 来自认证上下文，不允许从参数里传，参数也会先做 Zod 校验。这样未来无论接哪个模型 provider，模型调用的都是一层已经稳定、可测试、可审计的内部工具接口，而不是直接碰数据库。
+
+#### 为什么 provider 无关的工具层在真实模型集成之前
+
+这个顺序很重要，因为它首先锁定了困难的后端决策：工具名称和输入契约在引入任何模型 SDK 之前就变得稳定；确定性行为可以在不归咎于模型行为的情况下进行测试；用户隔离和参数验证在允许模型请求任何内容之前就已解决。
+
+#### 30秒讲法
+
+"Phase 3.0 我做的不是把大模型真正接进来，而是先把 Tool Calling 的后端骨架搭好。现在后端已经有三个内部工具：训练总览、单动作进展、推荐上下文。它们本质上都是对现有确定性服务的包装，不调 LLM，不做聊天，也不生成建议。工具执行时的 user_id 来自认证上下文，不允许从参数里传，参数也会先校验。这样未来无论接哪个模型提供商，模型调用的都是一层已经稳定、可测试、可审计的内部工具接口，而不是直接碰数据库。"
+
+#### Phase-specific Q&A
+
+**Q: 为什么不让模型直接调用数据库？**
+
+那会把数据访问、权限边界、聚合规则和语言生成混在一起，让系统更难测试、更难审计、更容易跨用户泄露，更容易幻觉——因为模型要同时决定查什么和如何解释它。
+
+**Q: 为什么要验证工具参数？**
+
+模型生成的或调用者提供的工具输入默认不可信。验证确保工具只接收预期的字段和格式，比如 `YYYY-MM-DD` 日期和有效的 `exercise_id`。这在允许未来 provider 集成之前同时保护了正确性和安全性。
+
+**Q: `tool_call_logs` 中记录什么？**
+
+后端记录执行元数据：认证的 `user_id`、工具名称、脱敏的输入参数、执行状态、持续时间、以及支持时的紧凑错误或输出元数据。重要的访谈点不是精确的存储格式，而是工具执行可以被观察和审计，不依赖模型层。
+
+---
+
+### 16.5 Phase 3.1 — Assistant 编排骨架
+
+#### 这一阶段做了什么
+
+Phase 3.1 新增了 assistant 编排骨架。后端现在有一个 `POST /api/assistant/mock-turn`，但它不是真正的 AI 对话，也不调大模型。它是一个确定性的 assistant 层：先根据 mode 选择要调的内部 tool，然后再用模板化方式把工具结果组装成 assistant 响应。如果提供 `session_id`，还会把 user message 和 assistant message 存到 `chat_sessions` 和 `messages` 表里。
+
+这个阶段的目标不是生成 AI 回答，而是先把 assistant 的后端编排、证据返回、会话持久化这些基础能力做稳。
+
+#### 为什么在真实 LLM 之前使用确定性模拟
+
+第一个问题不是模型能否自然地说话，而是后端 assistant 工作流是否正确：请求是否正确验证、是否选择了正确的内部工具路径、用户隔离是否得到保持、证据是否携带进了响应、轮次是否可以安全持久化。确定性模拟行为让你可以验证这些决策，而不必归咎于或依赖模型行为。
+
+层次区分：
+- **工具执行器**：低层内部后端层，验证工具参数并运行一个具名的确定性工具
+- **assistant 编排器**：高层后端层，接受 assistant 风格的请求，按模式选择工具路径，格式化确定性答案，并可选地持久化聊天消息
+- **模型 provider**：未来的外部 LLM 依赖，将决定或帮助决定调用哪些工具以及如何生成最终语言
+- **未来流式聊天**：未来面向用户的交互模型，将添加 token/chunk 流式传输、中间状态转换和多步工具/模型循环
+
+#### 30秒讲法
+
+"Phase 3.1 我做的是 Assistant Orchestration Skeleton。后端现在有一个 `POST /api/assistant/mock-turn`，但它不是真正的 AI 对话，也不调大模型。它是一个确定性的 assistant 层：先根据 mode 选择要调的内部 tool，比如训练总览、单动作进展、推荐上下文，然后再用模板化方式把工具结构组装成 assistant 回应。如果提供 session_id，还会把 user message 和 assistant message 存到 `chat_sessions` 和 `messages` 表里。这个阶段的目标不是生成 AI 回答，而是先把 assistant 的后端编排、证据返回、会话持久化这些基础能力做稳。"
+
+#### Phase-specific Q&A
+
+**Q: 这一阶段证明了什么？**
+
+证明后端已经可以支持 assistant 形状的产品工作流：一个经过认证的 assistant 端点存在、内部工具可以在该端点后面被编排、工具结果可以转化为 assistant 风格的摘要和证据、可选的聊天 session/消息持久化可以捕获轮次历史。
+
+**Q: 真实模型集成后如何替换模拟选择？**
+
+后来，确定性模式切换可以被 provider 支持的编排路径替换：请求仍然通过产品自有的 assistant 接口进入；认证上下文和验证规则仍然保留在后端；未来模型层可以决定调用哪个内部工具；同一个执行器仍然可以安全运行这些工具；最终模型响应可以替换今天的模板响应，同时保持证据和持久化期望不变。关键架构点是真实模型集成应该只替换选择和语言层，而不是确定性数据、验证或所有权边界。
+
+---
+
+### 16.6 Phase 3.2 — Provider Adapter
+
+#### 这一阶段做了什么
+
+Phase 3.2 是后端从只是确定性模拟 assistant 停止，开始证明真实 provider 可以插入而不放弃后端控制的时刻。
+
+现在后端可以通过 `ASSISTANT_PROVIDER` 在 `mock` 和 `anthropic` 之间切换，assistant orchestrator 仍然负责验证请求、决定允许哪些内部工具、执行工具、组装最终响应、以及持久化消息。Provider 本身只能返回 `message`、`tool_call` 或 `error` 这三种规范化结果，不能直接查库，也不能绕过 tool executor。
+
+重要的是 provider 集成不等于"AI 聊天完成了"。它只是证明编排契约足够强大，可以接受真实模型依赖，而不破坏用户隔离或工具边界。
+
+#### 30秒讲法
+
+"Phase 3.2 我做的是把真实 model provider 通过 Provider Adapter 接进后端，但不是直接做成聊天产品。现在后端可以通过 `ASSISTANT_PROVIDER` 在 `mock` 和 `anthropic` 之间切换，assistant orchestrator 仍然负责验证请求、决定允许哪些内部工具、执行工具、组装最终响应、以及持久化消息。Provider 本身只能返回 `message`、`tool_call` 或 `error` 这三种规范化结果，不能直接查库，也不能绕过 tool executor。这样面试时可以清楚说明：我们不是把模型 SDK 散落到 controller 里，而是先把 provider 边界、数据权限边界、和 tool execution 边界都收紧，再逐步往 streaming chat 演进。"
+
+#### Phase-specific Q&A
+
+**Q: 为什么添加 provider adapter 而不是直接在 assistant 服务中调用 Anthropic？**
+
+适配器将 provider 特定的载荷格式和传输规则隔离开来。assistant 服务应该拥有产品行为，而不是 SDK 繁文缛节。切换 provider 不应该需要重写控制器。
+
+**Q: env 切换证明了什么？**
+
+`ASSISTANT_PROVIDER=mock` 和 `ASSISTANT_PROVIDER=anthropic` 使用相同的编排器接口，这意味着 provider 切换不再只是理论，而是真实的架构接缝。
+
+**Q: 这个阶段最重要的边界是什么？**
+
+最重要的边界是 provider 可以影响工具选择，但后端仍然拥有工具执行、数据访问、验证、持久化和最终响应策略。
+
+---
+
+### 16.7 Phase 3.5 — 完整 Assistant 流程总结
+
+至此，项目可以被解释为完整的 AI 应用管道，而非孤立功能的集合。
+
+当前端到端的 assistant 流程是：
+1. 用户在前端 assistant 面板中输入消息
+2. 前端 hook 进入 `thinking` 状态
+3. 前端使用 `fetch` 加 `ReadableStream` 打开 `POST /api/assistant/stream-turn`
+4. 后端 assistant 编排器验证请求并解析经过认证的 session 所有权
+5. provider adapter 返回一个规范化结果：`message`、`tool_call` 或 `error`
+6. 如果 provider 请求工具，后端执行器验证工具名称、验证参数 schema，并注入认证的用户上下文
+7. 确定性工具返回带证据支持的结构化数据
+8. 编排器塑造最终 assistant 响应并发出项目自有的 SSE 事件
+9. 前端 hook 消费这些事件并在 `tool_calling`、`answering`、`done` 或 `error` 之间转换状态
+
+重要的访谈点：用户可以看到 assistant 在回答之前查询工具。系统不会把工具支持的推理呈现得好像凭空而来。
+
+#### 这条线路是面试时应该强调的主线
+
+- 真实训练日志
+- 确定性计算层
+- 工具注册表和执行器
+- provider adapter
+- SSE assistant 流
+- 前端聊天状态机
+
+正确的框架是："这已经是一个完整的 AI 应用链路，但它仍然是受控的单轮、单工具、证据优先的 assistant，而不是完整的类 agent 训练系统。"

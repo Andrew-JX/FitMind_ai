@@ -10,9 +10,9 @@ export function AssistantMessageList(props: AssistantMessageListProps) {
   if (props.messages.length === 0) {
     return (
       <StateNotice
-        description="你可以询问最近训练量、某个动作进展，或让助手解释推荐上下文。"
+        description="你可以先看上面的主动洞察，再继续追问为什么这样判断、今天适合练什么，或者某个动作有没有进步。"
         icon="bot"
-        title="从一个训练问题开始"
+        title="从一个训练追问开始"
       />
     );
   }

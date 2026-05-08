@@ -1,8 +1,13 @@
+import { useState } from "react";
+
 import { Button } from "../../components/Button";
 import { Icon } from "../../components/Icon";
+import { Input } from "../../components/Input";
 import { useTheme } from "../../theme/ThemeContext";
 
-export type RestTimerStatus = "running" | "paused" | "finished";
+const REST_TIMER_OPTIONS = [30, 60, 90, 120] as const;
+
+export type RestTimerStatus = "selecting" | "running" | "paused" | "finished";
 
 export interface RestTimerState {
   isRunning: boolean;
@@ -14,56 +19,125 @@ export interface RestTimerState {
 
 export interface TrainingSessionRestTimerProps {
   onClose: () => void;
-  onSkip: () => void;
+  onConfirmDuration: (seconds: number) => void;
   onToggleRunning: () => void;
   timer: RestTimerState;
 }
 
 export function TrainingSessionRestTimer(props: TrainingSessionRestTimerProps) {
   const { theme } = useTheme();
+  const [customRestSeconds, setCustomRestSeconds] = useState("150");
   const progress =
     props.timer.totalSeconds > 0
       ? Math.max(0, Math.min(1, props.timer.remainingSeconds / props.timer.totalSeconds))
       : 0;
 
-  if (props.timer.status === "finished") {
-    return (
-      <aside style={timerBarStyle(theme, "finished")}>
-        <div style={timerMainStyle}>
-          <Icon name="check" size={16} />
-          <strong style={timerTitleStyle(theme)}>休息结束，可以开始下一组了</strong>
-        </div>
-        <Button onClick={props.onClose} style={timerActionButtonStyle} type="button" variant="secondary">
-          关闭
-        </Button>
-      </aside>
-    );
-  }
-
   return (
-    <aside style={timerBarStyle(theme, props.timer.status)}>
-      <div style={timerTextWrapStyle}>
-        <div style={timerMainStyle}>
-          <Icon name="clock" size={16} />
-          <strong style={timerTitleStyle(theme)}>
-            {props.timer.status === "paused" ? "休息已暂停" : "休息中"}{" "}
-            {formatRestTime(props.timer.remainingSeconds)}
-          </strong>
-        </div>
-        <div style={progressTrackStyle(theme)}>
-          <div style={progressFillStyle(theme, progress)} />
-        </div>
-      </div>
-      <div style={timerActionsStyle}>
-        <Button onClick={props.onToggleRunning} style={timerActionButtonStyle} type="button" variant="secondary">
-          {props.timer.status === "paused" ? "继续" : "暂停"}
-        </Button>
-        <Button onClick={props.onSkip} style={timerActionButtonStyle} type="button" variant="secondary">
-          跳过
-        </Button>
-      </div>
-    </aside>
+    <div onClick={props.onClose} style={backdropStyle(theme)}>
+      <section
+        onClick={(event) => event.stopPropagation()}
+        style={cardStyle(theme)}
+      >
+        {props.timer.status === "selecting" ? (
+          <>
+            <header style={headerStyle}>
+              <div style={titleWrapStyle}>
+                <Icon name="clock" size={18} />
+                <strong style={titleStyle(theme)}>设置休息倒计时</strong>
+              </div>
+              <button
+                aria-label="关闭休息倒计时"
+                onClick={props.onClose}
+                style={closeButtonStyle(theme)}
+                type="button"
+              >
+                ×
+              </button>
+            </header>
+
+            <div style={optionGridStyle}>
+              {REST_TIMER_OPTIONS.map((seconds) => (
+                <button
+                  key={seconds}
+                  onClick={() => props.onConfirmDuration(seconds)}
+                  style={optionButtonStyle(theme)}
+                  type="button"
+                >
+                  {seconds} 秒
+                </button>
+              ))}
+            </div>
+
+            <div style={customRowStyle}>
+              <Input
+                min="1"
+                onChange={(event) => setCustomRestSeconds(event.target.value)}
+                type="number"
+                value={customRestSeconds}
+              />
+              <Button
+                disabled={!isValidRestSeconds(customRestSeconds)}
+                onClick={() => props.onConfirmDuration(Number.parseInt(customRestSeconds, 10))}
+                type="button"
+                variant="secondary"
+              >
+                自定义
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <header style={headerStyle}>
+              <div style={titleWrapStyle}>
+                <Icon name={props.timer.status === "finished" ? "check" : "clock"} size={18} />
+                <strong style={titleStyle(theme)}>
+                  {props.timer.status === "finished"
+                    ? "休息结束，可以开始下一组了"
+                    : props.timer.status === "paused"
+                      ? "休息已暂停"
+                      : "休息中"}
+                </strong>
+              </div>
+              <button
+                aria-label="关闭休息倒计时"
+                onClick={props.onClose}
+                style={closeButtonStyle(theme)}
+                type="button"
+              >
+                ×
+              </button>
+            </header>
+
+            <div style={countdownWrapStyle}>
+              <strong style={countdownStyle(theme)}>
+                {formatRestTime(props.timer.remainingSeconds)}
+              </strong>
+              <div style={progressTrackStyle(theme)}>
+                <div style={progressFillStyle(theme, progress)} />
+              </div>
+            </div>
+
+            <div style={actionRowStyle}>
+              {props.timer.status !== "finished" ? (
+                <Button onClick={props.onToggleRunning} type="button" variant="secondary">
+                  {props.timer.status === "paused" ? "继续" : "暂停"}
+                </Button>
+              ) : null}
+              <Button onClick={props.onClose} type="button" variant="secondary">
+                关闭
+              </Button>
+            </div>
+          </>
+        )}
+      </section>
+    </div>
   );
+}
+
+function isValidRestSeconds(value: string): boolean {
+  const seconds = Number.parseInt(value, 10);
+
+  return Number.isInteger(seconds) && seconds > 0;
 }
 
 function formatRestTime(totalSeconds: number): string {
@@ -74,57 +148,110 @@ function formatRestTime(totalSeconds: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-function timerBarStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-  status: RestTimerStatus,
-): React.CSSProperties {
-  const semanticColor = status === "finished" ? theme.colors.green : theme.colors.orange;
-
+function backdropStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
   return {
     alignItems: "center",
-    backgroundColor: theme.colors.surf,
-    border: `1px solid ${semanticColor}`,
-    borderRadius: theme.radius.card,
-    boxShadow: theme.shadows.card,
-    color: theme.colors.tx,
-    display: "grid",
-    gap: 12,
-    gridTemplateColumns: status === "finished" ? "minmax(0, 1fr) auto" : "minmax(0, 1fr) auto",
-    left: 16,
-    padding: 12,
+    backgroundColor: theme.isDark ? "rgba(0, 0, 0, 0.52)" : "rgba(0, 0, 0, 0.28)",
+    display: "flex",
+    inset: 0,
+    justifyContent: "center",
+    padding: 20,
     position: "absolute",
-    right: 16,
-    bottom: "calc(88px + env(safe-area-inset-bottom, 0px))",
-    zIndex: 5,
+    zIndex: 240,
   };
 }
 
-const timerTextWrapStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 8,
-  minWidth: 0,
-};
+function cardStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.surf,
+    border: `1px solid ${theme.colors.bdr2}`,
+    borderRadius: theme.radius.card,
+    boxShadow: theme.shadows.card,
+    display: "grid",
+    gap: 16,
+    maxWidth: 320,
+    padding: 18,
+    width: "100%",
+  };
+}
 
-const timerMainStyle: React.CSSProperties = {
+const headerStyle: React.CSSProperties = {
   alignItems: "center",
   display: "flex",
-  gap: 8,
-  minWidth: 0,
+  gap: 12,
+  justifyContent: "space-between",
 };
 
-function timerTitleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+const titleWrapStyle: React.CSSProperties = {
+  alignItems: "center",
+  display: "flex",
+  gap: 10,
+};
+
+function titleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
   return {
     color: theme.colors.tx,
+    fontSize: 15,
+    lineHeight: 1.4,
+  };
+}
+
+function closeButtonStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    background: "transparent",
+    border: "none",
+    color: theme.colors.tx3,
+    cursor: "pointer",
+    fontSize: 22,
+    lineHeight: 1,
+    padding: 0,
+  };
+}
+
+const optionGridStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 10,
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+};
+
+function optionButtonStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.surf2,
+    border: `1px solid ${theme.colors.bdr}`,
+    borderRadius: theme.radius.control,
+    color: theme.colors.tx,
+    cursor: "pointer",
     fontSize: 13,
-    lineHeight: 1.35,
+    fontWeight: 700,
+    padding: "12px 10px",
+  };
+}
+
+const customRowStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 10,
+  gridTemplateColumns: "minmax(0, 1fr) auto",
+};
+
+const countdownWrapStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 12,
+};
+
+function countdownStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    color: theme.colors.tx,
+    fontSize: 36,
+    lineHeight: 1,
+    textAlign: "center",
   };
 }
 
 function progressTrackStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf2,
-    borderRadius: 3,
-    height: 6,
+    borderRadius: 999,
+    height: 8,
     overflow: "hidden",
   };
 }
@@ -135,19 +262,15 @@ function progressFillStyle(
 ): React.CSSProperties {
   return {
     backgroundColor: theme.colors.orange,
-    borderRadius: 3,
+    borderRadius: 999,
     height: "100%",
     transition: "width 180ms ease",
     width: `${progress * 100}%`,
   };
 }
 
-const timerActionsStyle: React.CSSProperties = {
+const actionRowStyle: React.CSSProperties = {
   display: "flex",
-  gap: 8,
-};
-
-const timerActionButtonStyle: React.CSSProperties = {
-  fontSize: 12,
-  padding: "8px 10px",
+  gap: 10,
+  justifyContent: "flex-end",
 };

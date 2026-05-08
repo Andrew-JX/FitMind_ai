@@ -19,6 +19,7 @@ import type {
   AssistantStreamOptions,
 } from "./assistant-stream-types.js";
 import type {
+  AssistantIntentMode,
   AssistantProviderRequest,
   AssistantProviderResponse,
   AssistantProviderToolDefinition,
@@ -27,7 +28,12 @@ import type {
 const assistantModeSchema = z.enum([
   "training_overview",
   "exercise_progress",
-  "recommendation_context",
+  "next_training_focus",
+  "muscle_balance",
+  "training_imbalance",
+  "recovery_check",
+  "evidence_explain",
+  "unsupported",
 ]);
 
 const mockAssistantTurnSchema = z
@@ -119,9 +125,11 @@ interface RecommendationContextResult {
   };
   focus_exercises: Array<{
     exercise_name: string;
+    total_volume?: number | undefined;
   }>;
   recent_workouts: Array<{
     workout_id: string;
+    performed_at: string;
   }>;
   evidence: {
     workout_ids: string[];
@@ -131,7 +139,7 @@ interface RecommendationContextResult {
 }
 
 export interface MockAssistantTurnInput {
-  mode: "training_overview" | "exercise_progress" | "recommendation_context";
+  mode: AssistantIntentMode;
   session_id?: string | undefined;
   message: string;
   start_date: string;
@@ -175,7 +183,17 @@ interface ProviderSimulationResult {
   normalizedMessage: string;
 }
 
+type FocusArea =
+  | "back"
+  | "chest"
+  | "legs"
+  | "mixed"
+  | "shoulders"
+  | "unknown";
+
 const ANSWER_DELTA_CHUNK_SIZE = 24;
+const RECOVERY_BOUNDARY_COPY =
+  "我只能根据训练记录做一般性提醒，不能判断疼痛、疲劳或健康风险。如果有疼痛或不适，应优先休息或咨询专业人士。";
 
 function uniqueStrings(values: string[]): string[] {
   return [...new Set(values)];
@@ -255,24 +273,24 @@ function buildTrainingOverviewAnswer(
   if (result.totals.workout_count === 0) {
     return {
       summary:
-        "最近 30 天还没有训练记录。先完成一次训练，系统就能为你生成训练总览和 AI 可用上下文。",
+        "根据当前时间范围内的训练记录，你还没有可用的训练数据。先完成几次训练，助手才能给出更有意义的总览和建议。",
       bullets: [
-        `统计范围：${result.range.start_date} 至 ${result.range.end_date}`,
-        "训练次数：0 次",
-        "训练容量：0 kg",
+        `统计范围：${result.range.start_date} 到 ${result.range.end_date}`,
+        "当前训练次数：0 次",
+        "当前训练量：0 kg",
       ],
       evidence: buildEvidence("get_training_summary", result),
     };
   }
 
   return {
-    summary: `最近 30 天你共记录了 ${result.totals.workout_count} 次训练、${result.totals.set_count} 组训练组，总次数 ${result.totals.total_reps} 次，总训练容量 ${result.totals.total_volume} kg。`,
+    summary: `根据你最近这段时间的训练记录，你共训练了 ${result.totals.workout_count} 次，完成 ${result.totals.set_count} 组，累计 ${result.totals.total_reps} 次，总训练量约 ${result.totals.total_volume} kg。`,
     bullets: [
-      topExercise === undefined
-        ? "当前范围内还没有主要训练动作。"
-        : `当前主要训练动作是 ${topExercise.exercise_name}，总容量为 ${topExercise.total_volume} kg。`,
-      `本次分析基于 ${result.evidence.workout_ids.length} 条 workout 记录。`,
-      `统计范围：${result.range.start_date} 至 ${result.range.end_date}`,
+      topExercise
+        ? `当前训练量最集中的动作是 ${topExercise.exercise_name}，累计约 ${topExercise.total_volume} kg。`
+        : "当前时间范围内还没有明显集中的主要动作。",
+      `这个总结来自 ${result.evidence.workout_ids.length} 条已记录 workout。`,
+      "这些数字来自已记录训练，不是模型凭空猜测。",
     ],
     evidence: buildEvidence("get_training_summary", result),
   };
@@ -285,71 +303,177 @@ function buildExerciseProgressAnswer(
 
   if (result.totals.workout_count === 0) {
     return {
-      summary: `最近 30 天里还没有 ${exerciseName} 的训练记录，暂时无法给出 1RM 或进展结果。`,
+      summary: `${exerciseName} 最近这段时间还没有训练记录，所以我暂时看不出这个动作的稳定进展。`,
       bullets: [
-        `统计范围：${result.range.start_date} 至 ${result.range.end_date}`,
-        "最近训练次数：0 次",
-        "请先记录这个动作，或在分析页切换到已有数据的动作。",
+        `统计范围：${result.range.start_date} 到 ${result.range.end_date}`,
+        "当前训练次数：0 次",
+        "你可以先记录这个动作，或者去“分析”页切换到已有数据的动作。",
       ],
       evidence: buildEvidence("get_exercise_progress", result),
     };
   }
 
   return {
-    summary: `根据你最近的 ${exerciseName} 训练记录，当前系统预估你的 1RM 约为 ${result.totals.estimated_1rm_kg ?? "暂无结果"} kg。这个结果来自后端确定性计算规则，而不是模型猜测。`,
+    summary: `根据你最近的 ${exerciseName} 训练记录，当前估算 1RM 约为 ${formatMetricKg(result.totals.estimated_1rm_kg)}，观察到的最高训练重量约为 ${formatMetricKg(result.totals.max_weight_kg)}。`,
     bullets: [
-      `最近记录中最高训练重量为 ${result.totals.max_weight_kg ?? "暂无结果"} kg。`,
-      `最近 ${result.sessions.length} 次记录共关联 ${result.evidence.workout_ids.length} 条 workout 和 ${result.evidence.set_ids.length} 条 set。`,
-      `calculation_rules：${result.evidence.calculation_rules[0] ?? "当前未返回规则说明"}`,
+      `最近共纳入 ${result.totals.workout_count} 次训练、${result.totals.set_count} 条相关训练组。`,
+      `这个判断来自 ${result.evidence.workout_ids.length} 条 workout 和 ${result.evidence.set_ids.length} 条 set。`,
+      "这里的 1RM 是训练信号，不是保证值，也不是医疗或专业教练建议。",
     ],
     evidence: buildEvidence("get_exercise_progress", result),
   };
 }
 
 function buildRecommendationContextAnswer(
+  mode: AssistantIntentMode,
+  message: string,
   result: RecommendationContextResult,
 ): MockAssistantTurnResponseData["answer"] {
-  const topExercise = result.summary.by_exercise[0];
-
   if (result.summary.workout_count === 0) {
     return {
       summary:
-        "当前还没有可用于推荐上下文的训练记录。先完成训练记录，系统才会生成可供助手读取的确定性上下文。",
+        "当前还没有足够的训练记录可供判断。先记录几次训练后，我才能根据真实的 workout 和 set 给出更具体的解释。",
       bullets: [
-        `统计范围：${result.range.start_date} 至 ${result.range.end_date}`,
-        "重点动作：0 个",
-        "最近训练：0 条",
+        `统计范围：${result.range.start_date} 到 ${result.range.end_date}`,
+        "当前没有可用的训练量分布和最近训练记录。",
       ],
       evidence: buildEvidence("get_recommendation_context", result),
     };
   }
 
+  switch (mode) {
+    case "next_training_focus":
+      return buildNextTrainingFocusAnswer(result);
+    case "muscle_balance":
+      return buildMuscleBalanceAnswer(message, result);
+    case "training_imbalance":
+      return buildTrainingImbalanceAnswer(result);
+    case "recovery_check":
+      return buildRecoveryCheckAnswer(message, result);
+    case "evidence_explain":
+      return buildEvidenceExplainAnswer(result);
+    default:
+      return buildEvidenceExplainAnswer(result);
+  }
+}
+
+function buildNextTrainingFocusAnswer(
+  result: RecommendationContextResult,
+): MockAssistantTurnResponseData["answer"] {
+  const dominantArea = inferDominantFocusArea(result.summary.by_exercise);
+  const topExercise = result.summary.by_exercise[0];
+
   return {
-    summary: `AI 助手当前会读取一份确定性上下文预览，其中包含 ${result.summary.workout_count} 次训练、${result.summary.set_count} 组训练组、${result.summary.total_reps} 次总次数和 ${result.summary.total_volume} kg 总容量。`,
+    summary: `根据你最近 30 天的训练记录，下一次训练可以优先补${resolveNextFocusSuggestion(dominantArea)}。`,
     bullets: [
-      `这是一份 deterministic context preview，不是 AI 自动生成的训练建议。`,
-      `当前重点动作 ${result.focus_exercises.length} 个，最近训练 ${result.recent_workouts.length} 条。`,
-      topExercise === undefined
-        ? "当前范围内没有可展示的主要动作。"
-        : `主要动作是 ${topExercise.exercise_name}，总容量为 ${topExercise.total_volume} kg。`,
+      topExercise
+        ? `你当前训练量最集中的动作是 ${topExercise.exercise_name}。`
+        : "当前时间范围内还没有明显集中的主要动作。",
+      "这个建议只是基于已记录训练量和最近训练分布的保守提醒，不是生产级教练方案。",
+      "如果你的动作字典肌群信息还不完整，我会更多依据动作名称和训练量集中度来判断。",
+    ],
+    evidence: buildEvidence("get_recommendation_context", result),
+  };
+}
+
+function buildMuscleBalanceAnswer(
+  message: string,
+  result: RecommendationContextResult,
+): MockAssistantTurnResponseData["answer"] {
+  const targetArea = detectTargetArea(message);
+  const dominantArea = inferDominantFocusArea(result.summary.by_exercise);
+  const topExercise = result.summary.by_exercise[0];
+
+  const summary =
+    targetArea === "unknown"
+      ? "我会先根据最近训练量分布来判断你有没有明显忽略某一类动作。"
+      : targetArea === dominantArea
+        ? `从最近记录看，${describeTargetArea(targetArea)}相关训练并不算少，训练量已经比较靠前。`
+        : `从最近记录看，${describeTargetArea(targetArea)}相关训练暂时不是最集中的部分，可能还有补充空间。`;
+
+  return {
+    summary: `${summary} 当前动作字典的肌群信息有限，所以这个判断主要基于动作名称和训练量分布。`,
+    bullets: [
+      topExercise
+        ? `当前训练量最集中的动作是 ${topExercise.exercise_name}。`
+        : "当前时间范围内没有明显排在最前的动作。",
+      `最近 30 天共参考 ${result.summary.workout_count} 次训练和 ${result.summary.set_count} 组记录。`,
+    ],
+    evidence: buildEvidence("get_recommendation_context", result),
+  };
+}
+
+function buildTrainingImbalanceAnswer(
+  result: RecommendationContextResult,
+): MockAssistantTurnResponseData["answer"] {
+  const topExercises = result.summary.by_exercise.slice(0, 3);
+  const topVolume = topExercises.reduce(
+    (total, exercise) => total + exercise.total_volume,
+    0,
+  );
+  const firstExercise = topExercises[0];
+  const firstRatio =
+    topVolume === 0 || !firstExercise ? 0 : firstExercise.total_volume / topVolume;
+
+  return {
+    summary:
+      firstRatio >= 0.55
+        ? `最近训练量有一点集中在 ${firstExercise?.exercise_name ?? "少数动作"}，从分布上看存在一定偏科倾向。`
+        : "最近训练量没有明显只堆在单一动作上，整体分布看起来还算相对均衡。",
+    bullets: [
+      firstExercise
+        ? `Top 3 动作里，第一位约占 ${(firstRatio * 100).toFixed(0)}% 的训练量。`
+        : "当前时间范围内还没有明显的 top exercise 分布。",
+      "这个判断主要来自最近 30 天 top exercises 的训练量集中度，而不是模型主观猜测。",
+    ],
+    evidence: buildEvidence("get_recommendation_context", result),
+  };
+}
+
+function buildRecoveryCheckAnswer(
+  message: string,
+  result: RecommendationContextResult,
+): MockAssistantTurnResponseData["answer"] {
+  const targetArea = detectTargetArea(message);
+  const dominantArea = inferDominantFocusArea(result.summary.by_exercise);
+  const latestWorkout = result.recent_workouts[0];
+  const daysSince = latestWorkout ? getDaysSince(latestWorkout.performed_at) : null;
+  const relationCopy =
+    targetArea !== "unknown" && targetArea === dominantArea
+      ? `${describeTargetArea(targetArea)}相关训练在你最近记录里出现得不算少。`
+      : "从最近记录看，你确实有持续训练，但我不能只靠日志判断当天是否适合继续练同一部位。";
+
+  return {
+    summary: `${relationCopy} ${daysSince === null ? "" : `最近一次纳入参考的训练距离现在大约 ${daysSince} 天。 `}${RECOVERY_BOUNDARY_COPY}`,
+    bullets: [
+      "这类提醒主要依据最近训练时间和训练量分布，不包含疼痛、睡眠、主观疲劳等信息。",
+      "如果你今天有明显 soreness、疲劳或不适，应该优先休息而不是继续硬顶训练。",
+    ],
+    evidence: buildEvidence("get_recommendation_context", result),
+  };
+}
+
+function buildEvidenceExplainAnswer(
+  result: RecommendationContextResult,
+): MockAssistantTurnResponseData["answer"] {
+  return {
+    summary:
+      "这些判断来自已记录的 workout、set 和 calculation rules，不是模型凭空猜测。",
+    bullets: [
+      `当前共参考 ${result.evidence.workout_ids.length} 条 workout、${result.evidence.set_ids.length} 条 set。`,
+      `目前纳入 ${result.evidence.calculation_rules.length} 条 calculation rules。`,
+      "如果当前动作字典的肌群信息不完整，我会更多依据动作名称、训练量和最近训练频率来解释。",
     ],
     evidence: buildEvidence("get_recommendation_context", result),
   };
 }
 
 function buildProviderMessageAnswer(
-  mode: MockAssistantTurnInput["mode"],
   message: string,
 ): MockAssistantTurnResponseData["answer"] {
-  const isProductMessage =
-    !message.startsWith("Deterministic mock provider message:") &&
-    !message.startsWith("Deterministic mock provider error:");
-
   return {
     summary: message,
-    bullets: isProductMessage
-      ? ["本次没有执行内部工具调用。"]
-      : [`Mode: ${mode}`, "Provider path: message", "No internal tool was executed."],
+    bullets: [],
     evidence: buildMockProviderEvidence(),
   };
 }
@@ -399,7 +523,12 @@ function getToolDefinitionForMode(
         description: "Return deterministic progress data for one exercise.",
         input_fields: ["exercise_id", "start_date", "end_date"],
       };
-    case "recommendation_context":
+    case "next_training_focus":
+    case "muscle_balance":
+    case "training_imbalance":
+    case "recovery_check":
+    case "evidence_explain":
+    case "unsupported":
       return {
         name: "get_recommendation_context",
         description: "Return a deterministic recommendation context package.",
@@ -415,7 +544,7 @@ function getAllowedToolDefinitions(
     getToolDefinitionForMode(mode),
     getToolDefinitionForMode("training_overview"),
     getToolDefinitionForMode("exercise_progress"),
-    getToolDefinitionForMode("recommendation_context"),
+    getToolDefinitionForMode("next_training_focus"),
   ];
 
   return prioritizedTools.filter(
@@ -587,6 +716,7 @@ async function emitAnswerEvents(
 }
 
 function buildToolAnswer(
+  input: MockAssistantTurnInput,
   toolName: string,
   result: unknown,
 ): MockAssistantTurnResponseData["answer"] {
@@ -598,17 +728,13 @@ function buildToolAnswer(
     return buildExerciseProgressAnswer(result as ExerciseProgressResult);
   }
 
-  return buildRecommendationContextAnswer(result as RecommendationContextResult);
+  return buildRecommendationContextAnswer(
+    input.mode,
+    input.message,
+    result as RecommendationContextResult,
+  );
 }
 
-/**
- * Execute one deterministic mock assistant turn through the internal tool executor.
- *
- * @param userId - Authenticated user id from middleware context.
- * @param rawInput - Raw request body for the mock assistant turn.
- * @param options - Optional stream event sink for SSE responses.
- * @returns Deterministic mock assistant response assembled from tool output.
- */
 export async function runMockAssistantTurn(
   userId: string,
   rawInput: unknown,
@@ -656,7 +782,7 @@ export async function runMockAssistantTurn(
   let answer: MockAssistantTurnResponseData["answer"];
 
   if (providerResponse.kind === "message") {
-    answer = buildProviderMessageAnswer(input.mode, providerResponse.message);
+    answer = buildProviderMessageAnswer(providerResponse.message);
     await emitAnswerEvents(answer, options);
   } else {
     ensureAllowedProviderTool(providerResponse, providerRequest.allowed_tools);
@@ -712,7 +838,7 @@ export async function runMockAssistantTurn(
       throw error;
     }
 
-    answer = buildToolAnswer(providerResponse.tool_name, result);
+    answer = buildToolAnswer(input, providerResponse.tool_name, result);
     await emitAnswerEvents(answer, options);
   }
 
@@ -736,4 +862,137 @@ export async function runMockAssistantTurn(
   });
 
   return response;
+}
+
+function inferDominantFocusArea(
+  exercises: Array<{ exercise_name: string; total_volume: number }>,
+): FocusArea {
+  const areaScores = new Map<FocusArea, number>([
+    ["chest", 0],
+    ["back", 0],
+    ["legs", 0],
+    ["shoulders", 0],
+    ["unknown", 0],
+  ]);
+
+  for (const exercise of exercises) {
+    const area = inferFocusAreaFromName(exercise.exercise_name);
+    areaScores.set(area, (areaScores.get(area) ?? 0) + exercise.total_volume);
+  }
+
+  const rankedAreas = [...areaScores.entries()].sort((left, right) => right[1] - left[1]);
+  const topArea = rankedAreas[0];
+  const secondArea = rankedAreas[1];
+
+  if (!topArea || topArea[1] === 0) {
+    return "unknown";
+  }
+
+  if (secondArea && secondArea[1] > 0 && topArea[1] / secondArea[1] < 1.25) {
+    return "mixed";
+  }
+
+  return topArea[0];
+}
+
+function inferFocusAreaFromName(exerciseName: string): FocusArea {
+  const normalized = exerciseName.trim().toLowerCase();
+
+  if (/(bench|chest|fly|push[- ]?up|incline|decline|dip)/u.test(normalized)) {
+    return "chest";
+  }
+
+  if (
+    /(row|pull|lat|deadlift|pull[- ]?down|face pull|chin[- ]?up)/u.test(
+      normalized,
+    )
+  ) {
+    return "back";
+  }
+
+  if (/(squat|leg|lunge|rdl|romanian|calf|hip thrust|glute)/u.test(normalized)) {
+    return "legs";
+  }
+
+  if (/(shoulder|overhead press|lateral raise|rear delt|press)/u.test(normalized)) {
+    return "shoulders";
+  }
+
+  return "unknown";
+}
+
+function resolveNextFocusSuggestion(area: FocusArea): string {
+  switch (area) {
+    case "chest":
+      return "背部或腿部";
+    case "back":
+      return "腿部或胸推动作";
+    case "legs":
+      return "背部或胸推动作";
+    case "shoulders":
+      return "背部或腿部";
+    case "mixed":
+      return "最近训练量相对没那么集中的部位";
+    default:
+      return "训练记录相对较少的部位";
+  }
+}
+
+function detectTargetArea(message: string): FocusArea {
+  const normalized = message.trim().toLowerCase();
+
+  if (/(胸|卧推|bench|incline|push)/u.test(normalized)) {
+    return "chest";
+  }
+
+  if (/(背|引体|划船|row|pull|deadlift|lat)/u.test(normalized)) {
+    return "back";
+  }
+
+  if (/(腿|深蹲|squat|leg|lunge|calf|glute)/u.test(normalized)) {
+    return "legs";
+  }
+
+  if (/(肩|shoulder|press|lateral raise)/u.test(normalized)) {
+    return "shoulders";
+  }
+
+  return "unknown";
+}
+
+function describeTargetArea(area: FocusArea): string {
+  switch (area) {
+    case "chest":
+      return "胸部";
+    case "back":
+      return "背部";
+    case "legs":
+      return "腿部";
+    case "shoulders":
+      return "肩部";
+    case "mixed":
+      return "多部位";
+    default:
+      return "这类部位";
+  }
+}
+
+function formatMetricKg(value: number | null): string {
+  if (value === null) {
+    return "暂无结果";
+  }
+
+  return `${value.toLocaleString()} kg`;
+}
+
+function getDaysSince(value: string): number {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return 0;
+  }
+
+  const diff = Math.max(0, Date.now() - date.getTime());
+
+  return Math.floor(diff / (1000 * 60 * 60 * 24));
 }

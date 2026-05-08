@@ -21,14 +21,23 @@ export function AuthScreen(props: AuthScreenProps) {
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [localErrorMessage, setLocalErrorMessage] = useState<string | null>(null);
 
   const isSubmitting = status === "authenticating";
+  const visibleErrorMessage = localErrorMessage ?? errorMessage;
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
+    setLocalErrorMessage(null);
 
     if (mode === "register") {
+      if (password !== confirmPassword) {
+        setLocalErrorMessage("两次输入的密码不一致，请重新确认。");
+        return;
+      }
+
       await onRegister({
         email,
         password,
@@ -93,7 +102,7 @@ export function AuthScreen(props: AuthScreenProps) {
             marginTop: 8,
           }}
         >
-          基于真实训练日志的可追溯 AI 训练分析工作台
+          基于真实训练日志的可追溯 AI 训练分析工作台。
         </p>
 
         <div
@@ -109,7 +118,10 @@ export function AuthScreen(props: AuthScreenProps) {
         >
           <button
             disabled={isSubmitting}
-            onClick={() => setMode("login")}
+            onClick={() => {
+              setLocalErrorMessage(null);
+              setMode("login");
+            }}
             style={toggleButtonStyle(theme, mode === "login")}
             type="button"
           >
@@ -117,7 +129,10 @@ export function AuthScreen(props: AuthScreenProps) {
           </button>
           <button
             disabled={isSubmitting}
-            onClick={() => setMode("register")}
+            onClick={() => {
+              setLocalErrorMessage(null);
+              setMode("register");
+            }}
             style={toggleButtonStyle(theme, mode === "register")}
             type="button"
           >
@@ -154,17 +169,33 @@ export function AuthScreen(props: AuthScreenProps) {
           </label>
 
           {mode === "register" ? (
-            <label style={labelStyle(theme)}>
-              显示名称
-              <input
-                autoComplete="nickname"
-                disabled={isSubmitting}
-                onChange={(event) => setDisplayName(event.target.value)}
-                style={fieldStyle(theme)}
-                type="text"
-                value={displayName}
-              />
-            </label>
+            <>
+              <label style={labelStyle(theme)}>
+                确认密码
+                <input
+                  autoComplete="new-password"
+                  disabled={isSubmitting}
+                  minLength={8}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  required
+                  style={fieldStyle(theme)}
+                  type="password"
+                  value={confirmPassword}
+                />
+              </label>
+
+              <label style={labelStyle(theme)}>
+                显示名称
+                <input
+                  autoComplete="nickname"
+                  disabled={isSubmitting}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                  style={fieldStyle(theme)}
+                  type="text"
+                  value={displayName}
+                />
+              </label>
+            </>
           ) : null}
 
           <button
@@ -189,11 +220,11 @@ export function AuthScreen(props: AuthScreenProps) {
           </button>
         </form>
 
-        {errorMessage ? (
+        {visibleErrorMessage ? (
           <div style={{ marginTop: 14 }}>
             <StateNotice
-              description={errorMessage}
-              title="登录失败"
+              description={visibleErrorMessage}
+              title={mode === "register" ? "注册失败" : "登录失败"}
               tone="error"
             />
           </div>

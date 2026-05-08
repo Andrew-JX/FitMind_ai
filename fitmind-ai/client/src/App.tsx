@@ -48,6 +48,7 @@ export function App() {
   const [progressRefreshSignal, setProgressRefreshSignal] = useState(0);
   const [recommendationContextRefreshSignal, setRecommendationContextRefreshSignal] =
     useState(0);
+  const [assistantRefreshSignal, setAssistantRefreshSignal] = useState(0);
 
   useEffect(() => {
     if (!import.meta.env.DEV) {
@@ -91,84 +92,80 @@ export function App() {
       subtitle="基于真实训练日志的可追溯 AI 训练分析助手"
       userLabel={auth.user.display_name ?? auth.user.email}
     >
-      {activeTab === "training" ? (
-        <section style={tabSectionStyle}>
-          <TrainingView
-            exercisePickerProps={{
-              exercises: exerciseSearch.exercises,
-              isLoadingExercises: exerciseSearch.isLoadingExercises,
-              isLoadingMuscleGroups: exerciseSearch.isLoadingMuscleGroups,
-              muscleGroups: exerciseSearch.muscleGroups,
-              onSearch: exerciseSearch.searchExercises,
-              searchError: exerciseSearch.searchError,
-            }}
-            summary={trainingSummary.summary}
-            summaryLoading={trainingSummary.isLoading}
-            workoutFormProps={{
-              onCreated: handleWorkoutCreated,
-              token: auth.token,
-            }}
-            workoutsProps={{
-              deleteError: workouts.deleteError,
-              deletingWorkoutId: workouts.deletingWorkoutId,
-              detailError: workouts.detailError,
-              isLoadingDetail: workouts.isLoadingDetail,
-              isLoadingList: workouts.isLoadingList,
-              listError: workouts.listError,
-              onDeleteWorkout: handleDeleteWorkout,
-              onWorkoutEdited: handleWorkoutCreated,
-              onRefresh: workouts.refreshWorkouts,
-              onSelectWorkout: workouts.selectWorkout,
-              selectedWorkout: workouts.selectedWorkout,
-              selectedWorkoutId: workouts.selectedWorkoutId,
-              token: auth.token,
-              workouts: workouts.workouts,
-            }}
-          />
-        </section>
-      ) : null}
+      <section style={tabSectionStyle(activeTab === "training")}>
+        <TrainingView
+          exercisePickerProps={{
+            exercises: exerciseSearch.exercises,
+            isLoadingExercises: exerciseSearch.isLoadingExercises,
+            isLoadingMuscleGroups: exerciseSearch.isLoadingMuscleGroups,
+            muscleGroups: exerciseSearch.muscleGroups,
+            onSearch: exerciseSearch.searchExercises,
+            searchError: exerciseSearch.searchError,
+          }}
+          summary={trainingSummary.summary}
+          summaryLoading={trainingSummary.isLoading}
+          workoutFormProps={{
+            onCreated: handleWorkoutCreated,
+            token: auth.token,
+          }}
+          workoutsProps={{
+            deleteError: workouts.deleteError,
+            deletingWorkoutId: workouts.deletingWorkoutId,
+            detailError: workouts.detailError,
+            isLoadingDetail: workouts.isLoadingDetail,
+            isLoadingList: workouts.isLoadingList,
+            listError: workouts.listError,
+            onDeleteWorkout: handleDeleteWorkout,
+            onWorkoutEdited: handleWorkoutCreated,
+            onRefresh: workouts.refreshWorkouts,
+            onSelectWorkout: workouts.selectWorkout,
+            selectedWorkout: workouts.selectedWorkout,
+            selectedWorkoutId: workouts.selectedWorkoutId,
+            token: auth.token,
+            workouts: workouts.workouts,
+          }}
+        />
+      </section>
 
-      {activeTab === "analysis" ? (
-        <section style={tabSectionStyle}>
-          <AnalysisView
-            progressProps={{
-              refreshSignal: progressRefreshSignal,
-              selectedExerciseId: selectedProgressExerciseId,
-              selectedExerciseName: selectedProgressExerciseName,
-              token: auth.token,
-            }}
-            recommendationProps={{
-              refreshSignal: recommendationContextRefreshSignal,
-              token: auth.token,
-            }}
-            summary={trainingSummary.summary}
-            summaryProps={{
-              errorMessage: trainingSummary.errorMessage,
-              isLoading: trainingSummary.isLoading,
-              onExerciseSelect: handleExerciseSelect,
-              onRefresh: trainingSummary.refresh,
-              selectedExerciseId: selectedProgressExerciseId,
-              summary: trainingSummary.summary,
-            }}
-          />
-        </section>
-      ) : null}
+      <section style={tabSectionStyle(activeTab === "analysis")}>
+        <AnalysisView
+          progressProps={{
+            refreshSignal: progressRefreshSignal,
+            selectedExerciseId: selectedProgressExerciseId,
+            selectedExerciseName: selectedProgressExerciseName,
+            token: auth.token,
+          }}
+          recommendationProps={{
+            refreshSignal: recommendationContextRefreshSignal,
+            token: auth.token,
+          }}
+          summary={trainingSummary.summary}
+          summaryProps={{
+            errorMessage: trainingSummary.errorMessage,
+            isLoading: trainingSummary.isLoading,
+            onExerciseSelect: handleExerciseSelect,
+            onRefresh: trainingSummary.refresh,
+            selectedExerciseId: selectedProgressExerciseId,
+            summary: trainingSummary.summary,
+          }}
+        />
+      </section>
 
-      {activeTab === "assistant" ? (
-        <section style={tabSectionStyle}>
-          <AssistantWorkspace
-            selectedExerciseId={selectedProgressExerciseId}
-            selectedExerciseName={selectedProgressExerciseName}
-            token={auth.token}
-          />
-        </section>
-      ) : null}
+      <section style={tabSectionStyle(activeTab === "assistant")}>
+        <AssistantWorkspace
+          refreshSignal={assistantRefreshSignal}
+          selectedExerciseId={selectedProgressExerciseId}
+          selectedExerciseName={selectedProgressExerciseName}
+          token={auth.token}
+        />
+      </section>
     </AppShell>
   );
 
   async function handleWorkoutCreated(): Promise<void> {
     await Promise.all([workouts.refreshWorkouts(), trainingSummary.refresh()]);
     setRecommendationContextRefreshSignal((currentValue) => currentValue + 1);
+    setAssistantRefreshSignal((currentValue) => currentValue + 1);
 
     if (selectedProgressExerciseId !== null) {
       setProgressRefreshSignal((currentValue) => currentValue + 1);
@@ -181,6 +178,7 @@ export function App() {
     if (wasDeleted) {
       await trainingSummary.refresh();
       setRecommendationContextRefreshSignal((currentValue) => currentValue + 1);
+      setAssistantRefreshSignal((currentValue) => currentValue + 1);
 
       if (selectedProgressExerciseId !== null) {
         setProgressRefreshSignal((currentValue) => currentValue + 1);
@@ -197,8 +195,10 @@ export function App() {
   }
 }
 
-const tabSectionStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 16,
-  paddingBottom: 16,
-};
+function tabSectionStyle(isActive: boolean): React.CSSProperties {
+  return {
+    display: isActive ? "grid" : "none",
+    gap: 16,
+    paddingBottom: 16,
+  };
+}

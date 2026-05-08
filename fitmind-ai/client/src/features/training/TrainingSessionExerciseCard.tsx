@@ -22,7 +22,7 @@ export interface TrainingSessionExerciseCardProps {
   onMoveUp: () => void;
   onRemove: () => void;
   onReplace: () => void;
-  onStartRestTimer: (setId: string, seconds: number) => void;
+  onStartRestTimer: (setId: string) => void;
   onToggleExpanded: () => void;
   onToggleSetCompleted: (setId: string) => void;
   onUpdateSet: <TField extends keyof DraftSet>(
@@ -62,6 +62,7 @@ export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardPr
   return (
     <section
       onClick={(event) => {
+        event.stopPropagation();
         if (event.target === event.currentTarget) {
           props.onToggleExpanded();
         }
@@ -148,7 +149,7 @@ export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardPr
                   key={setDraft.id}
                   onCopy={() => props.onCopySet(setDraft.id)}
                   onDelete={() => props.onDeleteSet(setDraft.id)}
-                  onStartRestTimer={(seconds) => props.onStartRestTimer(setDraft.id, seconds)}
+                  onStartRestTimer={() => props.onStartRestTimer(setDraft.id)}
                   onToggleCompleted={() => props.onToggleSetCompleted(setDraft.id)}
                   onUpdate={(field, value) => props.onUpdateSet(setDraft.id, field, value)}
                   setDraft={setDraft}

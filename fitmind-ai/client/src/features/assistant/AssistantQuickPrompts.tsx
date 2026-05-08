@@ -1,13 +1,11 @@
-import { useMemo } from "react";
-
 import { Badge } from "../../components/Badge";
 import { Card } from "../../components/Card";
 import { useTheme } from "../../theme/ThemeContext";
-import type { AssistantMode } from "./assistant-types";
+import type { AssistantMode, AssistantPromptSuggestion } from "./assistant-types";
 
 export interface AssistantQuickPromptsProps {
   activeMode: AssistantMode;
-  onSelectMode: (mode: AssistantMode) => void;
+  onSelectPrompt: (prompt: AssistantPromptSuggestion) => void;
   selectedExerciseId?: string | null | undefined;
   selectedExerciseName?: string | null | undefined;
 }
@@ -16,36 +14,67 @@ interface PromptDefinition {
   description: string;
   disabled?: boolean | undefined;
   helper?: string | undefined;
-  mode: AssistantMode;
+  prompt: AssistantPromptSuggestion;
   title: string;
 }
 
 export function AssistantQuickPrompts(props: AssistantQuickPromptsProps) {
   const { theme } = useTheme();
-  const prompts = useMemo<PromptDefinition[]>(
-    () => [
-      {
-        description: "查看最近训练量、总容量和主要动作。",
+  const selectedExerciseName = props.selectedExerciseName?.trim() || "当前动作";
+  const prompts: PromptDefinition[] = [
+    {
+      description: "快速看最近训练次数、组数、训练量和当前主要训练动作。",
+      prompt: {
         mode: "training_overview",
-        title: "训练总览",
+        message: "最近训练总览",
       },
-      {
-        description: props.selectedExerciseName
-          ? `分析 ${props.selectedExerciseName} 的重量、次数和估算 1RM。`
-          : "分析当前选中动作的重量、次数和估算 1RM。",
-        disabled: !props.selectedExerciseId,
-        helper: "请先在分析页选择一个动作。",
+      title: "最近训练总览",
+    },
+    {
+      description: "基于最近记录，先给一个保守的下一次训练方向建议。",
+      prompt: {
+        mode: "next_training_focus",
+        message: "我今天练什么？",
+      },
+      title: "我今天练什么？",
+    },
+    {
+      description: "看最近训练量分布，判断胸部相关训练是否已经比较集中。",
+      prompt: {
+        mode: "muscle_balance",
+        message: "我胸练得够吗？",
+      },
+      title: "我胸练得够吗？",
+    },
+    {
+      description: "判断最近训练是不是明显集中在少数动作或同一类部位。",
+      prompt: {
+        mode: "training_imbalance",
+        message: "我是不是偏科？",
+      },
+      title: "我是不是偏科？",
+    },
+    {
+      description: props.selectedExerciseName
+        ? `分析 ${selectedExerciseName} 的重量变化、最高重量和估算 1RM。`
+        : "分析当前选中动作的重量变化、最高重量和估算 1RM。",
+      disabled: !props.selectedExerciseId,
+      helper: "请先去“分析”页选中一个动作。",
+      prompt: {
         mode: "exercise_progress",
-        title: "动作进展",
+        message: `分析一下${selectedExerciseName}的进展。`,
       },
-      {
-        description: "预览 AI 回答前会读取的确定性上下文。",
-        mode: "recommendation_context",
-        title: "推荐上下文",
+      title: "当前动作进展",
+    },
+    {
+      description: "解释这些建议背后具体参考了哪些训练记录和计算规则。",
+      prompt: {
+        mode: "evidence_explain",
+        message: "AI 根据什么判断？",
       },
-    ],
-    [props.selectedExerciseId, props.selectedExerciseName],
-  );
+      title: "AI 根据什么判断？",
+    },
+  ];
 
   return (
     <Card>
@@ -53,21 +82,21 @@ export function AssistantQuickPrompts(props: AssistantQuickPromptsProps) {
         <div>
           <h3 style={sectionTitleStyle}>快捷问题</h3>
           <p style={sectionCopyStyle(theme)}>
-            保留现有 quick prompt mode 和 payload 语义，只优化展示与说明。
+            这些入口会直接帮你追问最常见、也最稳定的训练问题，不需要先猜该怎么问。
           </p>
         </div>
-        <Badge tone="neutral">Quick Prompts</Badge>
+        <Badge tone="neutral">6 个常用问题</Badge>
       </div>
 
       <div style={promptListStyle}>
         {prompts.map((prompt) => {
-          const isActive = props.activeMode === prompt.mode;
+          const isActive = props.activeMode === prompt.prompt.mode;
 
           return (
             <button
               disabled={prompt.disabled}
-              key={prompt.mode}
-              onClick={() => props.onSelectMode(prompt.mode)}
+              key={prompt.title}
+              onClick={() => props.onSelectPrompt(prompt.prompt)}
               style={promptButtonStyle(theme, isActive, Boolean(prompt.disabled))}
               type="button"
             >

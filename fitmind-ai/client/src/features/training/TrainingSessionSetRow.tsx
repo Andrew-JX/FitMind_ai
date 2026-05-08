@@ -1,5 +1,3 @@
-import { useState } from "react";
-
 import type { DraftSet, EffortLevel } from "./training-session-draft";
 
 import { Button } from "../../components/Button";
@@ -16,15 +14,13 @@ const EFFORT_OPTIONS: Array<{
   { label: "困难", tone: "hard", value: "hard" },
 ];
 
-const REST_TIMER_OPTIONS = [30, 60, 90, 120] as const;
-
 export interface TrainingSessionSetRowProps {
   canComplete: boolean;
   canDelete: boolean;
   index: number;
   onCopy: () => void;
   onDelete: () => void;
-  onStartRestTimer?: ((seconds: number) => void) | undefined;
+  onStartRestTimer?: (() => void) | undefined;
   onToggleCompleted: () => void;
   onUpdate: <TField extends keyof DraftSet>(field: TField, value: DraftSet[TField]) => void;
   setDraft: DraftSet;
@@ -33,9 +29,8 @@ export interface TrainingSessionSetRowProps {
 
 export function TrainingSessionSetRow(props: TrainingSessionSetRowProps) {
   const { theme } = useTheme();
-  const [customRestSeconds, setCustomRestSeconds] = useState("150");
-  const [isRestPickerOpen, setIsRestPickerOpen] = useState(false);
   const showCompletion = props.showCompletion ?? true;
+  const restLabel = props.setDraft.restSeconds ? formatRestLabel(props.setDraft.restSeconds) : null;
 
   return (
     <div style={rowStyle(theme, showCompletion ? props.setDraft.completed : true)}>
@@ -45,7 +40,7 @@ export function TrainingSessionSetRow(props: TrainingSessionSetRowProps) {
           {props.onStartRestTimer ? (
             <button
               disabled={!props.canComplete}
-              onClick={() => setIsRestPickerOpen((currentValue) => !currentValue)}
+              onClick={props.onStartRestTimer}
               style={miniActionStyle(theme, !props.canComplete)}
               type="button"
             >
@@ -109,8 +104,8 @@ export function TrainingSessionSetRow(props: TrainingSessionSetRowProps) {
       </div>
 
       {showCompletion ? (
-        <div style={completeRowStyle}>
-          <span style={labelCaptionStyle(theme)}>完成</span>
+        <div style={completeRowStyle(Boolean(restLabel))}>
+          {restLabel ? <span style={restInfoStyle(theme)}>{restLabel}</span> : <span />}
           <Button
             disabled={!props.canComplete}
             onClick={props.onToggleCompleted}
@@ -122,64 +117,16 @@ export function TrainingSessionSetRow(props: TrainingSessionSetRowProps) {
           </Button>
         </div>
       ) : null}
-
-      {isRestPickerOpen && props.onStartRestTimer ? (
-        <div style={restPickerStyle(theme)}>
-          <span style={labelCaptionStyle(theme)}>休息倒计时</span>
-          <div style={restOptionGridStyle}>
-            {REST_TIMER_OPTIONS.map((seconds) => (
-              <button
-                key={seconds}
-                onClick={() => {
-                  if (!props.setDraft.completed) {
-                    props.onToggleCompleted();
-                  }
-
-                  props.onStartRestTimer?.(seconds);
-                  setIsRestPickerOpen(false);
-                }}
-                style={restOptionStyle(theme)}
-                type="button"
-              >
-                {seconds} 秒
-              </button>
-            ))}
-          </div>
-          <div style={customRestStyle}>
-            <Input
-              min="1"
-              onChange={(event) => setCustomRestSeconds(event.target.value)}
-              type="number"
-              value={customRestSeconds}
-            />
-            <Button
-              disabled={!isValidRestSeconds(customRestSeconds)}
-              onClick={() => {
-                const seconds = Number.parseInt(customRestSeconds, 10);
-                if (!props.setDraft.completed) {
-                  props.onToggleCompleted();
-                }
-
-                props.onStartRestTimer?.(seconds);
-                setIsRestPickerOpen(false);
-              }}
-              style={customRestButtonStyle}
-              type="button"
-              variant="secondary"
-            >
-              自定义
-            </Button>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
 
-function isValidRestSeconds(value: string): boolean {
-  const seconds = Number.parseInt(value, 10);
+function formatRestLabel(totalSeconds: number): string {
+  const safeSeconds = Math.max(0, totalSeconds);
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
 
-  return Number.isInteger(seconds) && seconds > 0;
+  return `休息 ${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
 function rowStyle(
@@ -288,52 +235,22 @@ function effortButtonStyle(
   };
 }
 
-const completeRowStyle: React.CSSProperties = {
-  alignItems: "center",
-  display: "flex",
-  gap: 12,
-  justifyContent: "space-between",
-};
-
-function restPickerStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function completeRowStyle(hasRestLabel: boolean): React.CSSProperties {
   return {
-    backgroundColor: theme.colors.surf2,
-    border: `1px solid ${theme.colors.bdr}`,
-    borderRadius: theme.radius.control,
-    display: "grid",
-    gap: 10,
-    padding: 10,
+    alignItems: "center",
+    display: "flex",
+    gap: 12,
+    justifyContent: hasRestLabel ? "space-between" : "flex-end",
   };
 }
 
-const restOptionGridStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 8,
-  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-};
-
-function restOptionStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function restInfoStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
   return {
-    backgroundColor: theme.colors.surf,
-    border: `1px solid ${theme.colors.bdr}`,
-    borderRadius: theme.radius.control,
     color: theme.colors.tx2,
-    cursor: "pointer",
     fontSize: 12,
-    fontWeight: 700,
-    padding: "9px 6px",
+    fontWeight: 600,
   };
 }
-
-const customRestStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 8,
-  gridTemplateColumns: "minmax(0, 1fr) auto",
-};
-
-const customRestButtonStyle: React.CSSProperties = {
-  padding: "10px 12px",
-};
 
 function completeButtonStyle(isCompleted: boolean): React.CSSProperties {
   return {

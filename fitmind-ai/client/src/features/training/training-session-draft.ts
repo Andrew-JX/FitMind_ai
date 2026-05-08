@@ -12,6 +12,7 @@ export interface DraftSet {
   effort: EffortLevel;
   id: string;
   reps: string;
+  restSeconds: number | null;
   weightKg: string;
 }
 
@@ -46,6 +47,7 @@ export function createDraftSet(previousSet?: DraftSet): DraftSet {
     effort: previousSet?.effort ?? "normal",
     id: createDraftSetId(),
     reps: previousSet?.reps ?? "",
+    restSeconds: previousSet?.restSeconds ?? null,
     weightKg: previousSet?.weightKg ?? "",
   };
 }

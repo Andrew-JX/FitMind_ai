@@ -1,4 +1,5 @@
 import type {
+  AssistantIntentMode,
   AssistantProvider,
   AssistantProviderRequest,
   AssistantProviderResponse,
@@ -27,99 +28,133 @@ function normalizeMessage(message: string): string {
   return message.trim().toLowerCase();
 }
 
-function mentionsRecommendationContext(message: string): boolean {
-  return /(recommendation\s*context|推荐上下文|看到哪些训练数据|ai 会看到哪些训练数据|训练数据)/iu.test(
-    message,
-  );
-}
+function detectIntentFromMessage(message: string): AssistantIntentMode | null {
+  if (
+    /(ai 根据什么判断|根据什么判断|怎么看我的训练数据|看到了哪些训练数据|recommendation\s*context|training\s*data|evidence)/iu.test(
+      message,
+    )
+  ) {
+    return "evidence_explain";
+  }
 
-function mentionsExerciseProgress(message: string): boolean {
-  return /(estimated\s*1rm|1rm|极限|最大重量|max\s*weight|卧推|bench\s*press|barbell\s*bench\s*press|深蹲|squat|硬拉|deadlift|进步怎么样)/iu.test(
-    message,
-  );
-}
+  if (
+    /(estimated\s*1rm|1rm|卧推|bench\s*press|barbell\s*bench\s*press|squat|deadlift|极限|最大重量|动作进展|有没有进步|预估我现在的)/iu.test(
+      message,
+    )
+  ) {
+    return "exercise_progress";
+  }
 
-function mentionsTrainingOverview(message: string): boolean {
-  return /(训练总览|最近训练总览|看看我最近练得怎么样|训练量如何|训练量|training\s*overview|training\s*summary|recent\s*training)/iu.test(
-    message,
-  );
+  if (
+    /(今天练什么|应该练什么|下一次训练建议练哪里|今天适合练背吗|下次练什么)/iu.test(
+      message,
+    )
+  ) {
+    return "next_training_focus";
+  }
+
+  if (
+    /(胸练得够吗|背是不是练少了|腿最近有没有练|背练得够吗|腿练得够吗|练得够吗)/iu.test(
+      message,
+    )
+  ) {
+    return "muscle_balance";
+  }
+
+  if (
+    /(偏科|只练胸|训练安排均衡吗|训练是不是不均衡|最近是不是只练)/iu.test(
+      message,
+    )
+  ) {
+    return "training_imbalance";
+  }
+
+  if (
+    /(还能练|练太频繁了|昨天练了.*今天还能练|恢复|今天还能练胸吗|今天还能练吗)/iu.test(
+      message,
+    )
+  ) {
+    return "recovery_check";
+  }
+
+  if (
+    /(最近训练总览|最近练得怎么样|这周练了几次|训练总览|training\s*overview|training\s*summary|recent\s*training)/iu.test(
+      message,
+    )
+  ) {
+    return "training_overview";
+  }
+
+  return null;
 }
 
 function buildSelectExerciseMessage(): AssistantProviderResponse {
   return {
     kind: "message",
     message:
-      "如果你想查看某个动作的 1RM、最大重量或最近进展，请先到“分析”页选择对应动作，然后再回来提问。",
+      "如果你想看某个动作的进展、最大重量或估算 1RM，请先去“分析”页选中对应动作，再回来追问。",
   };
 }
 
-function resolveDefaultIntent(
+function buildUnsupportedMessage(): AssistantProviderResponse {
+  return {
+    kind: "message",
+    message:
+      "我目前更适合回答这些训练问题：最近训练总览、我今天练什么、我胸练得够吗、我是不是偏科、当前动作进展、AI 根据什么判断。",
+  };
+}
+
+function buildToolCall(
+  toolName: "get_training_summary" | "get_exercise_progress" | "get_recommendation_context",
   request: AssistantProviderRequest,
 ): AssistantProviderResponse {
+  return {
+    kind: "tool_call",
+    tool_name: toolName,
+    tool_args: buildToolArgs(toolName, request),
+  };
+}
+
+function resolveIntent(request: AssistantProviderRequest): AssistantIntentMode {
   const normalizedMessage = normalizeMessage(
     request.simulation.normalized_message.length > 0
       ? request.simulation.normalized_message
       : request.conversation.user_message,
   );
 
-  if (mentionsRecommendationContext(normalizedMessage)) {
-    return {
-      kind: "tool_call",
-      tool_name: "get_recommendation_context",
-      tool_args: buildToolArgs("get_recommendation_context", request),
-    };
-  }
+  return detectIntentFromMessage(normalizedMessage) ?? "unsupported";
+}
 
-  if (
-    request.assistant_context.mode === "exercise_progress" ||
-    mentionsExerciseProgress(normalizedMessage)
-  ) {
+function resolveDefaultIntent(
+  request: AssistantProviderRequest,
+): AssistantProviderResponse {
+  const intent = resolveIntent(request);
+
+  if (intent === "exercise_progress") {
     if (!request.assistant_context.exercise_id) {
       return buildSelectExerciseMessage();
     }
 
-    return {
-      kind: "tool_call",
-      tool_name: "get_exercise_progress",
-      tool_args: buildToolArgs("get_exercise_progress", request),
-    };
+    return buildToolCall("get_exercise_progress", request);
+  }
+
+  if (intent === "training_overview") {
+    return buildToolCall("get_training_summary", request);
   }
 
   if (
-    request.assistant_context.mode === "recommendation_context" ||
-    mentionsRecommendationContext(normalizedMessage)
+    intent === "next_training_focus" ||
+    intent === "muscle_balance" ||
+    intent === "training_imbalance" ||
+    intent === "recovery_check" ||
+    intent === "evidence_explain"
   ) {
-    return {
-      kind: "tool_call",
-      tool_name: "get_recommendation_context",
-      tool_args: buildToolArgs("get_recommendation_context", request),
-    };
+    return buildToolCall("get_recommendation_context", request);
   }
 
-  if (
-    request.assistant_context.mode === "training_overview" ||
-    mentionsTrainingOverview(normalizedMessage)
-  ) {
-    return {
-      kind: "tool_call",
-      tool_name: "get_training_summary",
-      tool_args: buildToolArgs("get_training_summary", request),
-    };
-  }
-
-  return {
-    kind: "tool_call",
-    tool_name: "get_training_summary",
-    tool_args: buildToolArgs("get_training_summary", request),
-  };
+  return buildUnsupportedMessage();
 }
 
-/**
- * Execute the deterministic mock provider without calling any external model.
- *
- * @param request - Provider-neutral assistant request.
- * @returns Deterministic provider response for the current simulation mode.
- */
 export async function runMockProvider(
   request: AssistantProviderRequest,
 ): Promise<AssistantProviderResponse> {
@@ -129,8 +164,8 @@ export async function runMockProvider(
         kind: "message",
         message:
           request.simulation.normalized_message.length > 0
-            ? `Deterministic mock provider message: ${request.simulation.normalized_message}`
-            : "Deterministic mock provider message: no additional text was provided.",
+            ? request.simulation.normalized_message
+            : "这次没有额外的说明文本。",
       };
     case "error":
       return {
@@ -138,8 +173,8 @@ export async function runMockProvider(
         error_code: "MOCK_PROVIDER_ERROR",
         message:
           request.simulation.normalized_message.length > 0
-            ? `Deterministic mock provider error: ${request.simulation.normalized_message}`
-            : "Deterministic mock provider error was requested.",
+            ? request.simulation.normalized_message
+            : "模拟 provider 返回了一个错误。",
       };
     case "default":
       return resolveDefaultIntent(request);

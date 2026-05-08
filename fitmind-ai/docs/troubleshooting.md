@@ -1,4 +1,4 @@
-# 踩坑日记（troubleshooting.md）
+﻿# 踩坑日记（troubleshooting.md）
 
 > 这份文档记录开发过程中的所有「卡了 30 分钟以上」的问题。 **核心价值**：这是你面试时最好的素材库——「你这个项目踩过什么坑」的回答全从这里出。 每次遇到坑，必须当天记。隔天就忘了细节。
 
@@ -185,46 +185,46 @@
 
 ### 面试讲点
 - 这是很适合讲“工具链稳定性”的案例：业务代码没问题，真正卡人的是版本漂移和 monorepo 脚本路径假设。我没有盲目重装到能跑为止，而是把问题拆成“依赖版本”和“执行目录”两个根因分别处理。
-## [T03] [宸蹭慨澶峕 Runtime JS repository import 鎸囧悜 `env.js` 瀵艰嚧鐪熷疄 HTTP + DB 璺緞 500
+## [T03] [已修复] Runtime JS repository import 指向 `env.js` 导致真实 HTTP + DB 路径 500
 
-- **鏃ユ湡**锛?026-04-29
-- **闃舵**锛氶樁娈?1.2 - Workout HTTP APIs / Batch 6 Verification
-- **鑰楁椂**锛氱害 30+ 鍒嗛挓
+- **日期**：2026-04-29
+- **阶段**：阶段 1.2 - Workout HTTP APIs / Batch 6 Verification
+- **耗时**：约 30+ 分钟
 
-### 鐜拌薄
-- 鍗曞厓娴嬭瘯鍜?service 灞傝皟鐢ㄩ兘姝ｅ父锛屼絾鐢ㄧ湡瀹?HTTP 璇锋眰璺?`/api/auth/register` 鏃朵細杩斿洖 `500 INTERNAL_ERROR`銆?
-- 鐩存帴鐢?`tsx` 璋冪敤 `register()` 鏈嶅姟鍙堣兘姝ｅ父鎻掑叆鐢ㄦ埛锛岃〃闈㈢湅璧锋潵鍍忔槸鈥滄湁鏃跺ソ銆佹湁鏃跺潖鈥濈殑闅愯棌杩愯鏃堕棶棰樸€?
+### 现象
+- 单元测试和 service 层调用都正常，但用真实 HTTP 请求走 `/api/auth/register` 时会返回 `500 INTERNAL_ERROR`。
+- 直接用 `tsx` 调用 `register()` 服务又能正常插入用户，表面看起来像是"有时好、有时坏"的隐性运行时问题。
 
-### 鎺掓煡杩囩▼
-- 鍏堢敤鐪熷疄 `.env.local` + 涓存椂 `JWT_SECRET` 鍋?service 鐩存帴璋冪敤锛岀‘璁?DB 杩炴帴銆乁ser repository 鍜?JWT 绛惧彂鏈韩閮藉彲鐢ㄣ€?
-- 鍐嶇敤 `tsx` 鎵ц鐪熷疄 HTTP smoke锛屽彂鐜颁竴鏃﹁蛋鍒?repository 灞傦紝`pool.js` 浼氬湪杩愯鏃舵姤 `Cannot find module '../env.js'`銆?
-- 杩芥煡 `server/src/db/pool.js` 鍙戠幇瀹冩槸 JS 杩囨浮鏂囦欢锛屼絾鎸夌収 TS 璺嚎鍘?import `../env.js`锛屼粨搴撻噷瀹為檯鍙湁 `env.ts`銆?
+### 排查过程
+- 先用真实 `.env.local` + 临时 `JWT_SECRET` 做 service 直接调用，确认 DB 连接、User repository 和 JWT 签发本身都可用。
+- 再用 `tsx` 执行真实 HTTP smoke，发现一旦走到 repository 层，`pool.js` 会在运行时报 `Cannot find module '../env.js'`。
+- 追查 `server/src/db/pool.js` 发现它是 JS 过渡文件，但按照 TS 路径去 import `../env.js`，仓库里实际只有 `env.ts`。
 
-### 鏍规湰鍘熷洜
-- 椤圭洰褰撳墠鏄?TS app/service + JS repository/db 鐨勮繃娓″舰鎬侊紝TS 鍏ュ彛鍦?`tsx` 涓嬭兘鎶?`.js` 瑙ｆ瀽鍥炲搴旂殑 `.ts`锛屼絾 JS repository 鏂囦欢骞朵笉鑷姩浜彈鍚屾牱鐨勬ā鍧楅噸鍐欒鍒欍€?
-- 缁撴灉灏辨槸锛?db 鍏ュ彛鍦ㄧ湡瀹炶姹傞噷鎵嶄細瑙﹀彂鐨勬椂鍊欙紝鍘讳簡涓€涓笉瀛樺湪鐨?`env.js`锛屽艰嚧璺敱灞傜湅鍒扮粺涓€ `500`銆?
+### 根本原因
+- 项目当前是 TS app/service + JS repository/db 的过渡形态，TS 入口在 `tsx` 下能把 `.js` 解析回对应的 `.ts`，但 JS repository 文件并不自动受到同样的模块重写规则。
+- 结果就是，db 入口在真实请求里才会触发的时候，去了一个不存在的 `env.js`，导致路由层看到统一 `500`。
 
-### 瑙ｅ喅鏂规
-- 灏?`server/src/db/pool.js` 鐨勫鍏ヤ粠:
+### 解决方案
+- 将 `server/src/db/pool.js` 的导入从：
 
 ```js
 import { loadServerEnv } from "../env.js";
 ```
 
-- 鏀逛负:
+- 改为：
 
 ```js
 import { loadServerEnv } from "../env.ts";
 ```
 
-- 淇畬鍚庯紝`pnpm --filter @fitmind/server test`鍜?`pnpm --filter @fitmind/server type-check` 缁х画閫氳繃锛岃€屼笖 `tsx` 鐩存帴璋冪敤 `register()` 宸茬粡鑳藉熷湪鐪熷疄鏁版嵁搴撲笂鎴愬姛鎻掑叆鐢ㄦ埛銆?
+- 修复后，`pnpm --filter @fitmind/server test` 和 `pnpm --filter @fitmind/server type-check` 继续通过，而且 `tsx` 直接调用 `register()` 已经能够在真实数据库上成功插入用户。
 
-### 缁忛獙鏁欒
-- JS 杩囨浮灞傚拰 TS 鍏ュ彛灞傛贩鐢ㄦ椂锛屼笉鑳藉亣璁?`.js` 鍚庣紑鍦ㄦ墍鏈夎繍琛屾椂璺緞涓婇兘浼氳鑷姩閲嶅啓鍒?`.ts`銆?
-- 鐪熷疄 HTTP smoke 鍜?service 鐩存帴璋冪敤鍚勮嚜鑳芥姄鍒颁笉鍚岀殑闂锛氬墠鑰呮洿瀹规槗鎵撳埌鈥滆矾鐢?-> controller -> service -> db鈥濈殑缁堢偣鍏抽棴鐜己鍙ｃ€?
+### 经验教训
+- JS 过渡层和 TS 入口层混用时，不能假设 `.js` 后缀在所有运行时路径上都会被自动重写到 `.ts`。
+- 真实 HTTP smoke 和 service 直接调用各自能抓到不同的问题：前者更容易打到"路由 -> controller -> service -> db"的终端关闭缺口。
 
-### 闈㈣瘯璁茬偣
-- 杩欐槸涓€涓緢濂界殑鈥滆繃娓℃灦鏋勯殣鎬ц繍琛屾椂 bug鈥濇晠浜嬶細闈欐€佺被鍨嬪拰鍗曞厓娴嬭瘯閮借繃浜嗭紝浣嗙湡瀹炶姹傝繕鏄細鍦?JS repository 杈圭晫鐖嗘帀銆傚叧閿笉鏄贡鏀癸紝鑰屾槸鐢?service 鐩存帴璋冪敤鍜?HTTP smoke 鎶婇棶棰樺垏鍒嗗紑锛屾渶鍚庡畾浣嶅埌涓€琛屽鍏ュ悗缂€銆?
+### 面试讲点
+- 这是一个很好的"过渡架构隐性运行时 bug"故事：静态类型和单元测试都过了，但真实请求还是会在 JS repository 边界爆掉。关键不是乱改，而是用 service 直接调用和 HTTP smoke 把问题切分开，最后定位到一行导入后缀。
 ## [T04] [已修复] Workout service 直接按 string DTO 校验真实 DB 行，导致 `Date` / `numeric` 运行时映射误报 `400`
 
 - **日期**：2026-04-29

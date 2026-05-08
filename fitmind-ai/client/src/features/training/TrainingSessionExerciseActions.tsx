@@ -17,22 +17,75 @@ export interface TrainingSessionExerciseActionsProps {
   onReplace: () => void;
 }
 
+interface MenuPosition {
+  placement: "above" | "below";
+}
+
 export function TrainingSessionExerciseActions(props: TrainingSessionExerciseActionsProps) {
   const { theme } = useTheme();
   const { onOpenChange } = props;
+  const actionRootRef = useRef<HTMLDivElement | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [menuPosition, setMenuPosition] = useState({ left: 16, top: 72 });
+  const [menuPosition, setMenuPosition] = useState<MenuPosition>({ placement: "below" });
   const summary = getExerciseSummary(props.draftExercise);
 
   useEffect(() => {
     onOpenChange?.(isMenuOpen || isDetailOpen);
   }, [isDetailOpen, isMenuOpen, onOpenChange]);
 
+  useEffect(() => {
+    if (!isMenuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const targetNode = event.target;
+
+      if (!(targetNode instanceof Node)) {
+        return;
+      }
+
+      if (
+        menuRef.current?.contains(targetNode) ||
+        menuButtonRef.current?.contains(targetNode) ||
+        actionRootRef.current?.contains(targetNode)
+      ) {
+        return;
+      }
+
+      setIsMenuOpen(false);
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsMenuOpen(false);
+      }
+    };
+
+    const updateMenuPosition = () => {
+      setMenuPosition(getMenuPosition(menuButtonRef.current));
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleEscape);
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleEscape);
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [isMenuOpen]);
+
   return (
     <div
       onClick={(event) => event.stopPropagation()}
+      ref={actionRootRef}
       style={actionRootStyle}
     >
       <button
@@ -56,7 +109,7 @@ export function TrainingSessionExerciseActions(props: TrainingSessionExerciseAct
       </button>
 
       {isMenuOpen ? (
-        <div style={menuStyle(theme, menuPosition)} role="menu">
+        <div ref={menuRef} style={menuStyle(theme, menuPosition)} role="menu">
           <strong style={menuTitleStyle(theme)}>动作设置</strong>
           <button
             onClick={() => {
@@ -114,8 +167,14 @@ export function TrainingSessionExerciseActions(props: TrainingSessionExerciseAct
       ) : null}
 
       {isDetailOpen ? (
-        <div style={detailBackdropStyle(theme)}>
-          <section style={detailCardStyle(theme)}>
+        <div
+          onClick={() => setIsDetailOpen(false)}
+          style={detailBackdropStyle(theme)}
+        >
+          <section
+            onClick={(event) => event.stopPropagation()}
+            style={detailCardStyle(theme)}
+          >
             <header style={detailHeaderStyle}>
               <div>
                 <h3 style={detailTitleStyle(theme)}>{props.draftExercise.name}</h3>
@@ -166,31 +225,20 @@ function formatVolume(totalVolumeKg: number): string {
   return totalVolumeKg.toFixed(2);
 }
 
-function getMenuPosition(buttonElement: HTMLButtonElement | null): {
-  left: number;
-  top: number;
-} {
+function getMenuPosition(buttonElement: HTMLButtonElement | null): MenuPosition {
   if (!buttonElement) {
     return {
-      left: 16,
-      top: 72,
+      placement: "below",
     };
   }
 
   const rect = buttonElement.getBoundingClientRect();
-  const menuWidth = 164;
-  const estimatedMenuHeight = 238;
+  const estimatedMenuHeight = 248;
   const viewportPadding = 12;
-  const hasRoomBelow = window.innerHeight - rect.bottom > estimatedMenuHeight + 16;
+  const hasRoomBelow = window.innerHeight - rect.bottom >= estimatedMenuHeight + viewportPadding;
 
   return {
-    left: Math.max(
-      viewportPadding,
-      Math.min(window.innerWidth - menuWidth - viewportPadding, rect.right - menuWidth),
-    ),
-    top: hasRoomBelow
-      ? rect.bottom + 6
-      : Math.max(viewportPadding, rect.top - estimatedMenuHeight - 6),
+    placement: hasRoomBelow ? "below" : "above",
   };
 }
 
@@ -222,7 +270,7 @@ function menuButtonStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSS
 
 function menuStyle(
   theme: ReturnType<typeof useTheme>["theme"],
-  position: { left: number; top: number },
+  position: MenuPosition,
 ): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf,
@@ -231,11 +279,13 @@ function menuStyle(
     boxShadow: theme.shadows.card,
     display: "grid",
     gap: 4,
-    left: position.left,
-    minWidth: 164,
+    minWidth: 176,
     padding: 8,
-    position: "fixed",
-    top: position.top,
+    position: "absolute",
+    right: 0,
+    ...(position.placement === "below"
+      ? { top: "calc(100% + 6px)" }
+      : { bottom: "calc(100% + 6px)" }),
     zIndex: 220,
   };
 }
@@ -278,11 +328,11 @@ function detailBackdropStyle(theme: ReturnType<typeof useTheme>["theme"]): React
     alignItems: "end",
     backgroundColor: theme.isDark ? "rgba(0,0,0,0.42)" : "rgba(0,0,0,0.24)",
     display: "flex",
-    inset: "-12px",
+    inset: 0,
     justifyContent: "center",
     padding: 12,
     position: "fixed",
-    zIndex: 120,
+    zIndex: 240,
   };
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { ExercisePickerProps } from "./ExercisePicker";
 import type { DictionaryExercise } from "./dictionary-api";
@@ -35,7 +35,6 @@ export interface TrainingSessionComposerProps {
 
 export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
   const { theme } = useTheme();
-  const bodyRef = useRef<HTMLElement | null>(null);
   const [draftExercises, setDraftExercises] = useState<DraftExercise[]>([]);
   const [duplicateNotice, setDuplicateNotice] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -46,10 +45,7 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
   const [pendingExerciseRemovalId, setPendingExerciseRemovalId] = useState<string | null>(
     null,
   );
-  const [pendingRestTimerRequest, setPendingRestTimerRequest] = useState<{
-    seconds: number;
-    setId: string;
-  } | null>(null);
+  const [pendingRestTimerRequest, setPendingRestTimerRequest] = useState<string | null>(null);
   const [replacingDraftExerciseId, setReplacingDraftExerciseId] = useState<string | null>(
     null,
   );
@@ -154,7 +150,7 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
           </div>
         </header>
 
-        <main ref={bodyRef} style={bodyStyle(Boolean(restTimer))}>
+        <main onClick={collapseExpandedExercises} style={bodyStyle(Boolean(restTimer))}>
           {duplicateNotice ? (
             <StateNotice
               description={duplicateNotice}
@@ -188,9 +184,7 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
                   onMoveUp={() => handleMoveExercise(draftExercise.id, "up")}
                   onRemove={() => handleRemoveExercise(draftExercise.id)}
                   onReplace={() => handleStartReplaceExercise(draftExercise.id)}
-                  onStartRestTimer={(setId, seconds) =>
-                    handleStartRestTimer(setId, seconds)
-                  }
+                  onStartRestTimer={handleOpenRestTimer}
                   onToggleExpanded={() => handleToggleExpanded(draftExercise.id)}
                   onToggleSetCompleted={(setId) =>
                     handleToggleSetCompleted(draftExercise.id, setId)
@@ -218,7 +212,7 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
         {restTimer ? (
           <TrainingSessionRestTimer
             onClose={() => setRestTimer(null)}
-            onSkip={() => setRestTimer(null)}
+            onConfirmDuration={handleConfirmRestTimerDuration}
             onToggleRunning={handleToggleRestTimerRunning}
             timer={restTimer}
           />
@@ -266,7 +260,7 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
                 </Button>
                 <Button
                   onClick={() => {
-                    startRestTimer(pendingRestTimerRequest.setId, pendingRestTimerRequest.seconds);
+                    openRestTimerSelector(pendingRestTimerRequest);
                     setPendingRestTimerRequest(null);
                   }}
                   type="button"
@@ -367,6 +361,21 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
     });
   }
 
+  function collapseExpandedExercises(): void {
+    setDraftExercises((currentValue) => {
+      return currentValue.map((draftExercise) => {
+        if (!draftExercise.isExpanded) {
+          return draftExercise;
+        }
+
+        return {
+          ...draftExercise,
+          isExpanded: false,
+        };
+      });
+    });
+  }
+
   function handleStartReplaceExercise(exerciseId: string): void {
     setDuplicateNotice(null);
     setErrorMessage(null);
@@ -442,7 +451,6 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
         };
       });
     });
-    scrollComposerBodyToBottom();
   }
 
   function handleCopySet(exerciseId: string, setId: string): void {
@@ -508,6 +516,8 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
               ...setDraft,
               completed:
                 field === "weightKg" || field === "reps" ? false : setDraft.completed,
+              restSeconds:
+                field === "weightKg" || field === "reps" ? null : setDraft.restSeconds,
               [field]: value,
             };
           }),
@@ -534,12 +544,14 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
               return {
                 ...setDraft,
                 completed: false,
+                restSeconds: null,
               };
             }
 
             return {
               ...setDraft,
               completed: !setDraft.completed,
+              restSeconds: setDraft.completed ? null : setDraft.restSeconds,
             };
           }),
         };
@@ -547,37 +559,74 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
     });
   }
 
-  function handleStartRestTimer(setId: string, seconds: number): void {
-    const safeSeconds = Math.max(1, Math.floor(seconds));
-
+  function handleOpenRestTimer(setId: string): void {
     if (
       restTimer &&
-      (restTimer.status === "running" || restTimer.status === "paused") &&
-      restTimer.remainingSeconds > 0
+      (restTimer.status === "running" ||
+        restTimer.status === "paused" ||
+        restTimer.status === "selecting") &&
+      (restTimer.remainingSeconds > 0 || restTimer.status === "selecting")
     ) {
-      setPendingRestTimerRequest({
-        seconds: safeSeconds,
-        setId,
-      });
+      setPendingRestTimerRequest(setId);
       return;
     }
 
-    startRestTimer(setId, safeSeconds);
+    openRestTimerSelector(setId);
   }
 
-  function startRestTimer(setId: string, seconds: number): void {
+  function openRestTimerSelector(setId: string): void {
+    setRestTimer({
+      isRunning: false,
+      remainingSeconds: 0,
+      sourceSetId: setId,
+      status: "selecting",
+      totalSeconds: 0,
+    });
+  }
+
+  function handleConfirmRestTimerDuration(seconds: number): void {
+    const safeSeconds = Math.max(1, Math.floor(seconds));
+    const sourceSetId = restTimer?.sourceSetId;
+
+    if (!sourceSetId) {
+      return;
+    }
+
+    setDraftExercises((currentValue) => {
+      return currentValue.map((draftExercise) => {
+        return {
+          ...draftExercise,
+          sets: draftExercise.sets.map((setDraft) => {
+            if (setDraft.id !== sourceSetId) {
+              return setDraft;
+            }
+
+            return {
+              ...setDraft,
+              completed: true,
+              restSeconds: safeSeconds,
+            };
+          }),
+        };
+      });
+    });
+
     setRestTimer({
       isRunning: true,
-      remainingSeconds: seconds,
-      sourceSetId: setId,
+      remainingSeconds: safeSeconds,
+      sourceSetId,
       status: "running",
-      totalSeconds: seconds,
+      totalSeconds: safeSeconds,
     });
   }
 
   function handleToggleRestTimerRunning(): void {
     setRestTimer((currentValue) => {
-      if (!currentValue || currentValue.status === "finished") {
+      if (
+        !currentValue ||
+        currentValue.status === "finished" ||
+        currentValue.status === "selecting"
+      ) {
         return currentValue;
       }
 
@@ -640,19 +689,6 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
     setPendingRestTimerRequest(null);
     setReplacingDraftExerciseId(null);
     setRestTimer(null);
-  }
-
-  function scrollComposerBodyToBottom(): void {
-    requestAnimationFrame(() => {
-      if (!bodyRef.current) {
-        return;
-      }
-
-      bodyRef.current.scrollTo({
-        behavior: "smooth",
-        top: bodyRef.current.scrollHeight,
-      });
-    });
   }
 }
 
@@ -763,6 +799,7 @@ function translateErrorMessage(message: string): string {
 }
 
 const composerStyle: React.CSSProperties = {
+  height: "100dvh",
   inset: 0,
   left: "50%",
   maxWidth: 390,
@@ -790,10 +827,11 @@ function panelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPrope
     color: theme.colors.tx,
     display: "flex",
     flexDirection: "column",
+    height: "100%",
     inset: 0,
     overflow: "hidden",
     padding:
-      "max(16px, env(safe-area-inset-top, 16px)) 16px calc(112px + env(safe-area-inset-bottom, 0px))",
+      "max(16px, env(safe-area-inset-top, 16px)) 16px calc(24px + env(safe-area-inset-bottom, 0px))",
     position: "relative",
   };
 }
@@ -827,7 +865,7 @@ function bodyStyle(hasRestTimer: boolean): React.CSSProperties {
     minHeight: 0,
     overflowY: "auto",
     overscrollBehavior: "contain",
-    paddingBottom: hasRestTimer ? 236 : 180,
+    paddingBottom: hasRestTimer ? 176 : 112,
     touchAction: "pan-y",
     WebkitOverflowScrolling: "touch",
   };
@@ -875,7 +913,7 @@ const fabWrapStyle: React.CSSProperties = {
   bottom: "calc(24px + env(safe-area-inset-bottom, 0px))",
   position: "absolute",
   right: 16,
-  zIndex: 4,
+  zIndex: 210,
 };
 
 function fabStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {

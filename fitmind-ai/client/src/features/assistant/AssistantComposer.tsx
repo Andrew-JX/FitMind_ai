@@ -20,7 +20,7 @@ export function AssistantComposer(props: AssistantComposerProps) {
       <div style={{ flex: 1 }}>
         <textarea
           onChange={(event) => props.onChangeMessage(event.target.value)}
-          placeholder="问一个训练问题，例如：看看我最近的训练总览。"
+          placeholder="例如：为什么建议我练背？这周训练量是不是太少？我今天还能练胸吗？"
           rows={3}
           style={textareaStyle(theme)}
           value={props.message}
@@ -32,7 +32,7 @@ export function AssistantComposer(props: AssistantComposerProps) {
             停止
           </Button>
         ) : (
-          <Button type="submit">发送</Button>
+          <Button type="submit">发送追问</Button>
         )}
         <Button
           disabled={!props.canRetry || props.isStreaming}

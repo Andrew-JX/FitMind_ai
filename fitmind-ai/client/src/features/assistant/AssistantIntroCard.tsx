@@ -14,12 +14,12 @@ export function AssistantIntroCard() {
         </div>
       </div>
       <p style={subtitleStyle(theme)}>
-        助手会先调用确定性训练工具，再基于 evidence 解释你的训练表现。
+        这里不只是重复分析页的数据，而是把最近训练记录转成更容易理解的行动建议、提醒和判断依据。
       </p>
       <div style={badgeRowStyle}>
-        <Badge tone="info">SSE Stream</Badge>
-        <Badge tone="analysis">Tool Calling</Badge>
-        <Badge tone="accent">Evidence-backed</Badge>
+        <Badge tone="accent">主动洞察</Badge>
+        <Badge tone="analysis">动作进展</Badge>
+        <Badge tone="info">判断依据</Badge>
       </div>
     </Card>
   );

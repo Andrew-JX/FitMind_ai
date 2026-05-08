@@ -187,6 +187,17 @@ function notify(): void {
 
 function getReadableErrorMessage(error: unknown): string {
   if (error instanceof HttpClientError) {
+    if (
+      error.status === 409 ||
+      error.message === "An account with this email already exists."
+    ) {
+      return "这个邮箱已经注册过了，请直接登录或更换邮箱。";
+    }
+
+    if (error.message === "Invalid email or password.") {
+      return "邮箱或密码不正确。";
+    }
+
     return error.message;
   }
 

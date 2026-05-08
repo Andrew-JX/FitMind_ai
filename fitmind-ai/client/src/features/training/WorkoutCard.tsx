@@ -142,7 +142,7 @@ export function WorkoutCard(props: WorkoutCardProps) {
 
           {props.detail ? (
             <>
-              <div style={detailMetaGridStyle}>
+              <div style={isEditMode ? hiddenReadonlyBlockStyle : detailMetaGridStyle}>
                 <div style={detailBlockStyle(theme)}>
                   <span style={detailLabelStyle(theme)}>训练时间</span>
                   <strong style={detailValueStyle(theme)}>
@@ -159,7 +159,7 @@ export function WorkoutCard(props: WorkoutCardProps) {
                 ) : null}
               </div>
 
-              <div style={noteBlockStyle(theme)}>
+              <div style={isEditMode ? hiddenReadonlyBlockStyle : noteBlockStyle(theme)}>
                 <span style={detailLabelStyle(theme)}>备注</span>
                 <p style={detailParagraphStyle(theme)}>
                   {props.detail.notes?.trim() || "本次训练没有备注。"}
@@ -614,6 +614,7 @@ function buildDraftGroups(
           id: `persisted-${setItem.id}`,
           persistedSetId: setItem.id,
           reps: `${setItem.reps}`,
+          restSeconds: null,
           weightKg: `${setItem.weight_kg}`,
         };
       }),
@@ -842,6 +843,10 @@ const detailMetaGridStyle: React.CSSProperties = {
   display: "grid",
   gap: 8,
   gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+};
+
+const hiddenReadonlyBlockStyle: React.CSSProperties = {
+  display: "none",
 };
 
 const groupListStyle: React.CSSProperties = {

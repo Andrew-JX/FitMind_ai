@@ -9,12 +9,22 @@ export interface AssistantProviderSimulationHint {
   normalized_message: string;
 }
 
+export type AssistantIntentMode =
+  | "training_overview"
+  | "exercise_progress"
+  | "next_training_focus"
+  | "muscle_balance"
+  | "training_imbalance"
+  | "recovery_check"
+  | "evidence_explain"
+  | "unsupported";
+
 export interface AssistantProviderRequest {
   conversation: {
     user_message: string;
   };
   assistant_context: {
-    mode: "training_overview" | "exercise_progress" | "recommendation_context";
+    mode: AssistantIntentMode;
     start_date: string;
     end_date: string;
     exercise_id: string | null;

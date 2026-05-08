@@ -9,7 +9,12 @@ export type AssistantChatStatus =
 export type AssistantMode =
   | "training_overview"
   | "exercise_progress"
-  | "recommendation_context";
+  | "next_training_focus"
+  | "muscle_balance"
+  | "training_imbalance"
+  | "recovery_check"
+  | "evidence_explain"
+  | "unsupported";
 
 export interface AssistantChatRequestPayload {
   mode: AssistantMode;
@@ -18,6 +23,11 @@ export interface AssistantChatRequestPayload {
   end_date: string;
   exercise_id?: string | undefined;
   session_id?: string | undefined;
+}
+
+export interface AssistantPromptSuggestion {
+  message: string;
+  mode: AssistantMode;
 }
 
 export type AssistantStreamEvent =

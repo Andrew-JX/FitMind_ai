@@ -292,7 +292,7 @@ function screenStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProp
     padding:
       "max(16px, env(safe-area-inset-top, 16px)) 16px calc(16px + env(safe-area-inset-bottom, 0px))",
     position: "absolute",
-    zIndex: 4,
+    zIndex: 260,
   };
 }
 

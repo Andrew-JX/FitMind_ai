@@ -20,7 +20,7 @@ export function AssistantMessageBubble(props: AssistantMessageBubbleProps) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={metaRowStyle}>
           <span style={nameStyle(theme)}>{isAssistant ? "FitMind AI" : "你"}</span>
-          {message.isStreaming ? <Badge tone="info">Streaming</Badge> : null}
+          {message.isStreaming ? <Badge tone="info">生成中</Badge> : null}
         </div>
         <div style={bubbleStyle(theme, isAssistant)}>
           <p style={messageTextStyle}>{message.text || "..."}</p>

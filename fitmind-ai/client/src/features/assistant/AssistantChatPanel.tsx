@@ -1,17 +1,20 @@
-import { useState } from "react";
-
 import { Card } from "../../components/Card";
 import { StateNotice } from "../../components/StateNotice";
 import { useTheme } from "../../theme/ThemeContext";
+import { createDefaultAssistantRange } from "./assistant-date-range";
 import { AssistantComposer } from "./AssistantComposer";
 import { AssistantMessageList } from "./AssistantMessageList";
 import { AssistantQuickPrompts } from "./AssistantQuickPrompts";
-import { AssistantToolCallCard } from "./AssistantToolCallCard";
-import type { AssistantChatRequestPayload, AssistantMode } from "./assistant-types";
+import type {
+  AssistantChatRequestPayload,
+  AssistantPromptSuggestion,
+} from "./assistant-types";
 import type { UseAssistantChatResult } from "./use-assistant-chat";
 
 export interface AssistantChatPanelProps {
   chat: UseAssistantChatResult;
+  onPromptSuggestionChange: (prompt: AssistantPromptSuggestion) => void;
+  promptSuggestion?: AssistantPromptSuggestion | null | undefined;
   selectedExerciseId?: string | null | undefined;
   selectedExerciseName?: string | null | undefined;
   token: string | null;
@@ -20,8 +23,8 @@ export interface AssistantChatPanelProps {
 export function AssistantChatPanel(props: AssistantChatPanelProps) {
   const { chat } = props;
   const { theme } = useTheme();
-  const [message, setMessage] = useState("看看我最近的训练总览。");
-  const [mode, setMode] = useState<AssistantMode>("training_overview");
+  const message = props.promptSuggestion?.message ?? "";
+  const mode = props.promptSuggestion?.mode ?? "next_training_focus";
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -30,7 +33,7 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
       return;
     }
 
-    const range = createDefaultRange();
+    const range = createDefaultAssistantRange();
     const payload: AssistantChatRequestPayload = {
       mode,
       message,
@@ -46,38 +49,24 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
     await chat.sendMessage(payload);
   }
 
-  function applyQuickPrompt(nextMode: AssistantMode): void {
-    setMode(nextMode);
-    setMessage(
-      nextMode === "training_overview"
-        ? "看看我最近的训练总览。"
-        : nextMode === "exercise_progress"
-          ? `分析一下 ${props.selectedExerciseName?.trim() || "当前动作"} 的进展。`
-          : "预览这次回答会读取哪些推荐上下文。",
-    );
+  function applyQuickPrompt(nextPrompt: AssistantPromptSuggestion): void {
+    props.onPromptSuggestionChange(nextPrompt);
   }
 
   return (
     <section style={panelStyle}>
       <AssistantQuickPrompts
         activeMode={mode}
-        onSelectMode={applyQuickPrompt}
+        onSelectPrompt={applyQuickPrompt}
         selectedExerciseId={props.selectedExerciseId}
         selectedExerciseName={props.selectedExerciseName}
       />
 
-      <Card padding="14px">
-        <div style={sectionStyle}>
-          <h3 style={{ margin: 0 }}>工具调用状态</h3>
-          <AssistantToolCallCard toolCall={chat.activeToolCall} />
-        </div>
-      </Card>
-
-      {!props.selectedExerciseId ? (
+      {mode === "exercise_progress" && !props.selectedExerciseId ? (
         <StateNotice
-          description="前往“分析”选择动作后，可使用“动作进展”快捷问题。"
+          description="如果你想继续追问某个动作的 1RM、重量变化或最近进展，请先去“分析”页选中对应动作。"
           icon="target"
-          title="动作进展暂未就绪"
+          title="当前还没有选中动作"
           tone="warning"
         />
       ) : null}
@@ -85,22 +74,25 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
       <Card padding="14px">
         <section style={sectionStyle}>
           <div>
-            <h3 style={{ margin: 0 }}>对话消息</h3>
+            <h3 style={{ margin: 0 }}>继续追问</h3>
             <p style={copyStyle(theme)}>
-              仅展示提问、工具阶段和增量回答，不默认显示 raw debug JSON。
+              先看上面的主动洞察，如果你想继续问为什么这样判断、今天适不适合继续练，或者某个动作有没有进步，可以在这里追问。
             </p>
           </div>
           <AssistantMessageList messages={chat.messages} />
         </section>
       </Card>
 
-      <div style={modeMetaStyle(theme)}>当前模式：{formatMode(mode)}</div>
-
       <AssistantComposer
         canRetry={chat.messages.length > 0}
         isStreaming={chat.isStreaming}
         message={message}
-        onChangeMessage={setMessage}
+        onChangeMessage={(nextMessage) =>
+          props.onPromptSuggestionChange({
+            message: nextMessage,
+            mode,
+          })
+        }
         onClear={chat.clearConversation}
         onRetry={() => void chat.retryLast()}
         onStop={chat.abort}
@@ -109,45 +101,13 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
 
       {chat.errorMessage ? (
         <StateNotice
-          description="可以重试本次问题，或检查 assistant provider 配置。"
+          description="可以重试这次追问，或先回到训练 / 分析页确认最新记录已经刷新。"
           title="助手响应失败"
           tone="error"
         />
       ) : null}
     </section>
   );
-}
-
-function createDefaultRange(): { end_date: string; start_date: string } {
-  const today = new Date();
-  const endDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const startDate = new Date(endDate);
-  startDate.setDate(startDate.getDate() - 29);
-
-  return {
-    end_date: formatDateOnly(endDate),
-    start_date: formatDateOnly(startDate),
-  };
-}
-
-function formatDateOnly(date: Date): string {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-}
-
-function formatMode(mode: AssistantMode): string {
-  if (mode === "training_overview") {
-    return "training_overview";
-  }
-
-  if (mode === "exercise_progress") {
-    return "exercise_progress";
-  }
-
-  return "recommendation_context";
 }
 
 const panelStyle: React.CSSProperties = {
@@ -166,13 +126,5 @@ function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProper
     fontSize: 13,
     lineHeight: 1.6,
     margin: "8px 0 0",
-  };
-}
-
-function modeMetaStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return {
-    color: theme.colors.tx3,
-    fontSize: 11,
-    marginTop: -2,
   };
 }
