@@ -119,14 +119,14 @@ export function AssistantInsightDashboard(
             <Badge tone="accent">Insight Dashboard</Badge>
           </div>
           <p style={copyStyle(theme)}>
-            打开这里就能先看到训练建议、偏科提醒、恢复提醒和重点动作进展。
+            打开这里就能先看到训练建议、偏科提醒、恢复提醒和重点动作进展，再决定要不要继续追问。
           </p>
         </div>
       </div>
 
       {errorMessage ? (
         <StateNotice
-          description="请确认后端服务已启动，或稍后重试。"
+          description="这次没有成功拉取训练洞察。通常是后端暂时不可用或本地环境未启动；恢复后重新进入页面或再试一次即可。"
           icon="bot"
           title="洞察加载失败"
           tone="error"
@@ -134,14 +134,14 @@ export function AssistantInsightDashboard(
       ) : null}
 
       {isLoading && !snapshot ? (
-        <p style={copyStyle(theme)}>正在整理最近 30 天的训练洞察...</p>
+        <p style={copyStyle(theme)}>正在整理最近 30 天的训练记录并生成本页洞察...</p>
       ) : null}
 
       {hasEmptyState ? (
         <StateNotice
-          description="先完成几次训练记录，这里就会自动生成今日建议、偏科提醒和判断依据。"
+          description="当前账号还没有足够训练记录，但页面结构已经就绪。只要补 1-2 次训练，这里就会开始展示建议、偏科提醒、恢复节奏和动作进展。"
           icon="bot"
-          title="还没有可用的训练洞察"
+          title="洞察已准备好，等你喂第一批训练数据"
         />
       ) : null}
 

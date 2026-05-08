@@ -2815,6 +2815,89 @@ Verification:
 - `pnpm lint` passed
 - `pnpm --filter @fitmind/client exec .\node_modules\.bin\vite.cmd build` passed
 
+## 2026-05-09 Phase 4.2 Batch 2 - Assistant Demo Data & Smoke Stabilization
+
+### why this batch exists
+- Phase 4.2 Batch 1 已经把 Assistant 页做成了更像产品的主动洞察页，但当时 `assistant mock smoke` 被 `POST /api/auth/register -> 500` 阻塞，还不够稳定，不能放心演示或写进面试讲稿。
+- 这一批不继续扩 Assistant 功能，而是把 auth 诊断、demo 数据、空态稳健性和文档解释补齐。
+
+### auth smoke stabilization
+- 新增 `server/scripts/auth-register-smoke.ts`，只验证：
+  - `POST /api/auth/register`
+  - `POST /api/auth/login`
+  - `GET /api/auth/me`
+- 脚本每次都会生成唯一 email，并在失败时输出 step label 和 response body，便于快速区分 auth 层问题和 assistant 层问题。
+- 真实排查结果：
+  - sandbox 内运行时，auth smoke 仍会表现为 `POST /api/auth/register -> 500 INTERNAL_ERROR`
+  - 继续向下直调 `register()` 服务后，定位到真实根因是数据库外连被 sandbox 拦截，报 `connect EACCES ...:5432`
+  - 在提权环境下重跑 `auth-register-smoke.ts` 后，`register/login/me` 全部通过
+- 结论：这次 `assistant mock smoke` 的 500 不是 assistant routing bug，也不是 auth 业务逻辑 bug，而是当前 sandbox 环境下的数据库连接限制。
+
+### assistant smoke workflow changes
+- `server/package.json` 新增：
+  - `smoke:assistant-auth`
+  - `smoke:assistant-mock`
+- `smoke:assistant-mock` 会先跑 `auth-register-smoke.ts`，再跑 `assistant-mock-turn-smoke.ts`，优先把 auth 前置失败与 assistant 真问题拆开。
+- 在提权环境下，`assistant-mock-turn-smoke.ts` 已重新通过。
+
+### demo seed data
+- 新增 `server/scripts/seed-assistant-demo-data.ts`。
+- 脚本会加载 `server/.env.local`，使用固定 demo 用户 `assistant-demo@fitmind.local`，并在每次重跑时只替换该用户自己的 demo workouts / assistant logs。
+- demo 数据刻意构造成最近 30 天的稳定演示样本：
+  - Bench / Incline Bench 容量明显更高
+  - Row / Lat Pulldown 有记录但偏少
+  - Squat 只保留少量触点
+  - 最近一次 chest training 距现在约 2 天
+  - Bench 有足够多的 session 可触发重点动作进展和估算 1RM
+- 提权环境下脚本已通过，并输出：
+  - `email=assistant-demo@fitmind.local`
+  - `password=Passw0rd!`
+
+### insight dashboard hardening
+- 重写 `assistant-insight-builder.ts` 的 5 张卡片分支，让页面在稀疏数据下仍然像“准备好等待数据进入”的产品，而不是“坏掉了”的页面。
+- 重点覆盖：
+  - 没有 workout
+  - 训练次数或组数太少，不足以稳定判断偏科或下一次训练建议
+  - recovery 只能做弱判断
+  - 没有选中动作，所以不加载 exercise progress
+  - 选中了动作，但该动作在当前时间范围内没有 session
+- `AssistantInsightDashboard.tsx` 也同步强化了 loading / error / empty copy。
+
+### test coverage additions
+- 新增 `client/src/features/assistant/assistant-insight-builder.test.ts`，锁住 4 类关键状态：
+  - 全空数据
+  - 稀疏训练记录
+  - 已选动作但区间内无记录
+  - 胸推主导时的强建议分支
+- `vitest.config.ts` 已加入 `client/src/**/*.test.ts`。
+
+### files changed
+- `server/scripts/auth-register-smoke.ts`
+- `server/scripts/seed-assistant-demo-data.ts`
+- `server/package.json`
+- `client/src/features/assistant/AssistantInsightDashboard.tsx`
+- `client/src/features/assistant/assistant-insight-builder.ts`
+- `client/src/features/assistant/assistant-insight-builder.test.ts`
+- `vitest.config.ts`
+- `docs/project-study-guide.md`
+- `docs/progress.md`
+
+### verification results
+- `pnpm --filter @fitmind/server type-check` passed
+- `pnpm --filter @fitmind/client type-check` passed
+- `pnpm lint` passed
+- `pnpm --filter @fitmind/client exec .\node_modules\.bin\vite.cmd build` passed
+- `.\node_modules\.bin\vitest.cmd run client\src\features\assistant\assistant-insight-builder.test.ts` passed
+- 提权后 `.\node_modules\.bin\tsx.cmd scripts\auth-register-smoke.ts` passed
+- 提权后 `.\node_modules\.bin\tsx.cmd scripts\assistant-mock-turn-smoke.ts` passed
+- 提权后 `.\node_modules\.bin\tsx.cmd scripts\training-summary-api-smoke.ts` passed
+- 提权后 `.\node_modules\.bin\tsx.cmd scripts\recommendation-context-api-smoke.ts` passed
+- 提权后 `.\node_modules\.bin\tsx.cmd scripts\exercise-progress-api-smoke.ts` passed
+- 提权后 `.\node_modules\.bin\tsx.cmd scripts\seed-assistant-demo-data.ts` passed
+
+### notes
+- 根级 `pnpm test` 目前仍会命中已有的 `server/src/app.test.ts` 失败，这次没有把它们作为 Batch 2 范围的一部分；本批验证重点仍然是新的 auth smoke、assistant mock smoke、deterministic API smokes 和 dashboard builder test。
+
 ## 2026-05-07 Phase 4.2 Batch 1 - Assistant Insight Dashboard
 
 ### why this batch exists
