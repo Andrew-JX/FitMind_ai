@@ -8,19 +8,19 @@ import {
 describe("speech recognition helpers", () => {
   it("maps common browser recognition errors to user-safe messages", () => {
     expect(getSpeechRecognitionErrorMessage("not-allowed")).toContain(
-      "Microphone permission was denied",
+      "麦克风权限",
     );
     expect(getSpeechRecognitionErrorMessage("service-not-allowed")).toContain(
-      "Microphone permission was denied",
+      "麦克风权限",
     );
     expect(getSpeechRecognitionErrorMessage("no-speech")).toContain(
-      "No speech was detected",
+      "没有识别到语音",
     );
     expect(getSpeechRecognitionErrorMessage("audio-capture")).toContain(
-      "microphone is unavailable",
+      "麦克风不可用",
     );
     expect(getSpeechRecognitionErrorMessage("network")).toContain(
-      "Speech recognition is unavailable",
+      "语音识别暂时无法联网",
     );
   });
 

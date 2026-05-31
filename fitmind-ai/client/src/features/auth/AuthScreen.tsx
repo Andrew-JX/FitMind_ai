@@ -4,6 +4,10 @@ import type { LoginRequest, RegisterRequest } from "../../../../shared/src/auth"
 
 import { StateNotice } from "../../components/StateNotice";
 import { useTheme } from "../../theme/ThemeContext";
+import {
+  getRememberedLoginEmail,
+  saveRememberedLoginEmail,
+} from "./remembered-login-email";
 import type { AuthStatus } from "./use-auth";
 
 type AuthMode = "login" | "register";
@@ -18,17 +22,25 @@ export interface AuthScreenProps {
 export function AuthScreen(props: AuthScreenProps) {
   const { errorMessage, onLogin, onRegister, status } = props;
   const { theme } = useTheme();
+  const rememberedEmail = getRememberedLoginEmail();
   const [mode, setMode] = useState<AuthMode>("login");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(rememberedEmail);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [localErrorMessage, setLocalErrorMessage] = useState<string | null>(null);
+  const [rememberEmail, setRememberEmail] = useState(
+    rememberedEmail.length > 0,
+  );
+  const [localErrorMessage, setLocalErrorMessage] = useState<string | null>(
+    null,
+  );
 
   const isSubmitting = status === "authenticating";
   const visibleErrorMessage = localErrorMessage ?? errorMessage;
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+  async function handleSubmit(
+    event: React.FormEvent<HTMLFormElement>,
+  ): Promise<void> {
     event.preventDefault();
     setLocalErrorMessage(null);
 
@@ -44,6 +56,12 @@ export function AuthScreen(props: AuthScreenProps) {
         display_name: displayName.trim() || undefined,
       });
       return;
+    }
+
+    if (rememberEmail) {
+      saveRememberedLoginEmail(email);
+    } else {
+      saveRememberedLoginEmail("");
     }
 
     await onLogin({ email, password });
@@ -168,6 +186,18 @@ export function AuthScreen(props: AuthScreenProps) {
             />
           </label>
 
+          {mode === "login" ? (
+            <label style={rememberEmailStyle(theme)}>
+              <input
+                checked={rememberEmail}
+                disabled={isSubmitting}
+                onChange={(event) => setRememberEmail(event.target.checked)}
+                type="checkbox"
+              />
+              记住邮箱，不保存密码
+            </label>
+          ) : null}
+
           {mode === "register" ? (
             <>
               <label style={labelStyle(theme)}>
@@ -239,7 +269,7 @@ export function AuthScreen(props: AuthScreenProps) {
             marginTop: 14,
           }}
         >
-          Token 仅保存在内存，刷新页面后需要重新登录。
+          登录令牌仅保存在内存中；应用被系统结束后需要重新登录。
         </p>
       </section>
     </main>
@@ -261,7 +291,9 @@ function toggleButtonStyle(
   };
 }
 
-function labelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function labelStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     display: "grid",
@@ -270,12 +302,27 @@ function labelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPrope
   };
 }
 
-function fieldStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function rememberEmailStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    alignItems: "center",
+    color: theme.colors.tx2,
+    display: "flex",
+    fontSize: 12,
+    gap: 8,
+  };
+}
+
+function fieldStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf2,
     border: `1px solid ${theme.colors.bdr}`,
     borderRadius: 12,
     color: theme.colors.tx,
+    fontSize: 16,
     padding: "12px 14px",
   };
 }

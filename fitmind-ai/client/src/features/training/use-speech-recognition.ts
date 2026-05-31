@@ -86,7 +86,7 @@ export function useSpeechRecognition(
 
     if (!RecognitionConstructor) {
       setErrorMessage(
-        "This browser does not support speech recognition. You can continue using text input.",
+        "当前浏览器暂不支持语音识别，可以继续使用文本输入。",
       );
       return;
     }
@@ -127,7 +127,7 @@ export function useSpeechRecognition(
     try {
       recognition.start();
     } catch {
-      setErrorMessage("Speech recognition could not start. Try again later.");
+      setErrorMessage("语音识别无法启动，请稍后重试。");
       setIsListening(false);
     }
   }

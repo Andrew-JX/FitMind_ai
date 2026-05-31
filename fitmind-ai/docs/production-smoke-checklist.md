@@ -17,6 +17,7 @@ Use this checklist before sending the app to an interviewer, friend, or recruite
 - [ ] Confirm invalid login credentials show a friendly message.
 - [ ] Confirm logout returns to the login screen.
 - [ ] If a token expires or a `401` is reproduced, confirm the UI says `登录已过期，请重新登录。`.
+- [ ] Confirm the login screen can remember the email only, without storing password or token.
 
 ## Training
 
@@ -34,6 +35,7 @@ Use this checklist before sending the app to an interviewer, friend, or recruite
 - [ ] Save the parsed draft.
 - [ ] Confirm the saved intake workout appears in history.
 - [ ] Open the saved workout and edit the training time.
+- [ ] Voice intake can recover from the mobile microphone permission prompt with visible Done / Cancel controls.
 
 ## Analysis
 
@@ -62,18 +64,26 @@ Use this checklist before sending the app to an interviewer, friend, or recruite
 
 ## PWA Install Experience
 
-- [ ] Browser devtools detects `/manifest.webmanifest`.
-- [ ] Manifest shows `FitMind AI`, standalone display mode, and 192 / 512 icons.
-- [ ] iOS Safari can add the app to the home screen.
-- [ ] Android Chrome shows Add to Home screen or Install app.
-- [ ] Installed app opens in standalone mode rather than a normal browser tab.
+- [x] Browser devtools detects `/manifest.webmanifest`.
+- [x] Manifest shows `FitMind AI`, standalone display mode, and 192 / 512 icons.
+- [x] iOS Safari can add the app to the home screen.
+- [ ] Android Chrome shows Add to Home screen or Install app. Pending real Android device validation.
+- [x] Installed app opens in standalone mode rather than a normal browser tab on iPhone Safari.
 - [ ] App refresh still loads the training UI after service worker registration.
 - [ ] Offline navigation shows the friendly offline fallback page.
-- [ ] `/api/health` still returns a live 200 response when online.
-- [ ] `/api/*` responses are not served stale from the service worker cache.
+- [x] `/api/health` still returns a live 200 response when online.
+- [x] `/api/*` responses are not served stale from the service worker cache by `sw.js` design.
 - [ ] Login still works after the PWA changes.
 - [ ] Training create/edit still works after the PWA changes.
 - [ ] Intake still works after the PWA changes.
+
+## 2026-06-01 iPhone Safari Notes
+
+- Passed: add to home screen works, FitMind opens with an app-like standalone feel, icon appears on the home screen.
+- Found: because auth token is intentionally memory-only, reopening after the OS ends the PWA process requires login again.
+- Found: the previous press-and-hold voice input could get stuck after the iOS microphone permission prompt interrupted the pointer gesture.
+- Action in Batch 7B.1: keep token memory-only, add email-only remember convenience, and add visible voice Done / Cancel controls.
+- Android Chrome: pending real-device validation.
 
 ## Verification Notes
 

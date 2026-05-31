@@ -3497,3 +3497,26 @@ Notes:
 - Offline workout editing is intentionally not supported.
 - Auth storage and backend APIs were not changed.
 - Capacitor / React Native were intentionally deferred.
+
+## Phase 4.5 Batch 7B.1 - PWA Production Validation and Cache Hardening
+
+Completed:
+- Preserved mixed pre-7B.1 code/docs residue in a named stash instead of committing mojibake strings.
+- Ignored local dev logs and `.claude/` from the root worktree.
+- Kept service worker cache versioned as `fitmind-pwa-v1`.
+- Reconfirmed `/api/*` bypass so API and assistant SSE requests are not cached.
+- Replaced fragile press-and-hold voice intake with visible completion controls.
+- Added email-only login convenience without storing passwords or persisting auth tokens.
+- Added PWA cache clearing / reinstall troubleshooting notes to README.
+- Recorded iPhone Safari home-screen validation notes in the production smoke checklist.
+
+Pending production validation:
+- Deploy Batch 7B.1 to Vercel production.
+- Re-check `/api/health`, app shell, `sw.js`, manifest, and offline fallback.
+- Re-test iPhone voice permission flow after deployment.
+- Validate Android Chrome install when a real Android device is available.
+
+Notes:
+- Offline workout editing is still intentionally unsupported.
+- Push notifications, Capacitor, React Native, and Training Profile remain deferred.
+- Broader UI polish and exercise library improvements are deferred to a later UX batch.

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { createPortal } from "react-dom";
 
 import { Button } from "../../components/Button";
@@ -34,17 +34,17 @@ const COPY = {
   speechFallback:
     "\u5f53\u524d\u6d4f\u89c8\u5668\u6682\u4e0d\u652f\u6301\u8bed\u97f3\u8bc6\u522b\uff0c\u53ef\u4ee5\u7ee7\u7eed\u4f7f\u7528\u6587\u672c\u8bb0\u5f55\u3002",
   speechListening: "\u6b63\u5728\u542c...",
+  speechCancel: "取消",
+  speechDone: "完成",
+  speechHelp: "请说出训练内容；授权弹窗关闭后，也可以点完成结束录音。",
   speechNoticeTitle: "\u8bed\u97f3\u8bc6\u522b\u63d0\u793a",
-  speechRelease: "\u677e\u5f00\u7ed3\u675f\u5f55\u97f3",
+  speechRelease: "点击完成结束录音",
   speechTrigger: "\u8bed\u97f3\u8f93\u5165",
   textTrigger: "\u6587\u672c\u8f93\u5165",
 };
 
-const MIN_VOICE_HOLD_MS = 350;
-
 export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
   const { theme } = useTheme();
-  const voiceStartTimeRef = useRef<number | null>(null);
   const [text, setText] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isVoiceOverlayOpen, setIsVoiceOverlayOpen] = useState(false);
@@ -92,9 +92,7 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
     setIsModalOpen(true);
   }
 
-  function handleVoiceStart(event: React.PointerEvent<HTMLButtonElement>) {
-    event.preventDefault();
-
+  function handleVoiceStart() {
     if (isBusy) {
       return;
     }
@@ -107,29 +105,28 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
       return;
     }
 
-    event.currentTarget.setPointerCapture(event.pointerId);
-    voiceStartTimeRef.current = Date.now();
     speechRecognition.resetTranscript();
     setIsVoiceOverlayOpen(true);
     speechRecognition.startListening();
   }
 
-  function handleVoiceStop() {
+  function handleVoiceDone() {
     if (isBusy) {
       return;
     }
 
-    const elapsedMs =
-      voiceStartTimeRef.current === null
-        ? MIN_VOICE_HOLD_MS
-        : Date.now() - voiceStartTimeRef.current;
-    voiceStartTimeRef.current = null;
     setIsVoiceOverlayOpen(false);
     speechRecognition.stopListening();
+    setIsModalOpen(true);
+  }
 
-    if (elapsedMs >= MIN_VOICE_HOLD_MS) {
-      setIsModalOpen(true);
+  function handleVoiceCancel() {
+    if (isBusy) {
+      return;
     }
+
+    setIsVoiceOverlayOpen(false);
+    speechRecognition.stopListening();
   }
 
   function handleModalCancel() {
@@ -159,15 +156,7 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
         <Button
           aria-label={COPY.speechTrigger}
           disabled={isBusy}
-          onContextMenu={(event) => event.preventDefault()}
-          onPointerCancel={handleVoiceStop}
-          onPointerDown={handleVoiceStart}
-          onPointerLeave={(event) => {
-            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-              handleVoiceStop();
-            }
-          }}
-          onPointerUp={handleVoiceStop}
+          onClick={handleVoiceStart}
           style={micButtonStyle}
           title={COPY.speechTrigger}
           type="button"
@@ -178,7 +167,14 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
       </div>
 
       {isVoiceOverlayOpen
-        ? createPortal(<VoiceListeningOverlay />, document.body)
+        ? createPortal(
+            <VoiceListeningOverlay
+              errorMessage={speechRecognition.errorMessage}
+              onCancel={handleVoiceCancel}
+              onDone={handleVoiceDone}
+            />,
+            document.body,
+          )
         : null}
 
       {isModalOpen
@@ -273,7 +269,11 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
   );
 }
 
-function VoiceListeningOverlay() {
+function VoiceListeningOverlay(props: {
+  errorMessage: string | null;
+  onCancel: () => void;
+  onDone: () => void;
+}) {
   const { theme } = useTheme();
 
   return (
@@ -312,6 +312,24 @@ function VoiceListeningOverlay() {
         <p style={{ ...copyStyle, color: theme.colors.tx2 }}>
           {COPY.speechRelease}
         </p>
+        <p style={{ ...copyStyle, color: theme.colors.tx3 }}>
+          {COPY.speechHelp}
+        </p>
+        {props.errorMessage ? (
+          <StateNotice
+            description={props.errorMessage}
+            title={COPY.speechNoticeTitle}
+            tone="warning"
+          />
+        ) : null}
+        <div style={voiceActionRowStyle}>
+          <Button onClick={props.onCancel} type="button" variant="secondary">
+            {COPY.speechCancel}
+          </Button>
+          <Button onClick={props.onDone} type="button">
+            {COPY.speechDone}
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -349,10 +367,6 @@ const micButtonStyle: React.CSSProperties = {
   display: "inline-flex",
   justifyContent: "center",
   minWidth: 46,
-  touchAction: "none",
-  WebkitTouchCallout: "none",
-  WebkitUserSelect: "none",
-  userSelect: "none",
 };
 
 const modalBackdropStyle: React.CSSProperties = {
@@ -477,4 +491,11 @@ const voiceWaveBarStyle: React.CSSProperties = {
   height: 58,
   transformOrigin: "center",
   width: 8,
+};
+
+const voiceActionRowStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 10,
+  gridTemplateColumns: "repeat(2, minmax(96px, 1fr))",
+  width: "100%",
 };

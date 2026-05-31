@@ -35,6 +35,13 @@ Offline note:
 - Training data still requires network sync.
 - Offline workout editing, background sync, and push notifications are intentionally out of scope for the current web app.
 
+PWA troubleshooting:
+
+- To force a fresh app shell, open the site in Safari or Chrome and refresh once while online before launching from the home-screen icon again.
+- If the installed app keeps showing an older version, remove the FitMind home-screen icon and add it again from the browser.
+- If stale service worker data persists, clear site data for `fitmind-ai-psi.vercel.app` in browser settings, then reopen the production URL and reinstall.
+- FitMind can remember only the last login email when selected. It does not store the password or persist the auth token.
+
 ## Core Idea
 
 Workout logs  
