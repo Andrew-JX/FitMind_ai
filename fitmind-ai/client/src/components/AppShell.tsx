@@ -23,16 +23,17 @@ export function AppShell(props: AppShellProps) {
         backgroundColor: theme.colors.bg,
         color: theme.colors.tx,
         margin: "0 auto",
-        maxWidth: 390,
-        minHeight: "100vh",
-        paddingBottom: 88,
+        maxWidth: 430,
+        minHeight: "100dvh",
+        paddingBottom: "calc(92px + env(safe-area-inset-bottom, 0px))",
+        width: "100%",
       }}
     >
       <header
         style={{
           backgroundColor: theme.colors.bg,
           borderBottom: `1px solid ${theme.colors.bdr}`,
-          padding: "12px 16px",
+          padding: "max(12px, env(safe-area-inset-top, 0px)) 16px 12px",
           position: "sticky",
           top: 0,
           zIndex: 50,
@@ -46,7 +47,7 @@ export function AppShell(props: AppShellProps) {
             justifyContent: "space-between",
           }}
         >
-          <div style={{ alignItems: "center", display: "flex", gap: 10 }}>
+          <div style={{ alignItems: "center", display: "flex", gap: 10, minWidth: 0 }}>
             <div
               style={{
                 alignItems: "center",
@@ -54,6 +55,7 @@ export function AppShell(props: AppShellProps) {
                 borderRadius: 10,
                 color: theme.colors.acText,
                 display: "flex",
+                flex: "0 0 30px",
                 height: 30,
                 justifyContent: "center",
                 width: 30,
@@ -61,7 +63,7 @@ export function AppShell(props: AppShellProps) {
             >
               <Icon name="zap" size={16} />
             </div>
-            <div>
+            <div style={{ minWidth: 0 }}>
               <div style={{ alignItems: "center", display: "flex", gap: 8 }}>
                 <strong style={{ fontSize: 16 }}>FitMind AI</strong>
                 <Badge tone="accent">Workspace</Badge>
@@ -79,13 +81,11 @@ export function AppShell(props: AppShellProps) {
             </div>
           </div>
 
-          <div style={{ alignItems: "center", display: "flex", gap: 8 }}>
-            <IconButton
-              icon={isDark ? "sun" : "moon"}
-              label="切换主题"
-              onClick={toggleTheme}
-            />
-          </div>
+          <IconButton
+            icon={isDark ? "sun" : "moon"}
+            label="切换主题"
+            onClick={toggleTheme}
+          />
         </div>
 
         <div
@@ -101,6 +101,7 @@ export function AppShell(props: AppShellProps) {
             style={{
               color: theme.colors.tx2,
               fontSize: 11,
+              minWidth: 0,
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
@@ -116,6 +117,7 @@ export function AppShell(props: AppShellProps) {
               borderRadius: theme.radius.pill,
               color: theme.colors.tx2,
               cursor: "pointer",
+              flex: "0 0 auto",
               fontSize: 11,
               fontWeight: 700,
               padding: "7px 12px",
@@ -129,22 +131,7 @@ export function AppShell(props: AppShellProps) {
 
       <main style={{ padding: "12px 16px 0" }}>{props.children}</main>
 
-      <nav
-        style={{
-          backgroundColor: theme.colors.surf,
-          borderTop: `1px solid ${theme.colors.bdr}`,
-          bottom: 0,
-          display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          left: "50%",
-          maxWidth: 390,
-          padding: "6px 0 calc(env(safe-area-inset-bottom, 8px) + 6px)",
-          position: "fixed",
-          transform: "translateX(-50%)",
-          width: "100%",
-          zIndex: 50,
-        }}
-      >
+      <nav style={navStyle(theme)}>
         <TabButton
           active={props.activeTab === "training"}
           icon="dumbbell"
@@ -190,14 +177,45 @@ function TabButton(props: TabButtonProps) {
         display: "flex",
         flexDirection: "column",
         gap: 4,
-        padding: "4px 0",
+        minHeight: 48,
+        minWidth: 0,
+        padding: "5px 0",
+        WebkitTouchCallout: "none",
+        WebkitUserSelect: "none",
+        userSelect: "none",
       }}
       type="button"
     >
       <Icon name={props.icon} size={20} />
-      <span style={{ fontSize: 10, fontWeight: props.active ? 700 : 500 }}>
+      <span
+        style={{
+          fontSize: 11,
+          fontWeight: props.active ? 700 : 500,
+          lineHeight: 1.2,
+          whiteSpace: "nowrap",
+        }}
+      >
         {props.label}
       </span>
     </button>
   );
+}
+
+function navStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.surf,
+    border: `1px solid ${theme.colors.bdr}`,
+    borderRadius: 18,
+    bottom: "max(10px, env(safe-area-inset-bottom, 0px))",
+    boxShadow: theme.shadows.card,
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    left: "50%",
+    maxWidth: 390,
+    padding: "7px 6px",
+    position: "fixed",
+    transform: "translateX(-50%)",
+    width: "calc(100% - 20px)",
+    zIndex: 300,
+  };
 }

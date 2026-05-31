@@ -19,6 +19,7 @@ export type IconName =
   | "search"
   | "sun"
   | "moon"
+  | "mic"
   | "stop";
 
 export interface IconProps {
@@ -44,6 +45,7 @@ export function Icon(props: IconProps) {
       strokeLinecap="round"
       strokeLinejoin="round"
       strokeWidth="2"
+      style={{ display: "block", flexShrink: 0 }}
       viewBox="0 0 24 24"
       width={size}
     >
@@ -173,6 +175,8 @@ function renderPath(name: IconName): React.ReactNode {
         <path d="M3 6h18" />
         <path d="M8 6V4h8v2" />
         <path d="m19 6-1 14H6L5 6" />
+        <path d="M10 11v5" />
+        <path d="M14 11v5" />
       </>
     );
   }
@@ -213,6 +217,17 @@ function renderPath(name: IconName): React.ReactNode {
 
   if (name === "moon") {
     return <path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z" />;
+  }
+
+  if (name === "mic") {
+    return (
+      <>
+        <rect height="11" rx="4" width="7" x="8.5" y="3" />
+        <path d="M5 11a7 7 0 0 0 14 0" />
+        <path d="M12 18v3" />
+        <path d="M9 21h6" />
+      </>
+    );
   }
 
   return <rect height="8" rx="1" width="8" x="8" y="8" />;

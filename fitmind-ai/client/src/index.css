@@ -11,6 +11,8 @@ body,
 #root {
   margin: 0;
   min-height: 100%;
+  overflow-x: hidden;
+  width: 100%;
 }
 
 body {
@@ -18,6 +20,8 @@ body {
   background: #0f0f0f;
   color: #f0f0f0;
   line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 button,
@@ -29,7 +33,12 @@ textarea {
 
 button {
   appearance: none;
+  touch-action: manipulation;
   transition: opacity 150ms ease, transform 150ms ease, border-color 150ms ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
 }
 
 button:disabled {
@@ -40,6 +49,7 @@ button:disabled {
 input,
 textarea,
 select {
+  font-size: 16px !important;
   min-width: 0;
   transition: border-color 150ms ease, opacity 150ms ease;
 }

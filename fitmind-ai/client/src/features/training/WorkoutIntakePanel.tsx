@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
+import { Icon } from "../../components/Icon";
 import { StateNotice } from "../../components/StateNotice";
 import { useTheme } from "../../theme/ThemeContext";
 import { appendSpeechTranscript } from "./speech-recognition-utils";
@@ -161,13 +162,18 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
           onContextMenu={(event) => event.preventDefault()}
           onPointerCancel={handleVoiceStop}
           onPointerDown={handleVoiceStart}
+          onPointerLeave={(event) => {
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+              handleVoiceStop();
+            }
+          }}
           onPointerUp={handleVoiceStop}
           style={micButtonStyle}
           title={COPY.speechTrigger}
           type="button"
           variant="secondary"
         >
-          {"\ud83c\udfa3"}
+          <Icon name="mic" size={18} />
         </Button>
       </div>
 
@@ -339,8 +345,14 @@ const triggerActionsStyle: React.CSSProperties = {
 };
 
 const micButtonStyle: React.CSSProperties = {
+  alignItems: "center",
+  display: "inline-flex",
+  justifyContent: "center",
   minWidth: 46,
   touchAction: "none",
+  WebkitTouchCallout: "none",
+  WebkitUserSelect: "none",
+  userSelect: "none",
 };
 
 const modalBackdropStyle: React.CSSProperties = {
@@ -417,7 +429,7 @@ const labelStyle: React.CSSProperties = {
 
 const textareaStyle: React.CSSProperties = {
   boxSizing: "border-box",
-  fontSize: 14,
+  fontSize: 16,
   lineHeight: 1.6,
   minHeight: 124,
   outline: "none",

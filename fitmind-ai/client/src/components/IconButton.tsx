@@ -33,6 +33,7 @@ export function IconButton(props: IconButtonProps) {
         color,
         cursor: props.disabled ? "not-allowed" : "pointer",
         display: "inline-flex",
+        flex: "0 0 32px",
         height: 32,
         justifyContent: "center",
         opacity: props.disabled ? 0.56 : 1,
