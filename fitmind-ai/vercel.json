@@ -1,0 +1,15 @@
+{
+  "buildCommand": "pnpm --filter @fitmind/client exec vite build",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "outputDirectory": "client/dist",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
