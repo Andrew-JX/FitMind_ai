@@ -6,7 +6,7 @@
   "scripts": {
     "db:migrate": "node --env-file ../.env ./node_modules/node-pg-migrate/bin/node-pg-migrate.js -m ./migrations -t pgmigrations up",
     "db:migrate:down": "node --env-file ../.env ./node_modules/node-pg-migrate/bin/node-pg-migrate.js -m ./migrations -t pgmigrations down",
-    "build": "tsc -p tsconfig.json --noEmit false",
+    "build": "tsc -p tsconfig.json --noEmit false && node scripts/copy-runtime-js.mjs",
     "dev": "tsx watch --env-file ../.env src/server.ts",
     "seed:assistant-demo": "tsx scripts/seed-assistant-demo-data.ts",
     "seed:assistant-demo-data": "pnpm run seed:assistant-demo",
