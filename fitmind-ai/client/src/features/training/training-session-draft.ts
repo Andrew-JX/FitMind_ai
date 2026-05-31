@@ -1,16 +1,25 @@
 import type {
   CreateWorkoutRequest,
+  WorkoutDetailDto,
   WorkoutSetInput,
 } from "../../../../shared/src/training";
 
 import type { DictionaryExercise } from "./dictionary-api";
 
 export type EffortLevel = "easy" | "normal" | "hard";
+export type ExerciseLoadType = "weighted" | "bodyweight" | "timed";
+export type DraftExerciseMatchStatus = "matched" | "ambiguous" | "unresolved";
+
+export interface DraftExerciseCandidate {
+  exerciseId: string;
+  exerciseName: string;
+}
 
 export interface DraftSet {
   completed: boolean;
   effort: EffortLevel;
   id: string;
+  persistedSetId?: string | null | undefined;
   reps: string;
   restSeconds: number | null;
   weightKg: string;
@@ -18,12 +27,28 @@ export interface DraftSet {
 
 export interface DraftExercise {
   categoryLabel: string;
-  exercise: DictionaryExercise;
-  exerciseId: string;
+  candidateExercises: DraftExerciseCandidate[];
+  exercise: DictionaryExercise | null;
+  exerciseId: string | null;
   id: string;
+  inputName: string | null;
   isExpanded: boolean;
+  loadType: ExerciseLoadType;
+  matchStatus: DraftExerciseMatchStatus;
   name: string;
   sets: DraftSet[];
+}
+
+export interface TrainingSessionInitialDraft {
+  durationMin: number | null;
+  endedAt?: string | null | undefined;
+  exercises: DraftExercise[];
+  note: string | null;
+  originalWorkout?: WorkoutDetailDto | undefined;
+  performedAt: string;
+  source: "manual" | "intake" | "edit";
+  startedAt?: string | null | undefined;
+  workoutId?: string | undefined;
 }
 
 export function createDraftExercise(
@@ -32,10 +57,14 @@ export function createDraftExercise(
 ): DraftExercise {
   return {
     categoryLabel,
+    candidateExercises: [],
     exercise,
     exerciseId: exercise.id,
     id: `exercise-${exercise.id}`,
+    inputName: null,
     isExpanded: false,
+    loadType: getExerciseLoadType(exercise),
+    matchStatus: "matched",
     name: exercise.name_en,
     sets: [],
   };
@@ -57,7 +86,11 @@ export function getCompletedValidSetCount(draftExercises: DraftExercise[]): numb
     return (
       sum +
       exercise.sets.filter((setDraft) => {
-        return isDraftSetValid(setDraft) && setDraft.completed;
+        return (
+          exercise.matchStatus === "matched" &&
+          isDraftSetValid(setDraft, exercise) &&
+          setDraft.completed
+        );
       }).length
     );
   }, 0);
@@ -69,11 +102,11 @@ export function getExerciseSummary(draftExercise: DraftExercise): {
 } {
   return draftExercise.sets.reduce(
     (summary, setDraft) => {
-      if (!(setDraft.completed && isDraftSetValid(setDraft))) {
+      if (!(setDraft.completed && isDraftSetValid(setDraft, draftExercise))) {
         return summary;
       }
 
-      const weightKg = Number.parseFloat(setDraft.weightKg);
+      const weightKg = getDraftSetWeightKg(setDraft, draftExercise);
       const reps = Number.parseInt(setDraft.reps, 10);
 
       return {
@@ -88,11 +121,14 @@ export function getExerciseSummary(draftExercise: DraftExercise): {
   );
 }
 
-export function isDraftSetValid(setDraft: DraftSet): boolean {
-  const weightKg = Number.parseFloat(setDraft.weightKg);
+export function isDraftSetValid(
+  setDraft: DraftSet,
+  draftExercise?: Pick<DraftExercise, "loadType">,
+): boolean {
+  const weightKg = getDraftSetWeightKg(setDraft, draftExercise);
   const reps = Number.parseInt(setDraft.reps, 10);
 
-  return Number.isFinite(weightKg) && weightKg > 0 && Number.isInteger(reps) && reps > 0;
+  return Number.isFinite(weightKg) && weightKg >= 0 && Number.isInteger(reps) && reps > 0;
 }
 
 export function mapEffortToRpe(effort: EffortLevel): number {
@@ -110,13 +146,21 @@ export function mapEffortToRpe(effort: EffortLevel): number {
 export function buildWorkoutRequestFromDraft(input: {
   draftExercises: DraftExercise[];
   elapsedSeconds: number;
+  durationMinutes?: number | null | undefined;
+  endedAt?: string | null | undefined;
+  notes?: string | null | undefined;
   performedAt: Date;
+  startedAt?: string | null | undefined;
 }): CreateWorkoutRequest | null {
   const preparedSets: Array<Omit<WorkoutSetInput, "set_index">> = [];
 
   input.draftExercises.forEach((draftExercise) => {
     draftExercise.sets.forEach((setDraft) => {
-      if (!(setDraft.completed && isDraftSetValid(setDraft))) {
+      if (
+        !draftExercise.exerciseId ||
+        draftExercise.matchStatus !== "matched" ||
+        !(setDraft.completed && isDraftSetValid(setDraft, draftExercise))
+      ) {
         return;
       }
 
@@ -125,7 +169,7 @@ export function buildWorkoutRequestFromDraft(input: {
         is_warmup: false,
         reps: Number.parseInt(setDraft.reps, 10),
         rpe: mapEffortToRpe(setDraft.effort),
-        weight_kg: Number.parseFloat(setDraft.weightKg),
+        weight_kg: getDraftSetWeightKg(setDraft, draftExercise),
       });
     });
   });
@@ -134,11 +178,30 @@ export function buildWorkoutRequestFromDraft(input: {
     return null;
   }
 
-  return {
-    duration_minutes: Math.floor(input.elapsedSeconds / 60),
+  const durationMinutes = input.durationMinutes ?? Math.floor(input.elapsedSeconds / 60);
+  const request: CreateWorkoutRequest = {
     performed_at: input.performedAt.toISOString(),
     sets: assignSetIndexes(preparedSets),
   };
+
+  if (input.startedAt !== undefined) {
+    request.started_at = input.startedAt;
+  }
+
+  if (input.endedAt !== undefined) {
+    request.ended_at = input.endedAt;
+  }
+
+  if (durationMinutes > 0) {
+    request.duration_minutes = durationMinutes;
+  }
+
+  const trimmedNotes = input.notes?.trim();
+  if (trimmedNotes) {
+    request.notes = trimmedNotes;
+  }
+
+  return request;
 }
 
 function assignSetIndexes(
@@ -159,4 +222,42 @@ function assignSetIndexes(
 
 function createDraftSetId(): string {
   return `set-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function getExerciseLoadType(exercise: DictionaryExercise): ExerciseLoadType {
+  if (exercise.code === "plank_bodyweight") {
+    return "timed";
+  }
+
+  if (exercise.equipment?.toLowerCase() === "bodyweight" || isBodyweightCode(exercise.code)) {
+    return "bodyweight";
+  }
+
+  return "weighted";
+}
+
+function getDraftSetWeightKg(
+  setDraft: DraftSet,
+  draftExercise?: Pick<DraftExercise, "loadType">,
+): number {
+  if (draftExercise?.loadType === "bodyweight" && setDraft.weightKg.trim() === "") {
+    return 0;
+  }
+
+  return Number.parseFloat(setDraft.weightKg);
+}
+
+function isBodyweightCode(code: string): boolean {
+  return (
+    code.endsWith("_bodyweight") ||
+    [
+      "pull_up",
+      "chin_up",
+      "push_up",
+      "dip",
+      "crunch",
+      "hanging_leg_raise",
+      "russian_twist",
+    ].some((bodyweightCode) => code.includes(bodyweightCode))
+  );
 }

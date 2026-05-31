@@ -6,15 +6,11 @@ import { Pill } from "../../components/Pill";
 import { StateNotice } from "../../components/StateNotice";
 import { HttpClientError } from "../../services/http-client";
 import { useTheme } from "../../theme/ThemeContext";
-import {
-  getExerciseProgress,
-  type ExerciseProgress,
-} from "../training/exercise-progress-api";
-import { getRecommendationContext } from "../training/recommendation-context-api";
-import { getTrainingSummary } from "../training/training-summary-api";
 import { createDefaultAssistantRange } from "./assistant-date-range";
-import { buildAssistantInsightSnapshot } from "./assistant-insight-builder";
-import type { AssistantInsightSnapshot } from "./assistant-insight-types";
+import {
+  getAssistantInsights,
+  type AssistantInsightsResponse,
+} from "./assistant-insights-api";
 import type { AssistantPromptSuggestion } from "./assistant-types";
 
 export interface AssistantInsightDashboardProps {
@@ -29,7 +25,9 @@ export function AssistantInsightDashboard(
   props: AssistantInsightDashboardProps,
 ) {
   const { theme } = useTheme();
-  const [snapshot, setSnapshot] = useState<AssistantInsightSnapshot | null>(null);
+  const [snapshot, setSnapshot] = useState<AssistantInsightsResponse | null>(
+    null,
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [range] = useState(() => createDefaultAssistantRange());
@@ -49,36 +47,17 @@ export function AssistantInsightDashboard(
       setErrorMessage(null);
 
       try {
-        const [summary, recommendationContext, exerciseProgress] =
-          await Promise.all([
-            getTrainingSummary(props.token, {
-              endDate: range.end_date,
-              startDate: range.start_date,
-            }),
-            getRecommendationContext(props.token, {
-              endDate: range.end_date,
-              startDate: range.start_date,
-            }),
-            loadExerciseProgress(
-              props.token,
-              props.selectedExerciseId ?? null,
-              range.end_date,
-              range.start_date,
-            ),
-          ]);
+        const nextSnapshot = await getAssistantInsights(props.token, {
+          endDate: range.end_date,
+          exerciseId: props.selectedExerciseId ?? null,
+          startDate: range.start_date,
+        });
 
         if (!isActive) {
           return;
         }
 
-        setSnapshot(
-          buildAssistantInsightSnapshot({
-            exerciseProgress,
-            recommendationContext,
-            selectedExerciseName: props.selectedExerciseName,
-            summary,
-          }),
-        );
+        setSnapshot(nextSnapshot);
       } catch (error) {
         if (!isActive) {
           return;
@@ -134,7 +113,9 @@ export function AssistantInsightDashboard(
       ) : null}
 
       {isLoading && !snapshot ? (
-        <p style={copyStyle(theme)}>正在整理最近 30 天的训练记录并生成本页洞察...</p>
+        <p style={copyStyle(theme)}>
+          正在整理最近 30 天的训练记录并生成本页洞察...
+        </p>
       ) : null}
 
       {hasEmptyState ? (
@@ -177,14 +158,18 @@ export function AssistantInsightDashboard(
                     <Pill tone={card.tone}>{getToneLabel(card.type)}</Pill>
                   </div>
                   <p style={cardSummaryStyle(theme)}>{card.summary}</p>
-                  {card.hint ? <p style={cardHintStyle(theme)}>{card.hint}</p> : null}
-                  {card.evidenceSummary ? (
-                    <p style={cardEvidenceStyle(theme)}>{card.evidenceSummary}</p>
+                  {card.hint ? (
+                    <p style={cardHintStyle(theme)}>{card.hint}</p>
+                  ) : null}
+                  {card.evidence_summary ? (
+                    <p style={cardEvidenceStyle(theme)}>
+                      {card.evidence_summary}
+                    </p>
                   ) : null}
                 </>
               );
 
-              if (!card.suggestedPrompt) {
+              if (!card.suggested_prompt) {
                 return (
                   <article key={card.type} style={cardStyle(theme, false)}>
                     {content}
@@ -195,7 +180,7 @@ export function AssistantInsightDashboard(
               return (
                 <button
                   key={card.type}
-                  onClick={() => props.onPromptSelect(card.suggestedPrompt!)}
+                  onClick={() => props.onPromptSelect(card.suggested_prompt!)}
                   style={cardStyle(theme, true)}
                   type="button"
                 >
@@ -219,23 +204,6 @@ export function AssistantInsightDashboard(
   );
 }
 
-async function loadExerciseProgress(
-  token: string,
-  selectedExerciseId: string | null,
-  endDate: string,
-  startDate: string,
-): Promise<ExerciseProgress | null> {
-  if (!selectedExerciseId) {
-    return null;
-  }
-
-  return getExerciseProgress(token, {
-    endDate,
-    exerciseId: selectedExerciseId,
-    startDate,
-  });
-}
-
 function getReadableErrorMessage(error: unknown): string {
   if (error instanceof HttpClientError) {
     return error.message;
@@ -248,7 +216,9 @@ function getReadableErrorMessage(error: unknown): string {
   return "助手洞察暂时不可用。";
 }
 
-function getToneLabel(type: AssistantInsightSnapshot["cards"][number]["type"]): string {
+function getToneLabel(
+  type: AssistantInsightsResponse["cards"][number]["type"],
+): string {
   switch (type) {
     case "next_training_focus":
       return "今日建议";
@@ -308,7 +278,9 @@ const limitationTitleStyle: React.CSSProperties = {
   margin: 0,
 };
 
-function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function copyStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 13,
@@ -376,7 +348,9 @@ function cardSummaryStyle(
   };
 }
 
-function cardHintStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function cardHintStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.orange,
     fontSize: 12,

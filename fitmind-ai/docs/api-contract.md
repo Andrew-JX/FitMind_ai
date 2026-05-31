@@ -581,3 +581,171 @@ export const TOOL_DEFINITIONS = [
 ## 10. 版本演进
 
 API 当前版本：v1（隐式，不在 URL 里）。 若未来不兼容更新，加 `/api/v2/` 前缀。本项目周期内不会涉及。
+------
+
+## Phase 4.3 Addition - Training Muscle Load
+
+### GET /api/training/muscle-load
+
+Returns deterministic muscle-group load distribution for the authenticated user.
+
+Authentication:
+
+- Requires `Authorization: Bearer <jwt>`.
+- `user_id` is always read from auth context.
+- `user_id` query/body/tool args are not accepted as authority.
+
+Query:
+
+- `start_date`: `YYYY-MM-DD`
+- `end_date`: `YYYY-MM-DD`
+
+Calculation:
+
+- `raw_volume = weight_kg * reps`
+- `normalized_contribution_weight = contribution_weight / sum(contribution_weight for the exercise)`
+- `weighted_volume = raw_volume * normalized_contribution_weight`
+- `contribution_ratio = muscle_group_weighted_volume / total_weighted_volume`
+
+Response data:
+
+- `range`: requested date-only range.
+- `totals`: workout count, set count, total reps, raw volume, weighted volume, and represented muscle-group count.
+- `by_muscle_group`: grouped muscle rows with raw volume, weighted volume, contribution ratio, and top contributing exercises.
+- `top_muscle_groups`: highest weighted-volume groups.
+- `low_volume_muscle_groups`: lowest nonzero recorded-volume groups; this is not an `undertrained` judgment.
+- `evidence`: workout ids, set ids, and calculation rules.
+
+------
+
+## Phase 4.3 Addition - Assistant Insights
+
+### GET /api/training/assistant-insights
+
+Returns deterministic assistant dashboard cards for the authenticated user.
+
+Authentication:
+
+- Requires `Authorization: Bearer <jwt>`.
+- `user_id` is always read from auth context.
+- `user_id` query/body/tool args are not accepted as authority.
+
+Query:
+
+- `start_date`: `YYYY-MM-DD`
+- `end_date`: `YYYY-MM-DD`
+- `exercise_id`: optional selected exercise UUID
+
+Response data:
+
+- `range`: requested date-only range.
+- `overview`: workout count, set count, total volume, top muscle group name, and top exercise name.
+- `cards`: dashboard-ready assistant insight cards.
+- `limitations`: user-facing boundaries for deterministic reminders.
+- `evidence`: aggregate counts, calculation source names, and calculation rules. Raw workout/set ids are intentionally not returned by this endpoint.
+
+Notes:
+
+- This endpoint is deterministic and does not call an LLM.
+- The frontend renders the returned view-model and should not duplicate card business rules.
+- Muscle concentration language must stay conservative: lower share / higher share / current records are concentrated in, not undertrained or medical risk.
+
+------
+
+## Phase 4.4 Addition - Natural Language Workout Intake
+
+### POST /api/training/workout-intake/parse
+
+Parses a natural-language workout description into a structured workout draft for later user confirmation.
+
+Authentication:
+
+- Requires `Authorization: Bearer <jwt>`.
+- `user_id` is always read from auth context.
+- `user_id` query/body values are ignored and must not affect parsing or persistence.
+
+Request:
+
+- `text`: required natural-language workout description.
+- `performed_at`: optional ISO datetime; defaults to current server time when omitted.
+- `duration_min`: optional positive integer.
+- `note`: optional string.
+
+Response data:
+
+- `draft.performed_at`: ISO datetime used by the draft.
+- `draft.date_source`: `explicit_text`, `request_performed_at`, or `server_default`.
+- `draft.date_label`: recognized text date label such as `昨天` or normalized date such as `2026-05-29`.
+- `draft.duration_min`: provided duration or `null`.
+- `draft.note`: provided note or `null`.
+- `draft.exercises`: parsed exercise drafts with input name, match status, candidates, and parsed sets.
+- `draft.exercises[].sets`: complete, saveable set drafts. `weight_kg` and `reps` are positive values; the parser must not emit fake zero values for missing fields.
+- `draft.exercises[].incomplete_sets`: partial set facts recognized from oral / natural-language text, such as group count and weight without reps. These rows are not saveable until the user corrects the transcript and reparses.
+- `unresolved_items`: names that were ambiguous, unmatched, or missing parsable sets.
+- `warnings`: user-facing parse limitations.
+- `evidence`: parser version, rules, parser source, and fallback warnings.
+
+Notes:
+
+- This endpoint only generates a draft and does not create `workouts` or `sets`.
+- The endpoint runs the deterministic rule parser first; Batch 6 can optionally use an LLM structured fallback for low-quality oral parses.
+- Ambiguous exercise names return candidates and must be confirmed by the user.
+- This is natural-language / transcript intake only, not backend STT, audio upload, RAG, MCP, or Agent behavior.
+- Phase 4.4 Batch 5B keeps the parser conservative for oral inputs: missing weight or reps returns `incomplete_sets` and warnings instead of manufacturing values like `1kg x 0` or `7kg x 0`.
+
+### Phase 4.4 Batch 2 - Exercise Alias Matching
+
+The workout-intake parser now uses a deterministic system alias layer before fallback name matching.
+
+Alias behavior:
+
+- Exact system aliases can resolve directly to one standard exercise.
+- Broad aliases can intentionally return multiple candidates with `match_status: "ambiguous"`.
+- Unknown movement names still return `match_status: "unresolved"`.
+- Alias matching only affects draft generation and never writes workout data.
+
+Current boundaries:
+
+- Aliases are code-defined system aliases keyed by exercise `code`.
+- There is no user-custom alias table or migration in this batch.
+- Ambiguous aliases must be confirmed by a future UI before saving through the existing workout API.
+
+### Phase 4.4 Batch 5B - Voice Intake UX & Parser Guardrails
+
+The intake response now supports incomplete set drafts for recognized but unsaveable oral descriptions.
+
+Example:
+
+- Input: `我昨天训练了背部做了高位下拉做了十组，每组是70公斤`
+- Draft: matched `高位下拉`, `sets: []`, `incomplete_sets[0].group_count: 10`, `incomplete_sets[0].weight_kg: 70`, `incomplete_sets[0].missing_fields: ["reps"]`
+
+Contract boundaries:
+
+- Complete `sets` remain the only source for save payload construction.
+- `incomplete_sets` is review-only metadata that blocks save.
+- Context words such as `背部`, `今天`, `昨天`, `训练`, `练了`, `做了`, `每组`, and `然后` should not become standalone unresolved exercises.
+- Intake exercise display names are Chinese-first where a known Chinese name is available, with English fallback.
+- This batch still does not add LLM parsing, backend STT, audio upload, audio storage, or any workout persistence from the parse endpoint.
+
+### Phase 4.4 Batch 6 - LLM Structured Workout Intake Fallback
+
+The parse endpoint remains `POST /api/training/workout-intake/parse`, but the backend can now use a hybrid parser:
+
+- `evidence.source = "rule_parser"` when deterministic rules produce a complete draft.
+- `evidence.source = "llm_structured_fallback"` when a low-quality rule parse is repaired by the structured fallback.
+- `evidence.source = "rule_parser_llm_unavailable"` when fallback is disabled, unavailable, or fails schema validation.
+- `evidence.fallback_warnings` contains fallback failure details when the conservative rule result is returned.
+
+Fallback boundaries:
+
+- LLM output is strict JSON validated by Zod.
+- LLM output can contain `spoken_name`, complete `sets`, incomplete set facts, and warnings.
+- LLM output must not contain `exercise_id`; database exercise matching still uses the deterministic exercise matching service.
+- LLM fallback never creates `workouts` or `sets`; user confirmation and the existing create workout API remain the only persistence path.
+- `WORKOUT_INTAKE_LLM_PROVIDER` supports `off`, `mock`, and `anthropic`, defaulting to `mock` for local tests and smoke.
+- Phase 4.4 Batch 6B treats a matched exercise with no valid sets as low quality and attempts fallback, so oral phrases like `我今天训练了背部做了高位下拉做了3组每组做的是70公斤然后每组做了10次` can return a saveable draft instead of a matched empty row.
+- User-facing parse warnings are Chinese product copy; provider/debug failures remain in `evidence.fallback_warnings`.
+- Phase 4.4 Batch 6C resolves date hints like `昨天`, `前天`, `5月29号`, `五月二十九号`, `2026年5月29日`, `5/29`, and `2026-05-29` into `draft.performed_at`. Explicit text dates take priority over request `performed_at`; if text has no date, the request value is used; otherwise server time is used.
+- Phase 4.4 Batch 6D expands the system dictionary and alias map for common Chinese gym movements such as `哑铃推肩`, `坐姿哑铃推肩`, `引体向上`, `侧平举`, `杠铃划船`, `哑铃划船`, `腿屈伸`, `腿弯举`, and `臀推`.
+- Broad aliases such as `推肩`, `划船`, `夹胸`, `飞鸟`, `下拉`, and `弯举` remain ambiguous and must be confirmed by the user before saving.
+- Expanded exercise-muscle contribution weights are deterministic approximations for training load analysis; they are not medical or rehab advice.

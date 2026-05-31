@@ -270,7 +270,7 @@ fitmind-ai/
 │   ├── api-contract.md          # 后端接口约定
 │   ├── ai-decisions.md          # 关键技术决策记录
 │   ├── troubleshooting.md       # 踩坑日记
-│   └── interview-notes.md       # 面试问答稿（最后写）
+│   └── project-study-guide.md   # 面试问答稿 + 按阶段讲稿（最后写）
 └── ...
 ```
 
@@ -279,7 +279,7 @@ fitmind-ai/
 1. **现在**：PROJECT_BRIEF.md + AGENTS.md（让 AI 有抓手）
 2. **阶段 0**：architecture.md + db-schema.md + api-contract.md + ai-decisions.md（含初始决策）
 3. **阶段 1 开始**：troubleshooting.md（边踩边记）+ ai-decisions.md（边做边补）
-4. **打磨阶段**：README.md + interview-notes.md
+4. **打磨阶段**：README.md + project-study-guide.md
 
 ------
 

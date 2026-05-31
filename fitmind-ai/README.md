@@ -61,3 +61,29 @@ AI layer:
 - No second provider call after tool execution.
 - Recommendation context is deterministic preview, not medical advice.
 - Browser E2E test has not been completed.
+
+## Verification
+
+- `pnpm test`
+  - Unit-test lane only
+  - Does not prove real DB-backed flows
+- `pnpm smoke:auth`
+  - Real auth app path
+  - Requires `DATABASE_URL`
+- `pnpm smoke:assistant`
+  - Real auth + assistant mock-turn path
+  - Requires `DATABASE_URL`
+- `pnpm smoke:training`
+  - Real training summary / recommendation context / exercise progress paths
+  - Requires `DATABASE_URL`
+- `pnpm smoke:muscle-load`
+  - Real muscle-group load calculation path
+  - Requires `DATABASE_URL`
+- `pnpm seed:assistant-demo`
+  - Seeds the local deterministic assistant demo user and workouts
+
+Notes:
+
+- In this workspace, sandbox DB egress denial can block the DB-backed smoke commands even when the app logic is correct.
+- Elevated reruns are the source of truth for the current backend smoke status.
+- Browser E2E should not be claimed as complete.

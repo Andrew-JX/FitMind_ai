@@ -5,11 +5,14 @@ import {
   createWorkoutController,
   deleteSetController,
   deleteWorkoutController,
+  getAssistantInsightsController,
   getExerciseProgressController,
+  getMuscleLoadController,
   getRecommendationContextController,
   getWorkoutController,
   getTrainingSummaryController,
   listWorkoutsController,
+  parseWorkoutIntakeController,
   updateSetController,
   updateWorkoutController,
 } from "../controllers/workout-controller.js";
@@ -20,10 +23,22 @@ export const workoutsRouter = Router();
 workoutsRouter.use(authMiddleware);
 
 workoutsRouter.get("/workouts", listWorkoutsController);
-workoutsRouter.get("/training/exercise-progress", getExerciseProgressController);
+workoutsRouter.get(
+  "/training/assistant-insights",
+  getAssistantInsightsController,
+);
+workoutsRouter.get(
+  "/training/exercise-progress",
+  getExerciseProgressController,
+);
+workoutsRouter.get("/training/muscle-load", getMuscleLoadController);
 workoutsRouter.get(
   "/training/recommendation-context",
   getRecommendationContextController,
+);
+workoutsRouter.post(
+  "/training/workout-intake/parse",
+  parseWorkoutIntakeController,
 );
 workoutsRouter.get("/training/summary", getTrainingSummaryController);
 workoutsRouter.get("/workouts/:id", getWorkoutController);

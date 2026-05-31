@@ -42,12 +42,10 @@ export function App() {
   const [selectedProgressExerciseId, setSelectedProgressExerciseId] = useState<
     string | null
   >(null);
-  const [selectedProgressExerciseName, setSelectedProgressExerciseName] = useState<
-    string | null
-  >(null);
+  const [selectedProgressExerciseName, setSelectedProgressExerciseName] =
+    useState<string | null>(null);
   const [progressRefreshSignal, setProgressRefreshSignal] = useState(0);
-  const [recommendationContextRefreshSignal, setRecommendationContextRefreshSignal] =
-    useState(0);
+  const [analysisRefreshSignal, setAnalysisRefreshSignal] = useState(0);
   const [assistantRefreshSignal, setAssistantRefreshSignal] = useState(0);
 
   useEffect(() => {
@@ -129,6 +127,10 @@ export function App() {
 
       <section style={tabSectionStyle(activeTab === "analysis")}>
         <AnalysisView
+          muscleLoadProps={{
+            refreshSignal: analysisRefreshSignal,
+            token: auth.token,
+          }}
           progressProps={{
             refreshSignal: progressRefreshSignal,
             selectedExerciseId: selectedProgressExerciseId,
@@ -136,7 +138,7 @@ export function App() {
             token: auth.token,
           }}
           recommendationProps={{
-            refreshSignal: recommendationContextRefreshSignal,
+            refreshSignal: analysisRefreshSignal,
             token: auth.token,
           }}
           summary={trainingSummary.summary}
@@ -164,7 +166,7 @@ export function App() {
 
   async function handleWorkoutCreated(): Promise<void> {
     await Promise.all([workouts.refreshWorkouts(), trainingSummary.refresh()]);
-    setRecommendationContextRefreshSignal((currentValue) => currentValue + 1);
+    setAnalysisRefreshSignal((currentValue) => currentValue + 1);
     setAssistantRefreshSignal((currentValue) => currentValue + 1);
 
     if (selectedProgressExerciseId !== null) {
@@ -177,7 +179,7 @@ export function App() {
 
     if (wasDeleted) {
       await trainingSummary.refresh();
-      setRecommendationContextRefreshSignal((currentValue) => currentValue + 1);
+      setAnalysisRefreshSignal((currentValue) => currentValue + 1);
       setAssistantRefreshSignal((currentValue) => currentValue + 1);
 
       if (selectedProgressExerciseId !== null) {
@@ -188,7 +190,10 @@ export function App() {
     return wasDeleted;
   }
 
-  function handleExerciseSelect(exerciseId: string, exerciseName: string): void {
+  function handleExerciseSelect(
+    exerciseId: string,
+    exerciseName: string,
+  ): void {
     setSelectedProgressExerciseId(exerciseId);
     setSelectedProgressExerciseName(exerciseName);
     setActiveTab("analysis");

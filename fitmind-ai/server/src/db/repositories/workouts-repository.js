@@ -20,6 +20,8 @@ import { createDbPool } from "../pool.js";
  * @typedef {{
  *   id: string;
  *   performed_at: string;
+ *   started_at: string | null;
+ *   ended_at: string | null;
  *   duration_minutes: number | null;
  *   notes: string | null;
  *   sets_count: number;
@@ -31,6 +33,8 @@ import { createDbPool } from "../pool.js";
  * @typedef {{
  *   id: string;
  *   performed_at: string;
+ *   started_at: string | null;
+ *   ended_at: string | null;
  *   duration_minutes: number | null;
  *   notes: string | null;
  *   sets: WorkoutSetRow[];
@@ -121,6 +125,8 @@ export async function listWorkoutsByUser(filters, pool) {
         SELECT
           w.id,
           w.performed_at,
+          w.started_at,
+          w.ended_at,
           w.duration_minutes,
           w.notes,
           COUNT(s.id)::int AS sets_count,
@@ -239,6 +245,8 @@ export async function hasWorkoutById(workoutId, pool) {
  *   Owner user id.
  * @param {{
  *   performed_at: string;
+ *   started_at?: string | null | undefined;
+ *   ended_at?: string | null | undefined;
  *   duration_minutes?: number | undefined;
  *   notes?: string | undefined;
  *   sets: Array<{
@@ -260,13 +268,15 @@ export async function createWorkoutWithSets(userId, input, pool) {
   return withTransaction(pool, async (client) => {
     const workoutResult = await client.query(
       `
-        INSERT INTO workouts (user_id, performed_at, duration_minutes, notes)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO workouts (user_id, performed_at, started_at, ended_at, duration_minutes, notes)
+        VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING id
       `,
       [
         userId,
         input.performed_at,
+        input.started_at ?? null,
+        input.ended_at ?? null,
         input.duration_minutes ?? null,
         input.notes ?? null,
       ],
@@ -321,6 +331,8 @@ export async function createWorkoutWithSets(userId, input, pool) {
  *   Owner user id.
  * @param {{
  *   performed_at?: string | undefined;
+ *   started_at?: string | null | undefined;
+ *   ended_at?: string | null | undefined;
  *   duration_minutes?: number | undefined;
  *   notes?: string | undefined;
  * }} input
@@ -340,6 +352,16 @@ export async function updateWorkoutByIdForUser(workoutId, userId, input, pool) {
     if (input.performed_at !== undefined) {
       fields.push(`performed_at = $${fields.length + 3}`);
       values.push(input.performed_at);
+    }
+
+    if (input.started_at !== undefined) {
+      fields.push(`started_at = $${fields.length + 3}`);
+      values.push(input.started_at);
+    }
+
+    if (input.ended_at !== undefined) {
+      fields.push(`ended_at = $${fields.length + 3}`);
+      values.push(input.ended_at);
     }
 
     if (input.duration_minutes !== undefined) {
@@ -709,6 +731,8 @@ async function loadWorkoutDetail(queryable, workoutId, userId) {
       SELECT
         w.id,
         w.performed_at,
+        w.started_at,
+        w.ended_at,
         w.duration_minutes,
         w.notes,
         COALESCE(

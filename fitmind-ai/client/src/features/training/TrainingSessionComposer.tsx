@@ -15,19 +15,31 @@ import {
   type RestTimerState,
 } from "./TrainingSessionRestTimer";
 import { TrainingSessionTimer } from "./TrainingSessionTimer";
-import { createWorkout } from "./workout-api";
+import {
+  addWorkoutSet,
+  createWorkout,
+  deleteWorkoutSet,
+  updateWorkout,
+  updateWorkoutSet,
+} from "./workout-api";
 import {
   buildWorkoutRequestFromDraft,
   createDraftExercise,
   createDraftSet,
   getCompletedValidSetCount,
+  getExerciseLoadType,
+  isDraftSetValid,
   type DraftExercise,
   type DraftSet,
+  type TrainingSessionInitialDraft,
 } from "./training-session-draft";
+import { buildWorkoutEditPlan } from "./workout-to-session-draft";
 
 export interface TrainingSessionComposerProps {
   exerciseLibraryProps: ExercisePickerProps;
+  initialDraft?: TrainingSessionInitialDraft | null | undefined;
   isOpen: boolean;
+  mode?: "create_active" | "create_from_intake" | "edit_existing" | undefined;
   onCancel: () => void;
   onCreated?: (() => Promise<void>) | undefined;
   token: string | null;
@@ -39,9 +51,15 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
   const [duplicateNotice, setDuplicateNotice] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [draftDurationMin, setDraftDurationMin] = useState<number | null>(null);
+  const [draftEndedAt, setDraftEndedAt] = useState<string | null>(null);
+  const [draftNote, setDraftNote] = useState("");
+  const [draftPerformedAt, setDraftPerformedAt] = useState<string | null>(null);
+  const [draftStartedAt, setDraftStartedAt] = useState<string | null>(null);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isTimeEditorOpen, setIsTimeEditorOpen] = useState(false);
   const [pendingExerciseRemovalId, setPendingExerciseRemovalId] = useState<string | null>(
     null,
   );
@@ -50,9 +68,11 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
     null,
   );
   const [restTimer, setRestTimer] = useState<RestTimerState | null>(null);
+  const mode = props.mode ?? "create_active";
+  const isActiveSession = mode === "create_active";
 
   useEffect(() => {
-    if (!props.isOpen || !isRunning) {
+    if (!props.isOpen || !isActiveSession || !isRunning) {
       return;
     }
 
@@ -63,13 +83,29 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
     return () => {
       window.clearInterval(timerId);
     };
-  }, [isRunning, props.isOpen]);
+  }, [isActiveSession, isRunning, props.isOpen]);
 
   useEffect(() => {
     if (!props.isOpen) {
       resetComposerState();
     }
   }, [props.isOpen]);
+
+  useEffect(() => {
+    if (!props.isOpen || !props.initialDraft) {
+      return;
+    }
+
+    resetComposerState();
+    setDraftExercises(props.initialDraft.exercises);
+    setElapsedSeconds((props.initialDraft.durationMin ?? 0) * 60);
+    setDraftDurationMin(props.initialDraft.durationMin);
+    setDraftEndedAt(props.initialDraft.endedAt ?? null);
+    setDraftNote(props.initialDraft.note ?? "");
+    setDraftPerformedAt(props.initialDraft.performedAt);
+    setDraftStartedAt(props.initialDraft.startedAt ?? null);
+    setIsRunning(false);
+  }, [props.initialDraft, props.isOpen]);
 
   useEffect(() => {
     if (!props.isOpen || restTimer?.status !== "running") {
@@ -130,11 +166,29 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
           </div>
 
           <div style={headerBodyStyle}>
-            <TrainingSessionTimer
-              elapsedSeconds={elapsedSeconds}
-              isRunning={isRunning}
-              onToggleRunning={() => setIsRunning((currentValue) => !currentValue)}
-            />
+            {isActiveSession ? (
+              <TrainingSessionTimer
+                elapsedSeconds={elapsedSeconds}
+                isRunning={isRunning}
+                onToggleRunning={handleToggleSessionRunning}
+              />
+            ) : (
+              <button
+                onClick={() => setIsTimeEditorOpen(true)}
+                style={intakeTimeButtonStyle(theme)}
+                type="button"
+              >
+                <span>{"\u8bad\u7ec3\u65f6\u95f4"}</span>
+                <strong>
+                  {formatTrainingTimeSummary({
+                    durationMin: draftDurationMin,
+                    endedAt: draftEndedAt,
+                    performedAt: draftPerformedAt,
+                    startedAt: draftStartedAt,
+                  })}
+                </strong>
+              </button>
+            )}
 
             <div style={statusWrapStyle}>
               <div style={statusPillStyle(theme)}>
@@ -184,6 +238,7 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
                   onMoveUp={() => handleMoveExercise(draftExercise.id, "up")}
                   onRemove={() => handleRemoveExercise(draftExercise.id)}
                   onReplace={() => handleStartReplaceExercise(draftExercise.id)}
+                  onResolveCandidate={handleResolveCandidate}
                   onStartRestTimer={handleOpenRestTimer}
                   onToggleExpanded={() => handleToggleExpanded(draftExercise.id)}
                   onToggleSetCompleted={(setId) =>
@@ -196,6 +251,16 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
               ))}
             </div>
           )}
+
+          <label onClick={(event) => event.stopPropagation()} style={noteEditorStyle(theme)}>
+            {"\u5907\u6ce8"}
+            <textarea
+              onChange={(event) => setDraftNote(event.target.value)}
+              placeholder={"\u672c\u6b21\u8bad\u7ec3\u5907\u6ce8"}
+              style={noteTextareaStyle(theme)}
+              value={draftNote}
+            />
+          </label>
         </main>
 
         <div style={fabWrapStyle}>
@@ -284,6 +349,24 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
             {...props.exerciseLibraryProps}
           />
         ) : null}
+
+        {isTimeEditorOpen ? (
+          <TrainingTimeEditor
+            endedAt={draftEndedAt}
+            onClose={() => setIsTimeEditorOpen(false)}
+            onSave={(nextValue) => {
+              setDraftStartedAt(nextValue.startedAt);
+              setDraftEndedAt(nextValue.endedAt);
+              setDraftDurationMin(nextValue.durationMin);
+              if (nextValue.startedAt) {
+                setDraftPerformedAt(nextValue.startedAt);
+              }
+              setIsTimeEditorOpen(false);
+            }}
+            performedAt={draftPerformedAt}
+            startedAt={draftStartedAt}
+          />
+        ) : null}
       </div>
     </section>
   );
@@ -327,6 +410,8 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
             categoryLabel: getExerciseCategoryLabel(exercise),
             exercise,
             exerciseId: exercise.id,
+            loadType: getExerciseLoadType(exercise),
+            matchStatus: "matched",
             name: exercise.name_en,
           };
         });
@@ -358,6 +443,16 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
           isExpanded: !draftExercise.isExpanded,
         };
       });
+    });
+  }
+
+  function handleToggleSessionRunning(): void {
+    setIsRunning((currentValue) => {
+      if (!currentValue && !draftStartedAt) {
+        setDraftStartedAt(new Date().toISOString());
+      }
+
+      return !currentValue;
     });
   }
 
@@ -540,7 +635,7 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
               return setDraft;
             }
 
-            if (!canCompleteSet(setDraft)) {
+            if (!canCompleteSet(setDraft, draftExercise)) {
               return {
                 ...setDraft,
                 completed: false,
@@ -652,10 +747,27 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
       return;
     }
 
+    if (mode === "edit_existing") {
+      await handleCompleteEdit();
+      return;
+    }
+
+    const saveTime = new Date();
+    const activeStartedAt = draftStartedAt;
     const payload = buildWorkoutRequestFromDraft({
       draftExercises,
+      durationMinutes:
+        mode === "create_from_intake" ? draftDurationMin : undefined,
       elapsedSeconds,
-      performedAt: new Date(),
+      endedAt: activeStartedAt ? saveTime.toISOString() : draftEndedAt,
+      notes: draftNote,
+      performedAt:
+        mode === "create_from_intake" && draftPerformedAt
+          ? new Date(draftPerformedAt)
+          : activeStartedAt
+            ? new Date(activeStartedAt)
+            : saveTime,
+      startedAt: activeStartedAt ?? draftStartedAt,
     });
 
     if (!payload) {
@@ -678,13 +790,119 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
     }
   }
 
+  async function handleCompleteEdit(): Promise<void> {
+    if (!props.token || !props.initialDraft?.originalWorkout) {
+      setErrorMessage("Please fix the highlighted workout fields and try again.");
+      return;
+    }
+
+    const editDraft: TrainingSessionInitialDraft = {
+      ...props.initialDraft,
+      durationMin: draftDurationMin,
+      endedAt: draftEndedAt,
+      exercises: draftExercises,
+      note: draftNote,
+      performedAt: draftPerformedAt ?? props.initialDraft.performedAt,
+      startedAt: draftStartedAt,
+    };
+    const plan = buildWorkoutEditPlan(props.initialDraft.originalWorkout, editDraft);
+
+    setDuplicateNotice(null);
+    setErrorMessage(null);
+    setIsSubmitting(true);
+
+    try {
+      if (plan.workoutPatch) {
+        await updateWorkout(props.token, props.initialDraft.originalWorkout.id, plan.workoutPatch);
+      }
+
+      for (const setId of plan.setDeletes) {
+        await deleteWorkoutSet(props.token, setId);
+      }
+
+      for (const patch of plan.setPatches) {
+        await updateWorkoutSet(props.token, patch.setId, patch.input);
+      }
+
+      for (const add of plan.setAdds) {
+        await addWorkoutSet(props.token, props.initialDraft.originalWorkout.id, add);
+      }
+
+      resetComposerState();
+      await props.onCreated?.();
+    } catch (error) {
+      setErrorMessage(getReadableErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function handleResolveCandidate(exerciseId: string): void {
+    const exercise = props.exerciseLibraryProps.exercises.find(
+      (item) => item.id === exerciseId,
+    );
+
+    if (!exercise) {
+      setDuplicateNotice("\u8bf7\u6253\u5f00\u52a8\u4f5c\u5e93\u91cd\u65b0\u9009\u62e9\u8be5\u52a8\u4f5c\u3002");
+      return;
+    }
+
+    setDraftExercises((currentValue) => {
+      const targetExercise = currentValue.find((draftExercise) =>
+        draftExercise.candidateExercises.some(
+          (candidate) => candidate.exerciseId === exerciseId,
+        ),
+      );
+
+      if (!targetExercise) {
+        return currentValue;
+      }
+
+      const alreadyExists = currentValue.some((draftExercise) => {
+        return (
+          draftExercise.id !== targetExercise.id &&
+          draftExercise.matchStatus === "matched" &&
+          draftExercise.exerciseId === exercise.id
+        );
+      });
+
+      if (alreadyExists) {
+        setDuplicateNotice("杩欎釜鍔ㄤ綔宸茬粡鍦ㄦ湰娆¤缁冧腑");
+        return currentValue;
+      }
+
+      setDuplicateNotice(null);
+      return currentValue.map((draftExercise) => {
+        if (draftExercise.id !== targetExercise.id) {
+          return draftExercise;
+        }
+
+        return {
+          ...draftExercise,
+          categoryLabel: getExerciseCategoryLabel(exercise),
+          exercise,
+          exerciseId: exercise.id,
+          loadType: getExerciseLoadType(exercise),
+          matchStatus: "matched",
+          name: exercise.name_en,
+        };
+      });
+    });
+  }
+
   function resetComposerState(): void {
     setDraftExercises([]);
     setDuplicateNotice(null);
+    setDraftDurationMin(null);
+    setDraftEndedAt(null);
+    setDraftNote("");
+    setDraftPerformedAt(null);
+    setDraftStartedAt(null);
     setElapsedSeconds(0);
     setErrorMessage(null);
     setIsLibraryOpen(false);
     setIsRunning(false);
+    setIsTimeEditorOpen(false);
     setPendingExerciseRemovalId(null);
     setPendingRestTimerRequest(null);
     setReplacingDraftExerciseId(null);
@@ -692,11 +910,129 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
   }
 }
 
-function canCompleteSet(setDraft: DraftSet): boolean {
-  const weightKg = Number.parseFloat(setDraft.weightKg);
-  const reps = Number.parseInt(setDraft.reps, 10);
+function canCompleteSet(setDraft: DraftSet, draftExercise: DraftExercise): boolean {
+  return isDraftSetValid(setDraft, draftExercise);
+}
 
-  return Number.isFinite(weightKg) && weightKg > 0 && Number.isInteger(reps) && reps > 0;
+function TrainingTimeEditor(props: {
+  endedAt: string | null;
+  onClose: () => void;
+  onSave: (value: {
+    durationMin: number | null;
+    endedAt: string | null;
+    startedAt: string | null;
+  }) => void;
+  performedAt: string | null;
+  startedAt: string | null;
+}) {
+  const { theme } = useTheme();
+  const [startValue, setStartValue] = useState(
+    formatDateTimeLocalValue(props.startedAt ?? props.performedAt),
+  );
+  const [endValue, setEndValue] = useState(formatDateTimeLocalValue(props.endedAt));
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const durationMin = getDurationMinutesFromLocalValues(startValue, endValue);
+
+  return (
+    <div style={confirmBackdropStyle(theme)}>
+      <section style={timeEditorCardStyle(theme)}>
+        <div>
+          <strong style={confirmTitleStyle(theme)}>{"\u8bad\u7ec3\u65f6\u95f4"}</strong>
+          <p style={timeEditorSummaryStyle(theme)}>
+            {formatTrainingTimeSummary({
+              durationMin,
+              endedAt: parseDateTimeLocalValue(endValue),
+              performedAt: props.performedAt,
+              startedAt: parseDateTimeLocalValue(startValue),
+            })}
+          </p>
+        </div>
+
+        <label style={timeEditorLabelStyle(theme)}>
+          {"\u5f00\u59cb\u65f6\u95f4"}
+          <input
+            onChange={(event) => {
+              setStartValue(event.target.value);
+              setErrorMessage(null);
+            }}
+            style={timeEditorInputStyle(theme)}
+            type="datetime-local"
+            value={startValue}
+          />
+        </label>
+
+        <label style={timeEditorLabelStyle(theme)}>
+          {"\u7ed3\u675f\u65f6\u95f4"}
+          <input
+            onChange={(event) => {
+              setEndValue(event.target.value);
+              setErrorMessage(null);
+            }}
+            style={timeEditorInputStyle(theme)}
+            type="datetime-local"
+            value={endValue}
+          />
+        </label>
+
+        <p style={timeEditorSummaryStyle(theme)}>
+          {durationMin === null
+            ? "\u8bad\u7ec3\u65f6\u957f\uff1a\u672a\u8bbe\u7f6e"
+            : `\u8bad\u7ec3\u65f6\u957f\uff1a${durationMin} \u5206\u949f`}
+        </p>
+
+        {errorMessage ? (
+          <p style={timeEditorErrorStyle(theme)}>{errorMessage}</p>
+        ) : null}
+
+        <div style={confirmActionRowStyle}>
+          <Button onClick={props.onClose} type="button" variant="secondary">
+            {"\u53d6\u6d88"}
+          </Button>
+          <Button onClick={handleSave} type="button">
+            {"\u4fdd\u5b58\u65f6\u95f4"}
+          </Button>
+        </div>
+      </section>
+    </div>
+  );
+
+  function handleSave(): void {
+    if (!startValue && !endValue) {
+      props.onSave({
+        durationMin: null,
+        endedAt: null,
+        startedAt: null,
+      });
+      return;
+    }
+
+    if (!startValue || !endValue) {
+      setErrorMessage("\u8bf7\u540c\u65f6\u586b\u5199\u5f00\u59cb\u548c\u7ed3\u675f\u65f6\u95f4\u3002");
+      return;
+    }
+
+    const startedAt = parseDateTimeLocalValue(startValue);
+    const endedAt = parseDateTimeLocalValue(endValue);
+
+    if (!startedAt || !endedAt) {
+      setErrorMessage("\u8bf7\u586b\u5199\u6709\u6548\u7684\u8bad\u7ec3\u65f6\u95f4\u3002");
+      return;
+    }
+
+    const startedAtMs = new Date(startedAt).getTime();
+    const endedAtMs = new Date(endedAt).getTime();
+
+    if (startedAtMs >= endedAtMs) {
+      setErrorMessage("\u7ed3\u675f\u65f6\u95f4\u5fc5\u987b\u665a\u4e8e\u5f00\u59cb\u65f6\u95f4\u3002");
+      return;
+    }
+
+    props.onSave({
+      durationMin: Math.max(1, Math.round((endedAtMs - startedAtMs) / 60000)),
+      endedAt,
+      startedAt,
+    });
+  }
 }
 
 function getExerciseCategoryLabel(exercise: DictionaryExercise): string {
@@ -798,6 +1134,86 @@ function translateErrorMessage(message: string): string {
   return message;
 }
 
+function formatTrainingTimeSummary(input: {
+  durationMin: number | null;
+  endedAt: string | null | undefined;
+  performedAt: string | null | undefined;
+  startedAt: string | null | undefined;
+}): string {
+  if (input.startedAt && input.endedAt) {
+    return `${formatTimeOnly(input.startedAt)} - ${formatTimeOnly(input.endedAt)}`;
+  }
+
+  if (input.durationMin !== null) {
+    return `${input.durationMin} \u5206\u949f`;
+  }
+
+  if (input.performedAt) {
+    return "\u4ec5\u8bb0\u5f55\u4e86\u8bad\u7ec3\u65e5\u671f";
+  }
+
+  return "\u672a\u8bbe\u7f6e";
+}
+
+function formatTimeOnly(value: string): string {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleTimeString("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatDateTimeLocalValue(value: string | null | undefined): string {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  const hours = `${date.getHours()}`.padStart(2, "0");
+  const minutes = `${date.getMinutes()}`.padStart(2, "0");
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function parseDateTimeLocalValue(value: string): string | null {
+  if (!value.trim()) {
+    return null;
+  }
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function getDurationMinutesFromLocalValues(
+  startedAtValue: string,
+  endedAtValue: string,
+): number | null {
+  const startedAt = parseDateTimeLocalValue(startedAtValue);
+  const endedAt = parseDateTimeLocalValue(endedAtValue);
+
+  if (!startedAt || !endedAt) {
+    return null;
+  }
+
+  const durationMs = new Date(endedAt).getTime() - new Date(startedAt).getTime();
+
+  return durationMs > 0 ? Math.max(1, Math.round(durationMs / 60000)) : null;
+}
+
 const composerStyle: React.CSSProperties = {
   height: "100dvh",
   inset: 0,
@@ -855,6 +1271,93 @@ const headerBodyStyle: React.CSSProperties = {
   gap: 16,
   gridTemplateColumns: "minmax(0, 1fr) auto",
 };
+
+function intakeTimeButtonStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    background: "transparent",
+    border: "none",
+    color: theme.colors.tx,
+    cursor: "pointer",
+    display: "grid",
+    gap: 6,
+    padding: 0,
+    textAlign: "left",
+  };
+}
+
+function noteEditorStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    color: theme.colors.tx2,
+    display: "grid",
+    fontSize: 12,
+    fontWeight: 700,
+    gap: 8,
+  };
+}
+
+function noteTextareaStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.surf2,
+    border: `1px solid ${theme.colors.bdr}`,
+    borderRadius: theme.radius.control,
+    color: theme.colors.tx,
+    font: "inherit",
+    minHeight: 76,
+    padding: "10px 12px",
+    resize: "vertical",
+  };
+}
+
+function timeEditorCardStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.surf,
+    border: `1px solid ${theme.colors.bdr2}`,
+    borderRadius: theme.radius.card,
+    boxShadow: theme.shadows.card,
+    display: "grid",
+    gap: 12,
+    padding: 16,
+    width: "100%",
+  };
+}
+
+function timeEditorLabelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    color: theme.colors.tx2,
+    display: "grid",
+    fontSize: 12,
+    fontWeight: 700,
+    gap: 8,
+  };
+}
+
+function timeEditorInputStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.surf2,
+    border: `1px solid ${theme.colors.bdr}`,
+    borderRadius: theme.radius.control,
+    color: theme.colors.tx,
+    padding: "10px 12px",
+  };
+}
+
+function timeEditorSummaryStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    color: theme.colors.tx2,
+    fontSize: 12,
+    lineHeight: 1.6,
+    margin: "4px 0 0",
+  };
+}
+
+function timeEditorErrorStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    color: theme.colors.red,
+    fontSize: 12,
+    lineHeight: 1.6,
+    margin: 0,
+  };
+}
 
 function bodyStyle(hasRestTimer: boolean): React.CSSProperties {
   return {

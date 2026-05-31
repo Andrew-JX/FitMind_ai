@@ -18,6 +18,8 @@ export interface WorkoutSetRow {
 export interface WorkoutSummaryRow {
   id: string;
   performed_at: string;
+  started_at: string | null;
+  ended_at: string | null;
   duration_minutes: number | null;
   notes: string | null;
   sets_count: number;
@@ -27,6 +29,8 @@ export interface WorkoutSummaryRow {
 export interface WorkoutDetailRow {
   id: string;
   performed_at: string;
+  started_at: string | null;
+  ended_at: string | null;
   duration_minutes: number | null;
   notes: string | null;
   sets: WorkoutSetRow[];
@@ -42,6 +46,8 @@ export interface ListWorkoutsFilters {
 
 export interface CreateWorkoutInput {
   performed_at: string;
+  started_at?: string | null | undefined;
+  ended_at?: string | null | undefined;
   duration_minutes?: number | undefined;
   notes?: string | undefined;
   sets: Array<{
@@ -57,6 +63,8 @@ export interface CreateWorkoutInput {
 
 export interface UpdateWorkoutInput {
   performed_at?: string | undefined;
+  started_at?: string | null | undefined;
+  ended_at?: string | null | undefined;
   duration_minutes?: number | undefined;
   notes?: string | undefined;
 }

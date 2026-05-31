@@ -16,6 +16,7 @@ export interface ExercisePickerProps {
   isLoadingMuscleGroups: boolean;
   muscleGroups: DictionaryMuscleGroup[];
   onSearch: (input: { muscle: string; q: string }) => Promise<void>;
+  onSelectExercise?: ((exercise: DictionaryExercise) => void) | undefined;
   searchError: string | null;
 }
 
@@ -26,6 +27,7 @@ export function ExercisePicker(props: ExercisePickerProps) {
     isLoadingMuscleGroups,
     muscleGroups,
     onSearch,
+    onSelectExercise,
     searchError,
   } = props;
   const { theme } = useTheme();
@@ -110,32 +112,61 @@ export function ExercisePicker(props: ExercisePickerProps) {
               .map((muscle) => muscle.code);
 
             return (
-              <li key={exercise.id} style={resultCardStyle(theme)}>
-                <div style={titleRowStyle}>
-                  <strong style={{ fontSize: 13 }}>{exercise.name_en}</strong>
-                  {exercise.name_zh?.trim() ? (
-                    <Pill tone="info">{exercise.name_zh}</Pill>
-                  ) : null}
-                </div>
-                <div style={pillRowStyle}>
-                  {exercise.movement_pattern ? (
-                    <Pill tone="analysis">{exercise.movement_pattern}</Pill>
-                  ) : null}
-                  {exercise.equipment ? (
-                    <Pill tone="neutral">{exercise.equipment}</Pill>
-                  ) : null}
-                  {primaryMuscles.map((muscleCode) => (
-                    <Pill key={muscleCode} tone="accent">
-                      {muscleCode}
-                    </Pill>
-                  ))}
-                </div>
+              <li key={exercise.id} style={{ listStyle: "none" }}>
+                {onSelectExercise ? (
+                  <button
+                    onClick={() => onSelectExercise(exercise)}
+                    style={resultCardStyle(theme, true)}
+                    type="button"
+                  >
+                    <ExerciseResultContent
+                      exercise={exercise}
+                      primaryMuscles={primaryMuscles}
+                    />
+                  </button>
+                ) : (
+                  <div style={resultCardStyle(theme, false)}>
+                    <ExerciseResultContent
+                      exercise={exercise}
+                      primaryMuscles={primaryMuscles}
+                    />
+                  </div>
+                )}
               </li>
             );
           })}
         </ul>
       ) : null}
     </section>
+  );
+}
+
+function ExerciseResultContent(props: {
+  exercise: DictionaryExercise;
+  primaryMuscles: string[];
+}) {
+  return (
+    <>
+      <div style={titleRowStyle}>
+        <strong style={{ fontSize: 13 }}>{props.exercise.name_en}</strong>
+        {props.exercise.name_zh?.trim() ? (
+          <Pill tone="info">{props.exercise.name_zh}</Pill>
+        ) : null}
+      </div>
+      <div style={pillRowStyle}>
+        {props.exercise.movement_pattern ? (
+          <Pill tone="analysis">{props.exercise.movement_pattern}</Pill>
+        ) : null}
+        {props.exercise.equipment ? (
+          <Pill tone="neutral">{props.exercise.equipment}</Pill>
+        ) : null}
+        {props.primaryMuscles.map((muscleCode) => (
+          <Pill key={muscleCode} tone="accent">
+            {muscleCode}
+          </Pill>
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -195,11 +226,19 @@ function selectStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProp
   };
 }
 
-function resultCardStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function resultCardStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+  isSelectable: boolean,
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf2,
     border: `1px solid ${theme.colors.bdr}`,
     borderRadius: 12,
+    color: theme.colors.tx,
+    cursor: isSelectable ? "pointer" : "default",
+    display: "block",
     padding: 12,
+    textAlign: "left",
+    width: "100%",
   };
 }

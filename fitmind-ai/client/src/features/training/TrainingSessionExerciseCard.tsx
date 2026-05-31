@@ -22,6 +22,7 @@ export interface TrainingSessionExerciseCardProps {
   onMoveUp: () => void;
   onRemove: () => void;
   onReplace: () => void;
+  onResolveCandidate: (exerciseId: string) => void;
   onStartRestTimer: (setId: string) => void;
   onToggleExpanded: () => void;
   onToggleSetCompleted: (setId: string) => void;
@@ -35,7 +36,7 @@ export interface TrainingSessionExerciseCardProps {
 export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardProps) {
   const { theme } = useTheme();
   const summary = getExerciseSummary(props.draftExercise);
-  const primaryMuscles = props.draftExercise.exercise.muscles
+  const primaryMuscles = (props.draftExercise.exercise?.muscles ?? [])
     .filter((muscle) => muscle.is_primary)
     .slice(0, 2)
     .map((muscle) => muscle.code);
@@ -86,13 +87,23 @@ export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardPr
             <strong style={{ color: theme.colors.tx, fontSize: 15 }}>
               {props.draftExercise.name}
             </strong>
-            {props.draftExercise.exercise.name_zh?.trim() ? (
+            {props.draftExercise.exercise?.name_zh?.trim() ? (
               <p style={secondaryTextStyle(theme)}>
                 {props.draftExercise.exercise.name_zh}
               </p>
             ) : null}
+            {props.draftExercise.inputName &&
+            props.draftExercise.matchStatus !== "matched" ? (
+              <p style={secondaryTextStyle(theme)}>
+                {props.draftExercise.inputName}
+              </p>
+            ) : null}
           </div>
-          <Pill tone="info">{props.draftExercise.categoryLabel}</Pill>
+          <Pill tone={props.draftExercise.matchStatus === "matched" ? "info" : "warning"}>
+            {props.draftExercise.matchStatus === "matched"
+              ? props.draftExercise.categoryLabel
+              : "\u9700\u8981\u786e\u8ba4"}
+          </Pill>
         </div>
 
         <p style={statsStyle(theme)}>
@@ -100,10 +111,10 @@ export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardPr
         </p>
 
         <div style={metaRowStyle}>
-          {props.draftExercise.exercise.movement_pattern ? (
+          {props.draftExercise.exercise?.movement_pattern ? (
             <Pill tone="analysis">{props.draftExercise.exercise.movement_pattern}</Pill>
           ) : null}
-          {props.draftExercise.exercise.equipment ? (
+          {props.draftExercise.exercise?.equipment ? (
             <Pill tone="neutral">{props.draftExercise.exercise.equipment}</Pill>
           ) : null}
           {primaryMuscles.map((muscleCode) => (
@@ -116,6 +127,29 @@ export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardPr
 
       {props.draftExercise.isExpanded ? (
         <div onClick={(event) => event.stopPropagation()} style={editorShellStyle}>
+          {props.draftExercise.matchStatus !== "matched" ? (
+            <div style={resolutionPanelStyle(theme)}>
+              <p style={resolutionCopyStyle(theme)}>
+                {props.draftExercise.matchStatus === "ambiguous"
+                  ? "\u8fd9\u4e2a\u52a8\u4f5c\u9700\u8981\u5148\u786e\u8ba4\u5019\u9009\u3002"
+                  : "\u672a\u8bc6\u522b\u52a8\u4f5c\uff0c\u8bf7\u4ece\u52a8\u4f5c\u5e93\u9009\u62e9\u6807\u51c6\u52a8\u4f5c\u6216\u5220\u9664\u3002"}
+              </p>
+              {props.draftExercise.candidateExercises.length > 0 ? (
+                <div style={candidateRowStyle}>
+                  {props.draftExercise.candidateExercises.map((candidate) => (
+                    <button
+                      key={candidate.exerciseId}
+                      onClick={() => props.onResolveCandidate(candidate.exerciseId)}
+                      style={candidateButtonStyle(theme)}
+                      type="button"
+                    >
+                      {candidate.exerciseName}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           <div ref={editorScrollerRef} style={editorScrollerStyle()}>
             {props.draftExercise.sets.map((setDraft, index) => {
               const isActive = setDraft.id === visibleActiveSetId;
@@ -143,7 +177,7 @@ export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardPr
 
               return (
                 <TrainingSessionSetRow
-                  canComplete={isDraftSetValid(setDraft)}
+                  canComplete={isDraftSetValid(setDraft, props.draftExercise)}
                   canDelete={props.draftExercise.sets.length > 1}
                   index={index}
                   key={setDraft.id}
@@ -246,6 +280,45 @@ const editorShellStyle: React.CSSProperties = {
   display: "grid",
   gap: 12,
 };
+
+function resolutionPanelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.surf2,
+    border: `1px solid ${theme.colors.orange}`,
+    borderRadius: theme.radius.control,
+    display: "grid",
+    gap: 10,
+    padding: 12,
+  };
+}
+
+function resolutionCopyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    color: theme.colors.tx2,
+    fontSize: 12,
+    lineHeight: 1.6,
+    margin: 0,
+  };
+}
+
+const candidateRowStyle: React.CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 8,
+};
+
+function candidateButtonStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.surf,
+    border: `1px solid ${theme.colors.bdr}`,
+    borderRadius: theme.radius.control,
+    color: theme.colors.tx,
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 700,
+    padding: "8px 10px",
+  };
+}
 
 function editorScrollerStyle(): React.CSSProperties {
   return {

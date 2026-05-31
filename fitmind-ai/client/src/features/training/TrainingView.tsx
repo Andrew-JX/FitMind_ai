@@ -4,25 +4,36 @@ import type { ExercisePickerProps } from "./ExercisePicker";
 import type { WorkoutFormProps } from "./WorkoutForm";
 import type { WorkoutsPanelProps } from "./WorkoutsPanel";
 import type { TrainingSummary } from "./training-summary-api";
+import type { TrainingSessionInitialDraft } from "./training-session-draft";
 
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { ExercisePicker } from "./ExercisePicker";
 import { TrainingSessionComposer } from "./TrainingSessionComposer";
 import { TrainingStatsStrip } from "./TrainingStatsStrip";
+import { WorkoutIntakePanel } from "./WorkoutIntakePanel";
 import { WorkoutsPanel } from "./WorkoutsPanel";
+import { getWorkoutDetail } from "./workout-api";
+import { mapWorkoutIntakeDraftToSessionInitialDraft } from "./workout-intake-to-session-draft";
+import { mapWorkoutToSessionInitialDraft } from "./workout-to-session-draft";
 
 export interface TrainingViewProps {
   exercisePickerProps: ExercisePickerProps;
   summary: TrainingSummary | null;
   summaryLoading: boolean;
   workoutFormProps: WorkoutFormProps;
-  workoutsProps: WorkoutsPanelProps;
+  workoutsProps: Omit<WorkoutsPanelProps, "onEditWorkout">;
 }
 
 export function TrainingView(props: TrainingViewProps) {
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [isDictionaryOpen, setIsDictionaryOpen] = useState(false);
+  const [composerMode, setComposerMode] = useState<
+    "create_active" | "create_from_intake" | "edit_existing"
+  >("create_active");
+  const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null);
+  const [pendingInitialDraft, setPendingInitialDraft] =
+    useState<TrainingSessionInitialDraft | null>(null);
 
   return (
     <section style={viewStyle}>
@@ -32,16 +43,38 @@ export function TrainingView(props: TrainingViewProps) {
       />
 
       {!isComposerOpen ? (
-        <Button
-          onClick={() => setIsComposerOpen(true)}
-          style={{ width: "100%" }}
-          type="button"
-        >
-          + 记录训练
-        </Button>
+        <div style={recordActionsStyle}>
+          <Button
+            onClick={() => {
+              setComposerMode("create_active");
+              setPendingInitialDraft(null);
+              setIsComposerOpen(true);
+            }}
+            style={{ flex: 1 }}
+            type="button"
+          >
+            + 记录训练
+          </Button>
+          <WorkoutIntakePanel
+            onDraftParsed={(draft) => {
+              setPendingInitialDraft(
+                mapWorkoutIntakeDraftToSessionInitialDraft(
+                  draft,
+                  props.exercisePickerProps.exercises,
+                ),
+              );
+              setComposerMode("create_from_intake");
+              setIsComposerOpen(true);
+            }}
+            token={props.workoutFormProps.token}
+          />
+        </div>
       ) : null}
 
-      <WorkoutsPanel {...props.workoutsProps} />
+      <WorkoutsPanel
+        {...props.workoutsProps}
+        onEditWorkout={(workoutId) => void handleEditWorkout(workoutId)}
+      />
 
       <Card>
         <div style={dictionaryHeaderStyle}>
@@ -69,21 +102,64 @@ export function TrainingView(props: TrainingViewProps) {
 
       <TrainingSessionComposer
         exerciseLibraryProps={props.exercisePickerProps}
+        initialDraft={pendingInitialDraft}
         isOpen={isComposerOpen}
-        onCancel={() => setIsComposerOpen(false)}
-        onCreated={async () => {
-          await props.workoutFormProps.onCreated?.();
+        mode={composerMode}
+        onCancel={() => {
           setIsComposerOpen(false);
+          setEditingWorkoutId(null);
+          setPendingInitialDraft(null);
+          setComposerMode("create_active");
+        }}
+        onCreated={async () => {
+          if (composerMode === "edit_existing" && editingWorkoutId) {
+            await props.workoutsProps.onRefresh();
+            await props.workoutsProps.onSelectWorkout(editingWorkoutId);
+            await props.workoutFormProps.onCreated?.();
+          } else {
+            await props.workoutFormProps.onCreated?.();
+          }
+          setIsComposerOpen(false);
+          setEditingWorkoutId(null);
+          setPendingInitialDraft(null);
+          setComposerMode("create_active");
         }}
         token={props.workoutFormProps.token}
       />
     </section>
   );
+
+  async function handleEditWorkout(workoutId: string): Promise<void> {
+    const token = props.workoutFormProps.token;
+
+    if (!token) {
+      return;
+    }
+
+    const detail =
+      props.workoutsProps.selectedWorkoutId === workoutId &&
+      props.workoutsProps.selectedWorkout
+        ? props.workoutsProps.selectedWorkout
+        : await getWorkoutDetail(token, workoutId);
+
+    setPendingInitialDraft(
+      mapWorkoutToSessionInitialDraft(detail, props.exercisePickerProps.exercises),
+    );
+    setEditingWorkoutId(workoutId);
+    setComposerMode("edit_existing");
+    setIsComposerOpen(true);
+  }
 }
 
 const viewStyle: React.CSSProperties = {
   display: "grid",
   gap: 16,
+};
+
+const recordActionsStyle: React.CSSProperties = {
+  alignItems: "stretch",
+  display: "flex",
+  gap: 10,
 };
 
 const dictionaryHeaderStyle: React.CSSProperties = {

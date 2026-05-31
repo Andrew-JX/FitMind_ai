@@ -1,25 +1,65 @@
 # FitMind AI Demo Script
 
-## 1. Demo Positioning
+## 1. Positioning
 
-FitMind AI 是一个 AI-assisted training analysis system，不是普通聊天框，也不是单纯的 workout CRUD 页面。  
-它把真实训练日志、deterministic calculation layer、内部 Tool Calling、SSE assistant stream 和 evidence-backed assistant UI 串成了一条完整链路。  
-用户先记录 workout，系统再基于后端确定性计算生成 summary / progress / recommendation context，最后 AI 助手通过工具读取这些结构化结果来组织解释。  
-因此这个项目要展示的重点不是“模型会聊天”，而是“模型如何在受控边界内使用真实训练数据和可追溯 evidence”。  
+FitMind AI 当前最适合演示成一个 evidence-backed training analysis product，而不是一个自由聊天机器人。
+
+本轮 demo 的重点不是“模型会不会自由发挥”，而是：
+
+- 训练数据先进入真实 workout log
+- 后端 deterministic calculation layer 先产出稳定 summary / recommendation / progress
+- Assistant Insight Dashboard 先把价值直接展示出来
+- 用户再通过 quick prompt 追问
 
 ## 2. Demo Prerequisites
 
-本地启动细节以 [local-run-guide.md](/E:/studyspace/webroad/FitMind/fitmind-ai/docs/local-run-guide.md) 为准。
+本地默认端口：
 
 - Backend: `http://localhost:3000`
 - Frontend: `http://localhost:5173`
-- 前端通过 Vite proxy 将 `/api` 转发到后端
-- 本地演示建议先使用 `ASSISTANT_PROVIDER=mock`
-- 如需真实 provider 路径，才切换到 `ASSISTANT_PROVIDER=anthropic`
 
-## 3. Start Services
+推荐 provider：
 
-只使用仓库当前真实脚本：
+- 本地演示优先使用 `ASSISTANT_PROVIDER=mock`
+
+本地 demo 账号：
+
+- email: `assistant-demo@fitmind.local`
+- password: `Passw0rd!`
+
+说明：
+
+- 这是本地 demo seed 生成的账号，不是生产账号。
+- 如果数据库是共享 Neon 环境，不要把这组凭据当成可公开复用的共享账号去传播。
+
+## 3. Verification Lanes
+
+在讲 demo 之前，先明确项目当前验证分层：
+
+- `pnpm test`
+  - 只代表 unit-test lane
+  - 不要求数据库外连
+- `pnpm smoke:auth`
+  - 真实 auth app path
+  - 需要 `DATABASE_URL`
+  - 当前 sandbox 下可能因为 DB egress denial 失败，提权环境已通过
+- `pnpm smoke:assistant`
+  - 真实 auth + assistant mock-turn path
+  - 需要 `DATABASE_URL`
+  - 提权环境已通过
+- `pnpm smoke:training`
+  - 真实 training summary / recommendation context / exercise progress path
+  - 需要 `DATABASE_URL`
+  - 提权环境已通过
+- `pnpm seed:assistant-demo`
+  - 写入本地 demo 用训练数据
+  - 需要 `DATABASE_URL`
+
+不要把这些 DB-backed smoke 说成 root unit tests，也不要把它们说成浏览器 E2E。
+
+## 4. Start Services
+
+在仓库根目录执行：
 
 ```bash
 pnpm dev:server
@@ -29,252 +69,159 @@ pnpm dev:server
 pnpm dev:client
 ```
 
-等价写法：
+## 5. Seed Demo Data
+
+先准备演示数据：
 
 ```bash
-pnpm --filter @fitmind/server dev
+pnpm seed:assistant-demo
 ```
 
-```bash
-pnpm --filter @fitmind/client dev
-```
-
-如果数据库还没准备好，先按本地指南完成 migration / seed。
-
-## 4. Demo Flow
-
-### Step 1. Open frontend
-
-打开 `http://localhost:5173`。
+如果当前环境无法直接外连数据库，改用已批准的提权路径运行 package-local `tsx.cmd`。
 
 预期结果：
-- 进入中文登录/注册页
-- 页面说明 token 只保存在内存，刷新后需要重新登录
 
-### Step 2. Register or log in
+- demo 用户存在
+- 最近 30 天有 5 条演示用 workouts
+- 胸推动作容量明显高于背部和腿部
+- Bench 有足够记录展示重点动作进展
 
-注册一个新账号，或直接登录已有账号。
+## 6. Demo Flow
 
-预期结果：
-- 登录成功后进入工作台
-- 看到底部三 Tab：`训练`、`分析`、`AI 助手`
+### Step 1. Open frontend and log in
 
-### Step 3. Go to `训练` Tab
+打开 `http://localhost:5173`，使用 demo 用户登录：
 
-确认当前在训练页，页面包含训练统计、记录训练入口、训练日志和动作词典。
+- `assistant-demo@fitmind.local`
+- `Passw0rd!`
 
-可以说：
-“这里先不是 AI，而是真实训练数据入口。后面的分析和助手都建立在这里录入的 workout 之上。”
+可以先说明：
 
-### Step 4. Create one workout
+“这里登录的是本地 demo seed 账号，不是生产账号。这个账号的训练分布是为了稳定展示 insight dashboard 而专门构造的。”
 
-点击“记录训练”，填写一条 workout。
+### Step 2. Go directly to `AI 助手`
 
-建议：
-- 选择今天时间
-- 填一个简短备注
-- 选 1 到 2 个常见动作，例如卧推、深蹲、硬拉
+进入 `AI 助手` Tab，不要先从泛化聊天角度切入。
 
-### Step 5. Add several sets
+先讲页面定位：
 
-给每个动作加几组 set，填写 `reps`、`weight`、可选 `RPE`。
+“这一页不是先给你一个空聊天框，而是先把可解释、可复现的训练洞察主动展示出来，再允许你继续追问。”
 
-预期结果：
-- 可以搜索并选择动作
-- 至少保留一组
-- 提交后 workout 创建成功
+### Step 3. Explain the 5 insight cards
 
-### Step 6. Confirm training stats and workout list update
+按顺序展示当前 5 张卡：
 
-创建完成后，观察训练页顶部统计和训练日志。
+1. 今日建议
+2. 训练偏科提醒
+3. 恢复提醒
+4. 重点动作进展
+5. 判断依据
 
-预期结果：
-- workout list 立即刷新
-- 顶部训练统计刷新
-- 新建 workout 出现在训练日志中
+这里要明确讲两点：
 
-可以说：
-“这里可以看到 training CRUD 不是孤立的。创建 workout 之后，训练列表和 summary 会一起刷新，后面的分析上下文也会跟着更新。”
+- 这些内容不是 free chat 先编出来的
+- 它们来自 deterministic training data + evidence-backed context
 
-### Step 7. Go to `分析` Tab
+### Step 4. Click quick prompt: `我今天练什么？`
 
-切到分析页。
+展示 Assistant 从 dashboard 进入追问模式。
 
-预期结果：
-- 看到 30 天总览
-- 看到重点动作列表
-- 看到动作进展面板
-- 看到 AI 可用上下文预览
+强调：
 
-### Step 8. Explain deterministic analysis
+- quick prompt 不是硬编码答案
+- assistant 会走受控 tool path
+- 结果建立在已有 recommendation context 之上
 
-重点说明这页是后端 deterministic calculation layer，不是 AI 生成。
+### Step 5. Click quick prompt: `我是不是偏科？`
 
-依次指出：
-- `training summary`：30 天训练次数、总组数、总次数、总容量
-- `exercise ranking`：哪些动作在当前范围内贡献了更多 volume
-- `exercise progress`：单动作的 max weight、estimated 1RM、最近 session
-- `AI usable context preview`：后续助手会读到的 deterministic context package
+这里要把 demo seed 的设计价值说出来：
 
-可以说：
-“这页展示的是后端先算好的结构化结果。也就是说，AI 不是直接读原始 workout 表，更不是先编一段话，再回头找理由。”
+- 胸推容量明显更高
+- 背部有训练，但相对偏少
+- 腿部几乎没有形成均衡分布
 
-### Step 9. Select an exercise if needed
+这条路径适合直接展示：
 
-在重点动作列表中点击一个动作。
+- 为什么这批 demo data 不是随机 seed
+- 为什么 insight dashboard 可以稳定演示
 
-预期结果：
-- 该动作被选中
-- 动作进展面板显示这个动作的进展
-- 后续 AI 助手里的“动作进展” quick prompt 可用
+### Step 6. Click quick prompt: `AI 根据什么判断？`
 
-### Step 10. Go to `AI 助手` Tab
+这是面试价值最高的一步。
 
-切到 AI 助手页。
+建议说明：
 
-预期结果：
-- 看到状态栏
-- 看到 quick prompts
-- 看到消息区、工具调用卡、输入框
+“当前版本不是把原始 workouts 全塞进 prompt，而是先由后端 deterministic layer 做 summary / progress / recommendation context，再由 assistant 基于 evidence 做解释。”
 
-### Step 11. Use quick prompts
+### Step 7. Show unsupported prompt fallback
 
-依次演示：
-- `训练总览`
-- `动作进展`
-- `推荐上下文`
+手动输入一个明显超出范围的问题，例如天气、笑话或泛化生活建议。
 
-其中“动作进展”需要前一步已经选中动作。
+目标：
 
-预期结果：
-- 用户消息先进入消息流
-- 助手开始 streaming
-- 如果走工具路径，会出现 tool call card
+- 展示 unsupported intent 不会假装回答
+- 展示当前 assistant 的支持边界是诚实的
 
-### Step 12. Point out SSE status changes
+推荐讲法：
 
-演示时指出前端状态机会经历：
-- `thinking`
-- `tool_calling`
-- `answering`
-- `done`
+“当前阶段我没有把它做成自由聊天机器人，因为现在的目标是训练记录解释，而不是泛化问答。”
 
-如果失败，则会进入 `error`。
+### Step 8. Explain `分析` Tab vs `AI 助手` Tab
 
-可以说：
-“这里不是等一个阻塞式 HTTP 一次性返回，而是把 assistant turn 拆成了可见阶段，所以用户能知道系统是在思考、在调工具，还是已经开始输出答案。”
+最后切回 `分析` Tab，讲清分工：
 
-### Step 13. Point out tool call card
+- `分析`
+  - deterministic data surface
+  - 直接展示 summary / progress / context
+- `AI 助手`
+  - 基于这些稳定结果做产品化解释和追问交互
 
-当 quick prompt 触发工具时，指出工具调用卡上显示的工具名和状态。
+一句话总结可以用：
 
-当前核心工具：
-- `get_training_summary`
-- `get_exercise_progress`
-- `get_recommendation_context`
+“分析页负责把结果算清楚，AI 助手页负责把结果讲清楚。”
 
-预期结果：
-- 卡片显示 tool name
-- 显示 `running / success / error`
-- 成功后可看到 duration
-
-### Step 14. Explain evidence-backed answer
-
-最后强调答案不是“凭空聊出来”的，而是建立在确定性工具结果上。
-
-可以说：
-“这里我想展示的不是普通聊天框，而是一个有确定性计算层的 AI 应用。用户提问后，助手不会直接凭空生成回答，而是先通过后端工具读取训练摘要、动作进展或 recommendation context，然后再基于 evidence 组织解释。”  
-
-补充说明：
-- 当前可以展示 evidence-backed explanation
-- 当前不是 RAG
-- 当前不是 MCP
-- 当前不是 multi-tool loop
-- 当前也没有 tool 执行后的第二次 provider call
-
-## 5. What to Say During Demo
-
-下面是一组可以直接复用的中文讲稿。
+## 7. Suggested Speaking Track
 
 ### Opening
 
-“FitMind AI 不是一个普通聊天壳，也不是一个单纯记录训练的 CRUD 页面。它的核心价值是把真实训练日志、确定性计算、内部 Tool Calling 和 SSE 流式助手串成一条可解释的 AI 应用链路。”
+“FitMind AI 不是一个普通聊天壳，也不是一个纯 CRUD 项目。它的核心是把真实训练日志、deterministic calculation layer、受控 Tool Calling 和 SSE assistant UI 串成一条可解释的 AI application chain。”
 
-### On Training Tab
+### On the dashboard
 
-“第一步一定先从训练日志开始，因为真实 workout 是整个系统的事实来源。没有这层真实数据，后面的 summary、progress 和 AI explanation 都没有可信基础。”
+“我先不给用户一个空聊天框，而是先把最有价值的训练洞察主动展示出来。这样即使没有追问，页面本身也已经能表达产品价值。”
 
-### On Analysis Tab
+### On the assistant boundary
 
-“分析页展示的是 deterministic calculation layer。这里的数字不是模型推断出来的，而是后端根据训练记录和计算规则直接算出来的，所以可以稳定复现，也能回溯到 evidence。”
+“当前 assistant 不是自由聊天机器人。它优先回答训练相关问题，unsupported intent 会明确兜底，而不是假装什么都能答。”
 
-### On Assistant Tab
+### On verification
 
-“AI 助手这一步也不是直接把原始日志塞进 prompt。它先走受控工具边界，读取训练总览、动作进展或者 recommendation context，再组织成用户看得懂的解释。这能明显降低幻觉风险，也更方便审计。”
+“root `pnpm test` 现在只代表 unit-test lane。真实的 auth、assistant 和 training app path 是通过独立 smoke scripts 验证的；这些需要数据库外连，在当前 sandbox 环境下要区分环境限制和产品 bug。”
 
-### On SSE
+## 8. What Not to Claim
 
-“这里使用 SSE 的原因是，用户不需要盲等一个黑盒响应。前端可以明确显示 thinking、tool_calling、answering、done 这些阶段，知道系统现在到底在做什么。”
+本次 demo 不要 overclaim：
 
-### On Boundaries
+- 不要说 root `pnpm test` 覆盖了真实数据库链路
+- 不要说已经完成 browser E2E
+- 不要说 assistant 已支持多工具 agent loop
+- 不要说已经有第二次 provider call 或真正的自由聊天 orchestration
 
-“这个项目当前刻意保留边界：没有 RAG，没有 MCP，没有多工具 agent loop，也没有 tool 执行后的第二次 provider call。重点是先把 deterministic data、tool execution、provider boundary 和 streaming UX 做扎实。”
-
-## 6. Expected Results
-
-### After login
-
-- 成功进入工作台
-- 三个主 Tab 可切换
-
-### After creating workout
-
-- 训练日志出现新 workout
-- 训练统计更新
-- 后续分析页会读取到新的训练数据
-
-### On analysis page
-
-- 30 天 summary 可见
-- 可点击重点动作
-- 选中动作后能看到 progress
-- recommendation context panel 展示 deterministic preview
-
-### On assistant page
-
-- quick prompt 可直接发起请求
-- 状态栏出现 `thinking -> tool_calling -> answering -> done`
-- tool card 展示实际工具名
-- 消息区增量显示回答
-
-## 7. Known Local Issues
-
-- Windows 环境下可能遇到 `vite/esbuild spawn EPERM`
-- 当前已有 `client` 目录下 package-local `vite.cmd build` workaround
-- 某些目录映射下 Git 可能提示 `dubious ownership`
-- 手动 browser smoke 可能需要单独执行，当前不应宣称浏览器 E2E 已完成
-
-## 8. Demo Recovery
+## 9. Recovery Notes
 
 ### If login fails
 
 - 检查 backend 是否已启动
-- 检查 `.env` 中 `JWT_SECRET` 等配置
-- 确认当前请求是否打到 `http://localhost:3000`
+- 检查 `DATABASE_URL` 和 `JWT_SECRET`
+- 必要时先跑 `pnpm smoke:auth`
 
-### If training data does not load
+### If assistant page looks empty
 
-- 检查 `DATABASE_URL`
-- 检查 migration / seed 是否已执行
-- 检查后端是否成功连接数据库
+- 先确认已经跑过 `pnpm seed:assistant-demo`
+- 再确认当前登录的就是 demo 用户
 
-### If assistant fails
+### If DB-backed commands fail in sandbox
 
-- 先切回 `ASSISTANT_PROVIDER=mock`
-- 再确认后端 assistant stream 接口可用
-- 如果使用 `anthropic`，确认 `ANTHROPIC_API_KEY` 已正确配置
-
-### If build fails with EPERM
-
-- 使用已记录的 Windows workaround
-- 在 `client` 目录执行 `.\node_modules\.bin\vite.cmd build`
+- 先说明这是当前环境的 sandbox DB egress denial
+- 不要把它描述成 app 逻辑 bug
+- 改用已验证的 elevated run 路径

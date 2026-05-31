@@ -8,6 +8,7 @@ import {
   updateWorkoutSetSchema,
   workoutListQuerySchema,
 } from "../schemas/workout-schemas.js";
+import { workoutIntakeParseRequestSchema } from "../schemas/workout-intake-schemas.js";
 import {
   addUserWorkoutSet,
   createUserWorkout,
@@ -18,9 +19,12 @@ import {
   updateUserWorkout,
   updateUserWorkoutSet,
 } from "../services/training/workout-service.js";
+import { getUserAssistantInsights } from "../services/training/assistant-insights-service.js";
 import { getUserExerciseProgress } from "../services/training/exercise-progress-service.js";
+import { getUserMuscleLoad } from "../services/training/muscle-load-service.js";
 import { getUserRecommendationContext } from "../services/training/recommendation-context-service.js";
 import { getUserTrainingSummary } from "../services/training/training-summary-service.js";
+import { parseUserWorkoutIntakeDraft } from "../services/training/workout-intake-service.js";
 import { createSuccessResponse } from "../utils/api-response.js";
 
 type AuthLocals = {
@@ -70,6 +74,10 @@ const trainingDateRangeSchema = z
 
 const exerciseProgressQuerySchema = trainingDateRangeSchema.extend({
   exercise_id: z.string().uuid(),
+});
+
+const assistantInsightsQuerySchema = trainingDateRangeSchema.extend({
+  exercise_id: z.string().uuid().optional(),
 });
 
 function parseIdParams(params: Request["params"]): { id: string } {
@@ -151,6 +159,59 @@ export async function getExerciseProgressController(
 }
 
 /**
+ * Return deterministic muscle-load distribution for the authenticated user.
+ *
+ * @param req - Express request with date range query params.
+ * @param res - Express response with authenticated locals.
+ * @returns JSON muscle-load response.
+ */
+export async function getMuscleLoadController(
+  req: Request,
+  res: Response<unknown, AuthLocals>,
+) {
+  const query = trainingDateRangeSchema.parse({
+    start_date:
+      typeof req.query.start_date === "string" ? req.query.start_date : "",
+    end_date: typeof req.query.end_date === "string" ? req.query.end_date : "",
+  });
+  const result = await getUserMuscleLoad(res.locals.userId, query);
+
+  return res.status(200).json(createSuccessResponse(result));
+}
+
+/**
+ * Return deterministic assistant insight cards for the authenticated user.
+ *
+ * @param req - Express request with date range and optional exercise id.
+ * @param res - Express response with authenticated locals.
+ * @returns JSON assistant insight cards response.
+ */
+export async function getAssistantInsightsController(
+  req: Request,
+  res: Response<unknown, AuthLocals>,
+) {
+  const query = assistantInsightsQuerySchema.parse({
+    exercise_id:
+      typeof req.query.exercise_id === "string"
+        ? req.query.exercise_id
+        : undefined,
+    start_date:
+      typeof req.query.start_date === "string" ? req.query.start_date : "",
+    end_date: typeof req.query.end_date === "string" ? req.query.end_date : "",
+  });
+  const result = await getUserAssistantInsights({
+    exerciseId: query.exercise_id,
+    range: {
+      start_date: query.start_date,
+      end_date: query.end_date,
+    },
+    userId: res.locals.userId,
+  });
+
+  return res.status(200).json(createSuccessResponse(result));
+}
+
+/**
  * Return a deterministic recommendation context package for the authenticated user.
  *
  * @param req - Express request with date range query params.
@@ -167,6 +228,23 @@ export async function getRecommendationContextController(
     end_date: typeof req.query.end_date === "string" ? req.query.end_date : "",
   });
   const result = await getUserRecommendationContext(res.locals.userId, query);
+
+  return res.status(200).json(createSuccessResponse(result));
+}
+
+/**
+ * Parse natural-language workout text into a draft without saving it.
+ *
+ * @param req - Express request with natural-language text.
+ * @param res - Express response with authenticated locals.
+ * @returns JSON workout intake draft response.
+ */
+export async function parseWorkoutIntakeController(
+  req: Request,
+  res: Response<unknown, AuthLocals>,
+) {
+  const input = workoutIntakeParseRequestSchema.parse(req.body);
+  const result = await parseUserWorkoutIntakeDraft(res.locals.userId, input);
 
   return res.status(200).json(createSuccessResponse(result));
 }

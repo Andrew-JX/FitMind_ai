@@ -47,6 +47,8 @@ export interface WorkoutSetDto {
 export interface WorkoutSummaryDto {
   id: string;
   performed_at: string;
+  started_at: string | null;
+  ended_at: string | null;
   duration_minutes: number | null;
   notes: string | null;
   sets_count: number;
@@ -56,6 +58,8 @@ export interface WorkoutSummaryDto {
 export interface WorkoutDetailDto {
   id: string;
   performed_at: string;
+  started_at: string | null;
+  ended_at: string | null;
   duration_minutes: number | null;
   notes: string | null;
   sets: WorkoutSetDto[];
@@ -63,6 +67,8 @@ export interface WorkoutDetailDto {
 
 export interface CreateWorkoutRequest {
   performed_at: string;
+  started_at?: string | null | undefined;
+  ended_at?: string | null | undefined;
   duration_minutes?: number | undefined;
   notes?: string | undefined;
   sets: AddWorkoutSetRequest[];
@@ -70,6 +76,8 @@ export interface CreateWorkoutRequest {
 
 export interface UpdateWorkoutRequest {
   performed_at?: string | undefined;
+  started_at?: string | null | undefined;
+  ended_at?: string | null | undefined;
   duration_minutes?: number | undefined;
   notes?: string | undefined;
 }
@@ -129,6 +137,8 @@ const workoutSetDtoSchema = z.object({
 const workoutSummaryDtoSchema = z.object({
   id: z.string().uuid(),
   performed_at: isoDateStringSchema,
+  started_at: isoDateStringSchema.nullable(),
+  ended_at: isoDateStringSchema.nullable(),
   duration_minutes: z.number().int().positive().nullable(),
   notes: z.string().nullable(),
   sets_count: z.number().int().nonnegative(),
@@ -138,6 +148,8 @@ const workoutSummaryDtoSchema = z.object({
 const workoutDetailDtoSchema = z.object({
   id: z.string().uuid(),
   performed_at: isoDateStringSchema,
+  started_at: isoDateStringSchema.nullable(),
+  ended_at: isoDateStringSchema.nullable(),
   duration_minutes: z.number().int().positive().nullable(),
   notes: z.string().nullable(),
   sets: z.array(workoutSetDtoSchema),

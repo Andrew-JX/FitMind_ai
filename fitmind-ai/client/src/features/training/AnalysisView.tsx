@@ -1,5 +1,6 @@
 import type { TrainingSummary } from "./training-summary-api";
 import type { ExerciseProgressPanelProps } from "./ExerciseProgressPanel";
+import type { MuscleLoadPanelProps } from "./MuscleLoadPanel";
 import type { RecommendationContextPanelProps } from "./RecommendationContextPanel";
 import type { TrainingSummaryPanelProps } from "./TrainingSummaryPanel";
 
@@ -7,10 +8,12 @@ import { Badge } from "../../components/Badge";
 import { Card } from "../../components/Card";
 import { useTheme } from "../../theme/ThemeContext";
 import { ExerciseProgressPanel } from "./ExerciseProgressPanel";
+import { MuscleLoadPanel } from "./MuscleLoadPanel";
 import { RecommendationContextPanel } from "./RecommendationContextPanel";
 import { TrainingSummaryPanel } from "./TrainingSummaryPanel";
 
 export interface AnalysisViewProps {
+  muscleLoadProps: MuscleLoadPanelProps;
   progressProps: ExerciseProgressPanelProps;
   recommendationProps: RecommendationContextPanelProps;
   summary: TrainingSummary | null;
@@ -40,6 +43,7 @@ export function AnalysisView(props: AnalysisViewProps) {
       </Card>
 
       <TrainingSummaryPanel {...props.summaryProps} summary={props.summary} />
+      <MuscleLoadPanel {...props.muscleLoadProps} />
       <ExerciseProgressPanel {...props.progressProps} />
       <RecommendationContextPanel {...props.recommendationProps} />
     </section>
@@ -63,7 +67,9 @@ const titleStyle: React.CSSProperties = {
   margin: 0,
 };
 
-function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function copyStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 13,
@@ -72,7 +78,9 @@ function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProper
   };
 }
 
-function subtleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function subtleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx3,
     fontSize: 11,

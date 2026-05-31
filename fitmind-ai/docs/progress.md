@@ -2815,6 +2815,95 @@ Verification:
 - `pnpm lint` passed
 - `pnpm --filter @fitmind/client exec .\node_modules\.bin\vite.cmd build` passed
 
+## Phase 4.3 Batch 3 - Assistant Insights Backend Endpoint
+
+Moved the Assistant Insight Dashboard business rules from the frontend builder path into a backend deterministic endpoint. The frontend now renders a backend view-model instead of independently loading training summary, recommendation context, and exercise progress to assemble cards.
+
+### implementation
+- Added `GET /api/training/assistant-insights?start_date=&end_date=&exercise_id=optional`.
+- The endpoint uses the authenticated `user_id` from auth context only; `user_id` query injection is ignored.
+- The backend service composes existing deterministic services: training summary, recommendation context, muscle load, and optional exercise progress.
+- The response returns dashboard-ready `cards`, `overview`, `limitations`, and evidence counts/rules without exposing raw workout or set ids.
+- The Assistant Insight Dashboard now calls the new endpoint through `assistant-insights-api.ts` and keeps the existing card UI, quick prompts, loading, error, and empty states.
+
+### product boundaries
+- Card copy uses conservative language such as "current records are concentrated in", "can prioritize", and "lower share".
+- The endpoint does not add LLM behavior, SSE event changes, tool executor changes, RAG, MCP, multi-tool agent loop, or Anthropic second provider call.
+- Recovery cards retain the existing safety boundary: training records can support general reminders but cannot judge pain, fatigue, or health risk.
+
+### smoke coverage
+- Added `server/scripts/assistant-insights-api-smoke.ts`.
+- Added `pnpm smoke:assistant-insights` at root and server package levels.
+- Smoke covers auth requirement, populated cards, required card types, deterministic source names, no raw ids in response evidence, conservative copy, and `user_id` query injection isolation.
+
+### verification
+- `pnpm --filter @fitmind/server type-check` passed.
+- `pnpm --filter @fitmind/client type-check` passed.
+- `pnpm lint` passed.
+- `pnpm test` passed: 6 files, 29 tests.
+- `pnpm --filter @fitmind/client exec .\node_modules\.bin\vite.cmd build` passed.
+- Sandbox DB-backed `pnpm smoke:auth` and `pnpm smoke:assistant-insights` still fail at `POST /api/auth/register` with `500 INTERNAL_ERROR`, matching the known sandbox DB egress/environment constraint.
+- Elevated `pnpm smoke:auth` passed.
+- Elevated `pnpm smoke:assistant-insights` passed.
+
+## Phase 4.3 Batch 2 - Muscle Load Analysis UI
+
+Added a deterministic muscle-load panel to the Analysis tab so the `/api/training/muscle-load` evidence layer is visible before the Assistant consumes it.
+
+### implementation
+- Added a frontend `muscle-load-api` client that calls `GET /api/training/muscle-load?start_date=&end_date=` through the shared `requestJson` helper.
+- Added `MuscleLoadPanel` after the 30-day training summary and before exercise progress.
+- The panel shows 30-day raw volume, weighted volume, set count, represented muscle-group count, muscle-group ranking, top muscle groups, low-volume muscle groups, top contributing exercises, and evidence summary counts.
+- Evidence UI shows workout/set counts and calculation rules, but does not expose raw ids in the product interface.
+- App-level Analysis refresh now uses a shared `analysisRefreshSignal` for recommendation context and muscle-load panels, while selected exercise progress keeps its existing focused refresh behavior.
+
+### product boundaries
+- UI copy uses "higher share", "lower share", and "current records are concentrated in" language.
+- UI copy does not claim "undertrained", "serious imbalance", "must train", or medical/recovery risk.
+- `low_volume_muscle_groups` is framed as low share within current returned/recent records, not a complete all-muscle coverage judgment.
+- No Assistant UI, backend contract, provider loop, natural-language intake, voice capture, RAG, MCP, or agent behavior changed in this batch.
+
+### verification
+- `pnpm --filter @fitmind/client type-check` passed.
+- `pnpm --filter @fitmind/server type-check` passed.
+- `pnpm lint` passed.
+- `pnpm test` passed: 6 files, 29 tests.
+- `pnpm --filter @fitmind/client exec .\node_modules\.bin\vite.cmd build` passed.
+- Sandbox DB-backed `pnpm smoke:auth` and `pnpm smoke:muscle-load` still fail at `POST /api/auth/register` with `500 INTERNAL_ERROR`, matching the known sandbox DB egress/environment constraint.
+- Elevated `pnpm smoke:auth` passed.
+- Elevated `pnpm smoke:muscle-load` passed.
+
+## Phase 4.3 Batch 1 - Muscle Load Calculation Layer
+
+Added a deterministic backend muscle-load calculation layer for evidence-backed training imbalance analysis. This batch stays scoped to backend API, service/repository logic, smoke coverage, and verification notes; it does not change the Assistant UI, Analysis tab UI, provider loop, RAG, MCP, or agent behavior.
+
+### implementation
+- Added `GET /api/training/muscle-load?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD`.
+- The endpoint uses the authenticated `user_id` from auth context only; `user_id` query injection is ignored.
+- Date filtering follows the existing half-open date range rule:
+  - `performed_at >= start_date::date`
+  - `performed_at < (end_date::date + interval '1 day')`
+- Muscle load is calculated from existing `workouts`, `sets`, `exercises`, `exercise_muscles`, and `muscle_groups` data without adding tables.
+- Per-set raw volume is `weight_kg * reps`.
+- Per-exercise muscle contribution weights are normalized before allocation, so exercises with contribution weights that do not sum to 1 still distribute set volume consistently.
+- Response includes totals, `by_muscle_group`, `top_muscle_groups`, `low_volume_muscle_groups`, and evidence with workout ids, set ids, and calculation rules.
+- The naming intentionally uses `low_volume_muscle_groups`, not `undertrained_muscle_groups`, because the app does not yet model user goals, training frequency, or plan context.
+
+### smoke coverage
+- Added `server/scripts/muscle-load-api-smoke.ts`.
+- The smoke registers isolated users, creates a workout with bench press and row sets, calls `/api/training/muscle-load`, verifies chest/triceps/front delts weighted volume, checks contribution ratios sum close to 1, checks evidence ids/rules, and verifies `user_id` query injection cannot cross auth boundaries.
+- Added `pnpm smoke:muscle-load` at the root and server package levels.
+
+### verification
+- `pnpm --filter @fitmind/server type-check` passed.
+- `pnpm --filter @fitmind/client type-check` passed.
+- `pnpm lint` passed.
+- `pnpm test` passed: 6 files, 29 tests.
+- Sandbox DB-backed smoke attempts failed at `POST /api/auth/register` with `500 INTERNAL_ERROR`, matching the known DB egress/environment constraint rather than a muscle-load route failure.
+- Elevated `pnpm smoke:auth` passed.
+- Elevated `pnpm smoke:training` passed.
+- Elevated `pnpm smoke:muscle-load` passed.
+
 ## 2026-05-09 Phase 4.2 Batch 2 - Assistant Demo Data & Smoke Stabilization
 
 ### why this batch exists
@@ -2897,6 +2986,95 @@ Verification:
 
 ### notes
 - 根级 `pnpm test` 目前仍会命中已有的 `server/src/app.test.ts` 失败，这次没有把它们作为 Batch 2 范围的一部分；本批验证重点仍然是新的 auth smoke、assistant mock smoke、deterministic API smokes 和 dashboard builder test。
+
+## 2026-05-26 Phase 4.2 Batch 3 - Test Hygiene & Demo Closure
+
+### why this batch exists
+- Assistant 相关产品能力在 Batch 2 已经具备了稳定的 smoke 证据，但 root `pnpm test` 仍被历史 `server/src/app.test.ts` 拖住，验证叙事不够干净。
+- 本批不新增 AI 助手能力，而是把测试入口分层、app route smoke 职责边界、demo runbook 和验证文档一起收口。
+
+### root test hygiene
+- 重新审视 `server/src/app.test.ts` 后，确认它更适合作为纯 app / route boundary smoke，而不是继续承担 workout mutation 全链路断言。
+- 原先失败的 7 个 case 主要属于历史 route-smoke drift：
+  - 旧的 workout mutation HTTP 断言仍锚定在 root unit lane
+  - 这些路径已经被现有 DB-backed smoke scripts 更真实地覆盖
+- 本批处理方式不是“假装修绿”，而是明确收缩 `app.test.ts` 的职责：
+  - 保留 `health` endpoint
+  - 保留 `/api/auth/me` 未授权拦截
+  - 保留 protected route 的 malformed bearer header / invalid token / missing header 行为
+- workout mutation 主路径不再由 root unit smoke 宣称覆盖，而是继续由现有 backend smoke scripts 证明。
+
+### script split by intent
+- 根级 `package.json` 新增：
+  - `test:unit`
+  - `test:integration`
+  - `smoke:auth`
+  - `smoke:assistant`
+  - `smoke:training`
+  - `seed:assistant-demo`
+- 根级 `test` 现在等价于 `pnpm test:unit`，明确只代表 unit-test lane。
+- 根级 `verify` 现在只收口：
+  - `lint`
+  - `format:check`
+  - `type-check`
+  - `test:unit`
+- `@fitmind/server` 新增/整理：
+  - `seed:assistant-demo`
+  - `smoke:auth`
+  - `smoke:assistant`
+  - `smoke:training`
+  - `test:unit`
+- `test:integration` 目前明确打印“尚未配置 root integration suite”，避免把 smoke scripts 和 integration 概念混淆。
+
+### demo runbook hardening
+- 重写 `docs/demo-script.md`，改成围绕当前稳定 Assistant demo path 的 operator runbook：
+  - 启动 server / client
+  - 运行 assistant demo seed
+  - 用 demo 用户登录
+  - 先展示 5 张 insight cards
+  - 再点击 quick prompts：
+    - `我今天练什么？`
+    - `我是不是偏科？`
+    - `AI 根据什么判断？`
+  - 再展示 unsupported prompt fallback
+  - 最后解释 `分析` Tab 和 `AI 助手` Tab 的分工
+- 文档中已明确 demo 账号是本地 seed 账号，不是生产账号，也不应被描述成可公开复用的共享凭据。
+
+### documentation closeout
+- 更新 `README.md` 的 verification section，明确：
+  - root `pnpm test` = unit-test lane
+  - `smoke:auth` / `smoke:assistant` / `smoke:training` = DB-backed smoke
+  - sandbox DB egress denial 是环境限制，不是 app bug
+  - 不 overclaim browser E2E
+- 更新 `docs/project-study-guide.md`，加入一段更适合面试解释的 testing / verification framing：
+  - unit tests 证明路由 / controller / service 边界
+  - backend smoke scripts 证明真实 app + DB 链路
+  - elevated run 是当前 sandbox DB egress 限制下的必要验证路径
+
+### files changed
+- `server/src/app.test.ts`
+- `package.json`
+- `server/package.json`
+- `docs/demo-script.md`
+- `docs/project-study-guide.md`
+- `docs/progress.md`
+- `README.md`
+
+### verification results
+- `pnpm test` passed
+- `pnpm --filter @fitmind/server type-check` passed
+- `pnpm --filter @fitmind/client type-check` passed
+- `pnpm lint` passed
+- `pnpm --filter @fitmind/client exec .\node_modules\.bin\vite.cmd build` passed
+- `.\node_modules\.bin\vitest.cmd run client\src\features\assistant\assistant-insight-builder.test.ts` passed
+- 提权后 `pnpm smoke:auth` passed
+- 提权后 `pnpm seed:assistant-demo` passed
+- 提权后 `pnpm smoke:assistant` passed
+- 提权后 `pnpm smoke:training` passed
+
+### notes
+- 本批没有新增任何 AI insight 类型、backend `/assistant-insights` endpoint、多工具 agent loop、第二次 provider call、RAG、MCP 或浏览器 E2E 宣称。
+- 当前 root `pnpm test` 通过并不等于 DB-backed smoke 通过；两者在脚本和文档里已被明确拆开。
 
 ## 2026-05-07 Phase 4.2 Batch 1 - Assistant Insight Dashboard
 
@@ -3012,3 +3190,274 @@ Verification:
 - `pnpm lint` passed
 - `pnpm --filter @fitmind/client exec .\node_modules\.bin\vite.cmd build` passed
 
+
+## 2026-05-29 Phase 4.4 Batch 1 - Natural Language Workout Intake Backend
+
+Added a deterministic backend parser for natural-language workout intake. This batch only creates a workout draft and does not write `workouts` or `sets`.
+
+### Completed
+
+- Added authenticated `POST /api/training/workout-intake/parse`.
+- Added Zod request/response schemas for workout intake drafts.
+- Added a rule-based parser for normalized weight/reps formats such as `60公斤10个`, `60kg x 10`, `60 x 10`, and `60kg 10 reps`.
+- Added conservative exercise matching against the existing exercise dictionary with `matched`, `ambiguous`, and `unresolved` statuses.
+- Added parser unit tests and a DB-backed smoke script.
+- Added `pnpm smoke:workout-intake` at root and server package levels.
+
+### Boundaries
+
+- No workout persistence.
+- No frontend UI.
+- No voice capture or speech-to-text.
+- No LLM structured output, RAG, MCP, Agent, or provider loop changes.
+- Ambiguous movement names return candidates and require user confirmation.
+
+### Verification Notes
+
+- Parser unit test passed locally.
+- `pnpm --filter @fitmind/server type-check` passed locally.
+- Full verification and DB-backed smoke status are recorded in the implementation closeout.
+
+## 2026-05-30 Phase 4.4 Batch 2 - Exercise Alias & Matching Layer
+
+Added a deterministic exercise alias and matching layer for natural-language workout intake. This batch keeps the endpoint draft-only and does not add a database alias table, frontend UI, voice capture, LLM parsing, RAG, MCP, Agent behavior, or workout persistence.
+
+### Completed
+
+- Added a system exercise alias map keyed by canonical exercise code.
+- Added an exercise matching service with exact standard-name matching, exact alias matching, broad ambiguous aliases, normalized/contains fallback, stable candidates, and conservative unresolved results.
+- Refactored the workout-intake parser so parser logic handles text/sets while the matching service handles exercise candidates and confidence.
+- Expanded unit coverage for alias matches, broad ambiguous terms, unresolved terms, English normalization, and parser integration.
+- Expanded `pnpm smoke:workout-intake` to cover barbell bench press, lat pulldown, and broad row aliases.
+
+### Boundaries
+
+- No user-custom aliases.
+- No DB migration.
+- No direct workout creation.
+- Ambiguous aliases return candidates and must be confirmed by a future UI.
+
+### Verification Notes
+
+- Batch verification results are recorded in the implementation closeout.
+
+## 2026-05-30 Phase 4.4 Batch 6 - LLM Structured Workout Intake Fallback
+
+Added a backend-only hybrid parser for natural-language workout intake. The endpoint still exposes the same parse contract, but low-quality rule parses can now be repaired by a strict structured fallback.
+
+### Completed
+
+- Added `WORKOUT_INTAKE_LLM_PROVIDER=off|mock|anthropic`, defaulting to mock-safe behavior.
+- Added a strict Zod-validated LLM output schema for `spoken_name`, complete sets, incomplete sets, and warnings.
+- Added a deterministic mock fallback for oral workout text such as `上斜哑铃卧推三组每组27.5公斤每组次数8`.
+- Added optional Anthropic fallback plumbing while keeping it separate from `ASSISTANT_PROVIDER`.
+- Added a hybrid parser that runs rules first and automatically falls back when the rule output has no valid sets, incomplete sets, no-candidate items, no-set items, or missing-set warnings.
+- Kept exercise ID resolution deterministic by running LLM `spoken_name` through the existing exercise matching service.
+- Added evidence source metadata: `rule_parser`, `llm_structured_fallback`, and `rule_parser_llm_unavailable`.
+- Fixed decimal preservation in the rule parser so `27.5公斤` is not split into `5kg`.
+- Updated workout-intake smoke to cover mock LLM fallback without creating workouts.
+
+### Boundaries
+
+- LLM output never writes workouts or sets.
+- LLM output is rejected if it includes database-only fields such as `exercise_id`.
+- User confirmation and the existing create workout API remain the only save path.
+- No backend STT, audio upload/storage, RAG, MCP, Agent/provider loop, User Training Profile, or medical / rehab judgment.
+
+### Verification Notes
+
+- Batch verification results are recorded in the implementation closeout.
+
+## 2026-05-30 Phase 4.4 Batch 5C - Intake Modal Layering & Inline Draft Completion
+
+Repaired the next round of browser/manual feedback for voice and text intake. The transcript modal now behaves as a true viewport overlay, and incomplete draft rows can be completed directly inside the draft card instead of forcing users to rewrite the transcript.
+
+### Completed
+
+- Raised transcript modal and listening overlay to a viewport-level `document.body` portal with a very high z-index and full-screen pointer interception.
+- Added cross-clause parser merging for oral follow-ups like `每组做了10次` and `每组是70公斤` when they belong to the previous active exercise.
+- Added parser coverage for `杠铃卧推做了10组每组做的是70公斤，每组做了10次` and related high-pulldown phrasing.
+- Added `resolveIncompleteSetFields` so incomplete draft data can be completed into valid generated sets.
+- Added inline incomplete-set editors in draft cards for missing reps and / or missing weight.
+- Fixed the raw unicode escape display issue for the incomplete-set title.
+- Kept transcript editing and reparse as a fallback rather than the primary correction path.
+
+### Boundaries
+
+- No backend STT endpoint.
+- No audio upload or audio storage.
+- No Whisper / OpenAI speech API integration.
+- No LLM structured output, RAG, MCP, Agent, provider loop change, User Training Profile, or medical / rehab judgment.
+- No browser E2E claim unless a browser automation run is performed separately.
+
+### Verification Notes
+
+- Batch verification results are recorded in the implementation closeout.
+
+## 2026-05-30 Phase 4.4 Batch 5B - Voice Intake UX & Parser Guardrails
+
+Repaired the real manual-test issues in voice / natural-language intake. The Training tab no longer shows the large quick text panel by default, and the deterministic parser now stays conservative when oral inputs omit required set fields.
+
+### Completed
+
+- Moved quick intake behind lightweight Training-tab triggers next to `+ 记录训练`.
+- Added press-and-hold microphone interaction with a listening overlay and animated CSS wave bars.
+- Added a floating transcript confirmation modal with editable text, parse, cancel, draft review, and save actions.
+- Extended workout-intake response drafts with `incomplete_sets` for recognized but unsaveable partial set data.
+- Tightened set schema and parser output so complete `sets` require positive `weight_kg` and positive `reps`.
+- Added oral pattern support for `高位下拉十组，每组70公斤做10个`, `高位下拉做了十组，每组70公斤10个`, `十组高位下拉，每组70公斤做10个`, and `高位下拉两组45公斤12个`.
+- Guarded against context phrases like `背部`, `今天`, `昨天`, `训练`, `练了`, `做了`, and `每组` becoming fake unresolved exercises.
+- Made Chinese exercise names preferred in intake matching results when known.
+- Added tests for parser guardrails, conservative Chinese matching, incomplete draft blocking, and Chinese-first manual resolution display.
+
+### Boundaries
+
+- No backend STT endpoint.
+- No audio upload or audio storage.
+- No Whisper / OpenAI speech API integration.
+- No LLM structured output, RAG, MCP, Agent, provider loop change, user-custom aliases, User Training Profile, or medical / rehab judgment.
+- No browser E2E claim unless a browser automation run is performed separately.
+
+### Verification Notes
+
+- Batch verification results are recorded in the implementation closeout.
+
+## 2026-05-30 Phase 4.4 Batch 3 - Natural Language Workout Intake UI
+
+Added a frontend quick text logging flow on the Training tab. Users can paste a natural-language workout, parse it into the existing backend workout draft, review matched / ambiguous / unresolved exercises, resolve ambiguous candidates, delete unresolved rows, and save only after confirmation through the existing workout create API.
+
+### Completed
+
+- Added a typed client API wrapper for `POST /api/training/workout-intake/parse`.
+- Added a draft-to-`CreateWorkoutRequest` mapper with unit coverage for matched drafts, per-exercise set indexes, ambiguous / unresolved blocking, and invalid set blocking.
+- Added `WorkoutIntakePanel` as a separate Training-tab panel without changing the manual `TrainingSessionComposer`.
+- Saving confirmed drafts now calls the existing `createWorkout` API and then reuses the existing `onCreated` refresh path.
+- Ambiguous exercises require a candidate selection before save; unresolved exercises can be deleted in this batch.
+
+### Boundaries
+
+- No new backend endpoint or create workout contract change.
+- No automatic save from parser output.
+- No voice capture, speech-to-text, LLM structured output, RAG, MCP, Agent, provider loop change, user-custom aliases, or medical / rehab judgment.
+- Manual exercise-library selection for unresolved rows remains a future improvement.
+
+### Verification Notes
+
+- Batch verification results are recorded in the implementation closeout.
+
+## 2026-05-30 Phase 4.4 Batch 4 - Intake Draft Manual Resolution
+
+Improved the quick text intake draft review so ambiguous and unresolved exercise rows can be manually resolved through the existing exercise dictionary before saving. This keeps natural-language intake conservative while removing the main blocker before future voice capture.
+
+### Completed
+
+- Added optional selection mode to the existing exercise picker while preserving the default browse-only dictionary behavior.
+- Passed the existing exercise search props into `WorkoutIntakePanel`.
+- Added manual dictionary-exercise resolution for intake draft rows while preserving original `input_name` and parsed sets.
+- Ambiguous rows now support candidate selection or a library override.
+- Unresolved rows now support library selection or deletion.
+- Save-blocking copy now distinguishes empty drafts, unmatched exercises, and invalid / empty sets.
+- Added mapper tests for unresolved manual resolution and ambiguous manual override.
+
+### Boundaries
+
+- No backend endpoint or workout create contract changes.
+- No set editing in this batch.
+- No automatic save from parser output.
+- No voice capture, speech-to-text, LLM structured output, RAG, MCP, Agent, provider loop change, user-custom aliases, or medical / rehab judgment.
+
+### Verification Notes
+
+- Batch verification results are recorded in the implementation closeout.
+
+## 2026-05-30 Phase 4.4 Batch 5 - Voice Workout Capture
+
+Added a frontend-only browser voice input prototype to the quick text intake panel. Voice capture only produces editable transcript text; the transcript still goes through the existing parse, draft review, manual resolution, and user-confirmed save flow.
+
+### Completed
+
+- Added a narrow browser SpeechRecognition hook that detects `SpeechRecognition` / `webkitSpeechRecognition`.
+- Added speech recognition helper coverage for user-safe error copy and transcript append behavior.
+- Added voice controls to `WorkoutIntakePanel`: start listening, stop listening, listening state, unsupported-browser fallback, and speech error notice.
+- Final transcripts append into the existing text area without auto-parsing or auto-saving.
+- Existing parser endpoint, draft review, ambiguous / unresolved resolution, and `createWorkout` save path remain unchanged.
+
+### Boundaries
+
+- No backend STT endpoint.
+- No audio upload or audio storage.
+- No Whisper / OpenAI speech API integration.
+- No LLM structured output, RAG, MCP, Agent, provider loop change, user-custom aliases, or medical / rehab judgment.
+- Browser support depends on the user's SpeechRecognition implementation.
+
+### Verification Notes
+
+- Batch verification results are recorded in the implementation closeout.
+
+## 2026-05-30 Phase 4.4 Batch 6B - Hybrid Parser Fallback Reliability
+
+Repaired the hybrid workout-intake parser around real oral-input testing. The API now keeps the existing rule-first path, but treats any matched exercise without valid sets as low quality, expands mock fallback coverage for realistic Chinese workout phrases, and returns Chinese user-facing warning copy instead of English parser internals.
+
+### Completed
+
+- Strengthened the fallback quality gate so exercises with no valid sets trigger structured fallback instead of returning a dead-end matched row.
+- Added server coverage for realistic oral high-pulldown input such as `我今天训练了背部做了高位下拉做了3组每组做的是70公斤然后每组做了10次`.
+- Expanded mock structured fallback to better recognize oral reps patterns like `每组做的是...` and `每组的次数是...`.
+- Converted parser and fallback warnings to Chinese product copy.
+- Updated workout-intake smoke coverage for oral high-pulldown parsing while preserving no-persistence and no-secret-leak assertions.
+
+### Boundaries
+
+- No frontend flow change in this repair batch.
+- No backend STT, audio upload/storage, direct workout creation by LLM, LLM-selected exercise IDs, RAG, MCP, Agent/provider loop, User Training Profile, or medical / rehab behavior.
+
+### Verification Notes
+
+- Batch verification results are recorded in the implementation closeout.
+
+## 2026-05-31 Phase 4.4 Batch 6C - Date-Aware Workout Intake
+
+Fixed natural-language / voice intake date correctness. Workout intake now recognizes date hints in the transcript and writes the resolved date to `draft.performed_at`, so phrases like `昨天练了高位下拉...` no longer save as today by default.
+
+### Completed
+
+- Added deterministic date parsing for `今天`, `昨天`, `前天`, numeric month-day text, Chinese month-day text, slash dates, and ISO dates.
+- Added `draft.date_source` and `draft.date_label` to the intake response.
+- Rule parser and LLM fallback now share the same deterministic date result; the model does not decide final workout dates.
+- Frontend parse requests now send a local offset reference datetime to avoid UTC day drift.
+- Draft review shows a training date input and allows user correction before save.
+- Save payload still uses the existing `createWorkout` contract through `draft.performed_at`.
+
+### Boundaries
+
+- No new backend endpoint or workout create contract change.
+- No LLM date authority, Training Profile, RAG, MCP, Agent/provider loop, backend STT, audio upload/storage, or direct parser persistence.
+
+### Verification Notes
+
+- Batch verification results are recorded in the implementation closeout.
+
+## 2026-05-31 Phase 4.4 Batch 6D - Intake Modal Responsiveness + Exercise Dictionary Expansion
+
+Improved intake usability in two places: the transcript/draft modal now behaves like a bounded viewport-level dialog with a scrollable body and visible sticky footer actions, and the system exercise dictionary / alias layer now covers more common Chinese gym movements.
+
+### Completed
+
+- Reworked the intake modal into header, scrollable body, and sticky footer sections so parse/save actions stay visible on mobile-sized viewports.
+- Kept the modal mounted through `document.body` portal with full-screen fixed overlay and high z-index.
+- Hid the save action until a draft exists, reducing confusion before parsing.
+- Expanded dictionary seeds with common shoulder, back, chest, leg, arm, and core exercises such as dumbbell shoulder press, pull-up, chin-up, dumbbell row, cable fly, Bulgarian split squat, hammer curl, plank, and hanging leg raise.
+- Added Chinese alias coverage for common intake phrases including `哑铃推肩`, `坐姿哑铃推肩`, `引体向上`, `反手引体`, `侧平举`, `杠铃划船`, `哑铃划船`, `腿屈伸`, `腿弯举`, and `臀推`.
+- Kept broad aliases such as `推肩`, `划船`, `夹胸`, `飞鸟`, `下拉`, and `弯举` conservative as ambiguous candidates.
+- Added deterministic muscle-load mappings for the expanded exercises.
+- Updated workout-intake smoke coverage for dumbbell shoulder press and pull-up parse behavior.
+
+### Boundaries
+
+- No new backend endpoint or workout create contract change.
+- No user-custom dictionary / alias editor.
+- No backend STT, audio upload/storage, RAG, MCP, Agent/provider loop, User Training Profile, direct workout persistence by parser, or medical / rehab judgment.
+
+### Verification Notes
+
+- Batch verification results are recorded in the implementation closeout.

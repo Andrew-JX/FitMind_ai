@@ -65,6 +65,8 @@ const workoutSetRow = {
 const workoutDetailRow = {
   id: workoutId,
   performed_at: "2026-05-01T10:00:00.000Z",
+  started_at: "2026-05-01T10:00:00.000Z",
+  ended_at: "2026-05-01T11:15:00.000Z",
   duration_minutes: 75,
   notes: "leg day",
   sets: [workoutSetRow],
@@ -81,6 +83,8 @@ describe("workout-service", () => {
         {
           id: workoutId,
           performed_at: "2026-05-01T10:00:00.000Z",
+          started_at: "2026-05-01T10:00:00.000Z",
+          ended_at: "2026-05-01T11:15:00.000Z",
           duration_minutes: 75,
           notes: "leg day",
           sets_count: 3,
@@ -97,6 +101,8 @@ describe("workout-service", () => {
         {
           id: workoutId,
           performed_at: "2026-05-01T10:00:00.000Z",
+          started_at: "2026-05-01T10:00:00.000Z",
+          ended_at: "2026-05-01T11:15:00.000Z",
           duration_minutes: 75,
           notes: "leg day",
           sets_count: 3,

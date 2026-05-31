@@ -18,6 +18,7 @@ export interface WorkoutsPanelProps {
   isLoadingList: boolean;
   listError: string | null;
   onDeleteWorkout: (workoutId: string) => Promise<boolean>;
+  onEditWorkout: (workoutId: string) => void;
   onRefresh: () => Promise<void>;
   onSelectWorkout: (workoutId: string) => Promise<void>;
   onWorkoutEdited?: (() => Promise<void>) | undefined;
@@ -143,6 +144,7 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
                 isLoadingDetail={props.isLoadingDetail}
                 key={workout.id}
                 onDelete={() => handleDeleteWorkout(workout.id)}
+                onEdit={() => props.onEditWorkout(workout.id)}
                 onEdited={() => handleWorkoutEdited(workout.id)}
                 onToggle={() => handleToggleWorkout(workout.id, isExpanded)}
                 token={props.token}

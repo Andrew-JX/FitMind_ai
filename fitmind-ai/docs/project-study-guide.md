@@ -484,3 +484,197 @@ Phase 3.2 是后端从只是确定性模拟 assistant 停止，开始证明真�
 褰撳墠鐗堟湰鍒绘剰娌℃妸 AI 鍔╂墜鍋氭垚瀹屽叏鑷敱鑱婂ぉ銆傜幇闃舵鐨勭洰鏍囦笉鏄硾鍖栭棶绛旓紝鑰屾槸鎶?AI 鍥炵瓟寤虹珛鍦ㄥ彲瑙ｉ噴銆佸彲澶嶇幇銆佸彲杩芥函鐨勮缁冭褰曡В閲婁箣涓娿€傚鏋滅幇鍦ㄧ洿鎺ュ線“鑷敱鑱婂ぉ”鎺ㄨ繘锛岀郴缁熷氨闇€瑕佸悓鏃惰В鍐冲杞?tool loop銆乽nsupported intent 鍏滃簳銆佸畨鍏ㄨ竟鐣屻€佹洿澶嶆潅鐨?provider orchestration锛屼互鍙婃洿楂樼殑娴嬭瘯鎴愭湰銆?
 
 鎵€浠ヨ繖涓€鐗堥€夋嫨鐨勬槸 deterministic insight dashboard锛屽厛璁╃敤鎴锋墦寮€椤甸潰灏辫兘鐪嬪埌绋冲畾鐨勫缓璁€佸亸绉戞彁閱掋€佹仮澶嶆彁閱掑拰鍔ㄤ綔杩涘睍锛屽啀閫夋嫨鏄惁缁х画杩芥姇銆傝繖鏍峰仛鐨勫ソ澶勬槸锛氬欢绁?AI 鍔╂墜鐨勪骇鍝佸彲瑙佹€э紝鍚屾椂淇濇寔寤鸿鏈夋潵婧愩€佹湁璇佹嵁銆佹湁杈圭晫锛屾洿閫傚悎婕旂ず锛屼篃鏇撮€傚悎闈㈣瘯鏃惰娓呮“涓轰粈涔堢幇鍦ㄥ仛鎴愯繖鏍凤紝鑰屼笉鏄洿鎺ュ仛鎴愪竴涓棤杈圭晫鑱婂ぉ鏈哄櫒浜?銆?
+
+## 18. 娴嬭瘯涓庨獙璇佽娉?
+
+闈㈣瘯鏃跺彲浠ユ妸褰撳墠楠岃瘉绛栫暐璇存垚涓夊眰锛?
+
+## 19. Muscle Load Analysis UI 面试讲法
+
+Phase 4.3 的重点是把“偏科/肌群集中”从文案判断推进到可解释计算。后端先通过 `/api/training/muscle-load` 按 `exercise_muscles.contribution_weight` 把每组 `weight_kg * reps` 分摊到肌群，并在同一动作内归一化 contribution weight，避免字典权重总和不是 1 时造成容量膨胀或丢失。
+
+Analysis Tab 展示的是这层 deterministic evidence，而不是 AI 生成建议。用户可以看到最近 30 天的 weighted volume、contribution ratio、主要贡献动作、top muscle groups 和 low-volume muscle groups。这里的 low-volume 只表示最近记录或当前返回结果中占比较低，不等于训练不足、医疗风险或必须补练。
+
+这个设计让职责边界更清楚：Analysis Tab 负责展示原始、可追溯、可复现的计算结果；AI Assistant 后续可以消费同一套 muscle-load evidence，把它转成更自然的解释和建议。这样面试时可以说，项目没有让模型直接猜“你是不是偏科”，而是先建立确定性肌群负荷层，再让 assistant 在证据之上表达。
+
+## 20. Assistant Insights Backend Endpoint 面试讲法
+
+Phase 4.3 Batch 3 把 Assistant Insight Dashboard 的业务判断从前端 builder 收回后端。前端不再同时拉 training summary、recommendation context 和 exercise progress 后自己拼卡片，而是调用 `GET /api/training/assistant-insights`，直接渲染后端返回的 view-model。
+
+这个 endpoint 仍然不是 LLM 生成内容。它组合已有 deterministic services：training summary、recommendation context、muscle load，以及可选的 selected exercise progress。这样做的好处是业务判断集中在后端，AI Assistant、未来 mock provider 或真正 provider tool 都可以复用同一套 insight 口径。
+
+面试时可以这样讲：我没有让前端承担“偏科提醒/今日建议/判断依据”的业务规则，也没有让模型直接猜答案。后端先生成可测试、可复现、带 evidence summary 的 insight cards，前端只负责产品化渲染。这个阶段证明的是 deterministic insight orchestration，而不是 RAG、MCP 或多工具 Agent。
+
+- unit tests锛氱敤鏉ヨ瘉鏄庤矾鐢便€丆ontroller銆乷ervice 杈圭晫鍜岀函閫昏緫鍚堝悓
+- backend smoke scripts锛氱敤鏉ヨ瘉鏄庣湡瀹?app + DB 鏈鍒版湯閾捐矾
+- browser demo / manual smoke锛氱敤鏉ヨ鏄庝骇鍝佹紨绀鸿矾寰勶紝浣嗗綋鍓嶄笉 overclaim 瀹屾暣 E2E
+
+褰撳墠 root `pnpm test` 琛ㄧず鐨勬槸 unit-test lane锛屼笉绛変簬鈥滅湡瀹炴暟鎹簱璺緞鍏ㄩ儴閫氳繃鈥濄€傜湡瀹炵殑 auth銆乤ssistant mock-turn銆乼raining summary銆乺ecommendation context 鍜?exercise progress 閮芥槸閫氳繃鐙珛 smoke scripts 鍦ㄦ彁鏉冪幆澧冧笅楠岃瘉鐨勩€?
+
+濡傛灉闈㈣瘯瀹橀棶涓轰粈涔堣鎻愭潈杩愯锛屽彲浠ョ洿鎺ヨ锛氬綋鍓嶅伐浣滃尯鐨?sandbox 璁块棶鎺у埗浼氭嫤鎴?DB egress锛屾墍浠ユ湁涓€浜?DB-backed smoke 闇€瑕佺敤 elevated run 鎵嶈兘璇佹槑浜у搧閫昏緫鏄惁姝ｅ父銆傝繖鏄幆澧冮檺鍒讹紝涓嶆槸 app bug銆?
+
+## 21. Natural Language Workout Intake Backend
+
+Phase 4.4 Batch 1 adds a low-friction logging entry point: `POST /api/training/workout-intake/parse`.
+
+The important product boundary is that natural-language intake is not the analysis layer and not an AI reasoning feature. It converts a user's rough training description into a structured workout draft, then a future UI can ask the user to confirm or edit before saving through the existing workout API.
+
+Interview framing:
+
+> I did not let the model directly write workout records. The backend first parses natural language into a validated draft, matches exercises against the existing dictionary, returns ambiguous candidates instead of guessing, and only a later user-confirmed step can save the workout. This lowers logging friction while keeping the deterministic analysis chain trustworthy.
+
+Current Batch 1 boundaries:
+
+- Text input only; no voice capture or speech-to-text.
+- Rule-based deterministic parser only; no LLM structured output.
+- Draft generation only; no `workouts` or `sets` persistence.
+- Exercise matching uses the existing exercise dictionary and returns `matched`, `ambiguous`, or `unresolved`.
+- Ambiguous names such as broad bench-press terms are not silently mapped to the first candidate.
+
+## 22. Exercise Alias & Matching Layer
+
+Phase 4.4 Batch 2 separates exercise matching from the natural-language parser. The parser still handles text normalization, exercise segmentation, and set extraction; the new matching layer handles standard names, system aliases, broad aliases, candidate ordering, confidence, and unresolved results.
+
+Interview framing:
+
+> Natural-language workout logging is only useful if user phrases can be mapped safely to standard exercise IDs. I added a deterministic alias layer for common gym terms, but broad terms like "row" or "press" still return candidates instead of being silently saved. This preserves data quality while lowering logging friction.
+
+Current Batch 2 boundaries:
+
+- System aliases are code-defined and keyed by canonical exercise code.
+- No database migration or user-custom alias table yet.
+- Alias matching only improves draft generation; it still never creates workouts.
+- Future confirmation UI will let users resolve ambiguous candidates before saving.
+
+## 23. Natural Language Workout Intake UI
+
+Phase 4.4 Batch 3 turns the draft parser into a usable Training-tab flow. The frontend now has a "quick text logging" panel that sends natural-language text to `POST /api/training/workout-intake/parse`, renders the returned draft, and only saves after the user has confirmed every remaining exercise.
+
+Interview framing:
+
+> I kept natural-language intake as a confirmation workflow, not an auto-save workflow. The backend parser and alias layer still only generate a draft; the frontend blocks save for ambiguous or unresolved exercises, lets the user choose candidates or delete unresolved rows, and then reuses the normal create workout API. That keeps low-friction logging connected to the same deterministic analysis chain without polluting training data.
+
+Current Batch 3 boundaries:
+
+- Quick text intake is separate from the manual training composer.
+- Ambiguous rows require candidate selection before save.
+- Unresolved rows can be deleted; manual exercise-library selection is a future improvement.
+- Saving uses the existing `createWorkout` contract and refresh path.
+- No voice capture, speech-to-text, LLM structured output, RAG, MCP, Agent behavior, provider loop change, or medical / rehab advice.
+
+## 24. Intake Draft Manual Resolution
+
+Phase 4.4 Batch 4 closes the biggest usability gap before voice input: unresolved and ambiguous draft rows can now be resolved manually through the exercise dictionary instead of forcing the user to delete them.
+
+Interview framing:
+
+> Before adding voice, I made the confirmation step robust. If the parser cannot identify an exercise, or returns candidates that do not include the user's intent, the user can choose the correct standard exercise from the dictionary. The parser still never writes workout data directly; it produces a draft, the user resolves uncertainty, and only then does the frontend reuse the normal workout create API.
+
+Current Batch 4 boundaries:
+
+- ExercisePicker supports optional selection mode, but the normal dictionary browser remains browse-only.
+- Manual resolution changes only the draft's matched exercise fields; it preserves original input text and parsed sets.
+- Ambiguous rows can use backend candidates or a manual library override.
+- Unresolved rows can use manual library selection or be deleted.
+- Set editing is intentionally deferred; this batch only resolves exercise identity.
+- Voice capture can now reuse the same transcript -> parse -> review -> manual resolution -> save flow later.
+
+## 25. Voice Workout Capture
+
+Phase 4.4 Batch 5 adds a lightweight browser voice entry point on top of quick text intake. The browser turns speech into transcript text, the user can edit that text, and only then does the app reuse the existing parser, draft review, manual resolution, and save flow.
+
+Interview framing:
+
+> I did not build voice as a separate data-writing path. Voice only creates a transcript in the frontend. That transcript still becomes a workout draft, ambiguous or unresolved exercises still require confirmation or manual resolution, and the final save still uses the normal workout create API. This keeps voice low-friction without weakening data quality.
+
+Current Batch 5 boundaries:
+
+- Uses browser `SpeechRecognition` / `webkitSpeechRecognition` when available.
+- Unsupported browsers fall back to text intake.
+- No audio is uploaded, stored, or sent to a backend STT provider.
+- No Whisper / OpenAI speech API integration.
+- Voice does not auto-parse or auto-save; the user must review transcript text first.
+- Future production STT could replace transcript capture without changing the parser -> draft confirmation -> save chain.
+
+## 26. Voice Intake UX & Parser Guardrails
+
+Phase 4.4 Batch 5B is a repair batch based on real browser/manual testing. The quick intake UI is no longer a large always-visible panel in the Training tab. Instead, the main training row stays focused: `+ 记录训练` keeps the manual composer path, while lightweight text and microphone triggers open the same transcript confirmation modal.
+
+Interview framing:
+
+> I treated voice as an input source, not a trusted data source. Press-and-hold voice only creates editable transcript text. The user still checks the transcript, parses it into a draft, resolves ambiguity, and confirms before save. When the deterministic parser sees an incomplete oral phrase like "高位下拉十组，每组70公斤", it does not invent reps or generate `kg x 0`; it returns incomplete draft metadata and blocks save until the user corrects the text.
+
+Current Batch 5B boundaries:
+
+- Press-and-hold microphone UX uses browser SpeechRecognition only; no audio upload or backend STT.
+- The transcript modal does not auto-parse or auto-save.
+- Parser output now separates complete `sets` from review-only `incomplete_sets`.
+- `incomplete_sets` blocks save and explains missing fields such as reps or weight.
+- Context words such as back/chest/training/today/yesterday/filler are ignored instead of becoming unresolved exercise rows.
+- Chinese exercise display is preferred for intake results when a known Chinese name exists; a full app-wide language preference remains future work.
+- This is still deterministic parser work, not LLM structured output, RAG, MCP, Agent behavior, or medical / rehab advice.
+
+## 27. LLM Structured Workout Intake Fallback
+
+Phase 4.4 Batch 6 upgrades natural-language intake from pure rules to a hybrid parser. The deterministic parser still runs first for cheap, stable formats. If that result is low quality, the backend can call a structured LLM fallback that returns JSON draft data, then the existing Zod validation and exercise matching layers take over.
+
+Interview framing:
+
+> I did not let the model save workouts or choose database exercise IDs. The model only helps convert messy oral text into a structured draft shape. The backend validates that JSON with Zod, rejects unsafe fields like `exercise_id`, runs deterministic exercise matching, and still requires user confirmation before using the normal create workout API.
+
+Current Batch 6 boundaries:
+
+- Rule parser remains the first path.
+- LLM fallback is automatic only for low-quality parses: missing sets, incomplete sets, or unresolved-heavy output.
+- Mock fallback is the default so tests and smoke do not need a real model key.
+- Real Anthropic fallback is env-gated through `WORKOUT_INTAKE_LLM_PROVIDER=anthropic` and the existing API key infrastructure.
+- No backend STT, audio upload/storage, RAG, MCP, Agent loop, User Training Profile, or medical / rehab behavior.
+
+## 28. Hybrid Parser Fallback Reliability
+
+Phase 4.4 Batch 6B is a repair batch from real voice/manual testing. It tightens the quality gate around the hybrid intake parser: if a rule parse recognizes an exercise but cannot produce valid sets, the backend treats that as low quality and attempts the structured fallback instead of returning a matched-but-unsaveable draft.
+
+Interview framing:
+
+> I learned from manual voice testing that "matched exercise" is not enough. If the system identifies 高位下拉 but fails to parse 3 sets, 70kg, and 10 reps, that is still a failed intake. I tightened the hybrid parser so no-valid-set rows trigger fallback, expanded the deterministic mock fallback for realistic Chinese oral phrases, and kept all output as draft-only data that still goes through Zod validation, deterministic exercise matching, and user confirmation.
+
+Current Batch 6B boundaries:
+
+- The endpoint remains `POST /api/training/workout-intake/parse`; the frontend contract and save flow are unchanged.
+- User-facing parser warnings are Chinese product copy, not raw English implementation messages.
+- Mock fallback covers realistic local demo phrases without requiring a real API key.
+- Real Anthropic fallback remains opt-in through environment configuration.
+- No backend STT, audio upload/storage, direct workout creation by LLM, LLM-selected exercise IDs, RAG, MCP, Agent/provider loop, User Training Profile, or medical / rehab behavior.
+
+## 29. Date-Aware Workout Intake
+
+Phase 4.4 Batch 6C fixes a data correctness issue in natural-language and voice intake: a user can say "昨天" or "五月二十九号", and the draft now uses that training date instead of blindly saving everything as today.
+
+Interview framing:
+
+> I treated date parsing as part of workout data correctness, not a UI nicety. The transcript can contain relative dates like 昨天 / 前天 or absolute dates like 5月29号 / 2026-05-29. The backend resolves those deterministically against a local reference timestamp from the frontend, stores the result in `draft.performed_at`, and the frontend shows a date input so the user can confirm or correct it before saving.
+
+Current Batch 6C boundaries:
+
+- Text date hints take priority over request `performed_at`.
+- If no text date exists, the frontend-provided local reference datetime is used.
+- If the request also omits a date, the server current time remains the fallback.
+- The LLM fallback path does not decide final dates; it reuses the same deterministic date parser result.
+- The frontend save path still uses the existing `createWorkout` contract.
+- No Training Profile, RAG, MCP, Agent/provider loop, backend STT, or direct parser persistence was added.
+
+## 30. Intake Modal Responsiveness + Exercise Dictionary Expansion
+
+Phase 4.4 Batch 6D closes two practical usability gaps from manual testing: the intake modal must fit mobile viewports, and the exercise dictionary must recognize common Chinese workout phrases such as 哑铃推肩 and 引体向上.
+
+Interview framing:
+
+> The natural-language parser can only feel useful if the review UI is usable and the dictionary contains real gym movements. I changed the transcript modal into a bounded viewport dialog with a scrollable body and sticky footer actions, then expanded the deterministic exercise dictionary, alias map, and muscle-load mappings. Broad phrases still return candidates, so the system does not silently choose an exercise ID just because the model or parser heard a vague term.
+
+Current Batch 6D boundaries:
+
+- Modal responsiveness is a frontend layout fix; it does not change the parse or save contract.
+- Standard exercise IDs still come only from the system dictionary and deterministic alias/matching service.
+- Expanded muscle mappings are deterministic approximations for load analysis, not medical precision.
+- Broad aliases such as 推肩 / 划船 / 夹胸 / 飞鸟 / 下拉 / 弯举 remain ambiguous.
+- No user-custom aliases, admin dictionary editor, RAG, MCP, Agent/provider loop, backend STT, audio storage, or medical / rehab judgment was added.

@@ -17,6 +17,8 @@ export interface WorkoutSetDto {
 export interface WorkoutSummaryDto {
   id: string;
   performed_at: string;
+  started_at: string | null;
+  ended_at: string | null;
   duration_minutes: number | null;
   notes: string | null;
   sets_count: number;
@@ -26,6 +28,8 @@ export interface WorkoutSummaryDto {
 export interface WorkoutDetailDto {
   id: string;
   performed_at: string;
+  started_at: string | null;
+  ended_at: string | null;
   duration_minutes: number | null;
   notes: string | null;
   sets: WorkoutSetDto[];
@@ -47,6 +51,8 @@ export interface WorkoutSetInput {
 
 export interface CreateWorkoutRequest {
   performed_at: string;
+  started_at?: string | null | undefined;
+  ended_at?: string | null | undefined;
   duration_minutes?: number | undefined;
   notes?: string | undefined;
   sets: WorkoutSetInput[];
@@ -54,6 +60,8 @@ export interface CreateWorkoutRequest {
 
 export interface UpdateWorkoutRequest {
   performed_at?: string | undefined;
+  started_at?: string | null | undefined;
+  ended_at?: string | null | undefined;
   duration_minutes?: number | undefined;
   notes?: string | undefined;
 }

@@ -34,16 +34,21 @@ export function useExerciseSearch(): UseExerciseSearchResult {
 
     async function loadInitialMuscleGroups(): Promise<void> {
       setIsLoadingMuscleGroups(true);
+      setIsLoadingExercises(true);
       setSearchError(null);
 
       try {
-        const items = await listMuscleGroups();
+        const [muscleItems, exerciseItems] = await Promise.all([
+          listMuscleGroups(),
+          searchExercises({}),
+        ]);
 
         if (!isActive) {
           return;
         }
 
-        setMuscleGroups(items);
+        setMuscleGroups(muscleItems);
+        setExercises(exerciseItems);
       } catch (error) {
         if (!isActive) {
           return;
@@ -53,6 +58,7 @@ export function useExerciseSearch(): UseExerciseSearchResult {
       } finally {
         if (isActive) {
           setIsLoadingMuscleGroups(false);
+          setIsLoadingExercises(false);
         }
       }
     }

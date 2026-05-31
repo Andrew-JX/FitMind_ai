@@ -178,7 +178,7 @@ export function TrainingSessionExerciseActions(props: TrainingSessionExerciseAct
             <header style={detailHeaderStyle}>
               <div>
                 <h3 style={detailTitleStyle(theme)}>{props.draftExercise.name}</h3>
-                {props.draftExercise.exercise.name_zh?.trim() ? (
+                {props.draftExercise.exercise?.name_zh?.trim() ? (
                   <p style={detailSubtitleStyle(theme)}>
                     {props.draftExercise.exercise.name_zh}
                   </p>
