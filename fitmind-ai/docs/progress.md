@@ -3461,3 +3461,39 @@ Improved intake usability in two places: the transcript/draft modal now behaves 
 ### Verification Notes
 
 - Batch verification results are recorded in the implementation closeout.
+
+## Phase 4.5 Batch 7B - PWA Install Experience
+
+Completed:
+- Added PWA manifest with FitMind AI metadata.
+- Added PWA icons for 192x192, 512x512, maskable, and Apple touch icon.
+- Added iOS / Android home-screen metadata in the client HTML entry.
+- Added production-only service worker registration.
+- Added minimal service worker for app shell and static assets.
+- Added Chinese offline fallback page.
+- Explicitly bypassed `/api/*` so auth, training APIs, and assistant SSE are not cached.
+- Updated README with mobile install instructions.
+- Updated production smoke checklist with PWA validation steps.
+
+Verification:
+- pnpm --filter @fitmind/client type-check passed
+- pnpm lint passed
+- pnpm test passed
+- pnpm --filter @fitmind/client exec vite build passed
+- Built manifest, service worker, offline fallback, and icons exist in client/dist.
+- Built index.html includes manifest, theme-color, Apple mobile tags, and touch icon.
+- Built service worker contains `/api/` bypass and offline fallback paths.
+
+Pending production validation:
+- Deploy to Vercel production.
+- Verify manifest detection in browser devtools.
+- Verify iOS Add to Home Screen.
+- Verify Android Add to Home screen / Install app.
+- Verify standalone launch.
+- Verify offline fallback.
+- Verify login, training save, intake, and assistant still work after service worker activation.
+
+Notes:
+- Offline workout editing is intentionally not supported.
+- Auth storage and backend APIs were not changed.
+- Capacitor / React Native were intentionally deferred.

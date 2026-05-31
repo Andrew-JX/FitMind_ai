@@ -6,6 +6,35 @@ FitMind AI is an evidence-backed AI training analysis system that connects worko
 
 It is not a generic chatbot and not a pure CRUD app.
 
+## Production URL
+
+- Live app: https://fitmind-ai-psi.vercel.app/
+- The deployed client uses relative `/api` requests by default. `VITE_API_BASE_URL` can stay empty on Vercel unless the API is hosted on a separate origin.
+
+## Mobile Install
+
+FitMind AI includes a minimal PWA install experience for mobile home screens.
+
+iOS:
+
+1. Open https://fitmind-ai-psi.vercel.app/ in Safari.
+2. Tap Share.
+3. Tap Add to Home Screen.
+4. Launch FitMind from the new home-screen icon.
+
+Android:
+
+1. Open https://fitmind-ai-psi.vercel.app/ in Chrome.
+2. Tap the browser menu.
+3. Tap Add to Home screen or Install app.
+4. Launch FitMind from the new home-screen icon.
+
+Offline note:
+
+- The app has a friendly offline fallback page.
+- Training data still requires network sync.
+- Offline workout editing, background sync, and push notifications are intentionally out of scope for the current web app.
+
 ## Core Idea
 
 Workout logs  
@@ -45,6 +74,7 @@ AI layer:
 
 - Local run guide: [docs/local-run-guide.md](docs/local-run-guide.md)
 - Demo script: [docs/demo-script.md](docs/demo-script.md)
+- Production smoke checklist: [docs/production-smoke-checklist.md](docs/production-smoke-checklist.md)
 - Project study guide: [docs/project-study-guide.md](docs/project-study-guide.md)
 - Progress log: [docs/progress.md](docs/progress.md)
 - UI spec: [docs/UI_SPEC.md](docs/UI_SPEC.md)
@@ -61,6 +91,20 @@ AI layer:
 - No second provider call after tool execution.
 - Recommendation context is deterministic preview, not medical advice.
 - Browser E2E test has not been completed.
+
+## Vercel Environment Checklist
+
+Required:
+
+- `DATABASE_URL` - PostgreSQL connection string used by API routes and migrations.
+- `JWT_SECRET` - long random signing secret for auth tokens.
+- `ASSISTANT_PROVIDER` - use `mock` for stable demos unless a real provider is intentionally being tested.
+- `WORKOUT_INTAKE_LLM_PROVIDER` - use `mock` or `off` for stable demos; use `anthropic` only when the API key is configured.
+
+Optional:
+
+- `ANTHROPIC_API_KEY` - only required when `ASSISTANT_PROVIDER=anthropic` or `WORKOUT_INTAKE_LLM_PROVIDER=anthropic`.
+- `VITE_API_BASE_URL` - leave empty for the current Vercel single-origin deployment.
 
 ## Verification
 
