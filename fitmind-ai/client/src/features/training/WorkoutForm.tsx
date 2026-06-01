@@ -79,9 +79,7 @@ export function WorkoutForm(props: WorkoutFormProps) {
         <div style={setsHeaderStyle}>
           <div>
             <strong style={{ fontSize: 14 }}>训练组</strong>
-            <p style={subCopyStyle(theme)}>
-              每个动作会保留现有的 set_index 提交逻辑，不改数据语义。
-            </p>
+            <p style={subCopyStyle(theme)}>每组需要选择动作，并填写次数和重量。</p>
           </div>
           <Button onClick={form.addSetDraft} type="button" variant="secondary">
             添加一组
@@ -147,11 +145,11 @@ function translateMessage(message: string): string {
   }
 
   if (message === "Workout creation is unavailable right now.") {
-    return "请确认后端服务已启动，或稍后重试。";
+    return "训练保存失败，请稍后重试。";
   }
 
   if (message.startsWith("Saved workout with ")) {
-    return "训练创建成功，训练日志、分析数据和 AI 可用上下文已刷新。";
+    return "训练创建成功，训练记录和分析数据已刷新。";
   }
 
   return message

@@ -50,14 +50,14 @@ export function ExercisePicker(props: ExercisePickerProps) {
           <Input
             disabled={isLoadingExercises}
             onChange={(event) => setKeyword(event.target.value)}
-            placeholder="搜索动作，例如 Bench Press / Squat"
+            placeholder="输入动作名称，例如卧推 / Squat"
             type="text"
             value={keyword}
           />
         </label>
 
         <label style={labelStyle(theme)}>
-          肌群筛选
+          筛选肌群
           <select
             disabled={isLoadingExercises || isLoadingMuscleGroups}
             onChange={(event) => setSelectedMuscle(event.target.value)}
@@ -74,31 +74,31 @@ export function ExercisePicker(props: ExercisePickerProps) {
         </label>
 
         <Button disabled={isLoadingExercises || isLoadingMuscleGroups} type="submit">
-          {isLoadingExercises ? "搜索中..." : "搜索"}
+          {isLoadingExercises ? "搜索中..." : "搜索动作"}
         </Button>
       </form>
 
       {searchError ? (
         <div style={{ marginTop: 12 }}>
           <StateNotice
-            description="请确认后端服务已启动，或稍后重试。"
+            description="动作库暂时无法加载，请确认服务已启动，或稍后重试。"
             icon="search"
-            title="动作词典加载失败"
+            title="动作库加载失败"
             tone="error"
           />
         </div>
       ) : null}
 
       {isLoadingMuscleGroups ? (
-        <p style={copyStyle(theme)}>正在加载肌群词典...</p>
+        <p style={copyStyle(theme)}>正在加载肌群列表...</p>
       ) : null}
 
       {!searchError && !isLoadingExercises && exercises.length === 0 ? (
         <div style={{ marginTop: 12 }}>
           <StateNotice
-            description="输入关键词或选择肌群后，即可查看系统内置动作。"
+            description="换个关键词试试，或先切回全部肌群查看可用动作。"
             icon="search"
-            title="暂无搜索结果"
+            title="暂时没有找到动作"
           />
         </div>
       ) : null}
@@ -148,9 +148,11 @@ function ExerciseResultContent(props: {
   return (
     <>
       <div style={titleRowStyle}>
-        <strong style={{ fontSize: 13 }}>{props.exercise.name_en}</strong>
+        <strong style={{ fontSize: 13 }}>
+          {props.exercise.name_zh?.trim() || props.exercise.name_en}
+        </strong>
         {props.exercise.name_zh?.trim() ? (
-          <Pill tone="info">{props.exercise.name_zh}</Pill>
+          <Pill tone="neutral">{props.exercise.name_en}</Pill>
         ) : null}
       </div>
       <div style={pillRowStyle}>
@@ -237,6 +239,7 @@ function resultCardStyle(
     color: theme.colors.tx,
     cursor: isSelectable ? "pointer" : "default",
     display: "block",
+    minHeight: 58,
     padding: 12,
     textAlign: "left",
     width: "100%",

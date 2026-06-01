@@ -12,10 +12,10 @@ export function AssistantToolCallCard(props: AssistantToolCallCardProps) {
   if (!props.toolCall) {
     return (
       <Card padding="14px">
-        <div style={metaStyle(theme)}>工具调用状态</div>
-        <div style={headlineStyle(theme)}>等待本轮 Tool Calling</div>
+        <div style={metaStyle(theme)}>正在读取训练数据</div>
+        <div style={headlineStyle(theme)}>准备根据训练记录回答</div>
         <p style={copyStyle(theme)}>
-          当助手需要读取训练数据时，这里会展示当前工具名、状态和完成耗时。
+          当你提问时，我会先查看相关训练记录，再给出更具体的回答。
         </p>
       </Card>
     );
@@ -25,8 +25,8 @@ export function AssistantToolCallCard(props: AssistantToolCallCardProps) {
 
   return (
     <Card padding="14px">
-      <div style={metaStyle(theme)}>{isRunning ? "正在调用工具" : "工具调用完成"}</div>
-      <div style={toolNameStyle(theme)}>{props.toolCall.toolName}</div>
+      <div style={metaStyle(theme)}>{isRunning ? "正在读取训练数据" : "训练数据已读取"}</div>
+      <div style={toolNameStyle(theme)}>{getReadableToolName(props.toolCall.toolName)}</div>
       <div style={summaryRowStyle}>
         <span style={statusLabelStyle(theme)}>
           状态：{formatToolStatus(props.toolCall.status)}
@@ -42,26 +42,34 @@ export function AssistantToolCallCard(props: AssistantToolCallCardProps) {
 
 function formatToolStatus(status: AssistantActiveToolCall["status"]): string {
   if (status === "running") {
-    return "tool_calling";
+    return "读取中";
   }
 
   if (status === "success") {
-    return "success";
+    return "已完成";
   }
 
-  return "error";
+  return "读取失败";
+}
+
+function getReadableToolName(toolName: string): string {
+  return toolName
+    .replaceAll("get_training_summary", "训练总览")
+    .replaceAll("get_recommendation_context", "训练建议依据")
+    .replaceAll("get_exercise_progress", "动作进展")
+    .replaceAll("get_muscle_load", "肌群负荷");
 }
 
 function getToolCopy(toolCall: AssistantActiveToolCall): string {
   if (toolCall.status === "running") {
-    return "助手正在读取确定性训练结果，完成后会继续生成中文解释。";
+    return "正在查看你的训练记录，完成后会继续回答。";
   }
 
   if (toolCall.status === "success") {
-    return "本次工具读取已完成，回答会基于这次 evidence 继续拼接。";
+    return "已读取到相关训练数据，本次回答会基于这些记录生成。";
   }
 
-  return "本次工具调用返回错误，保留原有 SSE 错误处理链路。";
+  return "训练数据读取失败，可以稍后重试或换个问题。";
 }
 
 function metaStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
@@ -83,7 +91,6 @@ function headlineStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPr
 function toolNameStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
   return {
     color: theme.colors.blue,
-    fontFamily: theme.fonts.mono,
     fontSize: 15,
     fontWeight: 700,
   };

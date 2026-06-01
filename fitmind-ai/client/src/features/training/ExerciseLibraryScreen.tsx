@@ -15,16 +15,11 @@ const CATEGORY_LABELS = [
   "背",
   "腿",
   "肩",
-  "二头",
-  "三头",
-  "小腿",
-  "前臂",
-  "颈部",
-  "臀部",
-  "功能性",
+  "手臂",
   "核心",
   "热身",
   "拉伸",
+  "功能性",
   "其他",
 ] as const;
 
@@ -65,8 +60,7 @@ export function ExerciseLibraryScreen(props: ExerciseLibraryScreenProps) {
 
     return exercises.filter((exercise) => {
       const category = getExerciseCategory(exercise);
-      const categoryMatch =
-        selectedCategory === "全部" || category === selectedCategory;
+      const categoryMatch = selectedCategory === "全部" || category === selectedCategory;
 
       if (!categoryMatch) {
         return false;
@@ -103,7 +97,9 @@ export function ExerciseLibraryScreen(props: ExerciseLibraryScreenProps) {
           <div style={{ flex: 1 }}>
             <h2 style={titleStyle}>选择动作</h2>
             <p style={subtitleStyle(theme)}>
-              {mode === "replace" ? "选择一个新动作替换当前动作" : "从动作库添加本次训练动作"}
+              {mode === "replace"
+                ? "选择一个新动作替换当前动作"
+                : "从动作库添加本次训练动作"}
             </p>
           </div>
         </div>
@@ -136,7 +132,7 @@ export function ExerciseLibraryScreen(props: ExerciseLibraryScreenProps) {
       <div style={contentStyle}>
         {searchError ? (
           <StateNotice
-            description="请确认后端服务已启动，或稍后重试。"
+            description="动作库暂时无法加载，请确认服务已启动，或稍后重试。"
             icon="search"
             title="动作库加载失败"
             tone="error"
@@ -147,11 +143,9 @@ export function ExerciseLibraryScreen(props: ExerciseLibraryScreenProps) {
           <p style={loadingCopyStyle(theme)}>正在加载动作库...</p>
         ) : null}
 
-        {!searchError &&
-        !isLoadingExercises &&
-        filteredExercises.length === 0 ? (
+        {!searchError && !isLoadingExercises && filteredExercises.length === 0 ? (
           <StateNotice
-            description="换个关键词试试，或切换到“全部”分类。"
+            description="这个分类暂时没有匹配动作。可以换个关键词，或切回“全部”查看。"
             icon="search"
             title="没有找到动作"
           />
@@ -174,11 +168,13 @@ export function ExerciseLibraryScreen(props: ExerciseLibraryScreenProps) {
                     type="button"
                   >
                     <div style={cardTopRowStyle}>
-                      <strong style={{ fontSize: 14 }}>{exercise.name_en}</strong>
+                      <strong style={{ fontSize: 14 }}>
+                        {exercise.name_zh?.trim() || exercise.name_en}
+                      </strong>
                       <Pill tone="info">{category}</Pill>
                     </div>
                     {exercise.name_zh?.trim() ? (
-                      <div style={secondaryTextStyle(theme)}>{exercise.name_zh}</div>
+                      <div style={secondaryTextStyle(theme)}>{exercise.name_en}</div>
                     ) : null}
                     <div style={metaRowStyle}>
                       {exercise.movement_pattern ? (
@@ -224,7 +220,9 @@ function getExerciseCategory(exercise: DictionaryExercise): ExerciseCategory {
       return (
         code.includes("quad") ||
         code.includes("hamstring") ||
-        code.includes("leg")
+        code.includes("leg") ||
+        code.includes("glute") ||
+        code.includes("calf")
       );
     })
   ) {
@@ -235,28 +233,12 @@ function getExerciseCategory(exercise: DictionaryExercise): ExerciseCategory {
     return "肩";
   }
 
-  if (primaryCodes.some((code) => code.includes("bicep"))) {
-    return "二头";
-  }
-
-  if (primaryCodes.some((code) => code.includes("tricep"))) {
-    return "三头";
-  }
-
-  if (primaryCodes.some((code) => code.includes("calf"))) {
-    return "小腿";
-  }
-
-  if (primaryCodes.some((code) => code.includes("forearm") || code.includes("grip"))) {
-    return "前臂";
-  }
-
-  if (primaryCodes.some((code) => code.includes("neck"))) {
-    return "颈部";
-  }
-
-  if (primaryCodes.some((code) => code.includes("glute"))) {
-    return "臀部";
+  if (
+    primaryCodes.some((code) => {
+      return code.includes("bicep") || code.includes("tricep") || code.includes("forearm");
+    })
+  ) {
+    return "手臂";
   }
 
   if (primaryCodes.some((code) => code.includes("core") || code.includes("ab"))) {
@@ -344,6 +326,7 @@ function categoryButtonStyle(
     flex: "0 0 auto",
     fontSize: 12,
     fontWeight: 700,
+    minHeight: 36,
     padding: "8px 12px",
     whiteSpace: "nowrap",
   };
@@ -381,6 +364,7 @@ function cardStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProper
     cursor: "pointer",
     display: "grid",
     gap: 8,
+    minHeight: 72,
     padding: 14,
     textAlign: "left",
     width: "100%",

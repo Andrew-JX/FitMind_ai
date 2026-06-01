@@ -55,7 +55,7 @@ export function RecommendationContextPanel(props: RecommendationContextPanelProp
 
   async function refresh(): Promise<void> {
     if (!token) {
-      setErrorMessage("你必须先登录才能查看推荐上下文。");
+      setErrorMessage("请先登录后再查看训练建议依据。");
       return;
     }
 
@@ -87,8 +87,8 @@ export function RecommendationContextPanel(props: RecommendationContextPanelProp
       <div style={headerStyle}>
         <div>
           <div style={titleRowStyle}>
-            <h2 style={titleStyle}>AI 可用上下文预览</h2>
-            <Badge tone="info">Deterministic</Badge>
+            <h2 style={titleStyle}>训练建议依据</h2>
+            <Badge tone="info">数据来源</Badge>
           </div>
           <p style={copyStyle(theme)}>
             {context
@@ -96,7 +96,7 @@ export function RecommendationContextPanel(props: RecommendationContextPanelProp
               : `范围：${formatRangeLabel(range.start_date, range.end_date)}`}
           </p>
           <p style={subtleStyle(theme)}>
-            这里展示的是后端提供给 AI 助手的确定性上下文，不是模型直接生成的建议。
+            这里展示近期训练记录的结构化摘要，AI 助手回答时会参考这些数据。
           </p>
         </div>
 
@@ -112,20 +112,22 @@ export function RecommendationContextPanel(props: RecommendationContextPanelProp
 
       {errorMessage ? (
         <StateNotice
-          description="请确认后端服务已启动，或稍后重试。"
+          description={errorMessage}
           icon="tool"
-          title="数据加载失败"
+          title="训练数据加载失败"
           tone="error"
         />
       ) : null}
 
-      {isLoading && !context ? <p style={copyStyle(theme)}>正在加载分析数据...</p> : null}
+      {isLoading && !context ? (
+        <p style={copyStyle(theme)}>正在加载训练数据...</p>
+      ) : null}
 
       {hasEmptyState ? (
         <StateNotice
-          description="完成训练记录后，这里会展示总容量、动作排行和进展趋势。"
+          description="完成训练记录后，这里会展示总容量、重点动作和最近训练。"
           icon="tool"
-          title="暂无分析数据"
+          title="暂无训练分析数据"
         />
       ) : null}
 
@@ -134,7 +136,7 @@ export function RecommendationContextPanel(props: RecommendationContextPanelProp
           <section style={sectionCardStyle(theme)}>
             <div style={sectionHeaderStyle}>
               <h3 style={subheadingStyle}>训练摘要</h3>
-              <Pill tone="accent">summary</Pill>
+              <Pill tone="accent">摘要</Pill>
             </div>
             <AnalysisStatsGrid
               totals={{
@@ -150,10 +152,10 @@ export function RecommendationContextPanel(props: RecommendationContextPanelProp
             <section style={sectionCardStyle(theme)}>
               <div style={sectionHeaderStyle}>
                 <h3 style={subheadingStyle}>重点动作</h3>
-                <Pill tone="analysis">focus_exercises</Pill>
+                <Pill tone="analysis">近期表现</Pill>
               </div>
               {context.focus_exercises.length === 0 ? (
-                <p style={copyStyle(theme)}>当前范围内没有重点动作。</p>
+                <p style={copyStyle(theme)}>当前范围内还没有重点动作。</p>
               ) : (
                 <ul style={listStyle}>
                   {context.focus_exercises.map((exercise) => (
@@ -180,10 +182,10 @@ export function RecommendationContextPanel(props: RecommendationContextPanelProp
             <section style={sectionCardStyle(theme)}>
               <div style={sectionHeaderStyle}>
                 <h3 style={subheadingStyle}>最近训练</h3>
-                <Pill tone="warning">recent_workouts</Pill>
+                <Pill tone="warning">记录</Pill>
               </div>
               {context.recent_workouts.length === 0 ? (
-                <p style={copyStyle(theme)}>当前范围内没有最近训练。</p>
+                <p style={copyStyle(theme)}>当前范围内还没有最近训练。</p>
               ) : (
                 <ul style={listStyle}>
                   {context.recent_workouts.map((workout) => (
@@ -192,7 +194,9 @@ export function RecommendationContextPanel(props: RecommendationContextPanelProp
                         <strong>{formatDisplayDateTime(workout.performed_at)}</strong>
                         <Pill tone="info">{workout.total_volume.toLocaleString()} kg</Pill>
                       </div>
-                      <div style={itemMetaStyle(theme)}>{workout.set_count.toLocaleString()} 组</div>
+                      <div style={itemMetaStyle(theme)}>
+                        {workout.set_count.toLocaleString()} 组
+                      </div>
                       <div style={itemMetaStyle(theme)}>
                         {workout.notes?.trim() || "这次训练没有备注。"}
                       </div>
@@ -205,36 +209,21 @@ export function RecommendationContextPanel(props: RecommendationContextPanelProp
 
           <section style={sectionCardStyle(theme)}>
             <div style={sectionHeaderStyle}>
-              <h3 style={subheadingStyle}>证据链</h3>
-              <Pill tone="info">evidence</Pill>
+              <h3 style={subheadingStyle}>数据范围</h3>
+              <Pill tone="info">可追溯</Pill>
             </div>
             <div style={evidenceGridStyle}>
-              <div style={evidenceCellStyle(theme)}>
-                <span style={evidenceLabelStyle(theme)}>来源</span>
-                <strong style={evidenceValueStyle(theme)}>{context.evidence.source}</strong>
-              </div>
-              <div style={evidenceCellStyle(theme)}>
-                <span style={evidenceLabelStyle(theme)}>关联 workout</span>
-                <strong style={evidenceValueStyle(theme)}>
-                  {context.evidence.workout_ids.length} 条
-                </strong>
-              </div>
-              <div style={evidenceCellStyle(theme)}>
-                <span style={evidenceLabelStyle(theme)}>关联 set</span>
-                <strong style={evidenceValueStyle(theme)}>
-                  {context.evidence.set_ids.length} 条
-                </strong>
-              </div>
-              <div style={evidenceCellStyle(theme)}>
-                <span style={evidenceLabelStyle(theme)}>规则数量</span>
-                <strong style={evidenceValueStyle(theme)}>
-                  {context.evidence.calculation_rules.length} 条
-                </strong>
-              </div>
+              <EvidenceCell label="关联训练" value={`${context.evidence.workout_ids.length} 条`} />
+              <EvidenceCell label="关联组数" value={`${context.evidence.set_ids.length} 条`} />
+              <EvidenceCell
+                label="计算规则"
+                value={`${context.evidence.calculation_rules.length} 条`}
+              />
+              <EvidenceCell label="来源" value="训练记录" />
             </div>
 
             <details style={detailsStyle}>
-              <summary style={summaryStyle(theme)}>查看 calculation_rules</summary>
+              <summary style={summaryStyle(theme)}>查看计算规则</summary>
               <ul style={rulesListStyle(theme)}>
                 {context.evidence.calculation_rules.map((rule) => (
                   <li key={rule} style={{ marginBottom: "0.4rem" }}>
@@ -248,6 +237,15 @@ export function RecommendationContextPanel(props: RecommendationContextPanelProp
       ) : null}
     </Card>
   );
+
+  function EvidenceCell(props: { label: string; value: string }) {
+    return (
+      <div style={evidenceCellStyle(theme)}>
+        <span style={evidenceLabelStyle(theme)}>{props.label}</span>
+        <strong style={evidenceValueStyle(theme)}>{props.value}</strong>
+      </div>
+    );
+  }
 }
 
 function getReadableErrorMessage(error: unknown): string {
@@ -259,7 +257,7 @@ function getReadableErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return "推荐上下文暂时不可用。";
+  return "训练建议依据暂时不可用。";
 }
 
 function createDefaultRange(): RecommendationContextRange {
@@ -317,7 +315,7 @@ function formatDisplayDateTime(value: string): string {
 
 function formatMetric(value: number | null, unit: string): string {
   if (value === null) {
-    return "N/A";
+    return "暂无";
   }
 
   return `${value.toLocaleString()} ${unit}`;
@@ -392,7 +390,12 @@ function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProper
 }
 
 function subtleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return { color: theme.colors.tx3, fontSize: 11, lineHeight: 1.6, margin: "0.35rem 0 0" };
+  return {
+    color: theme.colors.tx3,
+    fontSize: 11,
+    lineHeight: 1.6,
+    margin: "0.35rem 0 0",
+  };
 }
 
 function sectionCardStyle(

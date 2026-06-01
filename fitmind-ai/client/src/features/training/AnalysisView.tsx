@@ -28,17 +28,15 @@ export function AnalysisView(props: AnalysisViewProps) {
       <Card>
         <div style={headerRowStyle}>
           <div>
-            <h2 style={titleStyle}>确定性分析</h2>
+            <h2 style={titleStyle}>训练分析</h2>
             <p style={copyStyle(theme)}>
-              基于你的训练日志进行规则计算，所有结论都可以追溯到原始 workout 和
-              set。
+              基于你的训练记录计算近期训练量、动作进展和肌群负荷。
             </p>
           </div>
-          <Badge tone="info">Deterministic</Badge>
+          <Badge tone="info">数据分析</Badge>
         </div>
         <p style={subtleStyle(theme)}>
-          这里展示的是后端 calculation layer 的结构化结果，不是 AI
-          生成建议，后续会被助手通过 Tool Calling 读取。
+          这里展示的是训练数据分析结果，AI 助手回答时也会参考这些记录。
         </p>
       </Card>
 

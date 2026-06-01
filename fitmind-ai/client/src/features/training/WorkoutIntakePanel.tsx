@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { createPortal } from "react-dom";
 
+import { ActionSheet } from "../../components/ActionSheet";
 import { Button } from "../../components/Button";
-import { Card } from "../../components/Card";
 import { Icon } from "../../components/Icon";
 import { StateNotice } from "../../components/StateNotice";
 import { useTheme } from "../../theme/ThemeContext";
@@ -21,26 +20,24 @@ export interface WorkoutIntakePanelProps {
 }
 
 const COPY = {
-  cancel: "\u53d6\u6d88",
-  errorTitle: "\u89e3\u6790\u5931\u8d25",
-  inputLabel: "\u8bad\u7ec3\u63cf\u8ff0",
-  modalHelp:
-    "\u8bed\u97f3\u8bc6\u522b\u53ef\u80fd\u6709\u8bef\uff0c\u8bf7\u5148\u68c0\u67e5\u6587\u5b57\uff0c\u518d\u89e3\u6790\u4e3a\u8bad\u7ec3\u8349\u7a3f\u3002",
-  modalTitle: "\u786e\u8ba4\u8bad\u7ec3\u63cf\u8ff0",
-  parse: "\u89e3\u6790\u8bad\u7ec3",
-  parsing: "\u89e3\u6790\u4e2d...",
+  cancel: "取消",
+  errorTitle: "识别失败",
+  inputLabel: "训练描述",
+  modalHelp: "语音识别可能有误，请先检查文字，再生成训练记录。",
+  modalTitle: "确认训练内容",
+  parse: "生成训练记录",
+  parsing: "识别中...",
   placeholder:
-    "\u4f8b\u5982\uff1a\u4eca\u5929\u6760\u94c3\u5367\u63a8\u4e09\u7ec4 60x10 65x8 70x6\uff0c\u9ad8\u4f4d\u4e0b\u62c9\u4e24\u7ec4 45x12\u3002",
-  speechFallback:
-    "\u5f53\u524d\u6d4f\u89c8\u5668\u6682\u4e0d\u652f\u6301\u8bed\u97f3\u8bc6\u522b\uff0c\u53ef\u4ee5\u7ee7\u7eed\u4f7f\u7528\u6587\u672c\u8bb0\u5f55\u3002",
-  speechListening: "\u6b63\u5728\u542c...",
+    "例如：今天杠铃卧推三组 60x10 65x8 70x6，高位下拉两组 45x12。",
+  speechFallback: "当前浏览器暂不支持语音识别，可以继续使用文本记录。",
+  speechListening: "正在听你说训练内容",
   speechCancel: "取消",
   speechDone: "完成",
-  speechHelp: "请说出训练内容；授权弹窗关闭后，也可以点完成结束录音。",
-  speechNoticeTitle: "\u8bed\u97f3\u8bc6\u522b\u63d0\u793a",
-  speechRelease: "点击完成结束录音",
-  speechTrigger: "\u8bed\u97f3\u8f93\u5165",
-  textTrigger: "\u6587\u672c\u8f93\u5165",
+  speechHelp: "可以说动作、重量、次数和组数。授权弹窗关闭后，也可以点完成结束录音。",
+  speechNoticeTitle: "语音识别提示",
+  speechRelease: "说完后点完成，我会把内容放到文字确认页。",
+  speechTrigger: "语音输入",
+  textTrigger: "文本输入",
 };
 
 export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
@@ -98,7 +95,6 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
     }
 
     setErrorMessage(null);
-    setIsModalOpen(false);
 
     if (!speechRecognition.isSupported) {
       setIsModalOpen(true);
@@ -150,7 +146,12 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
   return (
     <>
       <div style={triggerActionsStyle}>
-        <Button disabled={isBusy} onClick={handleTextOpen} type="button" variant="secondary">
+        <Button
+          disabled={isBusy}
+          onClick={handleTextOpen}
+          type="button"
+          variant="secondary"
+        >
           {COPY.textTrigger}
         </Button>
         <Button
@@ -163,175 +164,124 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
           variant="secondary"
         >
           <Icon name="mic" size={18} />
+          <span>{COPY.speechTrigger}</span>
         </Button>
       </div>
 
-      {isVoiceOverlayOpen
-        ? createPortal(
-            <VoiceListeningOverlay
-              errorMessage={speechRecognition.errorMessage}
-              onCancel={handleVoiceCancel}
-              onDone={handleVoiceDone}
-            />,
-            document.body,
-          )
-        : null}
-
-      {isModalOpen
-        ? createPortal(
-            <div style={modalBackdropStyle}>
-              <div style={modalShellStyle}>
-                <Card padding="0">
-                  <div style={modalLayoutStyle}>
-                    <div style={modalHeaderStyle}>
-                      <h2 style={titleStyle}>{COPY.modalTitle}</h2>
-                      <p style={{ ...copyStyle, color: theme.colors.tx2 }}>
-                        {COPY.modalHelp}
-                      </p>
-                    </div>
-
-                    <div style={modalBodyStyle}>
-                      {!speechRecognition.isSupported ? (
-                        <p style={{ ...copyStyle, color: theme.colors.orange }}>
-                          {COPY.speechFallback}
-                        </p>
-                      ) : null}
-
-                      {speechRecognition.errorMessage ? (
-                        <StateNotice
-                          description={speechRecognition.errorMessage}
-                          title={COPY.speechNoticeTitle}
-                          tone="warning"
-                        />
-                      ) : null}
-
-                      <label style={{ ...labelStyle, color: theme.colors.tx2 }}>
-                        {COPY.inputLabel}
-                      </label>
-                      <textarea
-                        disabled={isBusy}
-                        onChange={(event) => {
-                          setText(event.target.value);
-                          setErrorMessage(null);
-                        }}
-                        placeholder={COPY.placeholder}
-                        style={{
-                          ...textareaStyle,
-                          backgroundColor: theme.colors.surf2,
-                          border: `1px solid ${theme.colors.bdr}`,
-                          borderRadius: theme.radius.control,
-                          color: theme.colors.tx,
-                          fontFamily: theme.fonts.body,
-                        }}
-                        value={text}
-                      />
-
-                      {errorMessage ? (
-                        <StateNotice
-                          description={errorMessage}
-                          title={COPY.errorTitle}
-                          tone="error"
-                        />
-                      ) : null}
-                    </div>
-
-                    <div
-                      style={{
-                        ...modalFooterStyle,
-                        backgroundColor: theme.colors.surf,
-                        borderTop: `1px solid ${theme.colors.bdr}`,
-                      }}
-                    >
-                      <Button
-                        disabled={isBusy}
-                        onClick={handleModalCancel}
-                        type="button"
-                        variant="secondary"
-                      >
-                        {COPY.cancel}
-                      </Button>
-                      <Button
-                        disabled={!canParse || isBusy}
-                        onClick={handleParse}
-                        type="button"
-                      >
-                        {status === "parsing" ? COPY.parsing : COPY.parse}
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
-    </>
-  );
-}
-
-function VoiceListeningOverlay(props: {
-  errorMessage: string | null;
-  onCancel: () => void;
-  onDone: () => void;
-}) {
-  const { theme } = useTheme();
-
-  return (
-    <div style={voiceOverlayStyle}>
-      <style>
-        {`
-          @keyframes fitmindVoiceWave {
-            0%, 100% { transform: scaleY(0.35); opacity: 0.55; }
-            50% { transform: scaleY(1); opacity: 1; }
-          }
-        `}
-      </style>
-      <div
-        style={{
-          ...voiceOverlayCardStyle,
-          backgroundColor: theme.colors.surf,
-          border: `1px solid ${theme.colors.bdr}`,
-          boxShadow: theme.shadows.card,
-        }}
+      <ActionSheet
+        closeOnBackdrop={!isBusy}
+        description={COPY.modalHelp}
+        footer={
+          <div style={actionGridStyle}>
+            <Button
+              disabled={isBusy}
+              onClick={handleModalCancel}
+              type="button"
+              variant="secondary"
+            >
+              {COPY.cancel}
+            </Button>
+            <Button disabled={!canParse || isBusy} onClick={handleParse} type="button">
+              {status === "parsing" ? COPY.parsing : COPY.parse}
+            </Button>
+          </div>
+        }
+        onClose={handleModalCancel}
+        open={isModalOpen}
+        title={COPY.modalTitle}
       >
-        <h2 style={{ ...titleStyle, color: theme.colors.tx }}>
-          {COPY.speechListening}
-        </h2>
-        <div style={voiceWaveStyle} aria-hidden="true">
-          {Array.from({ length: 7 }, (_, index) => (
-            <span
-              key={index}
-              style={{
-                ...voiceWaveBarStyle,
-                animationDelay: `${index * 80}ms`,
-                backgroundColor: theme.colors.ac,
-              }}
-            />
-          ))}
-        </div>
-        <p style={{ ...copyStyle, color: theme.colors.tx2 }}>
-          {COPY.speechRelease}
-        </p>
-        <p style={{ ...copyStyle, color: theme.colors.tx3 }}>
-          {COPY.speechHelp}
-        </p>
-        {props.errorMessage ? (
+        {!speechRecognition.isSupported ? (
+          <p style={{ ...copyStyle, color: theme.colors.orange }}>
+            {COPY.speechFallback}
+          </p>
+        ) : null}
+
+        {speechRecognition.errorMessage ? (
           <StateNotice
-            description={props.errorMessage}
+            description={speechRecognition.errorMessage}
             title={COPY.speechNoticeTitle}
             tone="warning"
           />
         ) : null}
-        <div style={voiceActionRowStyle}>
-          <Button onClick={props.onCancel} type="button" variant="secondary">
-            {COPY.speechCancel}
-          </Button>
-          <Button onClick={props.onDone} type="button">
-            {COPY.speechDone}
-          </Button>
+
+        <label style={{ ...labelStyle, color: theme.colors.tx2 }}>
+          {COPY.inputLabel}
+          <textarea
+            disabled={isBusy}
+            onChange={(event) => {
+              setText(event.target.value);
+              setErrorMessage(null);
+            }}
+            placeholder={COPY.placeholder}
+            style={{
+              ...textareaStyle,
+              backgroundColor: theme.colors.surf2,
+              border: `1px solid ${theme.colors.bdr}`,
+              borderRadius: theme.radius.control,
+              color: theme.colors.tx,
+              fontFamily: theme.fonts.body,
+            }}
+            value={text}
+          />
+        </label>
+
+        {errorMessage ? (
+          <StateNotice
+            description={errorMessage}
+            title={COPY.errorTitle}
+            tone="error"
+          />
+        ) : null}
+      </ActionSheet>
+
+      <ActionSheet
+        description={COPY.speechRelease}
+        footer={
+          <div style={actionGridStyle}>
+            <Button onClick={handleVoiceCancel} type="button" variant="secondary">
+              {COPY.speechCancel}
+            </Button>
+            <Button onClick={handleVoiceDone} type="button">
+              {COPY.speechDone}
+            </Button>
+          </div>
+        }
+        onClose={handleVoiceCancel}
+        open={isVoiceOverlayOpen}
+        title={COPY.speechListening}
+      >
+        <style>
+          {`
+            @keyframes fitmindVoiceWave {
+              0%, 100% { transform: scaleY(0.35); opacity: 0.55; }
+              50% { transform: scaleY(1); opacity: 1; }
+            }
+          `}
+        </style>
+        <div style={voiceContentStyle}>
+          <div style={voiceWaveStyle} aria-hidden="true">
+            {Array.from({ length: 7 }, (_, index) => (
+              <span
+                key={index}
+                style={{
+                  ...voiceWaveBarStyle,
+                  animationDelay: `${index * 80}ms`,
+                  backgroundColor: theme.colors.ac,
+                }}
+              />
+            ))}
+          </div>
+          <p style={{ ...copyStyle, color: theme.colors.tx2 }}>{COPY.speechHelp}</p>
+          {speechRecognition.errorMessage ? (
+            <StateNotice
+              description={speechRecognition.errorMessage}
+              title={COPY.speechNoticeTitle}
+              tone="warning"
+            />
+          ) : null}
         </div>
-      </div>
-    </div>
+      </ActionSheet>
+    </>
   );
 }
 
@@ -340,7 +290,7 @@ function getErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return "The request could not be completed.";
+  return "训练内容暂时无法识别，请稍后重试。";
 }
 
 function formatLocalIsoWithOffset(date: Date): string {
@@ -358,123 +308,53 @@ function padDatePart(value: number): string {
 }
 
 const triggerActionsStyle: React.CSSProperties = {
-  display: "flex",
-  gap: 8,
+  display: "grid",
+  gap: 10,
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
 };
 
 const micButtonStyle: React.CSSProperties = {
   alignItems: "center",
   display: "inline-flex",
+  gap: 8,
   justifyContent: "center",
-  minWidth: 46,
+  minWidth: 0,
 };
 
-const modalBackdropStyle: React.CSSProperties = {
-  alignItems: "center",
-  background: "rgba(12, 16, 24, 0.52)",
-  bottom: 0,
-  display: "flex",
-  justifyContent: "center",
-  left: 0,
-  overflow: "hidden",
-  padding: 12,
-  pointerEvents: "auto",
-  position: "fixed",
-  right: 0,
-  top: 0,
-  zIndex: 2147483647,
-};
-
-const modalShellStyle: React.CSSProperties = {
-  maxHeight: "min(720px, calc(100dvh - 24px))",
-  maxWidth: 420,
-  width: "min(420px, 100%)",
-};
-
-const modalLayoutStyle: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  maxHeight: "min(720px, calc(100dvh - 24px))",
-  minHeight: 0,
-};
-
-const modalHeaderStyle: React.CSSProperties = {
-  flex: "0 0 auto",
-  padding: "18px 18px 12px",
-};
-
-const modalBodyStyle: React.CSSProperties = {
+const actionGridStyle: React.CSSProperties = {
   display: "grid",
-  flex: "1 1 auto",
-  gap: 12,
-  minHeight: 0,
-  overflowY: "auto",
-  padding: "0 18px 16px",
-};
-
-const modalFooterStyle: React.CSSProperties = {
-  display: "grid",
-  flex: "0 0 auto",
   gap: 10,
-  gridTemplateColumns: "repeat(2, minmax(105px, 1fr))",
-  padding: "12px 18px 16px",
-  position: "sticky",
-  bottom: 0,
-};
-
-const titleStyle: React.CSSProperties = {
-  fontSize: 16,
-  margin: 0,
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
 };
 
 const copyStyle: React.CSSProperties = {
   fontSize: 12,
   lineHeight: 1.6,
-  margin: "4px 0 0",
+  margin: 0,
 };
 
 const labelStyle: React.CSSProperties = {
-  display: "block",
+  display: "grid",
   fontSize: 12,
   fontWeight: 700,
-  marginBottom: 8,
-  marginTop: 14,
+  gap: 8,
 };
 
 const textareaStyle: React.CSSProperties = {
   boxSizing: "border-box",
   fontSize: 16,
   lineHeight: 1.6,
-  minHeight: 124,
+  minHeight: 150,
   outline: "none",
   padding: "12px 14px",
   resize: "vertical",
   width: "100%",
 };
 
-const voiceOverlayStyle: React.CSSProperties = {
-  alignItems: "center",
-  background: "rgba(12, 16, 24, 0.58)",
-  bottom: 0,
-  display: "flex",
-  justifyContent: "center",
-  left: 0,
-  padding: 24,
-  position: "fixed",
-  right: 0,
-  top: 0,
-  pointerEvents: "auto",
-  zIndex: 2147483647,
-};
-
-const voiceOverlayCardStyle: React.CSSProperties = {
-  borderRadius: 24,
+const voiceContentStyle: React.CSSProperties = {
   display: "grid",
   gap: 14,
   justifyItems: "center",
-  maxWidth: 320,
-  padding: "28px 30px",
-  width: "min(320px, 100%)",
 };
 
 const voiceWaveStyle: React.CSSProperties = {
@@ -491,11 +371,4 @@ const voiceWaveBarStyle: React.CSSProperties = {
   height: 58,
   transformOrigin: "center",
   width: 8,
-};
-
-const voiceActionRowStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 10,
-  gridTemplateColumns: "repeat(2, minmax(96px, 1fr))",
-  width: "100%",
 };

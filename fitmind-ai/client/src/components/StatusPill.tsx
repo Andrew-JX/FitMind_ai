@@ -68,7 +68,7 @@ function formatStatus(status: StatusTone): string {
   }
 
   if (status === "tool_calling") {
-    return "工具调用";
+    return "读取数据";
   }
 
   if (status === "answering") {

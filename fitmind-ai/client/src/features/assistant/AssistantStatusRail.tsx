@@ -21,12 +21,10 @@ export function AssistantStatusRail(props: AssistantStatusRailProps) {
           <StatusPill status={props.status} />
         </div>
         <div style={metaColumnStyle}>
-          <Badge tone="analysis">
-            provider {props.provider ? formatProvider(props.provider) : "waiting"}
-          </Badge>
-          <span style={sessionStyle(theme)}>
-            sessionId {props.sessionId ?? "waiting-for-session"}
-          </span>
+          <Badge tone="analysis">{formatProvider(props.provider)}</Badge>
+          {props.sessionId ? (
+            <span style={sessionStyle(theme)}>连续对话已开启</span>
+          ) : null}
         </div>
       </div>
       <p style={copyStyle(theme)}>{getStatusCopy(props.status)}</p>
@@ -34,32 +32,40 @@ export function AssistantStatusRail(props: AssistantStatusRailProps) {
   );
 }
 
-function formatProvider(provider: AssistantProvider): string {
-  return provider === "anthropic" ? "anthropic" : "mock";
+function formatProvider(provider: AssistantProvider | null): string {
+  if (provider === "anthropic") {
+    return "智能回答";
+  }
+
+  if (provider === "mock") {
+    return "演示回答";
+  }
+
+  return "准备中";
 }
 
 function getStatusCopy(status: AssistantChatStatus): string {
   if (status === "idle") {
-    return "准备就绪，可以开始新的训练问题。";
+    return "准备好了，可以开始新的训练问题。";
   }
 
   if (status === "thinking") {
-    return "正在理解问题，并准备选择合适的训练工具。";
+    return "正在理解问题，并准备查看相关训练记录。";
   }
 
   if (status === "tool_calling") {
-    return "正在通过 Tool Calling 读取确定性 evidence。";
+    return "正在读取你的训练数据。";
   }
 
   if (status === "answering") {
-    return "正在通过 SSE 增量拼接回答内容。";
+    return "正在组织回答内容。";
   }
 
   if (status === "done") {
-    return "回答完成，本轮 sessionId 会继续复用到下一次提问。";
+    return "回答完成，可以继续追问。";
   }
 
-  return "助手响应失败，可以重试本次问题，或检查 assistant provider 配置。";
+  return "助手响应失败，可以重试本次问题。";
 }
 
 const topRowStyle: React.CSSProperties = {
@@ -87,7 +93,6 @@ function labelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPrope
 function sessionStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
   return {
     color: theme.colors.tx3,
-    fontFamily: theme.fonts.mono,
     fontSize: 10,
     maxWidth: 180,
     overflowWrap: "anywhere",

@@ -70,7 +70,7 @@ export function WorkoutCard(props: WorkoutCardProps) {
           type="button"
           variant="secondary"
         >
-          {props.isExpanded ? "收起" : "展开"}
+          {props.isExpanded ? "收起详情" : "查看详情"}
         </Button>
       </div>
 
@@ -132,9 +132,14 @@ export function WorkoutCard(props: WorkoutCardProps) {
                         style={groupHeaderButtonStyle}
                         type="button"
                       >
-                        <strong style={{ color: theme.colors.tx, fontSize: 14 }}>
-                          {group.exerciseName}
-                        </strong>
+                        <div style={groupTitleRowStyle}>
+                          <strong style={{ color: theme.colors.tx, fontSize: 14 }}>
+                            {group.exerciseName}
+                          </strong>
+                          <span style={groupToggleStyle(theme)}>
+                            {isGroupExpanded ? "收起组数" : "查看组数"}
+                          </span>
+                        </div>
                         <p style={summaryTextStyle(theme)}>
                           {summary.setCount} 组 · 总容量 {formatVolume(summary.totalVolumeKg)} kg
                         </p>
@@ -150,7 +155,7 @@ export function WorkoutCard(props: WorkoutCardProps) {
                                     第 {setItem.set_index} 组
                                   </strong>
                                   <p style={metaTextStyle(theme)}>
-                                    {setItem.reps} x {setItem.weight_kg} kg
+                                    {setItem.weight_kg} kg x {setItem.reps} 次
                                   </p>
                                 </div>
                                 {setItem.rpe !== null ? (
@@ -250,7 +255,7 @@ function formatWorkoutTime(workout: WorkoutDetailDto): string {
     return `${formatDateTime(workout.started_at)} - ${formatTime(workout.ended_at)}`;
   }
 
-  return `${formatDateTime(workout.performed_at)}，暂无具体开始/结束时间`;
+  return `${formatDateTime(workout.performed_at)}，暂未记录具体开始/结束时间`;
 }
 
 function formatDateTime(value: string): string {
@@ -313,7 +318,7 @@ function getEffortLabel(rpe: number): string {
   }
 
   if (rpe <= 6) {
-    return "简单";
+    return "轻松";
   }
 
   return "正常";
@@ -352,6 +357,13 @@ const groupHeaderButtonStyle: React.CSSProperties = {
   width: "100%",
 };
 
+const groupTitleRowStyle: React.CSSProperties = {
+  alignItems: "center",
+  display: "flex",
+  gap: 10,
+  justifyContent: "space-between",
+};
+
 const setListStyle: React.CSSProperties = {
   display: "grid",
   gap: 8,
@@ -385,10 +397,11 @@ function cardStyle(
   isExpanded: boolean,
 ): React.CSSProperties {
   return {
-    backgroundColor: theme.colors.surf2,
+    backgroundColor: isExpanded ? withAlpha(theme.colors.ac, theme.isDark ? 0.08 : 0.06) : theme.colors.surf2,
     border: `1px solid ${isExpanded ? theme.colors.ac : theme.colors.bdr}`,
     borderRadius: theme.radius.card,
     padding: 14,
+    transition: "background-color 150ms ease, border-color 150ms ease",
   };
 }
 
@@ -477,12 +490,23 @@ function groupCardStyle(
   isExpanded: boolean,
 ): React.CSSProperties {
   return {
-    backgroundColor: theme.colors.surf,
+    backgroundColor: isExpanded
+      ? withAlpha(theme.colors.ac, theme.isDark ? 0.1 : 0.07)
+      : theme.colors.surf,
     border: `1px solid ${isExpanded ? theme.colors.ac : theme.colors.bdr}`,
     borderRadius: theme.radius.control,
     display: "grid",
     gap: 10,
     padding: 12,
+  };
+}
+
+function groupToggleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+  return {
+    color: theme.colors.ac,
+    flex: "0 0 auto",
+    fontSize: 11,
+    fontWeight: 700,
   };
 }
 
@@ -523,4 +547,13 @@ function deleteButtonStyle(theme: ReturnType<typeof useTheme>["theme"]): React.C
     fontWeight: 700,
     padding: 0,
   };
+}
+
+function withAlpha(hex: string, alpha: number): string {
+  const normalized = hex.replace("#", "");
+  const red = Number.parseInt(normalized.slice(0, 2), 16);
+  const green = Number.parseInt(normalized.slice(2, 4), 16);
+  const blue = Number.parseInt(normalized.slice(4, 6), 16);
+
+  return `rgba(${red}, ${green}, ${blue}, ${alpha.toFixed(2)})`;
 }

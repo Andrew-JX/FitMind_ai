@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 
 import type {
   WorkoutDetailDto,
   WorkoutSummaryDto,
 } from "../../../../shared/src/training";
 
+import { ActionSheet } from "../../components/ActionSheet";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { StateNotice } from "../../components/StateNotice";
@@ -50,7 +50,7 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
     <Card>
       <div style={headerStyle}>
         <div>
-          <h2 style={titleStyle}>训练日志</h2>
+          <h2 style={titleStyle}>训练记录</h2>
           <p style={copyStyle(theme)}>共 {props.workouts.length} 条</p>
         </div>
         <Button
@@ -65,9 +65,9 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
 
       {props.listError ? (
         <StateNotice
-          description="请确认后端服务已启动，或稍后重试。"
+          description="请确认服务已启动，或稍后重试。"
           icon="dumbbell"
-          title="数据加载失败"
+          title="训练记录加载失败"
           tone="error"
         />
       ) : null}
@@ -92,63 +92,54 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
         </div>
       ) : null}
 
-      {pendingDeleteWorkoutId
-        ? createPortal(
-            <div
-              aria-modal="true"
+      <ActionSheet
+        closeOnBackdrop={props.deletingWorkoutId !== pendingDeleteWorkoutId}
+        description="删除后，这条训练记录下的所有动作组也会一起删除。"
+        footer={
+          <div style={confirmActionRowStyle}>
+            <Button
+              disabled={props.deletingWorkoutId === pendingDeleteWorkoutId}
+              onClick={() => setPendingDeleteWorkoutId(null)}
+              type="button"
+              variant="secondary"
+            >
+              取消
+            </Button>
+            <Button
+              disabled={props.deletingWorkoutId === pendingDeleteWorkoutId}
               onClick={() => {
-                if (props.deletingWorkoutId !== pendingDeleteWorkoutId) {
-                  setPendingDeleteWorkoutId(null);
+                if (pendingDeleteWorkoutId) {
+                  void confirmDeleteWorkout(pendingDeleteWorkoutId);
                 }
               }}
-              role="dialog"
-              style={confirmBackdropStyle}
+              style={dangerConfirmButtonStyle(theme)}
+              type="button"
+              variant="secondary"
             >
-              <div
-                onClick={(event) => event.stopPropagation()}
-                style={confirmBoxStyle(theme)}
-              >
-                <strong style={confirmTitleStyle(theme)}>
-                  确认删除这条训练记录？
-                </strong>
-                <p style={confirmCopyStyle(theme)}>
-                  该训练记录下的所有动作组也会一起删除。
-                </p>
-                <div style={confirmActionRowStyle}>
-                  <Button
-                    disabled={props.deletingWorkoutId === pendingDeleteWorkoutId}
-                    onClick={() => setPendingDeleteWorkoutId(null)}
-                    type="button"
-                    variant="secondary"
-                  >
-                    取消
-                  </Button>
-                  <Button
-                    disabled={props.deletingWorkoutId === pendingDeleteWorkoutId}
-                    onClick={() => void confirmDeleteWorkout(pendingDeleteWorkoutId)}
-                    style={dangerConfirmButtonStyle(theme)}
-                    type="button"
-                    variant="secondary"
-                  >
-                    {props.deletingWorkoutId === pendingDeleteWorkoutId
-                      ? "删除中..."
-                      : "删除"}
-                  </Button>
-                </div>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
+              {props.deletingWorkoutId === pendingDeleteWorkoutId
+                ? "删除中..."
+                : "删除"}
+            </Button>
+          </div>
+        }
+        onClose={() => setPendingDeleteWorkoutId(null)}
+        open={pendingDeleteWorkoutId !== null}
+        title="删除这条训练记录？"
+        tone="danger"
+      >
+        <p style={confirmCopyStyle(theme)}>
+          这个操作无法撤销。建议只在确认记录录错时删除。
+        </p>
+      </ActionSheet>
 
       {props.isLoadingList && !props.listError ? (
-        <p style={copyStyle(theme)}>正在加载训练日志...</p>
+        <p style={copyStyle(theme)}>正在加载训练记录...</p>
       ) : null}
 
       {!props.isLoadingList && !props.listError && props.workouts.length === 0 ? (
         <div style={{ marginTop: 14 }}>
           <StateNotice
-            description="先记录一次训练，系统会自动生成训练统计和 AI 可用上下文。"
+            description="先记录一次训练，这里会展示你的训练时间、动作和组数。"
             icon="dumbbell"
             title="暂无训练记录"
           />
@@ -224,10 +215,10 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
 
 function translateError(message: string): string {
   return message
-    .replaceAll("Workout list is unavailable right now.", "数据加载失败，请稍后重试。")
-    .replaceAll("Workout detail is unavailable right now.", "数据加载失败，请稍后重试。")
-    .replaceAll("Workout deletion is unavailable right now.", "请稍后重试。")
-    .replaceAll("You must be signed in to view workouts.", "请先登录后再查看训练日志。")
+    .replaceAll("Workout list is unavailable right now.", "训练记录加载失败，请稍后重试。")
+    .replaceAll("Workout detail is unavailable right now.", "训练详情加载失败，请稍后重试。")
+    .replaceAll("Workout deletion is unavailable right now.", "删除失败，请稍后重试。")
+    .replaceAll("You must be signed in to view workouts.", "请先登录后再查看训练记录。")
     .replaceAll(
       "You must be signed in to view workout details.",
       "请先登录后再查看训练详情。",
@@ -309,27 +300,6 @@ function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProper
   };
 }
 
-function confirmBoxStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return {
-    backgroundColor: theme.colors.surf,
-    border: `1px solid ${theme.colors.bdr2}`,
-    borderRadius: theme.radius.card,
-    boxShadow: theme.shadows.card,
-    display: "grid",
-    gap: 10,
-    maxWidth: 360,
-    padding: 14,
-    width: "min(360px, calc(100vw - 32px))",
-  };
-}
-
-function confirmTitleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return {
-    color: theme.colors.tx,
-    fontSize: 15,
-  };
-}
-
 function confirmCopyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
   return {
     color: theme.colors.tx2,
@@ -341,22 +311,8 @@ function confirmCopyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CS
 
 const confirmActionRowStyle: React.CSSProperties = {
   display: "grid",
-  gap: 8,
+  gap: 10,
   gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-};
-
-const confirmBackdropStyle: React.CSSProperties = {
-  alignItems: "center",
-  background: "rgba(12, 16, 24, 0.58)",
-  bottom: 0,
-  display: "flex",
-  justifyContent: "center",
-  left: 0,
-  padding: "16px",
-  position: "fixed",
-  right: 0,
-  top: 0,
-  zIndex: 2147483647,
 };
 
 function dangerConfirmButtonStyle(

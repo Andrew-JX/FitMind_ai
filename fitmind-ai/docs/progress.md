@@ -3520,3 +3520,27 @@ Notes:
 - Offline workout editing is still intentionally unsupported.
 - Push notifications, Capacitor, React Native, and Training Profile remain deferred.
 - Broader UI polish and exercise library improvements are deferred to a later UX batch.
+
+## Phase 4.5 Batch 7C - Mobile Product UX Polish
+
+Completed:
+- Added shared ActionSheet component for consistent mobile modal / bottom-sheet behavior.
+- Simplified the training top action area for mobile width.
+- Moved secondary training entry methods into a clearer “more record methods” flow.
+- Polished text and voice intake interactions.
+- Kept voice input as tap-to-start with visible finish and cancel controls.
+- Improved workout card expansion labels and selected / expanded visual states.
+- Rewrote assistant and analysis copy away from developer-facing Tool Calling / context terminology.
+- Improved exercise library empty states without adding full exercise detail/history features.
+
+Verification:
+- pnpm --filter @fitmind/client type-check passed
+- pnpm lint passed
+- pnpm test passed
+- pnpm --filter @fitmind/client exec vite build passed
+- Local browser smoke reached the FitMind AI login screen.
+
+Pending production validation:
+- Deploy Batch 7C to Vercel production.
+- Re-test installed PWA on iPhone.
+- Verify training create/edit, text intake, voice intake, time edit, delete confirmation, and AI assistant flows.

@@ -6,6 +6,7 @@ import type { WorkoutsPanelProps } from "./WorkoutsPanel";
 import type { TrainingSummary } from "./training-summary-api";
 import type { TrainingSessionInitialDraft } from "./training-session-draft";
 
+import { ActionSheet } from "../../components/ActionSheet";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { ExercisePicker } from "./ExercisePicker";
@@ -28,6 +29,7 @@ export interface TrainingViewProps {
 export function TrainingView(props: TrainingViewProps) {
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [isDictionaryOpen, setIsDictionaryOpen] = useState(false);
+  const [isIntakeSheetOpen, setIsIntakeSheetOpen] = useState(false);
   const [composerMode, setComposerMode] = useState<
     "create_active" | "create_from_intake" | "edit_existing"
   >("create_active");
@@ -50,26 +52,41 @@ export function TrainingView(props: TrainingViewProps) {
               setPendingInitialDraft(null);
               setIsComposerOpen(true);
             }}
-            style={{ flex: 1 }}
             type="button"
           >
             + 记录训练
           </Button>
-          <WorkoutIntakePanel
-            onDraftParsed={(draft) => {
-              setPendingInitialDraft(
-                mapWorkoutIntakeDraftToSessionInitialDraft(
-                  draft,
-                  props.exercisePickerProps.exercises,
-                ),
-              );
-              setComposerMode("create_from_intake");
-              setIsComposerOpen(true);
-            }}
-            token={props.workoutFormProps.token}
-          />
+          <Button
+            onClick={() => setIsIntakeSheetOpen(true)}
+            type="button"
+            variant="secondary"
+          >
+            更多记录方式
+          </Button>
         </div>
       ) : null}
+
+      <ActionSheet
+        description="可以手动输入训练内容，也可以用语音先转成文字再确认。"
+        onClose={() => setIsIntakeSheetOpen(false)}
+        open={isIntakeSheetOpen}
+        title="选择记录方式"
+      >
+        <WorkoutIntakePanel
+          onDraftParsed={(draft) => {
+            setPendingInitialDraft(
+              mapWorkoutIntakeDraftToSessionInitialDraft(
+                draft,
+                props.exercisePickerProps.exercises,
+              ),
+            );
+            setComposerMode("create_from_intake");
+            setIsComposerOpen(true);
+            setIsIntakeSheetOpen(false);
+          }}
+          token={props.workoutFormProps.token}
+        />
+      </ActionSheet>
 
       <WorkoutsPanel
         {...props.workoutsProps}
@@ -79,9 +96,9 @@ export function TrainingView(props: TrainingViewProps) {
       <Card>
         <div style={dictionaryHeaderStyle}>
           <div>
-            <h2 style={dictionaryTitleStyle}>动作词典</h2>
+            <h2 style={dictionaryTitleStyle}>动作库</h2>
             <p style={dictionaryCopyStyle}>
-              用于查询系统内置动作名称和肌群标签，不影响当前训练记录。
+              查看可添加到训练记录的动作，完整中文动作库会在下一批继续打磨。
             </p>
           </div>
           <Button
@@ -89,7 +106,7 @@ export function TrainingView(props: TrainingViewProps) {
             type="button"
             variant="secondary"
           >
-            {isDictionaryOpen ? "收起" : "展开"}
+            {isDictionaryOpen ? "收起动作库" : "查看动作库"}
           </Button>
         </div>
 
@@ -158,8 +175,9 @@ const viewStyle: React.CSSProperties = {
 
 const recordActionsStyle: React.CSSProperties = {
   alignItems: "stretch",
-  display: "flex",
+  display: "grid",
   gap: 10,
+  gridTemplateColumns: "minmax(0, 1fr)",
 };
 
 const dictionaryHeaderStyle: React.CSSProperties = {

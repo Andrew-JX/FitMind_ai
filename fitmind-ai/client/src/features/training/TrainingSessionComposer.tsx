@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import type { ExercisePickerProps } from "./ExercisePicker";
 import type { DictionaryExercise } from "./dictionary-api";
 
+import { ActionSheet } from "../../components/ActionSheet";
 import { Button } from "../../components/Button";
 import { Icon } from "../../components/Icon";
 import { StateNotice } from "../../components/StateNotice";
@@ -867,7 +868,7 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
       });
 
       if (alreadyExists) {
-        setDuplicateNotice("杩欎釜鍔ㄤ綔宸茬粡鍦ㄦ湰娆¤缁冧腑");
+        setDuplicateNotice("这个动作已经在本次训练中。");
         return currentValue;
       }
 
@@ -934,19 +935,27 @@ function TrainingTimeEditor(props: {
   const durationMin = getDurationMinutesFromLocalValues(startValue, endValue);
 
   return (
-    <div style={confirmBackdropStyle(theme)}>
-      <section style={timeEditorCardStyle(theme)}>
-        <div>
-          <strong style={confirmTitleStyle(theme)}>{"\u8bad\u7ec3\u65f6\u95f4"}</strong>
-          <p style={timeEditorSummaryStyle(theme)}>
-            {formatTrainingTimeSummary({
-              durationMin,
-              endedAt: parseDateTimeLocalValue(endValue),
-              performedAt: props.performedAt,
-              startedAt: parseDateTimeLocalValue(startValue),
-            })}
-          </p>
+    <ActionSheet
+      description={formatTrainingTimeSummary({
+        durationMin,
+        endedAt: parseDateTimeLocalValue(endValue),
+        performedAt: props.performedAt,
+        startedAt: parseDateTimeLocalValue(startValue),
+      })}
+      footer={
+        <div style={confirmActionRowStyle}>
+          <Button onClick={props.onClose} type="button" variant="secondary">
+            {"\u53d6\u6d88"}
+          </Button>
+          <Button onClick={handleSave} type="button">
+            {"\u4fdd\u5b58\u65f6\u95f4"}
+          </Button>
         </div>
+      }
+      onClose={props.onClose}
+      open
+      title="训练时间"
+    >
 
         <label style={timeEditorLabelStyle(theme)}>
           {"\u5f00\u59cb\u65f6\u95f4"}
@@ -984,16 +993,7 @@ function TrainingTimeEditor(props: {
           <p style={timeEditorErrorStyle(theme)}>{errorMessage}</p>
         ) : null}
 
-        <div style={confirmActionRowStyle}>
-          <Button onClick={props.onClose} type="button" variant="secondary">
-            {"\u53d6\u6d88"}
-          </Button>
-          <Button onClick={handleSave} type="button">
-            {"\u4fdd\u5b58\u65f6\u95f4"}
-          </Button>
-        </div>
-      </section>
-    </div>
+    </ActionSheet>
   );
 
   function handleSave(): void {
@@ -1305,19 +1305,6 @@ function noteTextareaStyle(theme: ReturnType<typeof useTheme>["theme"]): React.C
     minHeight: 76,
     padding: "10px 12px",
     resize: "vertical",
-  };
-}
-
-function timeEditorCardStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return {
-    backgroundColor: theme.colors.surf,
-    border: `1px solid ${theme.colors.bdr2}`,
-    borderRadius: theme.radius.card,
-    boxShadow: theme.shadows.card,
-    display: "grid",
-    gap: 12,
-    padding: 16,
-    width: "100%",
   };
 }
 
