@@ -9,6 +9,13 @@ import {
   type DictionaryExercise,
   type DictionaryMuscleGroup,
 } from "./dictionary-api";
+import {
+  getEquipmentLabel,
+  getExerciseDisplayName,
+  getMovementPatternLabel,
+  getMuscleCodeLabel,
+  getMuscleGroupDisplayName,
+} from "./exercise-display";
 
 export interface ExercisePickerProps {
   exercises: DictionaryExercise[];
@@ -50,7 +57,7 @@ export function ExercisePicker(props: ExercisePickerProps) {
           <Input
             disabled={isLoadingExercises}
             onChange={(event) => setKeyword(event.target.value)}
-            placeholder="输入动作名称，例如卧推 / Squat"
+            placeholder="输入动作名称，例如卧推或深蹲"
             type="text"
             value={keyword}
           />
@@ -67,7 +74,7 @@ export function ExercisePicker(props: ExercisePickerProps) {
             <option value="">全部肌群</option>
             {muscleGroups.map((muscleGroup) => (
               <option key={muscleGroup.id} value={muscleGroup.code}>
-                {muscleGroup.name_zh?.trim() || muscleGroup.name_en}
+                {getMuscleGroupDisplayName(muscleGroup)}
               </option>
             ))}
           </select>
@@ -145,26 +152,22 @@ function ExerciseResultContent(props: {
   exercise: DictionaryExercise;
   primaryMuscles: string[];
 }) {
+  const movementLabel = getMovementPatternLabel(props.exercise.movement_pattern);
+  const equipmentLabel = getEquipmentLabel(props.exercise.equipment);
+
   return (
     <>
       <div style={titleRowStyle}>
         <strong style={{ fontSize: 13 }}>
-          {props.exercise.name_zh?.trim() || props.exercise.name_en}
+          {getExerciseDisplayName(props.exercise)}
         </strong>
-        {props.exercise.name_zh?.trim() ? (
-          <Pill tone="neutral">{props.exercise.name_en}</Pill>
-        ) : null}
       </div>
       <div style={pillRowStyle}>
-        {props.exercise.movement_pattern ? (
-          <Pill tone="analysis">{props.exercise.movement_pattern}</Pill>
-        ) : null}
-        {props.exercise.equipment ? (
-          <Pill tone="neutral">{props.exercise.equipment}</Pill>
-        ) : null}
+        {movementLabel ? <Pill tone="analysis">{movementLabel}</Pill> : null}
+        {equipmentLabel ? <Pill tone="neutral">{equipmentLabel}</Pill> : null}
         {props.primaryMuscles.map((muscleCode) => (
           <Pill key={muscleCode} tone="accent">
-            {muscleCode}
+            {getMuscleCodeLabel(muscleCode)}
           </Pill>
         ))}
       </div>

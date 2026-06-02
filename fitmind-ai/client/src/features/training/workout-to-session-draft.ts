@@ -6,6 +6,10 @@ import type {
 } from "../../../../shared/src/training";
 import type { DictionaryExercise } from "./dictionary-api";
 import {
+  getExerciseCategoryLabel as getDisplayExerciseCategoryLabel,
+  getExerciseDisplayName,
+} from "./exercise-display";
+import {
   getExerciseLoadType,
   isDraftSetValid,
   mapEffortToRpe,
@@ -43,7 +47,7 @@ export function mapWorkoutToSessionInitialDraft(
 
       return {
         candidateExercises: [],
-        categoryLabel: exercise ? getExerciseCategoryLabel(exercise) : "\u672a\u77e5",
+        categoryLabel: exercise ? getDisplayExerciseCategoryLabel(exercise) : "\u672a\u77e5",
         exercise,
         exerciseId: exercise?.id ?? exerciseId,
         id: `edit-exercise-${exerciseId}`,
@@ -51,7 +55,7 @@ export function mapWorkoutToSessionInitialDraft(
         isExpanded: false,
         loadType: exercise ? getExerciseLoadType(exercise) : "weighted",
         matchStatus: exercise ? "matched" : "unresolved",
-        name: exercise?.name_en ?? "\u672a\u77e5\u52a8\u4f5c",
+        name: exercise ? getExerciseDisplayName(exercise) : "\u672a\u77e5\u52a8\u4f5c",
         sets: [...sets]
           .sort((left, right) => left.set_index - right.set_index)
           .map((set) => mapWorkoutSetToDraftSet(set)),
@@ -211,24 +215,4 @@ function mapRpeToEffort(rpe: number | null): EffortLevel {
   }
 
   return "normal";
-}
-
-function getExerciseCategoryLabel(exercise: DictionaryExercise): string {
-  const primaryCodes = exercise.muscles
-    .filter((muscle) => muscle.is_primary)
-    .map((muscle) => muscle.code.toLowerCase());
-
-  if (primaryCodes.some((code) => code.includes("back") || code.includes("lat"))) {
-    return "\u80cc";
-  }
-
-  if (primaryCodes.some((code) => code.includes("chest") || code === "pecs")) {
-    return "\u80f8";
-  }
-
-  if (primaryCodes.some((code) => code.includes("quad") || code.includes("leg"))) {
-    return "\u817f";
-  }
-
-  return "\u5176\u4ed6";
 }

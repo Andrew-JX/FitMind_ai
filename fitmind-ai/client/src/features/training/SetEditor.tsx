@@ -6,6 +6,11 @@ import { IconButton } from "../../components/IconButton";
 import { Input } from "../../components/Input";
 import { Pill } from "../../components/Pill";
 import { useTheme } from "../../theme/ThemeContext";
+import {
+  getExerciseDisplayName,
+  getMovementPatternLabel,
+  getMuscleCodeLabel,
+} from "./exercise-display";
 
 export interface SetEditorProps {
   errors: WorkoutSetDraftErrors | undefined;
@@ -51,7 +56,7 @@ export function SetEditor(props: SetEditorProps) {
         搜索动作
         <Input
           onChange={(event) => props.onFieldChange("exerciseQuery", event.target.value)}
-          placeholder="搜索动作，例如 Bench Press / Squat"
+          placeholder="搜索动作，例如卧推或深蹲"
           type="text"
           value={props.setDraft.exerciseQuery}
         />
@@ -82,14 +87,17 @@ export function SetEditor(props: SetEditorProps) {
                   type="button"
                 >
                   <div style={resultTitleRowStyle}>
-                    <strong style={{ fontSize: 13 }}>{exercise.name_en}</strong>
-                    {exercise.name_zh?.trim() ? <Badge tone="info">{exercise.name_zh}</Badge> : null}
+                    <strong style={{ fontSize: 13 }}>{getExerciseDisplayName(exercise)}</strong>
                   </div>
                   <div style={resultMetaRowStyle}>
-                    {exercise.movement_pattern ? <Pill tone="neutral">{exercise.movement_pattern}</Pill> : null}
+                    {getMovementPatternLabel(exercise.movement_pattern) ? (
+                      <Pill tone="neutral">
+                        {getMovementPatternLabel(exercise.movement_pattern)}
+                      </Pill>
+                    ) : null}
                     {muscleTags.map((muscleTag) => (
                       <Pill key={muscleTag} tone="analysis">
-                        {muscleTag}
+                        {getMuscleCodeLabel(muscleTag)}
                       </Pill>
                     ))}
                   </div>
@@ -112,7 +120,7 @@ export function SetEditor(props: SetEditorProps) {
           />
         </label>
         <label style={labelStyle(theme)}>
-          重量 kg
+          重量（公斤）
           <Input
             min="0"
             onChange={(event) => props.onFieldChange("weightKg", event.target.value)}
@@ -123,7 +131,7 @@ export function SetEditor(props: SetEditorProps) {
           />
         </label>
         <label style={labelStyle(theme)}>
-          RPE
+          主观用力
           <Input
             max="10"
             min="1"

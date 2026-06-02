@@ -94,7 +94,7 @@ export function MuscleLoadPanel(props: MuscleLoadPanelProps) {
         <div>
           <div style={titleRowStyle}>
             <h2 style={titleStyle}>肌群负荷分析</h2>
-            <Badge tone="analysis">Muscle Load</Badge>
+            <Badge tone="analysis">肌群负荷</Badge>
           </div>
           <p style={copyStyle(theme)}>
             {muscleLoad
@@ -164,13 +164,13 @@ export function MuscleLoadPanel(props: MuscleLoadPanelProps) {
             <StatCell
               label="原始容量"
               tone="analysis"
-              unit="kg"
+              unit="公斤"
               value={formatVolume(muscleLoad.totals.total_raw_volume)}
             />
             <StatCell
               label="加权容量"
               tone="warning"
-              unit="kg"
+              unit="公斤"
               value={formatVolume(muscleLoad.totals.total_weighted_volume)}
             />
           </div>
@@ -194,8 +194,7 @@ export function MuscleLoadPanel(props: MuscleLoadPanelProps) {
               <div>
                 <h3 style={subheadingStyle}>肌群负荷排行</h3>
                 <p style={sectionCopyStyle(theme)}>
-                  weighted volume
-                  越高，表示当前记录中分配到该肌群的训练容量越高。
+                  加权容量越高，表示当前记录中分配到该肌群的训练容量越高。
                 </p>
               </div>
               <Pill tone="analysis">
@@ -233,27 +232,27 @@ export function MuscleLoadPanel(props: MuscleLoadPanelProps) {
           <section style={sectionCardStyle(theme)}>
             <div style={sectionHeaderStyle}>
               <h3 style={subheadingStyle}>证据摘要</h3>
-              <Pill tone="info">evidence</Pill>
+              <Pill tone="info">训练记录</Pill>
             </div>
             <div style={evidenceGridStyle}>
               <EvidenceCell
-                label="关联 workout"
+                label="关联训练"
                 value={`${muscleLoad.evidence.workout_ids.length} 条`}
               />
               <EvidenceCell
-                label="关联 set"
+                label="关联组数"
                 value={`${muscleLoad.evidence.set_ids.length} 条`}
               />
               <EvidenceCell
                 label="计算规则"
                 value={`${muscleLoad.evidence.calculation_rules.length} 条`}
               />
-              <EvidenceCell label="口径" value="weighted volume" />
+              <EvidenceCell label="口径" value="加权容量" />
             </div>
 
             <details style={detailsStyle}>
               <summary style={summaryStyle(theme)}>
-                查看 calculation_rules
+                查看计算规则
               </summary>
               <ul style={rulesListStyle(theme)}>
                 {muscleLoad.evidence.calculation_rules.map((rule) => (
@@ -318,7 +317,7 @@ function MuscleLoadGroupRow(props: MuscleLoadGroupRowProps) {
         </div>
         <div style={groupMetricStyle}>
           <strong>{formatRatio(group.contribution_ratio)}</strong>
-          <span>{formatVolume(group.weighted_volume)} kg</span>
+          <span>{formatVolume(group.weighted_volume)} 公斤</span>
         </div>
       </div>
 
@@ -331,7 +330,7 @@ function MuscleLoadGroupRow(props: MuscleLoadGroupRowProps) {
           {group.top_exercises.slice(0, 3).map((exercise) => (
             <span key={exercise.exercise_id} style={exerciseChipStyle(theme)}>
               {exercise.exercise_name} ·{" "}
-              {formatVolume(exercise.weighted_volume)} kg
+              {formatVolume(exercise.weighted_volume)} 公斤
             </span>
           ))}
         </div>

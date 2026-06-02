@@ -88,7 +88,7 @@ export function RecommendationContextPanel(props: RecommendationContextPanelProp
         <div>
           <div style={titleRowStyle}>
             <h2 style={titleStyle}>训练建议依据</h2>
-            <Badge tone="info">数据来源</Badge>
+            <Badge tone="info">训练记录</Badge>
           </div>
           <p style={copyStyle(theme)}>
             {context
@@ -96,7 +96,7 @@ export function RecommendationContextPanel(props: RecommendationContextPanelProp
               : `范围：${formatRangeLabel(range.start_date, range.end_date)}`}
           </p>
           <p style={subtleStyle(theme)}>
-            这里展示近期训练记录的结构化摘要，AI 助手回答时会参考这些数据。
+            这里展示近期训练记录的结构化摘要，智能助手回答时会参考这些数据。
           </p>
         </div>
 
@@ -162,7 +162,7 @@ export function RecommendationContextPanel(props: RecommendationContextPanelProp
                     <li key={exercise.exercise_id} style={listItemStyle(theme)}>
                       <div style={itemHeaderStyle}>
                         <strong>{exercise.exercise_name}</strong>
-                        <Pill tone="accent">{exercise.total_volume.toLocaleString()} kg</Pill>
+                        <Pill tone="accent">{exercise.total_volume.toLocaleString()} 公斤</Pill>
                       </div>
                       <div style={itemMetaStyle(theme)}>
                         {exercise.workout_count.toLocaleString()} 次训练 ·{" "}
@@ -170,8 +170,8 @@ export function RecommendationContextPanel(props: RecommendationContextPanelProp
                         {exercise.total_reps.toLocaleString()} 次
                       </div>
                       <div style={itemMetaStyle(theme)}>
-                        最高 {formatMetric(exercise.max_weight_kg, "kg")} · 估算 1RM{" "}
-                        {formatMetric(exercise.estimated_1rm_kg, "kg")}
+                        最高 {formatMetric(exercise.max_weight_kg, "公斤")} · 估算最大重量{" "}
+                        {formatMetric(exercise.estimated_1rm_kg, "公斤")}
                       </div>
                     </li>
                   ))}
@@ -192,7 +192,7 @@ export function RecommendationContextPanel(props: RecommendationContextPanelProp
                     <li key={workout.workout_id} style={listItemStyle(theme)}>
                       <div style={itemHeaderStyle}>
                         <strong>{formatDisplayDateTime(workout.performed_at)}</strong>
-                        <Pill tone="info">{workout.total_volume.toLocaleString()} kg</Pill>
+                        <Pill tone="info">{workout.total_volume.toLocaleString()} 公斤</Pill>
                       </div>
                       <div style={itemMetaStyle(theme)}>
                         {workout.set_count.toLocaleString()} 组

@@ -4,6 +4,10 @@ import type { DraftExercise } from "./training-session-draft";
 
 import { Pill } from "../../components/Pill";
 import { useTheme } from "../../theme/ThemeContext";
+import {
+  formatWeight,
+  getExerciseDisplayName,
+} from "./exercise-display";
 import { getExerciseSummary } from "./training-session-draft";
 
 export interface TrainingSessionExerciseActionsProps {
@@ -178,9 +182,9 @@ export function TrainingSessionExerciseActions(props: TrainingSessionExerciseAct
             <header style={detailHeaderStyle}>
               <div>
                 <h3 style={detailTitleStyle(theme)}>{props.draftExercise.name}</h3>
-                {props.draftExercise.exercise?.name_zh?.trim() ? (
+                {props.draftExercise.exercise ? (
                   <p style={detailSubtitleStyle(theme)}>
-                    {props.draftExercise.exercise.name_zh}
+                    {getExerciseDisplayName(props.draftExercise.exercise)}
                   </p>
                 ) : null}
               </div>
@@ -206,7 +210,7 @@ export function TrainingSessionExerciseActions(props: TrainingSessionExerciseAct
               <div style={detailRowStyle(theme)}>
                 <span>本次训练</span>
                 <strong>
-                  {summary.completedSets} 组 · 总容量 {formatVolume(summary.totalVolumeKg)} kg
+                  {summary.completedSets} 组 · 总容量 {formatWeight(formatVolume(summary.totalVolumeKg))}
                 </strong>
               </div>
             </div>

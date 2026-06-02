@@ -36,7 +36,7 @@ export function AnalysisView(props: AnalysisViewProps) {
           <Badge tone="info">数据分析</Badge>
         </div>
         <p style={subtleStyle(theme)}>
-          这里展示的是训练数据分析结果，AI 助手回答时也会参考这些记录。
+          这里展示的是训练数据分析结果，智能助手回答时也会参考这些记录。
         </p>
       </Card>
 

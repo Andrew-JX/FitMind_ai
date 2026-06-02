@@ -113,7 +113,7 @@ export async function getTrainingSummary(
       `
         SELECT
           s.exercise_id,
-          e.name_en AS exercise_name,
+          COALESCE(NULLIF(e.name_zh, ''), e.name_en) AS exercise_name,
           COUNT(*)::int AS set_count,
           COALESCE(SUM(COALESCE(s.reps, 0)), 0)::int AS total_reps,
           COALESCE(
@@ -126,8 +126,8 @@ export async function getTrainingSummary(
         WHERE w.user_id = $1
           AND w.performed_at >= $2::date
           AND w.performed_at < ($3::date + INTERVAL '1 day')
-        GROUP BY s.exercise_id, e.name_en
-        ORDER BY total_volume DESC, set_count DESC, e.name_en ASC
+        GROUP BY s.exercise_id, e.name_en, e.name_zh
+        ORDER BY total_volume DESC, set_count DESC, exercise_name ASC
       `,
       [filters.userId, filters.startDate, filters.endDate],
     );

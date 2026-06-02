@@ -30,7 +30,7 @@ export function WorkoutForm(props: WorkoutFormProps) {
       <div style={headerStyle}>
         <div>
           <h2 style={titleStyle}>记录训练</h2>
-          <p style={copyStyle(theme)}>添加本次训练的动作、重量、次数与 RPE。</p>
+          <p style={copyStyle(theme)}>添加本次训练的动作、重量、次数与主观用力。</p>
         </div>
       </div>
 
@@ -165,7 +165,7 @@ function translateMessage(message: string): string {
     .replaceAll("Set ", "第 ")
     .replaceAll(" reps", " 组次数")
     .replaceAll(" weight", " 组重量")
-    .replaceAll(" RPE", " 组 RPE")
+    .replaceAll(" RPE", " 组主观用力")
     .replaceAll(" needs an exercise selection.", " 组需要先选择动作。");
 }
 

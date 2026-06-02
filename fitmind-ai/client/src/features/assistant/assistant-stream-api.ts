@@ -187,7 +187,7 @@ function parseJson<TParsed>(rawText: string): TParsed | null {
 
 function getFallbackMessage(status: number): string | null {
   if (status === 401) {
-    return "Your session is not authorized. Please sign in again.";
+    return "登录状态已失效，请重新登录。";
   }
 
   if (status === 403) {

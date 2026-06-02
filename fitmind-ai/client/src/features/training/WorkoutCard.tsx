@@ -141,7 +141,7 @@ export function WorkoutCard(props: WorkoutCardProps) {
                           </span>
                         </div>
                         <p style={summaryTextStyle(theme)}>
-                          {summary.setCount} 组 · 总容量 {formatVolume(summary.totalVolumeKg)} kg
+                          {summary.setCount} 组 · 总容量 {formatVolume(summary.totalVolumeKg)} 公斤
                         </p>
                       </button>
 
@@ -155,7 +155,7 @@ export function WorkoutCard(props: WorkoutCardProps) {
                                     第 {setItem.set_index} 组
                                   </strong>
                                   <p style={metaTextStyle(theme)}>
-                                    {setItem.weight_kg} kg x {setItem.reps} 次
+                                    {setItem.weight_kg} 公斤 × {setItem.reps} 次
                                   </p>
                                 </div>
                                 {setItem.rpe !== null ? (

@@ -82,7 +82,7 @@ export function useAssistantChat(token: string | null): UseAssistantChatResult {
   async function sendMessage(payload: AssistantChatRequestPayload): Promise<void> {
     if (!token) {
       setStatus("error");
-      setErrorMessage("You must be signed in to use the assistant.");
+      setErrorMessage("请先登录后再使用训练助手。");
       return;
     }
 
@@ -90,7 +90,7 @@ export function useAssistantChat(token: string | null): UseAssistantChatResult {
 
     if (trimmedMessage.length === 0) {
       setStatus("error");
-      setErrorMessage("Assistant message is required.");
+      setErrorMessage("请输入想追问的内容。");
       return;
     }
 

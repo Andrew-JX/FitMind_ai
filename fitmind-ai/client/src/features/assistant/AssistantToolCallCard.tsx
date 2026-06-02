@@ -32,7 +32,7 @@ export function AssistantToolCallCard(props: AssistantToolCallCardProps) {
           状态：{formatToolStatus(props.toolCall.status)}
         </span>
         {props.toolCall.durationMs !== undefined ? (
-          <span style={durationStyle(theme)}>{props.toolCall.durationMs}ms</span>
+          <span style={durationStyle(theme)}>{props.toolCall.durationMs} 毫秒</span>
         ) : null}
       </div>
       <p style={copyStyle(theme)}>{getToolCopy(props.toolCall)}</p>

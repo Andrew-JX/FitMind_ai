@@ -64,7 +64,7 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
 
       {mode === "exercise_progress" && !props.selectedExerciseId ? (
         <StateNotice
-          description="如果你想继续追问某个动作的 1RM、重量变化或最近进展，请先去“分析”页选中对应动作。"
+          description="如果你想继续追问某个动作的估算最大重量、重量变化或最近进展，请先去“分析”页选中对应动作。"
           icon="target"
           title="当前还没有选中动作"
           tone="warning"

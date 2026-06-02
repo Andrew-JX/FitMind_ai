@@ -11,6 +11,7 @@ import {
   searchExercises,
   type DictionaryExercise,
 } from "./dictionary-api";
+import { getExerciseDisplayName } from "./exercise-display";
 import { createWorkout } from "./workout-api";
 
 export interface WorkoutSetDraft {
@@ -182,8 +183,8 @@ export function useWorkoutForm(token: string | null): UseWorkoutFormResult {
         return {
           ...draft,
           exerciseId: exercise.id,
-          exerciseName: exercise.name_en,
-          exerciseQuery: exercise.name_en,
+          exerciseName: getExerciseDisplayName(exercise),
+          exerciseQuery: getExerciseDisplayName(exercise),
           exerciseResults: [],
         };
       });
@@ -353,7 +354,7 @@ function buildCreateWorkoutRequest(input: {
         },
       }),
       rpe: draft.rpe.trim()
-        ? parseNumberField(draft.rpe, `Set ${index + 1} RPE`, {
+        ? parseNumberField(draft.rpe, `第 ${index + 1} 组主观用力`, {
             max: 10,
             min: 1,
             onError: (message) => {
@@ -364,7 +365,7 @@ function buildCreateWorkoutRequest(input: {
             },
           })
         : undefined,
-      weight_kg: parseNumberField(draft.weightKg, `Set ${index + 1} weight`, {
+      weight_kg: parseNumberField(draft.weightKg, `第 ${index + 1} 组重量`, {
         min: 0,
         onError: (message) => {
           errors.setDrafts[index] = {

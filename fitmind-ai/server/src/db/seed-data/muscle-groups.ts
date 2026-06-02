@@ -44,7 +44,7 @@ export const muscleGroupSeeds = [
   {
     code: "quads",
     nameEn: "Quads",
-    nameZh: "股四头",
+    nameZh: "股四头肌",
     parentCode: "legs",
     recoveryHours: 72,
   },
@@ -58,7 +58,7 @@ export const muscleGroupSeeds = [
   {
     code: "glutes",
     nameEn: "Glutes",
-    nameZh: "臀",
+    nameZh: "臀部",
     parentCode: "legs",
     recoveryHours: 72,
   },
@@ -100,14 +100,14 @@ export const muscleGroupSeeds = [
   {
     code: "biceps",
     nameEn: "Biceps",
-    nameZh: "肱二头",
+    nameZh: "肱二头肌",
     parentCode: null,
     recoveryHours: 24,
   },
   {
     code: "triceps",
     nameEn: "Triceps",
-    nameZh: "肱三头",
+    nameZh: "肱三头肌",
     parentCode: null,
     recoveryHours: 24,
   },

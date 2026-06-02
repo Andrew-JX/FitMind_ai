@@ -12,6 +12,7 @@ import { StateNotice } from "../../components/StateNotice";
 import { HttpClientError } from "../../services/http-client";
 import { useTheme } from "../../theme/ThemeContext";
 import { searchExercises } from "./dictionary-api";
+import { getExerciseDisplayName } from "./exercise-display";
 import { WorkoutCard } from "./WorkoutCard";
 
 export interface WorkoutsPanelProps {
@@ -246,7 +247,7 @@ function useExerciseNames(): Map<string, string> {
         setExerciseNames(
           new Map(
             exercises.map((exercise) => {
-              return [exercise.id, exercise.name_zh?.trim() || exercise.name_en] as const;
+              return [exercise.id, getExerciseDisplayName(exercise)] as const;
             }),
           ),
         );

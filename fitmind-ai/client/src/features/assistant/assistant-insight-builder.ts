@@ -41,7 +41,7 @@ export function buildAssistantInsightSnapshot(
     },
     cards,
     limitations: [
-      "这些结论主要基于最近 30 天已记录的 workout 和 set，不是模型凭空猜测。",
+      "这些结论主要基于最近 30 天已记录的训练和组数，不是模型凭空猜测。",
       "当前肌群映射仍有边界，所以部分判断会结合动作名称、训练频率和训练量来解释。",
       "恢复提醒只提供训练记录层面的参考，不能替代对疼痛、疲劳或健康风险的专业判断。",
     ],
@@ -95,7 +95,7 @@ function buildNextTrainingFocusCard(
     title: "今日建议",
     summary: `根据你最近 30 天的训练分布，下一次可以优先补${suggestion}。${topExercise ? `当前训练量最集中的动作是 ${topExercise.exercise_name}。` : ""}`,
     tone: "accent",
-    evidenceSummary: `最近 30 天共记录 ${input.summary.totals.workout_count} 次训练，并参考了 ${input.recommendationContext.evidence.workout_ids.length} 条 workout 证据。`,
+    evidenceSummary: `最近 30 天共记录 ${input.summary.totals.workout_count} 次训练，并参考了 ${input.recommendationContext.evidence.workout_ids.length} 条训练记录。`,
     suggestedPrompt: {
       mode: "next_training_focus",
       message: "我今天练什么？",
@@ -157,7 +157,7 @@ function buildTrainingImbalanceCard(
     title: "训练偏科提醒",
     summary: `${imbalanceSummary} 这个判断主要来自最近 30 天 top exercises 的训练量占比。`,
     tone: firstRatio >= 0.55 ? "warning" : "info",
-    evidenceSummary: `Top 3 动作共 ${topVolume.toLocaleString()} kg，其中第一位约占 ${(firstRatio * 100).toFixed(0)}%。`,
+    evidenceSummary: `前三个动作共 ${topVolume.toLocaleString()} 公斤，其中第一位约占 ${(firstRatio * 100).toFixed(0)}%。`,
     suggestedPrompt: {
       mode: "training_imbalance",
       message: "我是不是偏科？",
@@ -246,7 +246,7 @@ function buildExerciseProgressCard(
       summary:
         "当前还没有选中动作，所以这里先不直接判断某个动作的进展。去“分析”页选中一个动作后，我会自动把它的训练表现带回来。",
       tone: "analysis",
-      hint: "选中动作后，这里会显示该动作最近 30 天的训练次数、最高重量和估算 1RM。",
+      hint: "选中动作后，这里会显示该动作最近 30 天的训练次数、最高重量和估算最大重量。",
       suggestedPrompt: {
         mode: "exercise_progress",
         message: "当前动作进展",
@@ -273,7 +273,7 @@ function buildExerciseProgressCard(
       title: "重点动作进展",
       summary: `${selectedExerciseName || "当前动作"}已经有首条记录了，但目前还更适合当作起点，而不是稳定趋势。再记录 1-2 次后，进展判断会更有说服力。`,
       tone: "analysis",
-      evidenceSummary: `当前仅纳入 ${input.exerciseProgress.evidence.workout_ids.length} 条 workout、${input.exerciseProgress.evidence.set_ids.length} 条 set。`,
+      evidenceSummary: `当前仅纳入 ${input.exerciseProgress.evidence.workout_ids.length} 条训练、${input.exerciseProgress.evidence.set_ids.length} 组记录。`,
       suggestedPrompt: {
         mode: "exercise_progress",
         message: `分析一下${selectedExerciseName || "当前动作"}的进展`,
@@ -284,9 +284,9 @@ function buildExerciseProgressCard(
   return {
     type: "exercise_progress",
     title: "重点动作进展",
-    summary: `${selectedExerciseName || "当前动作"}最近共记录 ${input.exerciseProgress.totals.workout_count} 次训练，当前估算 1RM 约 ${formatKg(input.exerciseProgress.totals.estimated_1rm_kg)}，观察到的最高训练重量约 ${formatKg(input.exerciseProgress.totals.max_weight_kg)}。`,
+    summary: `${selectedExerciseName || "当前动作"}最近共记录 ${input.exerciseProgress.totals.workout_count} 次训练，当前估算最大重量约 ${formatKg(input.exerciseProgress.totals.estimated_1rm_kg)}，观察到的最高训练重量约 ${formatKg(input.exerciseProgress.totals.max_weight_kg)}。`,
     tone: "analysis",
-    evidenceSummary: `这个判断来自 ${input.exerciseProgress.evidence.workout_ids.length} 条 workout 和 ${input.exerciseProgress.evidence.set_ids.length} 条 set。`,
+    evidenceSummary: `这个判断来自 ${input.exerciseProgress.evidence.workout_ids.length} 条训练和 ${input.exerciseProgress.evidence.set_ids.length} 组记录。`,
     suggestedPrompt: {
       mode: "exercise_progress",
       message: `分析一下${selectedExerciseName || "当前动作"}的进展`,
@@ -302,11 +302,11 @@ function buildEvidenceExplainCard(
       type: "evidence_explain",
       title: "判断依据",
       summary:
-        "当前还没有训练证据可解释。等你开始记录 workout 和 set 后，我会把引用到的训练记录、动作分布和计算规则整理成可追溯的判断依据。",
+        "当前还没有训练证据可解释。等你开始记录训练和组数后，我会把引用到的训练记录、动作分布和计算规则整理成可追溯的判断依据。",
       tone: "info",
       suggestedPrompt: {
         mode: "evidence_explain",
-        message: "AI 根据什么判断？",
+        message: "智能助手根据什么判断？",
       },
     };
   }
@@ -315,12 +315,12 @@ function buildEvidenceExplainCard(
     type: "evidence_explain",
     title: "判断依据",
     summary:
-      "这些结论来自已记录的 workout、set 和 calculation rules，不是模型凭空猜测。当前肌群映射仍有边界，所以我会优先基于动作名称、训练量和最近训练频率来解释你的训练情况。",
+      "这些结论来自已记录的训练、组数和计算规则，不是模型凭空猜测。当前肌群映射仍有边界，所以我会优先基于动作名称、训练量和最近训练频率来解释你的训练情况。",
     tone: "info",
-    evidenceSummary: `本页共参考 ${input.recommendationContext.evidence.workout_ids.length} 条 workout、${input.recommendationContext.evidence.set_ids.length} 条 set，以及 ${input.recommendationContext.evidence.calculation_rules.length} 条 calculation rules。`,
+    evidenceSummary: `本页共参考 ${input.recommendationContext.evidence.workout_ids.length} 条训练、${input.recommendationContext.evidence.set_ids.length} 组记录，以及 ${input.recommendationContext.evidence.calculation_rules.length} 条计算规则。`,
     suggestedPrompt: {
       mode: "evidence_explain",
-      message: "AI 根据什么判断？",
+      message: "智能助手根据什么判断？",
     },
   };
 }
@@ -427,7 +427,7 @@ function formatKg(value: number | null): string {
     return "暂无结果";
   }
 
-  return `${value.toLocaleString()} kg`;
+  return `${value.toLocaleString()} 公斤`;
 }
 
 function getDaysSince(timestamp: string): number {

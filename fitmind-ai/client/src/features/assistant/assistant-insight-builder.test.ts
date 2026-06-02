@@ -270,6 +270,6 @@ describe("buildAssistantInsightSnapshot", () => {
 
     expect(snapshot.cards[0]?.summary).toContain("下一次可以优先补背部或腿部");
     expect(snapshot.cards[1]?.summary).toContain("当前分布有点偏向胸推动作");
-    expect(snapshot.cards[3]?.summary).toContain("当前估算 1RM");
+    expect(snapshot.cards[3]?.summary).toContain("当前估算最大重量");
   });
 });

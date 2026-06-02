@@ -19,7 +19,7 @@ export function ExerciseInsightCard(props: ExerciseInsightCardProps) {
         <div>
           <strong style={titleStyle(theme)}>{props.exercise.exercise_name}</strong>
           <p style={metaStyle(theme)}>
-            总容量 {props.exercise.total_volume.toLocaleString()} kg
+            总容量 {props.exercise.total_volume.toLocaleString()} 公斤
           </p>
         </div>
         {props.isSelected ? <Pill tone="accent">当前查看</Pill> : null}

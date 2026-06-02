@@ -63,7 +63,7 @@ export function TrainingSessionSetRow(props: TrainingSessionSetRowProps) {
 
       <div style={metricGridStyle}>
         <label style={labelStyle(theme)}>
-          重量 kg
+          重量（公斤）
           <Input
             min="0"
             onChange={(event) => props.onUpdate("weightKg", event.target.value)}

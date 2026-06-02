@@ -9,8 +9,8 @@ export function AssistantIntroCard() {
     <Card>
       <div style={headerStyle}>
         <div>
-          <p style={eyebrowStyle(theme)}>AI Assistant</p>
-          <h2 style={titleStyle}>AI 训练助手</h2>
+          <p style={eyebrowStyle(theme)}>智能助手</p>
+          <h2 style={titleStyle}>训练助手</h2>
         </div>
       </div>
       <p style={subtitleStyle(theme)}>

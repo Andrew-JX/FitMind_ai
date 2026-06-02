@@ -144,7 +144,7 @@ export function AssistantInsightDashboard(
             <div style={overviewCellStyle(theme)}>
               <span style={overviewLabelStyle(theme)}>总训练量</span>
               <strong style={overviewValueStyle(theme)}>
-                {snapshot.overview.total_volume.toLocaleString()} kg
+                {snapshot.overview.total_volume.toLocaleString()} 公斤
               </strong>
             </div>
           </div>

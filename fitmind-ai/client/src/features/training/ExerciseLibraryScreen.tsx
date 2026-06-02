@@ -8,22 +8,16 @@ import { Input } from "../../components/Input";
 import { Pill } from "../../components/Pill";
 import { StateNotice } from "../../components/StateNotice";
 import { useTheme } from "../../theme/ThemeContext";
-
-const CATEGORY_LABELS = [
-  "全部",
-  "胸",
-  "背",
-  "腿",
-  "肩",
-  "手臂",
-  "核心",
-  "热身",
-  "拉伸",
-  "功能性",
-  "其他",
-] as const;
-
-type ExerciseCategory = (typeof CATEGORY_LABELS)[number];
+import {
+  EXERCISE_CATEGORY_LABELS,
+  getEquipmentLabel,
+  getExerciseCategory,
+  getExerciseDisplayName,
+  getExerciseSearchText,
+  getMovementPatternLabel,
+  getMuscleCodeLabel,
+  type ExerciseCategory,
+} from "./exercise-display";
 
 export interface ExerciseLibraryScreenProps extends ExercisePickerProps {
   isOpen: boolean;
@@ -70,18 +64,7 @@ export function ExerciseLibraryScreen(props: ExerciseLibraryScreenProps) {
         return true;
       }
 
-      const searchableFields = [
-        exercise.name_en,
-        exercise.name_zh,
-        category,
-        exercise.equipment ?? "",
-        exercise.movement_pattern ?? "",
-        ...exercise.muscles.map((muscle) => muscle.code),
-      ];
-
-      return searchableFields.some((field) => {
-        return field.toLowerCase().includes(normalizedKeyword);
-      });
+      return getExerciseSearchText(exercise).includes(normalizedKeyword);
     });
   }, [exercises, keyword, selectedCategory]);
 
@@ -106,14 +89,14 @@ export function ExerciseLibraryScreen(props: ExerciseLibraryScreenProps) {
 
         <Input
           onChange={(event) => setKeyword(event.target.value)}
-          placeholder="搜索动作"
+          placeholder="搜索动作名称"
           type="text"
           value={keyword}
         />
       </header>
 
       <div style={categoryRailStyle}>
-        {CATEGORY_LABELS.map((category) => {
+        {EXERCISE_CATEGORY_LABELS.map((category) => {
           const isActive = category === selectedCategory;
 
           return (
@@ -145,7 +128,11 @@ export function ExerciseLibraryScreen(props: ExerciseLibraryScreenProps) {
 
         {!searchError && !isLoadingExercises && filteredExercises.length === 0 ? (
           <StateNotice
-            description="这个分类暂时没有匹配动作。可以换个关键词，或切回“全部”查看。"
+            description={
+              selectedCategory === "全部"
+                ? "可以换个关键词搜索动作名称。"
+                : "这个分类暂时没有动作，可以搜索动作名称或切回全部。"
+            }
             icon="search"
             title="没有找到动作"
           />
@@ -159,6 +146,8 @@ export function ExerciseLibraryScreen(props: ExerciseLibraryScreenProps) {
                 .filter((muscle) => muscle.is_primary)
                 .slice(0, 2)
                 .map((muscle) => muscle.code);
+              const movementLabel = getMovementPatternLabel(exercise.movement_pattern);
+              const equipmentLabel = getEquipmentLabel(exercise.equipment);
 
               return (
                 <li key={exercise.id} style={{ listStyle: "none" }}>
@@ -169,23 +158,16 @@ export function ExerciseLibraryScreen(props: ExerciseLibraryScreenProps) {
                   >
                     <div style={cardTopRowStyle}>
                       <strong style={{ fontSize: 14 }}>
-                        {exercise.name_zh?.trim() || exercise.name_en}
+                        {getExerciseDisplayName(exercise)}
                       </strong>
                       <Pill tone="info">{category}</Pill>
                     </div>
-                    {exercise.name_zh?.trim() ? (
-                      <div style={secondaryTextStyle(theme)}>{exercise.name_en}</div>
-                    ) : null}
                     <div style={metaRowStyle}>
-                      {exercise.movement_pattern ? (
-                        <Pill tone="analysis">{exercise.movement_pattern}</Pill>
-                      ) : null}
-                      {exercise.equipment ? (
-                        <Pill tone="neutral">{exercise.equipment}</Pill>
-                      ) : null}
+                      {movementLabel ? <Pill tone="analysis">{movementLabel}</Pill> : null}
+                      {equipmentLabel ? <Pill tone="neutral">{equipmentLabel}</Pill> : null}
                       {primaryMuscles.map((muscleCode) => (
                         <Pill key={muscleCode} tone="accent">
-                          {muscleCode}
+                          {getMuscleCodeLabel(muscleCode)}
                         </Pill>
                       ))}
                     </div>
@@ -198,71 +180,6 @@ export function ExerciseLibraryScreen(props: ExerciseLibraryScreenProps) {
       </div>
     </section>
   );
-}
-
-function getExerciseCategory(exercise: DictionaryExercise): ExerciseCategory {
-  const primaryCodes = exercise.muscles
-    .filter((muscle) => muscle.is_primary)
-    .map((muscle) => muscle.code.toLowerCase());
-  const movementPattern = exercise.movement_pattern?.toLowerCase() ?? "";
-  const searchable = `${exercise.name_en} ${exercise.name_zh} ${movementPattern}`.toLowerCase();
-
-  if (primaryCodes.some((code) => code.includes("chest") || code === "pecs")) {
-    return "胸";
-  }
-
-  if (primaryCodes.some((code) => code.includes("back") || code.includes("lat"))) {
-    return "背";
-  }
-
-  if (
-    primaryCodes.some((code) => {
-      return (
-        code.includes("quad") ||
-        code.includes("hamstring") ||
-        code.includes("leg") ||
-        code.includes("glute") ||
-        code.includes("calf")
-      );
-    })
-  ) {
-    return "腿";
-  }
-
-  if (primaryCodes.some((code) => code.includes("shoulder") || code.includes("delt"))) {
-    return "肩";
-  }
-
-  if (
-    primaryCodes.some((code) => {
-      return code.includes("bicep") || code.includes("tricep") || code.includes("forearm");
-    })
-  ) {
-    return "手臂";
-  }
-
-  if (primaryCodes.some((code) => code.includes("core") || code.includes("ab"))) {
-    return "核心";
-  }
-
-  if (searchable.includes("warm") || searchable.includes("activation")) {
-    return "热身";
-  }
-
-  if (searchable.includes("stretch") || searchable.includes("mobility")) {
-    return "拉伸";
-  }
-
-  if (
-    movementPattern.includes("carry") ||
-    movementPattern.includes("rotation") ||
-    movementPattern.includes("gait") ||
-    searchable.includes("sled")
-  ) {
-    return "功能性";
-  }
-
-  return "其他";
 }
 
 function screenStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
@@ -326,7 +243,8 @@ function categoryButtonStyle(
     flex: "0 0 auto",
     fontSize: 12,
     fontWeight: 700,
-    minHeight: 36,
+    minHeight: 38,
+    minWidth: 44,
     padding: "8px 12px",
     whiteSpace: "nowrap",
   };
@@ -377,14 +295,6 @@ const cardTopRowStyle: React.CSSProperties = {
   gap: 12,
   justifyContent: "space-between",
 };
-
-function secondaryTextStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
-  return {
-    color: theme.colors.tx2,
-    fontSize: 12,
-    lineHeight: 1.5,
-  };
-}
 
 const metaRowStyle: React.CSSProperties = {
   display: "flex",

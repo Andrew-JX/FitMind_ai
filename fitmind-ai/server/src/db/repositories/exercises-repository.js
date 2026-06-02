@@ -58,7 +58,7 @@ export async function searchExercises(filters = {}, pool) {
             )
           )
         GROUP BY e.id
-        ORDER BY e.name_en ASC
+        ORDER BY COALESCE(NULLIF(e.name_zh, ''), e.name_en) ASC
       `,
       [keywordPattern, muscleCode],
     );

@@ -30,7 +30,7 @@ export function TrainingStatsStrip(props: TrainingStatsStripProps) {
         <StatCell
           label="总容量"
           tone="info"
-          unit="kg"
+          unit="公斤"
           value={totalVolume.toLocaleString()}
         />
         <StatCell label="总组数" tone="analysis" unit="组" value={`${setCount}`} />

@@ -56,8 +56,8 @@ export function AssistantQuickPrompts(props: AssistantQuickPromptsProps) {
     },
     {
       description: props.selectedExerciseName
-        ? `分析 ${selectedExerciseName} 的重量变化、最高重量和估算 1RM。`
-        : "分析当前选中动作的重量变化、最高重量和估算 1RM。",
+        ? `分析 ${selectedExerciseName} 的重量变化、最高重量和估算最大重量。`
+        : "分析当前选中动作的重量变化、最高重量和估算最大重量。",
       disabled: !props.selectedExerciseId,
       helper: "请先去“分析”页选中一个动作。",
       prompt: {
@@ -70,9 +70,9 @@ export function AssistantQuickPrompts(props: AssistantQuickPromptsProps) {
       description: "解释这些建议背后具体参考了哪些训练记录和计算规则。",
       prompt: {
         mode: "evidence_explain",
-        message: "AI 根据什么判断？",
+        message: "智能助手根据什么判断？",
       },
-      title: "AI 根据什么判断？",
+      title: "智能助手根据什么判断？",
     },
   ];
 

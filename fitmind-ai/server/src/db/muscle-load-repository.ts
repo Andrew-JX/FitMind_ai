@@ -202,7 +202,7 @@ export async function getMuscleLoad(
                 / NULLIF(exercise_weight_totals.total_weight, 0)
               ) AS weighted_volume,
             mg.id AS muscle_group_id,
-            mg.name_en AS muscle_group_name
+            COALESCE(NULLIF(mg.name_zh, ''), mg.name_en) AS muscle_group_name
           FROM included_sets
           JOIN exercise_muscles em ON em.exercise_id = included_sets.exercise_id
           JOIN muscle_groups mg ON mg.id = em.muscle_group_id
@@ -253,7 +253,7 @@ export async function getMuscleLoad(
           SELECT
             mg.id AS muscle_group_id,
             e.id AS exercise_id,
-            e.name_en AS exercise_name,
+            COALESCE(NULLIF(e.name_zh, ''), e.name_en) AS exercise_name,
             COALESCE(
               SUM(
                 included_sets.raw_volume
@@ -272,7 +272,7 @@ export async function getMuscleLoad(
           JOIN exercise_weight_totals
             ON exercise_weight_totals.exercise_id = included_sets.exercise_id
           WHERE exercise_weight_totals.total_weight > 0
-          GROUP BY mg.id, e.id, e.name_en
+          GROUP BY mg.id, e.id, e.name_en, e.name_zh
         ),
         ranked_exercises AS (
           SELECT

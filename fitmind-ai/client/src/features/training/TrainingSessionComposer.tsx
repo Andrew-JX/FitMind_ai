@@ -34,6 +34,10 @@ import {
   type DraftSet,
   type TrainingSessionInitialDraft,
 } from "./training-session-draft";
+import {
+  getExerciseCategoryLabel as getDisplayExerciseCategoryLabel,
+  getExerciseDisplayName,
+} from "./exercise-display";
 import { buildWorkoutEditPlan } from "./workout-to-session-draft";
 
 export interface TrainingSessionComposerProps {
@@ -408,12 +412,12 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
 
           return {
             ...draftExercise,
-            categoryLabel: getExerciseCategoryLabel(exercise),
+            categoryLabel: getDisplayExerciseCategoryLabel(exercise),
             exercise,
             exerciseId: exercise.id,
             loadType: getExerciseLoadType(exercise),
             matchStatus: "matched",
-            name: exercise.name_en,
+            name: getExerciseDisplayName(exercise),
           };
         });
       }
@@ -426,7 +430,7 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
       }
 
       setDuplicateNotice(null);
-      return [...currentValue, createDraftExercise(exercise, getExerciseCategoryLabel(exercise))];
+      return [...currentValue, createDraftExercise(exercise, getDisplayExerciseCategoryLabel(exercise))];
     });
     setIsLibraryOpen(false);
     setReplacingDraftExerciseId(null);
@@ -880,12 +884,12 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
 
         return {
           ...draftExercise,
-          categoryLabel: getExerciseCategoryLabel(exercise),
+          categoryLabel: getDisplayExerciseCategoryLabel(exercise),
           exercise,
           exerciseId: exercise.id,
           loadType: getExerciseLoadType(exercise),
           matchStatus: "matched",
-          name: exercise.name_en,
+          name: getExerciseDisplayName(exercise),
         };
       });
     });
@@ -1033,81 +1037,6 @@ function TrainingTimeEditor(props: {
       startedAt,
     });
   }
-}
-
-function getExerciseCategoryLabel(exercise: DictionaryExercise): string {
-  const primaryCodes = exercise.muscles
-    .filter((muscle) => muscle.is_primary)
-    .map((muscle) => muscle.code.toLowerCase());
-  const movementPattern = exercise.movement_pattern?.toLowerCase() ?? "";
-  const searchable = `${exercise.name_en} ${exercise.name_zh} ${movementPattern}`.toLowerCase();
-
-  if (primaryCodes.some((code) => code.includes("chest") || code === "pecs")) {
-    return "胸";
-  }
-
-  if (primaryCodes.some((code) => code.includes("back") || code.includes("lat"))) {
-    return "背";
-  }
-
-  if (
-    primaryCodes.some((code) => {
-      return code.includes("quad") || code.includes("hamstring") || code.includes("leg");
-    })
-  ) {
-    return "腿";
-  }
-
-  if (primaryCodes.some((code) => code.includes("shoulder") || code.includes("delt"))) {
-    return "肩";
-  }
-
-  if (primaryCodes.some((code) => code.includes("bicep"))) {
-    return "二头";
-  }
-
-  if (primaryCodes.some((code) => code.includes("tricep"))) {
-    return "三头";
-  }
-
-  if (primaryCodes.some((code) => code.includes("calf"))) {
-    return "小腿";
-  }
-
-  if (primaryCodes.some((code) => code.includes("forearm") || code.includes("grip"))) {
-    return "前臂";
-  }
-
-  if (primaryCodes.some((code) => code.includes("neck"))) {
-    return "颈部";
-  }
-
-  if (primaryCodes.some((code) => code.includes("glute"))) {
-    return "臀部";
-  }
-
-  if (primaryCodes.some((code) => code.includes("core") || code.includes("ab"))) {
-    return "核心";
-  }
-
-  if (searchable.includes("warm") || searchable.includes("activation")) {
-    return "热身";
-  }
-
-  if (searchable.includes("stretch") || searchable.includes("mobility")) {
-    return "拉伸";
-  }
-
-  if (
-    movementPattern.includes("carry") ||
-    movementPattern.includes("rotation") ||
-    movementPattern.includes("gait") ||
-    searchable.includes("sled")
-  ) {
-    return "功能性";
-  }
-
-  return "其他";
 }
 
 function getReadableErrorMessage(error: unknown): string {
@@ -1355,7 +1284,9 @@ function bodyStyle(hasRestTimer: boolean): React.CSSProperties {
     minHeight: 0,
     overflowY: "auto",
     overscrollBehavior: "contain",
-    paddingBottom: hasRestTimer ? 176 : 112,
+    paddingBottom: hasRestTimer
+      ? "calc(176px + env(safe-area-inset-bottom, 0px))"
+      : "calc(120px + env(safe-area-inset-bottom, 0px))",
     touchAction: "pan-y",
     WebkitOverflowScrolling: "touch",
   };

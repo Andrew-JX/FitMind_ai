@@ -100,7 +100,7 @@ export async function getExerciseProgress(
           WHERE s.exercise_id = $2
         )
         SELECT
-          e.name_en AS exercise_name,
+          COALESCE(NULLIF(e.name_zh, ''), e.name_en) AS exercise_name,
           (SELECT COUNT(DISTINCT workout_id)::int FROM included_sets) AS workout_count,
           (SELECT COUNT(*)::int FROM included_sets) AS set_count,
           (SELECT COALESCE(SUM(reps), 0)::int FROM included_sets) AS total_reps,

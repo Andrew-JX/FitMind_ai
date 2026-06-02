@@ -5,6 +5,7 @@ import type {
 } from "../../../../shared/src/training";
 
 import type { DictionaryExercise } from "./dictionary-api";
+import { getExerciseDisplayName } from "./exercise-display";
 
 export type EffortLevel = "easy" | "normal" | "hard";
 export type ExerciseLoadType = "weighted" | "bodyweight" | "timed";
@@ -65,7 +66,7 @@ export function createDraftExercise(
     isExpanded: false,
     loadType: getExerciseLoadType(exercise),
     matchStatus: "matched",
-    name: exercise.name_en,
+    name: getExerciseDisplayName(exercise),
     sets: [],
   };
 }

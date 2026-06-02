@@ -1,5 +1,9 @@
 import type { DictionaryExercise } from "./dictionary-api";
 import {
+  getExerciseCategoryLabel as getDisplayExerciseCategoryLabel,
+  getExerciseDisplayName,
+} from "./exercise-display";
+import {
   getExerciseLoadType,
   type DraftExercise,
   type DraftSet,
@@ -40,7 +44,7 @@ function mapWorkoutIntakeExerciseToDraftExercise(
       : null;
   const matchStatus = matchedExercise ? "matched" : exercise.match_status;
   const displayName =
-    matchedExercise?.name_en ??
+    (matchedExercise ? getExerciseDisplayName(matchedExercise) : null) ??
     exercise.matched_exercise_name ??
     exercise.input_name;
   const loadType = matchedExercise ? getExerciseLoadType(matchedExercise) : "weighted";
@@ -50,7 +54,7 @@ function mapWorkoutIntakeExerciseToDraftExercise(
       exerciseId: candidate.exercise_id,
       exerciseName: candidate.exercise_name,
     })),
-    categoryLabel: matchedExercise ? getExerciseCategoryLabel(matchedExercise) : "\u9700\u8981\u786e\u8ba4",
+    categoryLabel: matchedExercise ? getDisplayExerciseCategoryLabel(matchedExercise) : "\u9700\u8981\u786e\u8ba4",
     exercise: matchedExercise,
     exerciseId: matchedExercise?.id ?? null,
     id: `intake-exercise-${index}-${exercise.input_name}`,
@@ -111,28 +115,4 @@ function mapRpeToEffort(rpe: number | null): EffortLevel {
   }
 
   return "normal";
-}
-
-function getExerciseCategoryLabel(exercise: DictionaryExercise): string {
-  const primaryCodes = exercise.muscles
-    .filter((muscle) => muscle.is_primary)
-    .map((muscle) => muscle.code.toLowerCase());
-
-  if (primaryCodes.some((code) => code.includes("back") || code.includes("lat"))) {
-    return "\u80cc";
-  }
-
-  if (primaryCodes.some((code) => code.includes("chest") || code === "pecs")) {
-    return "\u80f8";
-  }
-
-  if (primaryCodes.some((code) => code.includes("quad") || code.includes("leg"))) {
-    return "\u817f";
-  }
-
-  if (primaryCodes.some((code) => code.includes("shoulder") || code.includes("delt"))) {
-    return "\u80a9";
-  }
-
-  return "\u5176\u4ed6";
 }

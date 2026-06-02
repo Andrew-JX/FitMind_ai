@@ -8,6 +8,13 @@ import {
   getExerciseSummary,
   isDraftSetValid,
 } from "./training-session-draft";
+import {
+  formatWeight,
+  getEquipmentLabel,
+  getExerciseDisplayName,
+  getMovementPatternLabel,
+  getMuscleCodeLabel,
+} from "./exercise-display";
 import { TrainingSessionExerciseActions } from "./TrainingSessionExerciseActions";
 import { TrainingSessionSetRow } from "./TrainingSessionSetRow";
 
@@ -40,6 +47,10 @@ export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardPr
     .filter((muscle) => muscle.is_primary)
     .slice(0, 2)
     .map((muscle) => muscle.code);
+  const movementLabel = getMovementPatternLabel(
+    props.draftExercise.exercise?.movement_pattern,
+  );
+  const equipmentLabel = getEquipmentLabel(props.draftExercise.exercise?.equipment);
   const [activeSetId, setActiveSetId] = useState<string | null>(null);
   const [isActionLayerOpen, setIsActionLayerOpen] = useState(false);
   const editorScrollerRef = useRef<HTMLDivElement | null>(null);
@@ -87,9 +98,9 @@ export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardPr
             <strong style={{ color: theme.colors.tx, fontSize: 15 }}>
               {props.draftExercise.name}
             </strong>
-            {props.draftExercise.exercise?.name_zh?.trim() ? (
+            {props.draftExercise.exercise ? (
               <p style={secondaryTextStyle(theme)}>
-                {props.draftExercise.exercise.name_zh}
+                {getExerciseDisplayName(props.draftExercise.exercise)}
               </p>
             ) : null}
             {props.draftExercise.inputName &&
@@ -107,19 +118,15 @@ export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardPr
         </div>
 
         <p style={statsStyle(theme)}>
-          {summary.completedSets} 组 · 总容量 {formatVolume(summary.totalVolumeKg)} kg
+          {summary.completedSets} 组 · 总容量 {formatWeight(formatVolume(summary.totalVolumeKg))}
         </p>
 
         <div style={metaRowStyle}>
-          {props.draftExercise.exercise?.movement_pattern ? (
-            <Pill tone="analysis">{props.draftExercise.exercise.movement_pattern}</Pill>
-          ) : null}
-          {props.draftExercise.exercise?.equipment ? (
-            <Pill tone="neutral">{props.draftExercise.exercise.equipment}</Pill>
-          ) : null}
+          {movementLabel ? <Pill tone="analysis">{movementLabel}</Pill> : null}
+          {equipmentLabel ? <Pill tone="neutral">{equipmentLabel}</Pill> : null}
           {primaryMuscles.map((muscleCode) => (
             <Pill key={muscleCode} tone="accent">
-              {muscleCode}
+              {getMuscleCodeLabel(muscleCode)}
             </Pill>
           ))}
         </div>
@@ -164,7 +171,7 @@ export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardPr
                   >
                     <strong style={{ fontSize: 12 }}>第 {index + 1} 组</strong>
                     <span style={collapsedMetaStyle(theme)}>
-                      {setDraft.weightKg || "--"} kg · {setDraft.reps || "--"} 次
+                      {setDraft.weightKg || "--"} 公斤 · {setDraft.reps || "--"} 次
                     </span>
                     {setDraft.completed ? (
                       <span style={completedBadgeStyle(theme)}>已完成</span>

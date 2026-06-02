@@ -80,7 +80,7 @@ export function ExerciseProgressPanel(props: ExerciseProgressPanelProps) {
       <Card>
         <div style={titleRowStyle}>
           <h2 style={titleStyle}>动作进展</h2>
-          <Badge tone="analysis">Exercise Progress</Badge>
+          <Badge tone="analysis">动作进展</Badge>
         </div>
         <StateNotice
           description="完成训练记录后，这里会展示总容量、动作排行和进展趋势。"
@@ -107,7 +107,7 @@ export function ExerciseProgressPanel(props: ExerciseProgressPanelProps) {
         <div>
           <div style={titleRowStyle}>
             <h2 style={titleStyle}>动作进展</h2>
-            <Badge tone="analysis">Exercise Progress</Badge>
+            <Badge tone="analysis">动作进展</Badge>
           </div>
           <p style={copyStyle(theme)}>{displayExerciseName}</p>
           <p style={subtleStyle(theme)}>
@@ -141,13 +141,13 @@ export function ExerciseProgressPanel(props: ExerciseProgressPanelProps) {
             <StatCell
               label="最大重量"
               tone="success"
-              unit="kg"
+              unit="公斤"
               value={formatMetricValue(progress.totals.max_weight_kg)}
             />
             <StatCell
-              label="估算 1RM"
+              label="估算最大重量"
               tone="accent"
-              unit="kg"
+              unit="公斤"
               value={formatMetricValue(progress.totals.estimated_1rm_kg)}
             />
             <StatCell
@@ -167,7 +167,7 @@ export function ExerciseProgressPanel(props: ExerciseProgressPanelProps) {
           <div style={sessionSectionStyle(theme)}>
             <div style={sectionHeaderStyle}>
               <h3 style={subheadingStyle}>最近 5 次记录</h3>
-              <Pill tone="analysis">evidence</Pill>
+              <Pill tone="analysis">训练记录</Pill>
             </div>
             {recentSessions.length === 0 ? (
               <p style={copyStyle(theme)}>当前范围内暂时没有最近记录。</p>
@@ -182,12 +182,12 @@ export function ExerciseProgressPanel(props: ExerciseProgressPanelProps) {
                       {displayExerciseName} · {session.set_count} 组
                     </p>
                     <div style={sessionMetaStyle(theme)}>
-                      最高 {formatMetricValue(session.max_weight_kg)} kg · 估算 1RM{" "}
-                      {formatMetricValue(session.estimated_1rm_kg)} kg
+                      最高 {formatMetricValue(session.max_weight_kg)} 公斤 · 估算最大重量{" "}
+                      {formatMetricValue(session.estimated_1rm_kg)} 公斤
                     </div>
                     <div style={sessionMetaStyle(theme)}>
                       {session.total_reps.toLocaleString()} 次 · 容量{" "}
-                      {session.total_volume.toLocaleString()} kg
+                      {session.total_volume.toLocaleString()} 公斤
                     </div>
                   </li>
                 ))}
@@ -196,16 +196,16 @@ export function ExerciseProgressPanel(props: ExerciseProgressPanelProps) {
           </div>
 
           <details style={evidenceDetailsStyle(theme)}>
-            <summary style={summaryStyle(theme)}>查看 evidence</summary>
+            <summary style={summaryStyle(theme)}>查看计算依据</summary>
             <div style={evidenceBodyStyle()}>
               <p style={evidenceTextStyle(theme)}>
-                关联 workout：{progress.evidence.workout_ids.length} 条
+                关联训练：{progress.evidence.workout_ids.length} 条
               </p>
               <p style={evidenceTextStyle(theme)}>
-                关联 set：{progress.evidence.set_ids.length} 条
+                关联组数：{progress.evidence.set_ids.length} 条
               </p>
               <p style={evidenceTextStyle(theme)}>
-                calculation_rules：
+                计算规则：
                 {progress.evidence.calculation_rules.join(" / ") || "无"}
               </p>
             </div>
