@@ -53,8 +53,9 @@ export async function searchExercises(filters = {}, pool) {
               SELECT 1
               FROM exercise_muscles em_filter
               JOIN muscle_groups mg_filter ON mg_filter.id = em_filter.muscle_group_id
+              LEFT JOIN muscle_groups parent_filter ON parent_filter.id = mg_filter.parent_id
               WHERE em_filter.exercise_id = e.id
-                AND mg_filter.code = $2
+                AND (mg_filter.code = $2 OR parent_filter.code = $2)
             )
           )
         GROUP BY e.id

@@ -1151,7 +1151,7 @@ const composerStyle: React.CSSProperties = {
   position: "fixed",
   transform: "translateX(-50%)",
   width: "100%",
-  zIndex: 90,
+  zIndex: 400,
 };
 
 function backdropStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {

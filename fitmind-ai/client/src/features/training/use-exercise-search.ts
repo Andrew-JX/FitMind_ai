@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { HttpClientError } from "../../services/http-client";
 import {
@@ -70,7 +70,7 @@ export function useExerciseSearch(): UseExerciseSearchResult {
     };
   }, []);
 
-  async function runExerciseSearch(input: {
+  const runExerciseSearch = useCallback(async function runExerciseSearch(input: {
     muscle: string;
     q: string;
   }): Promise<void> {
@@ -90,7 +90,7 @@ export function useExerciseSearch(): UseExerciseSearchResult {
     } finally {
       setIsLoadingExercises(false);
     }
-  }
+  }, []);
 
   return {
     exercises,
