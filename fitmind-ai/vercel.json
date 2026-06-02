@@ -1,5 +1,5 @@
 {
-  "buildCommand": "pnpm --filter @fitmind/server run build && pnpm --filter @fitmind/client exec vite build",
+  "buildCommand": "pnpm --filter @fitmind/server run build && pnpm --filter @fitmind/client run build",
   "installCommand": "pnpm install --frozen-lockfile",
   "outputDirectory": "client/dist",
   "rewrites": [

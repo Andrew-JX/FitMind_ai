@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "build": "vite build",
     "dev": "vite",
     "type-check": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src vite.config.ts",
