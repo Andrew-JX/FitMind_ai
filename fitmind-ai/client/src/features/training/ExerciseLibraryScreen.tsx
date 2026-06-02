@@ -8,6 +8,7 @@ import { Input } from "../../components/Input";
 import { Pill } from "../../components/Pill";
 import { StateNotice } from "../../components/StateNotice";
 import { useTheme } from "../../theme/ThemeContext";
+import { ExerciseDetailSheet } from "./ExerciseDetailSheet";
 import {
   EXERCISE_CATEGORY_LABELS,
   getEquipmentLabel,
@@ -40,6 +41,9 @@ export function ExerciseLibraryScreen(props: ExerciseLibraryScreenProps) {
   } = props;
   const [keyword, setKeyword] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<ExerciseCategory>("全部");
+  const [selectedExercise, setSelectedExercise] = useState<DictionaryExercise | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!isOpen) {
@@ -152,7 +156,7 @@ export function ExerciseLibraryScreen(props: ExerciseLibraryScreenProps) {
               return (
                 <li key={exercise.id} style={{ listStyle: "none" }}>
                   <button
-                    onClick={() => onSelectExercise(exercise)}
+                    onClick={() => setSelectedExercise(exercise)}
                     style={cardStyle(theme)}
                     type="button"
                   >
@@ -178,6 +182,17 @@ export function ExerciseLibraryScreen(props: ExerciseLibraryScreenProps) {
           </ul>
         ) : null}
       </div>
+
+      <ExerciseDetailSheet
+        actionLabel={mode === "replace" ? "替换为这个动作" : "加入本次训练"}
+        exercise={selectedExercise}
+        onClose={() => setSelectedExercise(null)}
+        onSelectExercise={(exercise) => {
+          onSelectExercise(exercise);
+          setSelectedExercise(null);
+        }}
+        token={props.token}
+      />
     </section>
   );
 }

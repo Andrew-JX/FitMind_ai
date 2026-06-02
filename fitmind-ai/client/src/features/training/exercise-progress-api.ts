@@ -16,6 +16,7 @@ export interface ExerciseProgressTotals {
   total_reps: number;
   total_volume: number;
   max_weight_kg: number | null;
+  max_reps: number | null;
   estimated_1rm_kg: number | null;
 }
 
@@ -26,6 +27,7 @@ export interface ExerciseProgressSession {
   total_reps: number;
   total_volume: number;
   max_weight_kg: number | null;
+  max_reps: number | null;
   estimated_1rm_kg: number | null;
   set_ids: string[];
 }

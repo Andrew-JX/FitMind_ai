@@ -28,6 +28,9 @@ export async function searchExercises(filters = {}, pool) {
           e.equipment,
           e.is_compound AS "isCompound",
           e.default_rest_seconds AS "defaultRestSeconds",
+          e.technique_cues_zh AS "techniqueCuesZh",
+          e.common_mistakes_zh AS "commonMistakesZh",
+          e.equipment_notes_zh AS "equipmentNotesZh",
           COALESCE(
             json_agg(
               json_build_object(

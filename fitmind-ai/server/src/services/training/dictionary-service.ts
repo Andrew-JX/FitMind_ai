@@ -28,6 +28,9 @@ const exerciseRowSchema = z.object({
   nameZh: z.string().min(1),
   movementPattern: z.string().nullable(),
   equipment: z.string().nullable(),
+  techniqueCuesZh: z.array(z.string()),
+  commonMistakesZh: z.array(z.string()),
+  equipmentNotesZh: z.string().nullable(),
   muscles: z.array(exerciseMuscleRowSchema),
 });
 
@@ -54,6 +57,9 @@ export interface SearchExercisesResult {
     name_zh: string;
     movement_pattern: string | null;
     equipment: string | null;
+    technique_cues_zh: string[];
+    common_mistakes_zh: string[];
+    equipment_notes_zh: string | null;
     muscles: Array<{
       code: string;
       contribution_weight: number;
@@ -108,6 +114,9 @@ export async function searchDictionaryExercises(
         name_zh: parsedRow.nameZh,
         movement_pattern: parsedRow.movementPattern,
         equipment: parsedRow.equipment,
+        technique_cues_zh: parsedRow.techniqueCuesZh,
+        common_mistakes_zh: parsedRow.commonMistakesZh,
+        equipment_notes_zh: parsedRow.equipmentNotesZh,
         muscles: parsedRow.muscles.map((muscle) => ({
           code: muscle.code,
           contribution_weight: muscle.contributionWeight,

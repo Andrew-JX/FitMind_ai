@@ -5,6 +5,7 @@ import { Input } from "../../components/Input";
 import { Pill } from "../../components/Pill";
 import { StateNotice } from "../../components/StateNotice";
 import { useTheme } from "../../theme/ThemeContext";
+import { ExerciseDetailSheet } from "./ExerciseDetailSheet";
 import {
   type DictionaryExercise,
   type DictionaryMuscleGroup,
@@ -25,6 +26,7 @@ export interface ExercisePickerProps {
   onSearch: (input: { muscle: string; q: string }) => Promise<void>;
   onSelectExercise?: ((exercise: DictionaryExercise) => void) | undefined;
   searchError: string | null;
+  token?: string | null | undefined;
 }
 
 export function ExercisePicker(props: ExercisePickerProps) {
@@ -33,13 +35,17 @@ export function ExercisePicker(props: ExercisePickerProps) {
     isLoadingExercises,
     isLoadingMuscleGroups,
     muscleGroups,
-    onSearch,
-    onSelectExercise,
-    searchError,
+  onSearch,
+  onSelectExercise,
+  searchError,
+  token,
   } = props;
   const { theme } = useTheme();
   const [keyword, setKeyword] = useState("");
   const [selectedMuscle, setSelectedMuscle] = useState("");
+  const [selectedExercise, setSelectedExercise] = useState<DictionaryExercise | null>(
+    null,
+  );
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -122,7 +128,7 @@ export function ExercisePicker(props: ExercisePickerProps) {
               <li key={exercise.id} style={{ listStyle: "none" }}>
                 {onSelectExercise ? (
                   <button
-                    onClick={() => onSelectExercise(exercise)}
+                    onClick={() => setSelectedExercise(exercise)}
                     style={resultCardStyle(theme, true)}
                     type="button"
                   >
@@ -132,18 +138,37 @@ export function ExercisePicker(props: ExercisePickerProps) {
                     />
                   </button>
                 ) : (
-                  <div style={resultCardStyle(theme, false)}>
+                  <button
+                    onClick={() => setSelectedExercise(exercise)}
+                    style={resultCardStyle(theme, true)}
+                    type="button"
+                  >
                     <ExerciseResultContent
                       exercise={exercise}
                       primaryMuscles={primaryMuscles}
                     />
-                  </div>
+                  </button>
                 )}
               </li>
             );
           })}
         </ul>
       ) : null}
+
+      <ExerciseDetailSheet
+        actionLabel="加入本次训练"
+        exercise={selectedExercise}
+        onClose={() => setSelectedExercise(null)}
+        onSelectExercise={
+          onSelectExercise
+            ? (exercise) => {
+                onSelectExercise(exercise);
+                setSelectedExercise(null);
+              }
+            : undefined
+        }
+        token={token}
+      />
     </section>
   );
 }

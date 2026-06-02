@@ -38,6 +38,9 @@ export interface ExerciseRow {
   nameZh: string;
   movementPattern: string | null;
   equipment: string | null;
+  techniqueCuesZh: string[];
+  commonMistakesZh: string[];
+  equipmentNotesZh: string | null;
   muscles: ExerciseMuscleRow[];
 }
 

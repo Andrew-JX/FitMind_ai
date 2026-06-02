@@ -12,12 +12,15 @@ function createExercise(
 ): DictionaryExercise {
   return {
     code: "bench_press_barbell",
+    common_mistakes_zh: ["避免耸肩", "避免弹起"],
     equipment: "barbell",
+    equipment_notes_zh: "确认杠铃路径稳定。",
     id: benchExerciseId,
     movement_pattern: "horizontal_push",
     muscles: [],
     name_en: "Barbell Bench Press",
     name_zh: "\u6760\u94c3\u5367\u63a8",
+    technique_cues_zh: ["肩胛稳定", "控制下降"],
     ...overrides,
   };
 }

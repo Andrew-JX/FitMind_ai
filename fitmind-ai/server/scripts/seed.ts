@@ -21,6 +21,9 @@ interface ExerciseSeed {
   equipment: string | null;
   isCompound: boolean;
   defaultRestSeconds: number;
+  techniqueCuesZh: string[];
+  commonMistakesZh: string[];
+  equipmentNotesZh: string;
 }
 
 interface ExerciseMuscleSeed {
@@ -139,9 +142,12 @@ async function seedExercises(
           movement_pattern,
           equipment,
           is_compound,
-          default_rest_seconds
+          default_rest_seconds,
+          technique_cues_zh,
+          common_mistakes_zh,
+          equipment_notes_zh
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         ON CONFLICT (code)
         DO UPDATE SET
           name_en = EXCLUDED.name_en,
@@ -149,7 +155,10 @@ async function seedExercises(
           movement_pattern = EXCLUDED.movement_pattern,
           equipment = EXCLUDED.equipment,
           is_compound = EXCLUDED.is_compound,
-          default_rest_seconds = EXCLUDED.default_rest_seconds
+          default_rest_seconds = EXCLUDED.default_rest_seconds,
+          technique_cues_zh = EXCLUDED.technique_cues_zh,
+          common_mistakes_zh = EXCLUDED.common_mistakes_zh,
+          equipment_notes_zh = EXCLUDED.equipment_notes_zh
         RETURNING id
       `,
       [
@@ -160,6 +169,9 @@ async function seedExercises(
         seed.equipment,
         seed.isCompound,
         seed.defaultRestSeconds,
+        seed.techniqueCuesZh,
+        seed.commonMistakesZh,
+        seed.equipmentNotesZh,
       ],
     );
 

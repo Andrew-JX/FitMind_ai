@@ -36,6 +36,7 @@ export interface ExerciseProgressTotalsDto {
   total_reps: number;
   total_volume: number;
   max_weight_kg: number | null;
+  max_reps: number | null;
   estimated_1rm_kg: number | null;
 }
 
@@ -46,6 +47,7 @@ export interface ExerciseProgressSessionDto {
   total_reps: number;
   total_volume: number;
   max_weight_kg: number | null;
+  max_reps: number | null;
   estimated_1rm_kg: number | null;
   set_ids: string[];
 }
@@ -71,6 +73,7 @@ const totalsSchema = z.object({
   total_reps: z.number().int().nonnegative(),
   total_volume: z.preprocess(normalizeNumericValue, z.number().nonnegative()),
   max_weight_kg: z.preprocess(normalizeNumericValue, z.number().nonnegative()).nullable(),
+  max_reps: z.number().int().nonnegative().nullable(),
   estimated_1rm_kg: z.preprocess(normalizeNumericValue, z.number().nonnegative()).nullable(),
   workout_ids: z.array(z.string().uuid()),
   set_ids: z.array(z.string().uuid()),
@@ -83,6 +86,7 @@ const sessionSchema = z.object({
   total_reps: z.number().int().nonnegative(),
   total_volume: z.preprocess(normalizeNumericValue, z.number().nonnegative()),
   max_weight_kg: z.preprocess(normalizeNumericValue, z.number().nonnegative()).nullable(),
+  max_reps: z.number().int().nonnegative().nullable(),
   estimated_1rm_kg: z.preprocess(normalizeNumericValue, z.number().nonnegative()).nullable(),
   set_ids: z.array(z.string().uuid()),
 });
@@ -118,6 +122,7 @@ export async function getUserExerciseProgress(
       total_reps: session.total_reps,
       total_volume: session.total_volume,
       max_weight_kg: session.max_weight_kg,
+      max_reps: session.max_reps,
       estimated_1rm_kg: session.estimated_1rm_kg,
       set_ids: session.set_ids,
     };
@@ -135,6 +140,7 @@ export async function getUserExerciseProgress(
       total_reps: totals.total_reps,
       total_volume: totals.total_volume,
       max_weight_kg: totals.max_weight_kg,
+      max_reps: totals.max_reps,
       estimated_1rm_kg: totals.estimated_1rm_kg,
     },
     sessions,
@@ -150,6 +156,7 @@ export async function getUserExerciseProgress(
         "total_reps sums included reps and treats nullable reps as zero if encountered.",
         "total_volume sums weight_kg multiplied by reps and treats nullable weight_kg or reps as zero if encountered.",
         "max_weight_kg returns the maximum included weight_kg or null when no matching sets exist.",
+        "max_reps returns the maximum included reps or null when no matching sets exist.",
         "estimated_1rm_kg uses the Epley formula weight_kg * (1 + reps / 30) and returns the maximum included estimate or null when no matching sets exist.",
         "Each session row rolls up one workout and its session estimated_1rm_kg is the maximum Epley estimate across matching sets within that workout.",
       ],

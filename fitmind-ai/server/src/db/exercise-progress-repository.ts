@@ -17,6 +17,7 @@ interface ExerciseProgressTotalsRow {
   total_reps: number;
   total_volume: string | number;
   max_weight_kg: string | number | null;
+  max_reps: number | null;
   estimated_1rm_kg: string | number | null;
   workout_ids: string[];
   set_ids: string[];
@@ -29,6 +30,7 @@ interface ExerciseProgressSessionRow {
   total_reps: number;
   total_volume: string | number;
   max_weight_kg: string | number | null;
+  max_reps: number | null;
   estimated_1rm_kg: string | number | null;
   set_ids: string[];
 }
@@ -113,6 +115,10 @@ export async function getExerciseProgress(
             FROM included_sets
           ) AS max_weight_kg,
           (
+            SELECT MAX(reps)::int
+            FROM included_sets
+          ) AS max_reps,
+          (
             SELECT MAX(weight_kg * (1 + (reps::numeric / 30)))::numeric
             FROM included_sets
           ) AS estimated_1rm_kg,
@@ -153,6 +159,7 @@ export async function getExerciseProgress(
             0
           )::numeric AS total_volume,
           MAX(COALESCE(s.weight_kg, 0))::numeric AS max_weight_kg,
+          MAX(COALESCE(s.reps, 0))::int AS max_reps,
           MAX(
             COALESCE(s.weight_kg, 0) * (1 + (COALESCE(s.reps, 0)::numeric / 30))
           )::numeric AS estimated_1rm_kg,
@@ -188,6 +195,7 @@ export async function getExerciseProgress(
           total_reps: 0,
           total_volume: 0,
           max_weight_kg: null,
+          max_reps: null,
           estimated_1rm_kg: null,
           workout_ids: [],
           set_ids: [],

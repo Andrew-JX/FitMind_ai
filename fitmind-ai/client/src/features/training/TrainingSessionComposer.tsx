@@ -351,6 +351,7 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
               setReplacingDraftExerciseId(null);
             }}
             onSelectExercise={handleSelectExercise}
+            token={props.token}
             {...props.exerciseLibraryProps}
           />
         ) : null}

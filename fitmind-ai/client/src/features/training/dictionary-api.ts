@@ -21,6 +21,9 @@ export interface DictionaryExercise {
   name_zh: string;
   movement_pattern: string | null;
   equipment: string | null;
+  technique_cues_zh: string[];
+  common_mistakes_zh: string[];
+  equipment_notes_zh: string | null;
   muscles: DictionaryExerciseMuscle[];
 }
 

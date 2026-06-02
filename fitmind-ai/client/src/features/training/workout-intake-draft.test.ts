@@ -87,11 +87,14 @@ function createDictionaryExercise(
 ): DictionaryExercise {
   return {
     code: "lat_pulldown_cable",
+    common_mistakes_zh: ["避免后仰借力", "避免半程动作"],
     equipment: "cable",
+    equipment_notes_zh: "调好滑轮高度。",
     id: "lat-pulldown-id",
     movement_pattern: "pull",
     muscles: [],
     name_en: "Lat Pulldown",
+    technique_cues_zh: ["肩胛下沉", "肘部向下拉"],
     name_zh: "高位下拉",
     ...overrides,
   };

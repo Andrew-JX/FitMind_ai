@@ -112,7 +112,10 @@ export function TrainingView(props: TrainingViewProps) {
 
         {isDictionaryOpen ? (
           <div style={{ marginTop: 12 }}>
-            <ExercisePicker {...props.exercisePickerProps} />
+            <ExercisePicker
+              {...props.exercisePickerProps}
+              token={props.workoutFormProps.token}
+            />
           </div>
         ) : null}
       </Card>

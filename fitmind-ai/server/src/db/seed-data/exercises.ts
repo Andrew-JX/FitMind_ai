@@ -1,4 +1,4 @@
-export const exerciseSeeds = [
+const baseExerciseSeeds = [
   {
     code: "bench_press_barbell",
     nameEn: "Barbell Bench Press",
@@ -387,3 +387,114 @@ export const exerciseSeeds = [
     defaultRestSeconds: 60,
   },
 ] as const;
+
+type BaseExerciseSeed = (typeof baseExerciseSeeds)[number];
+
+const movementDetailMap: Record<
+  string,
+  { cues: string[]; mistakes: string[] }
+> = {
+  anti_extension: {
+    cues: ["收紧腹部和臀部，让身体从头到脚保持一条直线。", "用稳定呼吸维持姿势，不要憋气硬撑。"],
+    mistakes: ["塌腰或撅臀会降低核心训练效果。", "肩膀耸起、脖子紧张会让动作变形。"],
+  },
+  elbow_extension: {
+    cues: ["上臂保持稳定，主要用肘关节完成伸展。", "下压到底时短暂停顿，感受肱三头肌收缩。"],
+    mistakes: ["身体前后晃动借力会削弱目标肌群刺激。", "手腕过度弯折容易造成不适。"],
+  },
+  elbow_flexion: {
+    cues: ["保持上臂贴近身体，控制哑铃或杠铃上升。", "下降阶段放慢速度，保持肌肉张力。"],
+    mistakes: ["甩动身体借力会让手臂刺激不足。", "肘部明显前移会改变动作轨迹。"],
+  },
+  gait: {
+    cues: ["保持身体直立，步幅稳定，脚步轻落地。", "根据训练目标控制速度和呼吸节奏。"],
+    mistakes: ["疲劳后含胸低头会影响呼吸和姿态。", "速度过快导致动作失控会增加受伤风险。"],
+  },
+  hip_flexion: {
+    cues: ["先收紧核心，再抬腿，避免身体大幅摆动。", "抬起时呼气，下降时保持控制。"],
+    mistakes: ["利用惯性甩腿会减少核心参与。", "下放过快容易让腰部代偿。"],
+  },
+  horizontal_pull: {
+    cues: ["先稳定躯干，再把肘部向身体后方拉。", "顶峰位置夹紧背部，下降时保持控制。"],
+    mistakes: ["耸肩或用手臂硬拉会削弱背部发力。", "身体晃动过大会让重量失去参考价值。"],
+  },
+  horizontal_push: {
+    cues: ["肩胛保持稳定，推起时让手臂沿自然轨迹发力。", "下降阶段控制速度，底部不要放松。"],
+    mistakes: ["肩膀前顶会增加肩部压力。", "弹起重量或半程动作会影响训练质量。"],
+  },
+  knee_dominant: {
+    cues: ["膝盖跟随脚尖方向移动，保持脚掌稳定。", "下降和起身都要控制节奏，避免失去平衡。"],
+    mistakes: ["膝盖内扣会增加关节压力。", "为了重量牺牲动作深度会降低训练效果。"],
+  },
+  lunge: {
+    cues: ["前脚踩稳，身体保持直立，核心收紧。", "下降时控制膝盖方向，起身时用前腿发力。"],
+    mistakes: ["步距过窄会让身体左右晃动。", "后脚蹬地过多会减少前腿刺激。"],
+  },
+  plantar_flexion: {
+    cues: ["脚掌稳定踩实，抬起脚跟时在顶端短暂停顿。", "下降到可控范围，感受小腿被拉长。"],
+    mistakes: ["快速弹动会减少有效刺激。", "脚踝向内或向外翻会影响发力。"],
+  },
+  rotation: {
+    cues: ["核心先收紧，再控制躯干旋转。", "动作幅度以稳定为先，不追求过快速度。"],
+    mistakes: ["只用手臂摆动会削弱核心参与。", "腰部塌陷或后仰会增加不适风险。"],
+  },
+  shoulder_abduction: {
+    cues: ["手肘微弯，从身体两侧平稳抬起。", "抬到肩部附近即可，下降时保持控制。"],
+    mistakes: ["耸肩借力会让斜方肌过度参与。", "重量过大导致甩动会影响肩部刺激。"],
+  },
+  shoulder_flexion: {
+    cues: ["核心收紧，手臂向前平稳抬起。", "控制下放速度，保持肩部张力。"],
+    mistakes: ["后仰借力会让动作失去控制。", "抬得过高或耸肩会增加肩部压力。"],
+  },
+  spinal_flexion: {
+    cues: ["先收紧腹部，再让胸椎向骨盆方向卷起。", "回到起始位置时保持控制，不要完全放松。"],
+    mistakes: ["只用手臂拉绳会减少腹部参与。", "腰部过度弯折可能造成不适。"],
+  },
+  vertical_pull: {
+    cues: ["先下沉肩胛，再把肘部向下拉。", "顶端保持身体稳定，底部感受背部收缩。"],
+    mistakes: ["用身体后仰甩动借力会降低背部刺激。", "只拉到半程会让动作效果打折。"],
+  },
+  vertical_push: {
+    cues: ["核心收紧，推起时让手肘稳定向上伸展。", "下降到可控深度，保持肩部稳定。"],
+    mistakes: ["腰部过度后仰会增加下背压力。", "推起时耸肩会让肩颈过度紧张。"],
+  },
+};
+
+const equipmentNotes: Record<string, string> = {
+  barbell: "使用杠铃时先确认握距和杠铃路径稳定，重量增加要循序渐进。",
+  bodyweight: "自重动作可以通过节奏、停顿或辅助带调节难度。",
+  cable: "使用绳索时先调好滑轮高度，保持拉力方向和动作轨迹一致。",
+  dumbbell: "使用哑铃时左右两侧都要保持稳定，优先选择能控制全程的重量。",
+  kettlebell: "使用壶铃时注意握持稳定，摆动类动作先保证髋部发力和节奏。",
+  machine: "使用器械时先调好座椅和把手位置，让关节对齐器械轴线。",
+  plate: "使用杠铃片时握持要稳，避免手腕过度弯折。",
+  resistance_band: "使用弹力带时确认固定点牢靠，并控制回弹速度。",
+  sled: "使用雪橇时保持躯干稳定，先用可控负重建立节奏。",
+};
+
+const fallbackDetail = {
+  cues: ["先确认动作姿势稳定，再逐步增加训练重量。", "全程保持可控节奏，优先完成标准动作。"],
+  mistakes: ["为了追求重量牺牲动作质量会增加风险。", "动作过快或幅度不足会影响训练效果。"],
+};
+
+export const exerciseSeeds = baseExerciseSeeds.map((seed) => {
+  const movementDetail =
+    (seed.movementPattern ? movementDetailMap[seed.movementPattern] : undefined) ??
+    fallbackDetail;
+  const equipmentNote =
+    (seed.equipment ? equipmentNotes[seed.equipment] : undefined) ??
+    "请根据动作需要选择合适器械，并确认训练环境安全。";
+
+  return {
+    ...seed,
+    commonMistakesZh: movementDetail.mistakes,
+    equipmentNotesZh: equipmentNote,
+    techniqueCuesZh: movementDetail.cues,
+  };
+}) satisfies Array<
+  BaseExerciseSeed & {
+    commonMistakesZh: string[];
+    equipmentNotesZh: string;
+    techniqueCuesZh: string[];
+  }
+>;

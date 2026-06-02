@@ -15,7 +15,9 @@ function createExercise(
 ): DictionaryExercise {
   return {
     code: "shoulder_press_dumbbell",
+    common_mistakes_zh: ["避免耸肩", "避免后仰"],
     equipment: "dumbbell",
+    equipment_notes_zh: "选择可控重量。",
     id: "exercise-1",
     movement_pattern: "vertical_push",
     muscles: [
@@ -26,6 +28,7 @@ function createExercise(
       },
     ],
     name_en: "Dumbbell Shoulder Press",
+    technique_cues_zh: ["核心收紧", "稳定推起"],
     name_zh: "哑铃推肩",
     ...overrides,
   };

@@ -51,4 +51,21 @@ describe("exercise dictionary expansion seeds", () => {
       );
     }
   });
+
+  it("adds Chinese detail content for every exercise", () => {
+    for (const exercise of exerciseSeeds) {
+      expect(
+        exercise.techniqueCuesZh.length,
+        `${exercise.code} should include at least two technique cues`,
+      ).toBeGreaterThanOrEqual(2);
+      expect(
+        exercise.commonMistakesZh.length,
+        `${exercise.code} should include at least two common mistakes`,
+      ).toBeGreaterThanOrEqual(2);
+      expect(
+        exercise.equipmentNotesZh.trim().length,
+        `${exercise.code} should include equipment notes`,
+      ).toBeGreaterThan(0);
+    }
+  });
 });

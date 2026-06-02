@@ -148,6 +148,7 @@ describe("buildAssistantInsightSnapshot", () => {
           total_reps: 0,
           total_volume: 0,
           max_weight_kg: null,
+          max_reps: null,
           estimated_1rm_kg: null,
         },
         sessions: [],
@@ -241,6 +242,7 @@ describe("buildAssistantInsightSnapshot", () => {
           total_reps: 36,
           total_volume: 2900,
           max_weight_kg: 92.5,
+          max_reps: 10,
           estimated_1rm_kg: 104.8,
         },
         sessions: [
@@ -253,6 +255,7 @@ describe("buildAssistantInsightSnapshot", () => {
             total_reps: 9,
             total_volume: 830,
             max_weight_kg: 92.5,
+            max_reps: 5,
             estimated_1rm_kg: 104.8,
             set_ids: ["set-1", "set-2"],
           },
