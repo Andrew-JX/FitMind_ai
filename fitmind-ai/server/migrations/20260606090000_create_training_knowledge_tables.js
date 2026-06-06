@@ -139,7 +139,7 @@ export const up = (pgm) => {
     tags: {
       type: "jsonb",
       notNull: true,
-      default: "'[]'::jsonb",
+      default: pgm.func("'[]'::jsonb"),
     },
     search_text: {
       type: "text",

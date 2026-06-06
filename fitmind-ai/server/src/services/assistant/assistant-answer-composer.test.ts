@@ -5,11 +5,35 @@ import {
   composeMixedToolRagAnswer,
   composeUnsupportedAnswer,
 } from "./assistant-answer-composer.js";
-import { retrieveKnowledgeChunks } from "../rag/knowledge-retriever.js";
+import { rankKnowledgeChunks } from "../rag/knowledge-retriever.js";
+
+const knowledgeRows = [
+  {
+    id: "chunk-rpe",
+    title: "RPE 主观用力程度",
+    category: "training_concept",
+    chunk_text: "RPE 用来描述一组训练距离力竭还有多远。",
+    source_type: "seed" as const,
+    tags: ["RPE", "强度"],
+    search_text: "RPE 主观用力程度 training_concept 强度",
+  },
+  {
+    id: "chunk-bench",
+    title: "卧推进步停滞",
+    category: "exercise_progress",
+    chunk_text: "卧推短期没进步可能和训练容量、恢复或动作技术有关。",
+    source_type: "seed" as const,
+    tags: ["卧推", "停滞", "训练容量"],
+    search_text: "卧推进步停滞 exercise_progress 训练容量",
+  },
+];
 
 describe("assistant answer composer", () => {
   it("composes mixed tool and RAG answers with evidence and sources", () => {
-    const sources = retrieveKnowledgeChunks("卧推没进步是不是训练量不够？");
+    const sources = rankKnowledgeChunks(
+      knowledgeRows,
+      "卧推没进步是不是训练量不够？",
+    );
     const answer = composeMixedToolRagAnswer({
       message: "卧推没进步是不是训练量不够？",
       sources,
@@ -31,7 +55,7 @@ describe("assistant answer composer", () => {
   it("composes knowledge answers with sources but no training evidence", () => {
     const answer = composeKnowledgeAnswer({
       message: "RPE 是什么？",
-      sources: retrieveKnowledgeChunks("RPE 是什么？"),
+      sources: rankKnowledgeChunks(knowledgeRows, "RPE 是什么？"),
     });
 
     expect(answer.intent).toBe("knowledge");

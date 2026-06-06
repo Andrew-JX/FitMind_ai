@@ -3710,3 +3710,27 @@ Next validation:
 - Push the module-format fix to `main` to trigger a new Git-backed Vercel production deployment.
 - Confirm the new Git-triggered deployment reaches Ready.
 - Confirm `https://fitmind-ai-psi.vercel.app/api/health` returns 200 after the Git-triggered deployment.
+
+## Phase 4.8B - DB-backed Knowledge Retriever
+
+Completed:
+- Replaced the runtime static-corpus RAG path with an async DB-backed keyword retriever for assistant `knowledge` and `mixed_tool_rag` intents.
+- Added a `knowledge_documents` / `knowledge_chunks` repository boundary that joins document metadata to chunk content and returns only source fields needed by the assistant.
+- Refactored knowledge tokenization and ranking into reusable pure helpers so keyword behavior can be tested without a database.
+- Preserved the assistant response contract: user-specific training data remains `evidence`, and general training knowledge remains `sources`.
+- Added a DB-backed knowledge retriever smoke script for `RPE 是什么？` that asserts source count, title, category, and chunk text without printing secrets.
+- Fixed the pending training knowledge migration so `knowledge_chunks.tags` uses a raw `jsonb` empty-array default instead of a quoted string.
+- Applied the existing up migration path against the configured database after smoke confirmed `knowledge_chunks` was missing.
+
+Verification:
+- Targeted retriever, repository, intent router, and answer composer tests passed.
+- Training knowledge migration default-value regression test passed.
+- `pnpm --filter @fitmind/server type-check` passed.
+- `pnpm --filter @fitmind/client type-check` passed.
+- `pnpm test:unit` passed: 26 test files, 118 tests.
+- `pnpm --filter @fitmind/client run build` passed.
+- `pnpm lint` passed.
+- `pnpm --filter @fitmind/server run smoke:knowledge-rag ../.env` passed after the up migration, returning the DB source `RPE 主观用力程度`.
+
+Deferred:
+- Embeddings, pgvector, semantic search, reranking, LangChain, LangGraph, MCP, multi-agent behavior, auth changes, training CRUD changes, voice changes, and UI redesign remain out of scope.

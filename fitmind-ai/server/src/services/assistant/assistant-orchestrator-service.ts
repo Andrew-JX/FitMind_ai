@@ -921,7 +921,7 @@ export async function runMockAssistantTurn(
 
     const answer = composeKnowledgeAnswer({
       message: input.message,
-      sources: retrieveKnowledgeChunks(input.message),
+      sources: await retrieveKnowledgeChunks(input.message),
     });
 
     await emitAnswerEvents(answer, options);
@@ -1051,7 +1051,7 @@ export async function runMockAssistantTurn(
       });
       answer = composeMixedToolRagAnswer({
         message: input.message,
-        sources: retrieveKnowledgeChunks(input.message),
+        sources: await retrieveKnowledgeChunks(input.message),
         toolEvidence: buildEvidence(providerResponse.tool_name, result),
       });
     } else {
