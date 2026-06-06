@@ -4,7 +4,6 @@ import { ZodError } from "zod";
 import { assistantRouter } from "./routes/assistant.js";
 import { authRouter } from "./routes/auth.js";
 import { healthRouter } from "./routes/health.js";
-import { oneShotDbInitRouter } from "./routes/one-shot-db-init.js";
 import { apiRouter } from "./routes/api.js";
 import { workoutsRouter } from "./routes/workouts.js";
 import { createErrorResponse } from "./utils/api-response.js";
@@ -17,7 +16,6 @@ export function createApp() {
 
   app.use("/api/auth", authRouter);
   app.use("/api/health", healthRouter);
-  app.use("/api/internal", oneShotDbInitRouter);
   app.use("/api", apiRouter);
   app.use("/api", assistantRouter);
   app.use("/api", workoutsRouter);
