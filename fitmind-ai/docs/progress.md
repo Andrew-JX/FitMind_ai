@@ -3544,3 +3544,114 @@ Pending production validation:
 - Deploy Batch 7C to Vercel production.
 - Re-test installed PWA on iPhone.
 - Verify training create/edit, text intake, voice intake, time edit, delete confirmation, and AI assistant flows.
+
+## Phase 4.7 - Voice Workout Intake Upgrade
+
+Completed:
+- Upgraded workout voice intake from a one-shot final-transcript flow to a more reliable progressive speech input flow.
+- Enabled interim speech recognition results so users can see live transcription while speaking.
+- Preserved final and interim transcript handling separately.
+- Removed the standalone text-intake entry from the main training flow.
+- Kept an editable confirmation step after voice recognition so users can correct recognition errors before generating a workout draft.
+- Added a "continue speaking" flow so users can append another voice segment after the first recognition pass.
+- Updated training entry copy to focus on voice-based workout logging.
+
+Verification:
+- `vitest run client/src/features/training/speech-recognition-utils.test.ts` passed.
+- `pnpm --filter @fitmind/client type-check` passed.
+- `pnpm test:unit` passed.
+- `pnpm --filter @fitmind/client exec vite build` passed.
+
+Notes:
+- Full `pnpm verify` still fails because of pre-existing repository-wide Prettier drift unrelated to this batch.
+- Browser microphone interaction still requires real-device validation because sandbox browser automation could not complete microphone testing.
+
+## Phase 4.7D - Exercise Detail and Exercise History
+
+Completed:
+- Added exercise detail support to the exercise dictionary.
+- Added Chinese technique cues, common mistakes, and equipment notes for exercises.
+- Extended exercise dictionary responses with `technique_cues_zh`, `common_mistakes_zh`, and `equipment_notes_zh`.
+- Added `ExerciseDetailSheet` using the shared ActionSheet pattern.
+- Changed exercise card behavior so tapping an exercise opens the detail sheet before adding it to the current workout.
+- Added recent exercise history display based on existing exercise progress data.
+- Preserved the existing Chinese display layer and avoided exposing English/internal fields in normal user-facing UI.
+
+Verification:
+- `pnpm --filter @fitmind/client type-check` passed.
+- `pnpm --filter @fitmind/server type-check` passed.
+- `pnpm lint` passed.
+- `pnpm test` passed.
+- `pnpm --filter @fitmind/client exec vite build` passed.
+- `pnpm --filter @fitmind/server build` passed.
+
+Notes:
+- Initial production deployment exposed that the Vercel Production database did not yet contain the seeded exercise dictionary data.
+- Production dictionary initialization was handled separately in Phase 4.7D.1.
+
+## Phase 4.7D.1 - Production Dictionary Initialization
+
+Completed:
+- Investigated why production `/api/exercises` returned an empty list after 7D deployment.
+- Confirmed the issue was production database initialization rather than frontend or API implementation.
+- Added a temporary protected one-shot production DB initialization endpoint.
+- Used Vercel runtime environment access to initialize the real production database without exposing production secrets locally.
+- Ran production migration and idempotent seed successfully.
+- Verified production exercise dictionary data is available.
+- Removed the temporary initialization endpoint after successful initialization.
+- Removed `DB_INIT_TOKEN` from Vercel Production.
+- Redeployed production after cleanup.
+
+Production verification:
+- `/api/health` returns 200.
+- `/api/exercises` returns 43 exercises.
+- `/api/exercises?muscle=shoulders` returns 15 shoulder-related exercises.
+- Exercise detail fields are returned: `technique_cues_zh`, `common_mistakes_zh`, and `equipment_notes_zh`.
+
+Safety:
+- No production secret values were printed.
+- No local token file remains.
+- Temporary initialization code was removed after successful seed.
+- Git workspace was clean after cleanup.
+
+## Phase 4.8A - Evidence-backed Assistant + RAG Skeleton
+
+Completed:
+- Upgraded FitMind Assistant from fixed prompt-style interactions to natural training-question handling with `mode: "auto"`.
+- Added a rule-based assistant intent router.
+- Supported assistant intents: `summary`, `progress`, `imbalance`, `recommendation`, `exercise_history`, `evidence`, `knowledge`, `mixed_tool_rag`, and `unsupported`.
+- Added a small training knowledge RAG MVP.
+- Added `knowledge_documents` and `knowledge_chunks` database migration as the future persistence layer for training knowledge.
+- Seeded an initial training knowledge corpus covering RPE, training volume, progressive overload, bench press plateau, deload, squat knee valgus, shoulder press mistakes, pull-up technique, and fatigue and recovery.
+- Added keyword/full-text-style knowledge retrieval as the first RAG skeleton.
+- Kept embedding provider, pgvector, LangChain, LangGraph, MCP, and multi-agent orchestration out of this batch.
+- Added assistant orchestration that can choose deterministic training tools only, RAG knowledge retrieval only, mixed tool + RAG context, or unsupported response.
+- Split assistant answer grounding into `evidence` for user-specific training data from deterministic tools and `sources` for general training knowledge from RAG retrieval.
+- Added structured answer fields: `intent`, `conclusion`, `recommendation`, `evidence`, `sources`, and `limitations`.
+- Added frontend support for the new `retrieving` stream state.
+- Updated assistant UI so messages can display collapsible Evidence, Sources, and Limitations.
+- Changed quick prompts into example questions instead of the only supported assistant entry path.
+- Preserved the principle that the model must not invent user training facts.
+
+Verification:
+- `pnpm --filter @fitmind/server type-check` passed.
+- `pnpm --filter @fitmind/client type-check` passed.
+- `pnpm test:unit` passed.
+- `pnpm --filter @fitmind/client exec vite build` passed.
+
+Added / updated tests:
+- Intent router tests for natural training questions, knowledge questions, mixed questions, and unsupported questions.
+- Knowledge retriever tests for seeded training concepts.
+- Assistant answer composer tests for structured evidence and sources.
+- Frontend structured output tests for rendering assistant evidence and sources.
+
+Pending:
+- Manual browser smoke has not been completed yet.
+- Production deployment has not been completed yet.
+- Production migration and knowledge seed still need to be applied if this batch is deployed.
+- Current RAG implementation uses a static seed corpus / keyword retriever; vector retrieval with embeddings and pgvector is intentionally deferred.
+
+Next:
+- Phase 4.8B: persist and query the training knowledge base from the database.
+- Phase 4.8C: upgrade keyword retrieval to pgvector / embedding-based retrieval.
+- Phase 4.8D: improve Tool + RAG answer quality and demo scripts.

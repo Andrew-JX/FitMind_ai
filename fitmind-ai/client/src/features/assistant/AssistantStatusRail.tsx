@@ -57,6 +57,10 @@ function getStatusCopy(status: AssistantChatStatus): string {
     return "正在读取你的训练数据。";
   }
 
+  if (status === "retrieving") {
+    return "正在检索训练知识。";
+  }
+
   if (status === "answering") {
     return "正在组织回答内容。";
   }
@@ -82,7 +86,9 @@ const metaColumnStyle: React.CSSProperties = {
   justifyItems: "end",
 };
 
-function labelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function labelStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx3,
     fontSize: 11,
@@ -90,7 +96,9 @@ function labelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPrope
   };
 }
 
-function sessionStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function sessionStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx3,
     fontSize: 10,
@@ -100,7 +108,9 @@ function sessionStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPro
   };
 }
 
-function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function copyStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 12,

@@ -14,6 +14,18 @@ import {
 } from "../ai/tools/tool-types.js";
 import { runAssistantProvider } from "./provider-adapter.js";
 import { getConfiguredAssistantProvider } from "./provider-config.js";
+import {
+  composeKnowledgeAnswer,
+  composeMixedToolRagAnswer,
+  composeUnsupportedAnswer,
+  type AssistantAnswerEvidence,
+  type AssistantStructuredAnswer,
+} from "./assistant-answer-composer.js";
+import {
+  classifyAssistantIntent,
+  type AssistantRoutedIntent,
+} from "./assistant-intent-router.js";
+import { retrieveKnowledgeChunks } from "../rag/knowledge-retriever.js";
 import type {
   AssistantStreamEvent,
   AssistantStreamOptions,
@@ -26,6 +38,7 @@ import type {
 } from "./provider-types.js";
 
 const assistantModeSchema = z.enum([
+  "auto",
   "training_overview",
   "exercise_progress",
   "next_training_focus",
@@ -151,22 +164,13 @@ export interface MockAssistantTurnResponseData {
   session_id: string;
   mode: string;
   assistant_type: "deterministic_mock";
+  intent: AssistantRoutedIntent;
   tool_calls: Array<{
     tool_name: string;
     status: "success" | "error";
     duration_ms: number;
   }>;
-  answer: {
-    summary: string;
-    bullets: string[];
-    evidence: {
-      source: "deterministic_tool_executor" | "deterministic_mock_provider";
-      tool_names: string[];
-      workout_ids: string[];
-      set_ids: string[];
-      calculation_rules: string[];
-    };
-  };
+  answer: AssistantStructuredAnswer;
 }
 
 interface PersistedTextBlock {
@@ -183,13 +187,13 @@ interface ProviderSimulationResult {
   normalizedMessage: string;
 }
 
-type FocusArea =
-  | "back"
-  | "chest"
-  | "legs"
-  | "mixed"
-  | "shoulders"
-  | "unknown";
+interface AssistantAnswerCore {
+  summary: string;
+  bullets: string[];
+  evidence: AssistantAnswerEvidence;
+}
+
+type FocusArea = "back" | "chest" | "legs" | "mixed" | "shoulders" | "unknown";
 
 const ANSWER_DELTA_CHUNK_SIZE = 24;
 const RECOVERY_BOUNDARY_COPY =
@@ -215,7 +219,7 @@ function buildUserMessageContent(message: string): PersistedTextBlock[] {
 }
 
 function buildAssistantMessageContent(
-  answer: MockAssistantTurnResponseData["answer"],
+  answer: AssistantStructuredAnswer,
 ): PersistedTextBlock[] {
   const bulletLines = answer.bullets.map((bullet) => `- ${bullet}`);
 
@@ -230,7 +234,10 @@ function buildAssistantMessageContent(
   ];
 }
 
-function buildEvidence(toolName: string, result: unknown) {
+function buildEvidence(
+  toolName: string,
+  result: unknown,
+): AssistantAnswerEvidence {
   const record =
     typeof result === "object" && result !== null
       ? (result as { evidence?: unknown })
@@ -255,7 +262,7 @@ function buildEvidence(toolName: string, result: unknown) {
   };
 }
 
-function buildMockProviderEvidence(): MockAssistantTurnResponseData["answer"]["evidence"] {
+function buildMockProviderEvidence(): AssistantAnswerEvidence {
   return {
     source: "deterministic_mock_provider",
     tool_names: [],
@@ -265,9 +272,53 @@ function buildMockProviderEvidence(): MockAssistantTurnResponseData["answer"]["e
   };
 }
 
+function completeAnswer(input: {
+  summary: string;
+  bullets: string[];
+  evidence: AssistantAnswerEvidence;
+  intent: AssistantRoutedIntent;
+  recommendation?: string | undefined;
+  limitations?: string[] | undefined;
+}): AssistantStructuredAnswer {
+  return {
+    summary: input.summary,
+    bullets: input.bullets,
+    conclusion: input.summary,
+    recommendation:
+      input.recommendation ??
+      "请结合最近训练记录、主观疲劳和动作状态保守调整训练安排。",
+    evidence: input.evidence,
+    sources: [],
+    intent: input.intent,
+    limitations: input.limitations ?? [],
+  };
+}
+
+function normalizeStructuredAnswer(
+  answer: AssistantAnswerCore | AssistantStructuredAnswer,
+  intent: AssistantRoutedIntent,
+): AssistantStructuredAnswer {
+  if (
+    "intent" in answer &&
+    "sources" in answer &&
+    "limitations" in answer &&
+    "conclusion" in answer &&
+    "recommendation" in answer
+  ) {
+    return answer;
+  }
+
+  return completeAnswer({
+    summary: answer.summary,
+    bullets: answer.bullets,
+    evidence: answer.evidence,
+    intent,
+  });
+}
+
 function buildTrainingOverviewAnswer(
   result: TrainingOverviewResult,
-): MockAssistantTurnResponseData["answer"] {
+): AssistantAnswerCore {
   const topExercise = result.by_exercise[0];
 
   if (result.totals.workout_count === 0) {
@@ -298,7 +349,7 @@ function buildTrainingOverviewAnswer(
 
 function buildExerciseProgressAnswer(
   result: ExerciseProgressResult,
-): MockAssistantTurnResponseData["answer"] {
+): AssistantAnswerCore {
   const exerciseName = result.exercise.exercise_name ?? "当前动作";
 
   if (result.totals.workout_count === 0) {
@@ -328,7 +379,7 @@ function buildRecommendationContextAnswer(
   mode: AssistantIntentMode,
   message: string,
   result: RecommendationContextResult,
-): MockAssistantTurnResponseData["answer"] {
+): AssistantAnswerCore {
   if (result.summary.workout_count === 0) {
     return {
       summary:
@@ -359,7 +410,7 @@ function buildRecommendationContextAnswer(
 
 function buildNextTrainingFocusAnswer(
   result: RecommendationContextResult,
-): MockAssistantTurnResponseData["answer"] {
+): AssistantAnswerCore {
   const dominantArea = inferDominantFocusArea(result.summary.by_exercise);
   const topExercise = result.summary.by_exercise[0];
 
@@ -379,7 +430,7 @@ function buildNextTrainingFocusAnswer(
 function buildMuscleBalanceAnswer(
   message: string,
   result: RecommendationContextResult,
-): MockAssistantTurnResponseData["answer"] {
+): AssistantAnswerCore {
   const targetArea = detectTargetArea(message);
   const dominantArea = inferDominantFocusArea(result.summary.by_exercise);
   const topExercise = result.summary.by_exercise[0];
@@ -405,7 +456,7 @@ function buildMuscleBalanceAnswer(
 
 function buildTrainingImbalanceAnswer(
   result: RecommendationContextResult,
-): MockAssistantTurnResponseData["answer"] {
+): AssistantAnswerCore {
   const topExercises = result.summary.by_exercise.slice(0, 3);
   const topVolume = topExercises.reduce(
     (total, exercise) => total + exercise.total_volume,
@@ -413,7 +464,9 @@ function buildTrainingImbalanceAnswer(
   );
   const firstExercise = topExercises[0];
   const firstRatio =
-    topVolume === 0 || !firstExercise ? 0 : firstExercise.total_volume / topVolume;
+    topVolume === 0 || !firstExercise
+      ? 0
+      : firstExercise.total_volume / topVolume;
 
   return {
     summary:
@@ -433,11 +486,13 @@ function buildTrainingImbalanceAnswer(
 function buildRecoveryCheckAnswer(
   message: string,
   result: RecommendationContextResult,
-): MockAssistantTurnResponseData["answer"] {
+): AssistantAnswerCore {
   const targetArea = detectTargetArea(message);
   const dominantArea = inferDominantFocusArea(result.summary.by_exercise);
   const latestWorkout = result.recent_workouts[0];
-  const daysSince = latestWorkout ? getDaysSince(latestWorkout.performed_at) : null;
+  const daysSince = latestWorkout
+    ? getDaysSince(latestWorkout.performed_at)
+    : null;
   const relationCopy =
     targetArea !== "unknown" && targetArea === dominantArea
       ? `${describeTargetArea(targetArea)}相关训练在你最近记录里出现得不算少。`
@@ -455,7 +510,7 @@ function buildRecoveryCheckAnswer(
 
 function buildEvidenceExplainAnswer(
   result: RecommendationContextResult,
-): MockAssistantTurnResponseData["answer"] {
+): AssistantAnswerCore {
   return {
     summary:
       "这些判断来自已记录的 workout、set 和 calculation rules，不是模型凭空猜测。",
@@ -468,9 +523,7 @@ function buildEvidenceExplainAnswer(
   };
 }
 
-function buildProviderMessageAnswer(
-  message: string,
-): MockAssistantTurnResponseData["answer"] {
+function buildProviderMessageAnswer(message: string): AssistantAnswerCore {
   return {
     summary: message,
     bullets: [],
@@ -511,6 +564,12 @@ function getToolDefinitionForMode(
   mode: MockAssistantTurnInput["mode"],
 ): AssistantProviderToolDefinition {
   switch (mode) {
+    case "auto":
+      return {
+        name: "get_recommendation_context",
+        description: "Return a deterministic recommendation context package.",
+        input_fields: ["start_date", "end_date"],
+      };
     case "training_overview":
       return {
         name: "get_training_summary",
@@ -537,6 +596,61 @@ function getToolDefinitionForMode(
   }
 }
 
+function resolveRoutedIntent(
+  input: MockAssistantTurnInput,
+): AssistantRoutedIntent {
+  if (input.mode === "auto") {
+    return classifyAssistantIntent(input.message).intent;
+  }
+
+  switch (input.mode) {
+    case "training_overview":
+      return "summary";
+    case "exercise_progress":
+      return "progress";
+    case "next_training_focus":
+    case "recovery_check":
+      return "recommendation";
+    case "muscle_balance":
+    case "training_imbalance":
+      return "imbalance";
+    case "evidence_explain":
+      return "evidence";
+    case "unsupported":
+      return "unsupported";
+    default:
+      return "unsupported";
+  }
+}
+
+function resolveExecutionModeForIntent(
+  input: MockAssistantTurnInput,
+  intent: AssistantRoutedIntent,
+): AssistantIntentMode {
+  if (input.mode !== "auto") {
+    return input.mode;
+  }
+
+  switch (intent) {
+    case "summary":
+    case "exercise_history":
+      return "training_overview";
+    case "progress":
+      return input.exercise_id ? "exercise_progress" : "next_training_focus";
+    case "imbalance":
+      return "training_imbalance";
+    case "recommendation":
+      return "next_training_focus";
+    case "evidence":
+      return "evidence_explain";
+    case "mixed_tool_rag":
+      return "next_training_focus";
+    case "knowledge":
+    case "unsupported":
+      return "unsupported";
+  }
+}
+
 function getAllowedToolDefinitions(
   mode: MockAssistantTurnInput["mode"],
 ): AssistantProviderToolDefinition[] {
@@ -555,6 +669,7 @@ function getAllowedToolDefinitions(
 
 function buildProviderRequest(
   input: MockAssistantTurnInput,
+  executionMode: AssistantIntentMode,
 ): AssistantProviderRequest {
   const simulation = parseProviderSimulation(input.message);
 
@@ -563,12 +678,12 @@ function buildProviderRequest(
       user_message: input.message,
     },
     assistant_context: {
-      mode: input.mode,
+      mode: executionMode,
       start_date: input.start_date,
       end_date: input.end_date,
       exercise_id: input.exercise_id ?? null,
     },
-    allowed_tools: getAllowedToolDefinitions(input.mode),
+    allowed_tools: getAllowedToolDefinitions(executionMode),
     simulation: {
       scenario: simulation.scenario,
       normalized_message: simulation.normalizedMessage,
@@ -584,7 +699,9 @@ function ensureAllowedProviderTool(
     return;
   }
 
-  const isAllowed = allowedTools.some((tool) => tool.name === response.tool_name);
+  const isAllowed = allowedTools.some(
+    (tool) => tool.name === response.tool_name,
+  );
 
   if (!isAllowed) {
     throw new HttpError(
@@ -620,7 +737,11 @@ async function resolveSession(
   }
 
   if (await hasChatSessionById(sessionId)) {
-    throw new HttpError(403, "FORBIDDEN", "You cannot access this chat session.");
+    throw new HttpError(
+      403,
+      "FORBIDDEN",
+      "You cannot access this chat session.",
+    );
   }
 
   throw new HttpError(404, "NOT_FOUND", "Chat session was not found.");
@@ -666,7 +787,9 @@ async function emitEvent(
   await options?.onEvent?.(event);
 }
 
-function formatAnswerText(answer: MockAssistantTurnResponseData["answer"]): string {
+function formatAnswerText(
+  answer: MockAssistantTurnResponseData["answer"],
+): string {
   const bulletLines = answer.bullets.map((bullet) => `- ${bullet}`);
 
   return bulletLines.length === 0
@@ -699,7 +822,7 @@ function buildAnswerDeltas(
 }
 
 async function emitAnswerEvents(
-  answer: MockAssistantTurnResponseData["answer"],
+  answer: AssistantStructuredAnswer,
   options: AssistantStreamOptions | undefined,
 ): Promise<void> {
   await emitEvent(options, {
@@ -719,7 +842,7 @@ function buildToolAnswer(
   input: MockAssistantTurnInput,
   toolName: string,
   result: unknown,
-): MockAssistantTurnResponseData["answer"] {
+): AssistantAnswerCore {
   if (toolName === "get_training_summary") {
     return buildTrainingOverviewAnswer(result as TrainingOverviewResult);
   }
@@ -755,7 +878,82 @@ export async function runMockAssistantTurn(
     type: "session",
     session_id: resolvedSession.sessionId,
   });
-  const providerRequest = buildProviderRequest(input);
+  const intent = resolveRoutedIntent(input);
+  const executionMode = resolveExecutionModeForIntent(input, intent);
+
+  if (intent === "unsupported") {
+    const answer = composeUnsupportedAnswer(input.message);
+
+    await emitAnswerEvents(answer, options);
+
+    const response: MockAssistantTurnResponseData = {
+      session_id: resolvedSession.sessionId,
+      mode: input.mode,
+      assistant_type: "deterministic_mock",
+      intent,
+      tool_calls: [],
+      answer,
+    };
+
+    await persistMockTurnMessages({
+      sessionId: resolvedSession.sessionId,
+      request: input,
+      response,
+    });
+
+    await emitEvent(options, {
+      type: "structured_output",
+      output: response,
+    });
+    await emitEvent(options, {
+      type: "done",
+      session_id: resolvedSession.sessionId,
+    });
+
+    return response;
+  }
+
+  if (intent === "knowledge") {
+    await emitEvent(options, {
+      type: "state",
+      state: "retrieving",
+    });
+
+    const answer = composeKnowledgeAnswer({
+      message: input.message,
+      sources: retrieveKnowledgeChunks(input.message),
+    });
+
+    await emitAnswerEvents(answer, options);
+
+    const response: MockAssistantTurnResponseData = {
+      session_id: resolvedSession.sessionId,
+      mode: input.mode,
+      assistant_type: "deterministic_mock",
+      intent,
+      tool_calls: [],
+      answer,
+    };
+
+    await persistMockTurnMessages({
+      sessionId: resolvedSession.sessionId,
+      request: input,
+      response,
+    });
+
+    await emitEvent(options, {
+      type: "structured_output",
+      output: response,
+    });
+    await emitEvent(options, {
+      type: "done",
+      session_id: resolvedSession.sessionId,
+    });
+
+    return response;
+  }
+
+  const providerRequest = buildProviderRequest(input, executionMode);
 
   await emitEvent(options, {
     type: "provider_selected",
@@ -765,9 +963,14 @@ export async function runMockAssistantTurn(
   const providerResponse = await runAssistantProvider(providerRequest);
 
   if (providerResponse.kind === "error") {
-    const error = new HttpError(502, "AI_PROVIDER_ERROR", providerResponse.message, {
-      provider_error_code: providerResponse.error_code,
-    });
+    const error = new HttpError(
+      502,
+      "AI_PROVIDER_ERROR",
+      providerResponse.message,
+      {
+        provider_error_code: providerResponse.error_code,
+      },
+    );
 
     await emitEvent(options, {
       type: "error",
@@ -779,10 +982,13 @@ export async function runMockAssistantTurn(
   }
 
   const toolCalls: MockAssistantTurnResponseData["tool_calls"] = [];
-  let answer: MockAssistantTurnResponseData["answer"];
+  let answer: AssistantStructuredAnswer;
 
   if (providerResponse.kind === "message") {
-    answer = buildProviderMessageAnswer(providerResponse.message);
+    answer = normalizeStructuredAnswer(
+      buildProviderMessageAnswer(providerResponse.message),
+      intent,
+    );
     await emitAnswerEvents(answer, options);
   } else {
     ensureAllowedProviderTool(providerResponse, providerRequest.allowed_tools);
@@ -838,7 +1044,29 @@ export async function runMockAssistantTurn(
       throw error;
     }
 
-    answer = buildToolAnswer(input, providerResponse.tool_name, result);
+    if (intent === "mixed_tool_rag") {
+      await emitEvent(options, {
+        type: "state",
+        state: "retrieving",
+      });
+      answer = composeMixedToolRagAnswer({
+        message: input.message,
+        sources: retrieveKnowledgeChunks(input.message),
+        toolEvidence: buildEvidence(providerResponse.tool_name, result),
+      });
+    } else {
+      answer = normalizeStructuredAnswer(
+        buildToolAnswer(
+          {
+            ...input,
+            mode: executionMode,
+          },
+          providerResponse.tool_name,
+          result,
+        ),
+        intent,
+      );
+    }
     await emitAnswerEvents(answer, options);
   }
 
@@ -846,6 +1074,7 @@ export async function runMockAssistantTurn(
     session_id: resolvedSession.sessionId,
     mode: input.mode,
     assistant_type: "deterministic_mock",
+    intent,
     tool_calls: toolCalls,
     answer,
   };
@@ -854,6 +1083,11 @@ export async function runMockAssistantTurn(
     sessionId: resolvedSession.sessionId,
     request: input,
     response,
+  });
+
+  await emitEvent(options, {
+    type: "structured_output",
+    output: response,
   });
 
   await emitEvent(options, {
@@ -880,7 +1114,9 @@ function inferDominantFocusArea(
     areaScores.set(area, (areaScores.get(area) ?? 0) + exercise.total_volume);
   }
 
-  const rankedAreas = [...areaScores.entries()].sort((left, right) => right[1] - left[1]);
+  const rankedAreas = [...areaScores.entries()].sort(
+    (left, right) => right[1] - left[1],
+  );
   const topArea = rankedAreas[0];
   const secondArea = rankedAreas[1];
 
@@ -910,11 +1146,15 @@ function inferFocusAreaFromName(exerciseName: string): FocusArea {
     return "back";
   }
 
-  if (/(squat|leg|lunge|rdl|romanian|calf|hip thrust|glute)/u.test(normalized)) {
+  if (
+    /(squat|leg|lunge|rdl|romanian|calf|hip thrust|glute)/u.test(normalized)
+  ) {
     return "legs";
   }
 
-  if (/(shoulder|overhead press|lateral raise|rear delt|press)/u.test(normalized)) {
+  if (
+    /(shoulder|overhead press|lateral raise|rear delt|press)/u.test(normalized)
+  ) {
     return "shoulders";
   }
 

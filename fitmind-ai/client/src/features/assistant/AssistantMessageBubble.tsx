@@ -19,14 +19,85 @@ export function AssistantMessageBubble(props: AssistantMessageBubbleProps) {
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={metaRowStyle}>
-          <span style={nameStyle(theme)}>{isAssistant ? "训练助手" : "你"}</span>
+          <span style={nameStyle(theme)}>
+            {isAssistant ? "训练助手" : "你"}
+          </span>
           {message.isStreaming ? <Badge tone="info">生成中</Badge> : null}
         </div>
         <div style={bubbleStyle(theme, isAssistant)}>
           <p style={messageTextStyle}>{message.text || "..."}</p>
+          {isAssistant ? (
+            <AssistantMessageEvidenceSummary message={message} />
+          ) : null}
         </div>
       </div>
     </article>
+  );
+}
+
+function AssistantMessageEvidenceSummary(props: {
+  message: AssistantChatMessage;
+}) {
+  const { message } = props;
+  const hasEvidence =
+    (message.evidence?.toolNames.length ?? 0) > 0 ||
+    (message.evidence?.workoutIds.length ?? 0) > 0 ||
+    (message.evidence?.setIds.length ?? 0) > 0;
+  const hasSources = (message.sources?.length ?? 0) > 0;
+  const hasLimitations = (message.limitations?.length ?? 0) > 0;
+
+  if (!hasEvidence && !hasSources && !hasLimitations && !message.intent) {
+    return null;
+  }
+
+  return (
+    <div style={structuredOutputStyle}>
+      {message.intent ? (
+        <div style={structuredLineStyle}>Intent: {message.intent}</div>
+      ) : null}
+      {hasEvidence ? (
+        <details>
+          <summary style={summaryStyle}>Evidence</summary>
+          <ul style={listStyle}>
+            {message.evidence?.toolNames.length ? (
+              <li>Tools: {message.evidence.toolNames.join("、")}</li>
+            ) : null}
+            {message.evidence?.workoutIds.length ? (
+              <li>Workouts: {message.evidence.workoutIds.length} 条</li>
+            ) : null}
+            {message.evidence?.setIds.length ? (
+              <li>Sets: {message.evidence.setIds.length} 条</li>
+            ) : null}
+            {message.evidence?.calculationRules.length ? (
+              <li>Rules: {message.evidence.calculationRules.join("、")}</li>
+            ) : null}
+          </ul>
+        </details>
+      ) : null}
+      {hasSources ? (
+        <details>
+          <summary style={summaryStyle}>Sources</summary>
+          <ul style={listStyle}>
+            {message.sources?.map((source) => (
+              <li key={source.id}>
+                <strong>{source.title}</strong>
+                <span>：{source.chunkText}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+      {hasLimitations ? (
+        <details>
+          <summary style={summaryStyle}>Limitations</summary>
+          <ul style={listStyle}>
+            {message.limitations?.map((limitation) => (
+              <li key={limitation}>{limitation}</li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </div>
   );
 }
 
@@ -66,7 +137,9 @@ const metaRowStyle: React.CSSProperties = {
   marginBottom: 6,
 };
 
-function nameStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function nameStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx3,
     fontSize: 11,
@@ -92,4 +165,31 @@ const messageTextStyle: React.CSSProperties = {
   margin: 0,
   whiteSpace: "pre-wrap",
   wordBreak: "break-word",
+};
+
+const structuredOutputStyle: React.CSSProperties = {
+  borderTop: "1px solid rgba(128, 128, 128, 0.22)",
+  display: "grid",
+  gap: 8,
+  marginTop: 12,
+  paddingTop: 10,
+};
+
+const structuredLineStyle: React.CSSProperties = {
+  fontSize: 11,
+  fontWeight: 700,
+  opacity: 0.7,
+};
+
+const summaryStyle: React.CSSProperties = {
+  cursor: "pointer",
+  fontSize: 12,
+  fontWeight: 800,
+};
+
+const listStyle: React.CSSProperties = {
+  fontSize: 12,
+  lineHeight: 1.6,
+  margin: "8px 0 0",
+  paddingLeft: 18,
 };

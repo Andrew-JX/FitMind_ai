@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { HttpClientError } from "../../services/http-client";
 import { streamAssistantChat } from "./assistant-stream-api";
+import { mergeStructuredOutputIntoMessage } from "./assistant-structured-output";
 import type {
   AssistantActiveToolCall,
   AssistantChatMessage,
@@ -34,9 +35,8 @@ export interface UseAssistantChatResult {
 export function useAssistantChat(token: string | null): UseAssistantChatResult {
   const [messages, setMessages] = useState<AssistantChatMessage[]>([]);
   const [status, setStatus] = useState<AssistantChatStatus>("idle");
-  const [activeToolCall, setActiveToolCall] = useState<AssistantActiveToolCall | null>(
-    null,
-  );
+  const [activeToolCall, setActiveToolCall] =
+    useState<AssistantActiveToolCall | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [provider, setProvider] = useState<AssistantProvider | null>(null);
@@ -79,7 +79,9 @@ export function useAssistantChat(token: string | null): UseAssistantChatResult {
     status,
   };
 
-  async function sendMessage(payload: AssistantChatRequestPayload): Promise<void> {
+  async function sendMessage(
+    payload: AssistantChatRequestPayload,
+  ): Promise<void> {
     if (!token) {
       setStatus("error");
       setErrorMessage("请先登录后再使用训练助手。");
@@ -264,6 +266,17 @@ export function useAssistantChat(token: string | null): UseAssistantChatResult {
                 text: `${message.text}${event.text}`,
               }
             : message,
+        ),
+      );
+      return;
+    }
+
+    if (event.type === "structured_output") {
+      setMessages((currentMessages) =>
+        mergeStructuredOutputIntoMessage(
+          currentMessages,
+          assistantMessageId,
+          event.output,
         ),
       );
       return;

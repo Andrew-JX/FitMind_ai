@@ -1,7 +1,10 @@
 import { Badge } from "../../components/Badge";
 import { Card } from "../../components/Card";
 import { useTheme } from "../../theme/ThemeContext";
-import type { AssistantMode, AssistantPromptSuggestion } from "./assistant-types";
+import type {
+  AssistantMode,
+  AssistantPromptSuggestion,
+} from "./assistant-types";
 
 export interface AssistantQuickPromptsProps {
   activeMode: AssistantMode;
@@ -82,10 +85,10 @@ export function AssistantQuickPrompts(props: AssistantQuickPromptsProps) {
         <div>
           <h3 style={sectionTitleStyle}>快捷问题</h3>
           <p style={sectionCopyStyle(theme)}>
-            这些入口会直接帮你追问最常见、也最稳定的训练问题，不需要先猜该怎么问。
+            这些只是示例问法。你也可以直接输入自然训练问题，助手会先判断意图，再读取训练数据或检索训练知识。
           </p>
         </div>
-        <Badge tone="neutral">6 个常用问题</Badge>
+        <Badge tone="neutral">示例问题</Badge>
       </div>
 
       <div style={promptListStyle}>
@@ -97,7 +100,11 @@ export function AssistantQuickPrompts(props: AssistantQuickPromptsProps) {
               disabled={prompt.disabled}
               key={prompt.title}
               onClick={() => props.onSelectPrompt(prompt.prompt)}
-              style={promptButtonStyle(theme, isActive, Boolean(prompt.disabled))}
+              style={promptButtonStyle(
+                theme,
+                isActive,
+                Boolean(prompt.disabled),
+              )}
               type="button"
             >
               <div style={promptTitleRowStyle}>
@@ -106,7 +113,9 @@ export function AssistantQuickPrompts(props: AssistantQuickPromptsProps) {
                 </span>
                 {isActive ? <Badge tone="accent">当前</Badge> : null}
               </div>
-              <span style={promptDescriptionStyle(theme, Boolean(prompt.disabled))}>
+              <span
+                style={promptDescriptionStyle(theme, Boolean(prompt.disabled))}
+              >
                 {prompt.description}
               </span>
               {prompt.disabled && prompt.helper ? (
@@ -132,7 +141,9 @@ const sectionTitleStyle: React.CSSProperties = {
   margin: 0,
 };
 
-function sectionCopyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function sectionCopyStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 12,
@@ -194,7 +205,9 @@ function promptDescriptionStyle(
   };
 }
 
-function promptHelperStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function promptHelperStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.orange,
     fontSize: 11,

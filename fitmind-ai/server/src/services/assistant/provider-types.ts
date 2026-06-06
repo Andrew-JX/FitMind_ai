@@ -10,6 +10,7 @@ export interface AssistantProviderSimulationHint {
 }
 
 export type AssistantIntentMode =
+  | "auto"
   | "training_overview"
   | "exercise_progress"
   | "next_training_focus"

@@ -5,6 +5,7 @@ export type StatusTone =
   | "idle"
   | "thinking"
   | "tool_calling"
+  | "retrieving"
   | "answering"
   | "done"
   | "error";
@@ -24,7 +25,7 @@ export function StatusPill(props: StatusPillProps) {
           ? getToneColors(theme, "accent")
           : props.status === "tool_calling"
             ? getToneColors(theme, "info")
-            : props.status === "answering"
+            : props.status === "retrieving" || props.status === "answering"
               ? getToneColors(theme, "analysis")
               : getToneColors(theme, "neutral");
 
@@ -69,6 +70,10 @@ function formatStatus(status: StatusTone): string {
 
   if (status === "tool_calling") {
     return "读取数据";
+  }
+
+  if (status === "retrieving") {
+    return "检索知识";
   }
 
   if (status === "answering") {

@@ -24,9 +24,11 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
   const { chat } = props;
   const { theme } = useTheme();
   const message = props.promptSuggestion?.message ?? "";
-  const mode = props.promptSuggestion?.mode ?? "next_training_focus";
+  const mode = props.promptSuggestion?.mode ?? "auto";
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+  async function handleSubmit(
+    event: React.FormEvent<HTMLFormElement>,
+  ): Promise<void> {
     event.preventDefault();
 
     if (mode === "exercise_progress" && !props.selectedExerciseId) {
@@ -41,7 +43,7 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
       end_date: range.end_date,
       exercise_id:
         mode === "exercise_progress"
-          ? props.selectedExerciseId ?? undefined
+          ? (props.selectedExerciseId ?? undefined)
           : undefined,
       session_id: chat.sessionId ?? undefined,
     };
@@ -76,7 +78,7 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
           <div>
             <h3 style={{ margin: 0 }}>继续追问</h3>
             <p style={copyStyle(theme)}>
-              先看上面的主动洞察，如果你想继续问为什么这样判断、今天适不适合继续练，或者某个动作有没有进步，可以在这里追问。
+              可以直接自然追问训练记录、动作进展或训练知识。上面的按钮只是示例，不是唯一问法。
             </p>
           </div>
           <AssistantMessageList messages={chat.messages} />
@@ -120,7 +122,9 @@ const sectionStyle: React.CSSProperties = {
   gap: 10,
 };
 
-function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function copyStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 13,

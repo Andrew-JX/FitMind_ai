@@ -2,11 +2,13 @@ export type AssistantChatStatus =
   | "idle"
   | "thinking"
   | "tool_calling"
+  | "retrieving"
   | "answering"
   | "done"
   | "error";
 
 export type AssistantMode =
+  | "auto"
   | "training_overview"
   | "exercise_progress"
   | "next_training_focus"
@@ -31,7 +33,10 @@ export interface AssistantPromptSuggestion {
 }
 
 export type AssistantStreamEvent =
-  | { type: "state"; state: "thinking" | "tool_calling" | "answering" }
+  | {
+      type: "state";
+      state: "thinking" | "tool_calling" | "retrieving" | "answering";
+    }
   | { type: "session"; session_id: string }
   | { type: "provider_selected"; provider: "mock" | "anthropic" }
   | { type: "tool_call_started"; tool_name: string }
@@ -42,6 +47,7 @@ export type AssistantStreamEvent =
       duration_ms: number;
     }
   | { type: "answer_delta"; text: string }
+  | { type: "structured_output"; output: AssistantStructuredOutput }
   | {
       type: "done";
       message_id?: string | undefined;
@@ -55,7 +61,11 @@ export interface AssistantChatMessage {
   id: string;
   role: AssistantMessageRole;
   text: string;
+  evidence?: AssistantMessageEvidence | undefined;
+  intent?: string | undefined;
   isStreaming?: boolean | undefined;
+  limitations?: string[] | undefined;
+  sources?: AssistantMessageSource[] | undefined;
 }
 
 export interface AssistantActiveToolCall {
@@ -65,3 +75,46 @@ export interface AssistantActiveToolCall {
 }
 
 export type AssistantProvider = "mock" | "anthropic";
+
+export interface AssistantMessageEvidence {
+  calculationRules: string[];
+  setIds: string[];
+  toolNames: string[];
+  workoutIds: string[];
+}
+
+export interface AssistantMessageSource {
+  category: string;
+  chunkText: string;
+  id: string;
+  sourceType: string;
+  tags: string[];
+  title: string;
+}
+
+export interface AssistantStructuredOutput {
+  intent?: string | undefined;
+  answer?:
+    | {
+        evidence?:
+          | {
+              calculation_rules?: string[] | undefined;
+              set_ids?: string[] | undefined;
+              tool_names?: string[] | undefined;
+              workout_ids?: string[] | undefined;
+            }
+          | undefined;
+        limitations?: string[] | undefined;
+        sources?:
+          | Array<{
+              category?: string | undefined;
+              chunk_text?: string | undefined;
+              id?: string | undefined;
+              source_type?: string | undefined;
+              tags?: string[] | undefined;
+              title?: string | undefined;
+            }>
+          | undefined;
+      }
+    | undefined;
+}
