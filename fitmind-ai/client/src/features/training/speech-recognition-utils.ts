@@ -8,6 +8,26 @@ export type SpeechRecognitionErrorCode =
   | "not-allowed"
   | "service-not-allowed";
 
+export interface SpeechRecognitionAlternativeLike {
+  transcript: string;
+}
+
+export interface SpeechRecognitionResultLike {
+  isFinal: boolean;
+  item(index: number): SpeechRecognitionAlternativeLike;
+  length: number;
+}
+
+export interface SpeechRecognitionResultListLike {
+  item(index: number): SpeechRecognitionResultLike;
+  length: number;
+}
+
+export interface SpeechRecognitionTranscriptSnapshot {
+  finalTranscript: string;
+  interimTranscript: string;
+}
+
 export function getSpeechRecognitionErrorMessage(
   errorCode: SpeechRecognitionErrorCode | string,
 ): string {
@@ -51,4 +71,37 @@ export function appendSpeechTranscript(
   }
 
   return `${trimmedCurrentText} ${trimmedTranscript}`;
+}
+
+export function collectSpeechRecognitionTranscriptSnapshot(
+  results: SpeechRecognitionResultListLike,
+  resultIndex: number,
+): SpeechRecognitionTranscriptSnapshot {
+  const finalParts: string[] = [];
+  const interimParts: string[] = [];
+
+  for (let index = resultIndex; index < results.length; index += 1) {
+    const result = results.item(index);
+
+    if (result.length <= 0) {
+      continue;
+    }
+
+    const transcript = result.item(0).transcript.trim();
+
+    if (!transcript) {
+      continue;
+    }
+
+    if (result.isFinal) {
+      finalParts.push(transcript);
+    } else {
+      interimParts.push(transcript);
+    }
+  }
+
+  return {
+    finalTranscript: finalParts.join(" ").trim(),
+    interimTranscript: interimParts.join(" ").trim(),
+  };
 }

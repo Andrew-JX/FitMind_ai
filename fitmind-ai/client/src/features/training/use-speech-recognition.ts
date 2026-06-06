@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 
 import {
+  appendSpeechTranscript,
+  collectSpeechRecognitionTranscriptSnapshot,
   getSpeechRecognitionErrorMessage,
   type SpeechRecognitionErrorCode,
 } from "./speech-recognition-utils";
@@ -52,6 +54,7 @@ interface SpeechRecognitionWindow extends Window {
 
 export interface UseSpeechRecognitionResult {
   errorMessage: string | null;
+  interimTranscript: string;
   isListening: boolean;
   isSupported: boolean;
   resetTranscript: () => void;
@@ -60,19 +63,16 @@ export interface UseSpeechRecognitionResult {
   transcript: string;
 }
 
-export interface UseSpeechRecognitionOptions {
-  onFinalTranscript?: ((transcript: string) => void) | undefined;
-}
-
-export function useSpeechRecognition(
-  options: UseSpeechRecognitionOptions = {},
-): UseSpeechRecognitionResult {
+export function useSpeechRecognition(): UseSpeechRecognitionResult {
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [finalTranscript, setFinalTranscript] = useState("");
+  const [interimTranscript, setInterimTranscript] = useState("");
   const [isListening, setIsListening] = useState(false);
-  const [onFinalTranscript] = useState(() => options.onFinalTranscript);
-  const [isSupported] = useState(() => getSpeechRecognitionConstructor() !== null);
-  const [transcript, setTranscript] = useState("");
+  const [isSupported] = useState(
+    () => getSpeechRecognitionConstructor() !== null,
+  );
+  const transcript = appendSpeechTranscript(finalTranscript, interimTranscript);
 
   useEffect(() => {
     return () => {
@@ -85,9 +85,7 @@ export function useSpeechRecognition(
     const RecognitionConstructor = getSpeechRecognitionConstructor();
 
     if (!RecognitionConstructor) {
-      setErrorMessage(
-        "当前浏览器暂不支持语音识别，可以继续使用文本输入。",
-      );
+      setErrorMessage("当前浏览器暂不支持语音识别，可以继续使用文本输入。");
       return;
     }
 
@@ -95,7 +93,7 @@ export function useSpeechRecognition(
 
     const recognition = new RecognitionConstructor();
     recognition.continuous = true;
-    recognition.interimResults = false;
+    recognition.interimResults = true;
     recognition.lang = "zh-CN";
     recognition.maxAlternatives = 1;
     recognition.onstart = () => {
@@ -110,19 +108,23 @@ export function useSpeechRecognition(
       setIsListening(false);
     };
     recognition.onresult = (event) => {
-      const finalTranscript = extractFinalTranscript(event);
+      const snapshot = collectSpeechRecognitionTranscriptSnapshot(
+        event.results,
+        event.resultIndex,
+      );
 
-      if (finalTranscript) {
-        onFinalTranscript?.(finalTranscript);
-        setTranscript((currentTranscript) =>
-          appendInternalTranscript(currentTranscript, finalTranscript),
+      if (snapshot.finalTranscript) {
+        setFinalTranscript((currentTranscript) =>
+          appendSpeechTranscript(currentTranscript, snapshot.finalTranscript),
         );
       }
+
+      setInterimTranscript(snapshot.interimTranscript);
     };
 
     recognitionRef.current = recognition;
     setErrorMessage(null);
-    setTranscript("");
+    resetTranscript();
 
     try {
       recognition.start();
@@ -138,11 +140,13 @@ export function useSpeechRecognition(
   }
 
   function resetTranscript() {
-    setTranscript("");
+    setFinalTranscript("");
+    setInterimTranscript("");
   }
 
   return {
     errorMessage,
+    interimTranscript,
     isListening,
     isSupported,
     resetTranscript,
@@ -164,34 +168,4 @@ function getSpeechRecognitionConstructor(): BrowserSpeechRecognitionConstructor 
     speechWindow.webkitSpeechRecognition ??
     null
   );
-}
-
-function extractFinalTranscript(
-  event: BrowserSpeechRecognitionResultEvent,
-): string {
-  const transcriptParts: string[] = [];
-
-  for (let index = event.resultIndex; index < event.results.length; index += 1) {
-    const result = event.results.item(index);
-
-    if (result.isFinal && result.length > 0) {
-      transcriptParts.push(result.item(0).transcript);
-    }
-  }
-
-  return transcriptParts.join(" ").trim();
-}
-
-function appendInternalTranscript(
-  currentTranscript: string,
-  nextTranscript: string,
-): string {
-  const trimmedCurrent = currentTranscript.trim();
-  const trimmedNext = nextTranscript.trim();
-
-  if (!trimmedNext) {
-    return currentTranscript;
-  }
-
-  return trimmedCurrent ? `${trimmedCurrent} ${trimmedNext}` : trimmedNext;
 }

@@ -61,16 +61,16 @@ export function TrainingView(props: TrainingViewProps) {
             type="button"
             variant="secondary"
           >
-            更多记录方式
+            语音记录训练
           </Button>
         </div>
       ) : null}
 
       <ActionSheet
-        description="可以手动输入训练内容，也可以用语音先转成文字再确认。"
+        description="说出动作、重量、次数和组数，识别后先确认文字，再生成训练记录。"
         onClose={() => setIsIntakeSheetOpen(false)}
         open={isIntakeSheetOpen}
-        title="选择记录方式"
+        title="语音记录训练"
       >
         <WorkoutIntakePanel
           onDraftParsed={(draft) => {
@@ -163,7 +163,10 @@ export function TrainingView(props: TrainingViewProps) {
         : await getWorkoutDetail(token, workoutId);
 
     setPendingInitialDraft(
-      mapWorkoutToSessionInitialDraft(detail, props.exercisePickerProps.exercises),
+      mapWorkoutToSessionInitialDraft(
+        detail,
+        props.exercisePickerProps.exercises,
+      ),
     );
     setEditingWorkoutId(workoutId);
     setComposerMode("edit_existing");

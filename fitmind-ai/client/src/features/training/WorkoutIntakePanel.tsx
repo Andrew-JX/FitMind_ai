@@ -23,21 +23,22 @@ const COPY = {
   cancel: "取消",
   errorTitle: "识别失败",
   inputLabel: "训练描述",
-  modalHelp: "语音识别可能有误，请先检查文字，再生成训练记录。",
+  modalHelp: "语音识别可能有误，请先检查文字；如果还没说完，可以继续语音补充。",
   modalTitle: "确认训练内容",
   parse: "生成训练记录",
   parsing: "识别中...",
-  placeholder:
-    "例如：今天杠铃卧推三组 60x10 65x8 70x6，高位下拉两组 45x12。",
-  speechFallback: "当前浏览器暂不支持语音识别，可以继续使用文本记录。",
+  placeholder: "例如：今天杠铃卧推三组 60x10 65x8 70x6，高位下拉两组 45x12。",
+  speechContinue: "继续说",
+  speechFallback: "当前浏览器暂不支持语音识别，请换用支持语音识别的浏览器。",
   speechListening: "正在听你说训练内容",
   speechCancel: "取消",
   speechDone: "完成",
-  speechHelp: "可以说动作、重量、次数和组数。授权弹窗关闭后，也可以点完成结束录音。",
+  speechHelp:
+    "可以说动作、重量、次数和组数。说慢一点也没关系，下方会实时显示识别结果。",
   speechNoticeTitle: "语音识别提示",
-  speechRelease: "说完后点完成，我会把内容放到文字确认页。",
+  speechRelease: "说完后点完成；如果浏览器自动暂停，可以点继续说。",
   speechTrigger: "语音输入",
-  textTrigger: "文本输入",
+  speechTriggerLong: "语音记录训练",
 };
 
 export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
@@ -47,13 +48,13 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
   const [isVoiceOverlayOpen, setIsVoiceOverlayOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [status, setStatus] = useState<IntakeStatus>("idle");
-  const speechRecognition = useSpeechRecognition({
-    onFinalTranscript: (transcript) => {
-      setText((currentText) => appendSpeechTranscript(currentText, transcript));
-    },
-  });
+  const speechRecognition = useSpeechRecognition();
 
   const isBusy = status === "parsing";
+  const voicePreviewText = appendSpeechTranscript(
+    text,
+    speechRecognition.transcript,
+  );
   const canParse =
     props.token !== null && text.trim().length > 0 && status !== "parsing";
 
@@ -80,15 +81,6 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
     }
   }
 
-  function handleTextOpen() {
-    if (isBusy) {
-      return;
-    }
-
-    setErrorMessage(null);
-    setIsModalOpen(true);
-  }
-
   function handleVoiceStart() {
     if (isBusy) {
       return;
@@ -97,7 +89,7 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
     setErrorMessage(null);
 
     if (!speechRecognition.isSupported) {
-      setIsModalOpen(true);
+      setErrorMessage(COPY.speechFallback);
       return;
     }
 
@@ -111,6 +103,9 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
       return;
     }
 
+    setText((currentText) =>
+      appendSpeechTranscript(currentText, speechRecognition.transcript),
+    );
     setIsVoiceOverlayOpen(false);
     speechRecognition.stopListening();
     setIsModalOpen(true);
@@ -147,14 +142,6 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
     <>
       <div style={triggerActionsStyle}>
         <Button
-          disabled={isBusy}
-          onClick={handleTextOpen}
-          type="button"
-          variant="secondary"
-        >
-          {COPY.textTrigger}
-        </Button>
-        <Button
           aria-label={COPY.speechTrigger}
           disabled={isBusy}
           onClick={handleVoiceStart}
@@ -164,9 +151,17 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
           variant="secondary"
         >
           <Icon name="mic" size={18} />
-          <span>{COPY.speechTrigger}</span>
+          <span>{COPY.speechTriggerLong}</span>
         </Button>
       </div>
+
+      {errorMessage && !isModalOpen ? (
+        <StateNotice
+          description={errorMessage}
+          title={COPY.errorTitle}
+          tone="error"
+        />
+      ) : null}
 
       <ActionSheet
         closeOnBackdrop={!isBusy}
@@ -181,7 +176,22 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
             >
               {COPY.cancel}
             </Button>
-            <Button disabled={!canParse || isBusy} onClick={handleParse} type="button">
+            <Button
+              disabled={isBusy}
+              onClick={() => {
+                setIsModalOpen(false);
+                handleVoiceStart();
+              }}
+              type="button"
+              variant="secondary"
+            >
+              {COPY.speechContinue}
+            </Button>
+            <Button
+              disabled={!canParse || isBusy}
+              onClick={handleParse}
+              type="button"
+            >
               {status === "parsing" ? COPY.parsing : COPY.parse}
             </Button>
           </div>
@@ -238,7 +248,11 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
         description={COPY.speechRelease}
         footer={
           <div style={actionGridStyle}>
-            <Button onClick={handleVoiceCancel} type="button" variant="secondary">
+            <Button
+              onClick={handleVoiceCancel}
+              type="button"
+              variant="secondary"
+            >
               {COPY.speechCancel}
             </Button>
             <Button onClick={handleVoiceDone} type="button">
@@ -271,13 +285,44 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
               />
             ))}
           </div>
-          <p style={{ ...copyStyle, color: theme.colors.tx2 }}>{COPY.speechHelp}</p>
+          <p style={{ ...copyStyle, color: theme.colors.tx2 }}>
+            {COPY.speechHelp}
+          </p>
+          <label
+            style={{ ...labelStyle, color: theme.colors.tx2, width: "100%" }}
+          >
+            {COPY.inputLabel}
+            <textarea
+              aria-live="polite"
+              readOnly
+              placeholder="开始说训练内容后，这里会实时出现识别结果。"
+              style={{
+                ...textareaStyle,
+                backgroundColor: theme.colors.surf2,
+                border: `1px solid ${theme.colors.bdr}`,
+                borderRadius: theme.radius.control,
+                color: theme.colors.tx,
+                fontFamily: theme.fonts.body,
+                minHeight: 120,
+              }}
+              value={voicePreviewText}
+            />
+          </label>
           {speechRecognition.errorMessage ? (
             <StateNotice
               description={speechRecognition.errorMessage}
               title={COPY.speechNoticeTitle}
               tone="warning"
             />
+          ) : null}
+          {!speechRecognition.isListening ? (
+            <Button
+              onClick={handleVoiceStart}
+              type="button"
+              variant="secondary"
+            >
+              {COPY.speechContinue}
+            </Button>
           ) : null}
         </div>
       </ActionSheet>
@@ -310,7 +355,7 @@ function padDatePart(value: number): string {
 const triggerActionsStyle: React.CSSProperties = {
   display: "grid",
   gap: 10,
-  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gridTemplateColumns: "minmax(0, 1fr)",
 };
 
 const micButtonStyle: React.CSSProperties = {
@@ -324,7 +369,7 @@ const micButtonStyle: React.CSSProperties = {
 const actionGridStyle: React.CSSProperties = {
   display: "grid",
   gap: 10,
-  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(0, 1fr))",
 };
 
 const copyStyle: React.CSSProperties = {
