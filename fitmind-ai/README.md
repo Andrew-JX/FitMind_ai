@@ -91,7 +91,7 @@ AI layer:
 
 ## Current Limitations
 
-- No RAG.
+- RAG is currently an MVP skeleton: static seed corpus plus keyword retrieval, not embeddings or pgvector yet.
 - No MCP.
 - No multi-tool agent loop.
 - No real Anthropic token streaming.

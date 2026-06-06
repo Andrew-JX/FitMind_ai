@@ -225,3 +225,47 @@ pnpm seed:assistant-demo
 - 先说明这是当前环境的 sandbox DB egress denial
 - 不要把它描述成 app 逻辑 bug
 - 改用已验证的 elevated run 路径
+
+## 10. Phase 4.8A.1 Assistant RAG Demo Flow
+
+Use this flow for the current production-ready assistant demo. The point is to show that FitMind separates user training evidence from general training knowledge sources.
+
+Prerequisite:
+
+- Log in with a test/demo account that has recent bench press workouts.
+- In the Assistant page, select bench press as the focused exercise when demonstrating exercise progress or mixed Tool + RAG questions.
+- Keep `ASSISTANT_PROVIDER=mock` for a stable demo unless intentionally testing the Anthropic adapter.
+
+Stable question sequence:
+
+1. Ask: `我最近卧推是不是没进步？`
+2. Show: the answer is routed as `progress` and displays Evidence from deterministic training data.
+3. Ask: `RPE 是什么？`
+4. Show: the answer is routed as `knowledge` and displays Sources from the training knowledge retriever.
+5. Ask: `卧推没进步是不是训练量不够？`
+6. Show: the answer is routed as `mixed_tool_rag` and displays Evidence + Sources together.
+7. Ask: `你根据什么判断？`
+8. Show: the assistant explains what training data / deterministic evidence it used.
+9. Ask an unsupported question such as `给我讲个笑话`.
+10. Show: the assistant returns a scoped boundary instead of pretending to be a general chatbot.
+
+Speaking track:
+
+> FitMind AI does not put every fact into the prompt. User-specific training records go through deterministic tools and appear as Evidence. General training concepts go through the RAG knowledge retriever and appear as Sources. The model's job is to organize and explain the result, not invent training facts.
+
+Production smoke reference from 2026-06-06:
+
+- `/api/health`: 200.
+- `/api/exercises`: DB-backed 200.
+- Bench progress with selected exercise: `progress`, Evidence present.
+- RPE question: `knowledge`, Sources present.
+- Bench volume / plateau question with selected exercise: `mixed_tool_rag`, Evidence and Sources present.
+- Evidence question: `evidence`.
+- Unsupported joke request: `unsupported`, scoped limitation present.
+
+What not to overclaim:
+
+- This is not embedding RAG yet.
+- This is not pgvector retrieval yet.
+- `knowledge_documents` and `knowledge_chunks` are the future persistence layer, but the current runtime retriever still uses the static seed corpus.
+- This is not LangChain, LangGraph, MCP, or a multi-agent workflow.

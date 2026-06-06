@@ -3655,3 +3655,33 @@ Next:
 - Phase 4.8B: persist and query the training knowledge base from the database.
 - Phase 4.8C: upgrade keyword retrieval to pgvector / embedding-based retrieval.
 - Phase 4.8D: improve Tool + RAG answer quality and demo scripts.
+
+## Phase 4.8A.1 - Production Validation and RAG Demo Smoke
+
+Completed:
+- Confirmed the workspace is on `main` with latest commit `4fcfdea feat: add evidence-backed assistant rag skeleton`.
+- Treated `client-dev.pid` as local dev noise and did not include it in the docs commit.
+- Deployed the current `fitmind-ai` source directory to Vercel Production with `npx vercel deploy --prod --force`.
+- Verified the production alias `https://fitmind-ai-psi.vercel.app` points to the ready deployment `fitmind-dlxmxbtcn-minyu-jis-projects.vercel.app`.
+- Verified production `/api/health` returns `200` with `{"ok":true,"data":{"status":"ok"}}`.
+- Verified production `/api/exercises` returns a DB-backed `200` response.
+- Ran production assistant smoke through a temporary test user with five bench-focused workouts.
+- Verified natural bench progress questions classify as `progress` and return training Evidence when an exercise is selected.
+- Verified `RPE 是什么？` classifies as `knowledge` and returns Sources.
+- Verified `卧推没进步是不是训练量不够？` classifies as `mixed_tool_rag` and returns both Evidence and Sources when an exercise is selected.
+- Verified `你根据什么判断？` classifies as `evidence`.
+- Verified `给我讲个笑话` classifies as `unsupported` and returns a scoped limitation instead of a general chatbot answer.
+
+Verification:
+- `pnpm --filter @fitmind/server type-check` passed.
+- `pnpm --filter @fitmind/client type-check` passed.
+- `pnpm test:unit` passed: 24 test files, 113 tests.
+- `pnpm --filter @fitmind/client run build` passed.
+- Vercel source-directory production deploy completed successfully.
+- Production smoke account: `rag-smoke-20260606222715@example.com`.
+
+Notes:
+- A Git-triggered Vercel production deployment for `4fcfdea` failed because the remote Git build path did not install workspace dev dependencies before running `tsc`.
+- A prebuilt deployment was briefly attempted, but DB-backed routes returned `ERR_MODULE_NOT_FOUND`; the production alias was immediately restored to the prior Ready deployment before using the successful source-directory deploy path.
+- `vercel pull --environment=production` produced an empty local `DATABASE_URL` value even though `vercel env ls` shows the encrypted Production variable exists, so production DB migration was not run locally from pulled env.
+- Current runtime RAG remains static seed corpus plus keyword retrieval. DB-backed knowledge retrieval, embeddings, and pgvector remain deferred to 4.8B/4.8C.
