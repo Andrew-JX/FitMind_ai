@@ -3685,3 +3685,23 @@ Notes:
 - A prebuilt deployment was briefly attempted, but DB-backed routes returned `ERR_MODULE_NOT_FOUND`; the production alias was immediately restored to the prior Ready deployment before using the successful source-directory deploy path.
 - `vercel pull --environment=production` produced an empty local `DATABASE_URL` value even though `vercel env ls` shows the encrypted Production variable exists, so production DB migration was not run locally from pulled env.
 - Current runtime RAG remains static seed corpus plus keyword retrieval. DB-backed knowledge retrieval, embeddings, and pgvector remain deferred to 4.8B/4.8C.
+
+## Phase 4.8A.2 - Vercel Git Build Path Fix
+
+Completed:
+- Investigated failed Git-triggered production deployments after `4fcfdea` and `ad3f8c4`.
+- Confirmed Git builds cloned `github.com/Andrew-JX/FitMind_ai` at the repository root while the app workspace lives in `fitmind-ai/`.
+- Confirmed the failed build ran `pnpm install --frozen-lockfile` from the repository root, then tried to build `fitmind-ai/server`, where `tsc` was unavailable.
+- Updated the Vercel project `rootDirectory` setting from `.` / `null` to `fitmind-ai` using the Vercel project API.
+- Left assistant behavior, RAG behavior, auth, schema, migrations, training CRUD, voice, and UI design unchanged.
+
+Verification:
+- `pnpm --filter @fitmind/server type-check` passed.
+- `pnpm --filter @fitmind/client type-check` passed.
+- `pnpm test:unit` passed: 24 test files, 113 tests.
+- `pnpm --filter @fitmind/client run build` passed.
+
+Next validation:
+- Push this docs/config note to `main` to trigger a new Git-backed Vercel production deployment.
+- Confirm the new Git-triggered deployment reaches Ready.
+- Confirm `https://fitmind-ai-psi.vercel.app/api/health` returns 200 after the Git-triggered deployment.
