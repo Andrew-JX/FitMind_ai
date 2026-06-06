@@ -1,12 +1,17 @@
-const js = require("@eslint/js");
-const globals = require("globals");
-const reactHooks = require("eslint-plugin-react-hooks");
-const reactRefresh = require("eslint-plugin-react-refresh");
-const tseslint = require("typescript-eslint");
+import js from "@eslint/js";
+import globals from "globals";
+import reactHooks from "eslint-plugin-react-hooks";
+import reactRefresh from "eslint-plugin-react-refresh";
+import tseslint from "typescript-eslint";
 
-module.exports = tseslint.config(
+export default tseslint.config(
   {
-    ignores: ["**/dist/**", "**/node_modules/**", "**/.pnpm-store/**"],
+    ignores: [
+      "**/dist/**",
+      "**/node_modules/**",
+      "**/.pnpm-store/**",
+      "**/.vercel/**",
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -38,7 +43,15 @@ module.exports = tseslint.config(
     },
   },
   {
-    files: ["eslint.config.js", "server/pgmigrate.config.cjs"],
+    files: ["eslint.config.js"],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
+  {
+    files: ["server/pgmigrate.config.cjs"],
     languageOptions: {
       globals: {
         ...globals.node,

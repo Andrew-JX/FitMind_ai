@@ -3693,6 +3693,9 @@ Completed:
 - Confirmed Git builds cloned `github.com/Andrew-JX/FitMind_ai` at the repository root while the app workspace lives in `fitmind-ai/`.
 - Confirmed the failed build ran `pnpm install --frozen-lockfile` from the repository root, then tried to build `fitmind-ai/server`, where `tsc` was unavailable.
 - Updated the Vercel project `rootDirectory` setting from `.` / `null` to `fitmind-ai` using the Vercel project API.
+- Investigated the first Ready Git build after the path fix, which returned `FUNCTION_INVOCATION_FAILED` on `/api/health` with `ReferenceError: exports is not defined`.
+- Aligned the Vercel function module format by marking the root package as ESM and changing `api/index.js` to an ESM default export.
+- Converted `eslint.config.js` to ESM and ignored local `.vercel` build output so lint does not scan generated deployment artifacts.
 - Left assistant behavior, RAG behavior, auth, schema, migrations, training CRUD, voice, and UI design unchanged.
 
 Verification:
@@ -3700,8 +3703,10 @@ Verification:
 - `pnpm --filter @fitmind/client type-check` passed.
 - `pnpm test:unit` passed: 24 test files, 113 tests.
 - `pnpm --filter @fitmind/client run build` passed.
+- `pnpm lint` passed.
+- `npx vercel build --prod` passed, and the generated function package keeps `"type": "module"` with an ESM `api/index.js`.
 
 Next validation:
-- Push this docs/config note to `main` to trigger a new Git-backed Vercel production deployment.
+- Push the module-format fix to `main` to trigger a new Git-backed Vercel production deployment.
 - Confirm the new Git-triggered deployment reaches Ready.
 - Confirm `https://fitmind-ai-psi.vercel.app/api/health` returns 200 after the Git-triggered deployment.

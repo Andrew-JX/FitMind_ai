@@ -1,8 +1,6 @@
-/* global module */
-
 let appPromise;
 
-module.exports = async function handler(request, response) {
+export default async function handler(request, response) {
   if (!appPromise) {
     appPromise = import("../server/dist/app.js").then(({ createApp }) => createApp());
   }
@@ -10,4 +8,4 @@ module.exports = async function handler(request, response) {
   const app = await appPromise;
 
   return app(request, response);
-};
+}
