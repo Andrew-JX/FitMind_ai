@@ -3845,3 +3845,39 @@ Verification so far:
 
 Pending closeout:
 - Re-run production health and assistant prompts after deployment.
+
+## Phase 5.0 - AI Training Coach Productization Closeout
+
+Closed:
+- Added the visible AI Coach product flow on top of Evidence + Hybrid RAG.
+- Added deterministic weekly training report service and `GET /api/training/weekly-report`.
+- Added AI tool `get_weekly_training_report`.
+- Added assistant intents and modes: `weekly_report`, `plateau_diagnosis`, and `next_week_plan`.
+- Kept Assistant response shape compatible: user training data remains Evidence, retrieved knowledge remains Sources.
+- Added Assistant quick prompts for weekly report, plateau diagnosis, and next-week draft.
+- Updated production assistant smoke to cover weekly report, plateau diagnosis, mixed Tool + RAG, next-week plan, and unsupported prompts.
+- Updated API contract and demo script with the Phase 5.0 product story.
+
+Verification:
+- `pnpm --filter @fitmind/server type-check` passed.
+- `pnpm test` passed: 32 files, 145 tests.
+- `pnpm lint` passed.
+- `pnpm --filter @fitmind/client build` passed.
+- `pnpm type-check` passed.
+- Production `/api/health` returned 200 with status `ok`.
+- `pnpm --filter @fitmind/server run smoke:assistant-production` passed after commit `01723fa` was pushed to `origin/main` and deployed.
+
+Production smoke results:
+- `RPE 是什么？` -> `knowledge`, 3 Sources, 0 Evidence.
+- `帮我做一份本周训练报告` -> `weekly_report`, 0 Sources, 2 workout Evidence.
+- `卧推平台期怎么诊断？` -> `plateau_diagnosis`, 3 Sources, 2 workout Evidence.
+- `卧推没进步是不是训练量不够？` -> `mixed_tool_rag`, 3 Sources, 2 workout Evidence.
+- `给我一个下周训练草案，要参考训练容量、渐进超负荷和deload` -> `next_week_plan`, 3 Sources, 2 workout Evidence.
+- `给我讲个笑话` -> `unsupported`, 0 Sources, 0 Evidence.
+
+Out of scope:
+- Save/Share is deferred to Phase 5.1.
+- No LangChain, LangGraph, MCP, agents, auth redesign, UI redesign, voice changes, or RAG architecture changes were added.
+
+Notes:
+- `client-dev.pid` remained local uncommitted noise and was not included in Phase 5.0 commits.
