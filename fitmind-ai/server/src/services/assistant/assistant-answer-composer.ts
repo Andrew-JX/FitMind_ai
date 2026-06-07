@@ -81,7 +81,7 @@ export function composeKnowledgeAnswer(input: {
     sources,
     intent: "knowledge",
     limitations: [
-      "本批 RAG MVP 使用 seed 知识库和关键词检索，暂未接入向量检索。",
+      "当前 RAG 来源来自 DB-backed 训练知识库；通用知识不代表医疗或康复建议。",
     ],
   };
 }

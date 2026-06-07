@@ -10,6 +10,7 @@
     "dev": "tsx watch --env-file ../.env src/server.ts",
     "seed:assistant-demo": "tsx scripts/seed-assistant-demo-data.ts",
     "seed:assistant-demo-data": "pnpm run seed:assistant-demo",
+    "embed:knowledge": "tsx scripts/embed-knowledge-chunks.ts",
     "smoke:auth": "tsx scripts/auth-register-smoke.ts",
     "smoke:assistant-auth": "pnpm run smoke:auth",
     "smoke:assistant": "tsx scripts/auth-register-smoke.ts && tsx scripts/assistant-mock-turn-smoke.ts",

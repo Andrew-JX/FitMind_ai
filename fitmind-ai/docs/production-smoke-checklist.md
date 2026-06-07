@@ -94,4 +94,9 @@ Use this checklist before sending the app to an interviewer, friend, or recruite
   - `pnpm smoke:training`
   - `pnpm smoke:assistant`
   - `pnpm smoke:workout-intake`
+- Phase 4.8C vector RAG smoke additionally requires `VOYAGE_API_KEY`, the pgvector migration, and knowledge embedding backfill:
+  - `pnpm --filter @fitmind/server run db:migrate`
+  - `pnpm --filter @fitmind/server run embed:knowledge ../.env`
+  - `pnpm --filter @fitmind/server run smoke:knowledge-rag ../.env`
+  - When `VOYAGE_API_KEY` is set, the smoke asserts `Retrieval mode: vector`.
 - This checklist is manual browser smoke. Do not mark it complete unless the live browser flow was actually run.

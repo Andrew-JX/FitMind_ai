@@ -14,6 +14,7 @@ const serverEnvSchema = z.object({
     .enum(["off", "mock", "anthropic"])
     .default("mock"),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  VOYAGE_API_KEY: z.string().min(1).optional(),
 });
 
 export interface ServerEnv {
@@ -24,6 +25,7 @@ export interface ServerEnv {
   assistantProvider: "mock" | "anthropic";
   workoutIntakeLlmProvider: "off" | "mock" | "anthropic";
   anthropicApiKey?: string | undefined;
+  voyageApiKey?: string | undefined;
 }
 
 export function loadServerEnv(
@@ -39,6 +41,7 @@ export function loadServerEnv(
     assistantProvider: parsed.ASSISTANT_PROVIDER,
     workoutIntakeLlmProvider: parsed.WORKOUT_INTAKE_LLM_PROVIDER,
     anthropicApiKey: parsed.ANTHROPIC_API_KEY,
+    voyageApiKey: parsed.VOYAGE_API_KEY,
   };
 }
 

@@ -348,8 +348,8 @@ estimated_1rm = weight × (1 + reps / 30)
 
 ## [D09] embedding provider 选型（扩展阶段 RAG）
 
-- **日期**：扩展阶段 A 开始前填
-- **状态**：proposed
+- **日期**：2026-06-07
+- **状态**：accepted
 
 ### 背景
 
@@ -357,22 +357,28 @@ RAG 需要把动作百科文本转成向量。Anthropic 不提供 embedding，�
 
 ### 备选方案
 
-1. **Voyage AI**（Anthropic 官方推荐）— voyage-3 / voyage-3-large
+1. **Voyage AI**（Anthropic 官方推荐）— voyage-4-lite / voyage-4
 2. **OpenAI embeddings**（text-embedding-3-small / large）— 生态广
 3. **国产 embedding**（BGE 系列）— 自部署
 
 ### 决定
 
-**进入扩展阶段 A 前重新核对官方文档，再做最终选择**。
+Phase 4.8C 选择 **Voyage AI `voyage-4-lite`**，固定使用 `1024` 维 float embedding。
+
+- document chunk embedding 使用 `input_type: "document"`
+- query embedding 使用 `input_type: "query"`
+- pgvector 第一版使用 exact cosine search：`ORDER BY embedding <=> query LIMIT k`
+- 暂不添加 HNSW / IVFFlat index；当前 seed corpus 很小，先保证语义检索路径可验收
 
 ### 复审条件
 
-- 做扩展 A 时核对当时的最新推荐和价格
-- 在 `db-schema.md` 里 `vector(N)` 的维度也要这时确定
+- 知识库规模明显扩大，exact search 延迟开始影响生产体验
+- 需要更高召回或更低成本时，比较 `voyage-4-lite`、`voyage-4`、OpenAI embeddings 或本地 BGE
+- 准备添加 HNSW / IVFFlat index 时重新评估 recall / latency / migration 风险
 
 ### 面试讲点
 
-> 我做 RAG 时核实了当时官方推荐的 embedding provider，选了 Voyage AI（如果最终选了 Voyage）。pgvector 的维度参数和 provider 输出维度必须对齐。Anthropic 官方明确说他们不做 embedding，需要外部供应商，这一点很多人不知道。
+> 我做 RAG 时没有直接把关键词检索包装成“向量检索”，而是先把 provider、维度和 pgvector schema 锁定。Anthropic 不提供 embedding，所以选择 Voyage AI；`voyage-4-lite` 默认 1024 维，和 `vector(1024)` 对齐。第一版不急着加 ANN index，因为 corpus 很小，exact cosine search 更容易验证正确性。
 
 ------
 

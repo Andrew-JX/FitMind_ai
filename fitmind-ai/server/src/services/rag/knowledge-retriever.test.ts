@@ -37,6 +37,65 @@ const dbRows = [
 ];
 
 describe("retrieveKnowledgeChunks", () => {
+  it("uses vector retrieval when an embedding provider and vector repository are available", async () => {
+    const chunks = await retrieveKnowledgeChunks("RPE 鏄粈涔堬紵", {
+      repository: {
+        listKnowledgeChunks: async () => {
+          throw new Error("keyword fallback should not run");
+        },
+        searchKnowledgeChunksByEmbedding: async (embedding, limit) => {
+          expect(embedding).toEqual([0.1, 0.2, 0.3]);
+          expect(limit).toBe(3);
+
+          return [
+            {
+              id: "chunk-rpe",
+              title: "RPE 涓昏鐢ㄥ姏绋嬪害",
+              category: "training_concept",
+              chunk_text: "RPE vector source",
+              source_type: "seed" as const,
+              tags: ["RPE"],
+              search_text: "RPE vector source",
+              score: 0.92,
+            },
+          ];
+        },
+      },
+      embeddingProvider: {
+        embedQuery: async (query) => {
+          expect(query).toContain("RPE");
+          return [0.1, 0.2, 0.3];
+        },
+      },
+    });
+
+    expect(chunks).toEqual([
+      {
+        id: "chunk-rpe",
+        title: "RPE 涓昏鐢ㄥ姏绋嬪害",
+        category: "training_concept",
+        chunk_text: "RPE vector source",
+        source_type: "seed",
+        tags: ["RPE"],
+        score: 0.92,
+        retrieval_mode: "vector",
+      },
+    ]);
+  });
+
+  it("falls back to keyword retrieval when no embedding provider is configured", async () => {
+    const chunks = await retrieveKnowledgeChunks("RPE 鏄粈涔堬紵", {
+      repository: {
+        listKnowledgeChunks: async () => dbRows,
+        searchKnowledgeChunksByEmbedding: async () => {
+          throw new Error("vector search should not run");
+        },
+      },
+    });
+
+    expect(chunks[0]?.id).toBe("chunk-rpe");
+  });
+
   it("retrieves RPE knowledge sources from a DB-backed repository", async () => {
     const chunks = await retrieveKnowledgeChunks("RPE 是什么？", {
       repository: {
@@ -83,6 +142,7 @@ describe("rankKnowledgeChunks", () => {
 
     expect(ranked[0]?.id).toBe("chunk-rpe");
     expect(ranked[0]?.score).toBeGreaterThan(0);
+    expect(ranked[0]?.retrieval_mode).toBe("keyword");
   });
 
   it("ranks bench and progressive overload sources for a mixed bench question", () => {

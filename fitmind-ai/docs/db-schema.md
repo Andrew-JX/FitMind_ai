@@ -38,8 +38,8 @@ knowledge_chunks（动作百科 RAG）
 -- 启用 UUID 生成（主线 migration 启用）
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- pgvector 扩展不在主线启用，扩展阶段 A（RAG）的 migration 中再启用
--- CREATE EXTENSION IF NOT EXISTS vector;
+-- pgvector 扩展不在主线启用；Phase 4.8C 的 RAG migration 已启用
+CREATE EXTENSION IF NOT EXISTS vector;
 ```
 
 ### 2.2 用户表
@@ -234,10 +234,10 @@ CREATE INDEX idx_tool_call_logs_tool ON tool_call_logs(tool_name);
 ### 2.11 知识库分块（扩展阶段 RAG）
 
 ```sql
--- ⚠️ 此表不在主线 migration 创建。扩展阶段 A（RAG）开始时单独执行 migration:
+-- ⚠️ 此表不在主线 migration 创建。扩展阶段 A（RAG）单独执行 migration:
 --   1. CREATE EXTENSION IF NOT EXISTS vector;
---   2. 根据 ai-decisions.md D09 确定的 embedding provider 决定向量维度
---      - Voyage-3:                          VECTOR(1024)
+--   2. ai-decisions.md D09 已确定 Phase 4.8C 使用 Voyage voyage-4-lite
+--      - Voyage voyage-4-lite:              VECTOR(1024)
 --      - OpenAI text-embedding-3-small:     VECTOR(1536)
 --      - OpenAI text-embedding-3-large:     VECTOR(3072)
 CREATE TABLE knowledge_chunks (
@@ -248,12 +248,16 @@ CREATE TABLE knowledge_chunks (
   exercise_id     UUID REFERENCES exercises(id),  -- 关联到具体动作（可选）
   content         TEXT NOT NULL,                  -- 分块后的文本内容
   content_tsv     TSVECTOR,                       -- 全文检索（可选混合检索）
-  embedding       VECTOR(1024),                   -- 维度按 embedding provider 调整
+  embedding       VECTOR(1024),                   -- Phase 4.8C: Voyage voyage-4-lite
+  embedding_model VARCHAR(80),
+  embedded_at     TIMESTAMPTZ,
   safety_level    VARCHAR(20) DEFAULT 'general',  -- general / advisory（伤病相关高敏感）
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 向量近邻索引（IVFFlat 适合小规模，HNSW 适合大规模；做扩展阶段再决定）
+-- Phase 4.8C 先使用 exact cosine search，不创建 ANN index:
+-- ORDER BY embedding <=> $query_embedding LIMIT k
+-- 后续 corpus 变大后再评估 HNSW / IVFFlat。
 -- CREATE INDEX idx_knowledge_chunks_embedding ON knowledge_chunks
 --   USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
@@ -261,7 +265,7 @@ CREATE TABLE knowledge_chunks (
 -- CREATE INDEX idx_knowledge_chunks_tsv ON knowledge_chunks USING GIN(content_tsv);
 ```
 
-**注意**：`embedding` 维度要等 RAG 阶段确定 provider 后填。Voyage AI 的 voyage-3 是 1024 维。
+**注意**：Phase 4.8C 已确定 `embedding` 使用 `vector(1024)`，provider/model 为 Voyage AI `voyage-4-lite`。当前先做 exact cosine search，不加 HNSW / IVFFlat。
 
 ------
 

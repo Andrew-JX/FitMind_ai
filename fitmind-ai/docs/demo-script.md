@@ -253,7 +253,7 @@ Speaking track:
 
 > FitMind AI does not put every fact into the prompt. User-specific training records go through deterministic tools and appear as Evidence. General training concepts go through the RAG knowledge retriever and appear as Sources. The model's job is to organize and explain the result, not invent training facts.
 
-Production smoke reference from 2026-06-06:
+Production smoke reference from 2026-06-06 / Phase 4.8B closeout:
 
 - `/api/health`: 200.
 - `/api/exercises`: DB-backed 200.
@@ -265,7 +265,6 @@ Production smoke reference from 2026-06-06:
 
 What not to overclaim:
 
-- This is not embedding RAG yet.
-- This is not pgvector retrieval yet.
-- `knowledge_documents` and `knowledge_chunks` are the future persistence layer, but the current runtime retriever still uses the static seed corpus.
-- This is not LangChain, LangGraph, MCP, or a multi-agent workflow.
+- Phase 4.8B uses DB-backed keyword retrieval.
+- Phase 4.8C upgrades the retriever to Voyage `voyage-4-lite` embeddings plus pgvector exact cosine search.
+- This is still not reranking, LangChain, LangGraph, MCP, or multi-agent orchestration.

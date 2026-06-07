@@ -88,9 +88,20 @@ async function main(): Promise<void> {
     "Expected first source chunk text.",
   );
 
+  if (
+    process.env.VOYAGE_API_KEY !== undefined &&
+    process.env.VOYAGE_API_KEY.trim().length > 0
+  ) {
+    assert(
+      sources[0]?.retrieval_mode === "vector",
+      "Expected DB-backed knowledge retriever smoke to use vector retrieval when VOYAGE_API_KEY is set.",
+    );
+  }
+
   console.log("DB-backed knowledge retriever smoke passed.");
   console.log(`Sources returned: ${sources.length}`);
   console.log(`Top source: ${sources[0].title}`);
+  console.log(`Retrieval mode: ${sources[0].retrieval_mode}`);
 }
 
 main().catch((error: unknown) => {

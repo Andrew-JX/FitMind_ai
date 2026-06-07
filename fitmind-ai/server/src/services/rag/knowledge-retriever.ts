@@ -1,18 +1,32 @@
 import {
   listKnowledgeChunks,
+  searchKnowledgeChunksByEmbedding,
   type KnowledgeChunkRow,
+  type KnowledgeChunkSearchRow,
 } from "../../db/knowledge-repository.js";
+import { loadServerEnv } from "../../env.js";
+import { createVoyageEmbeddingProvider } from "./voyage-embedding-client.js";
 
 export type RetrievedKnowledgeChunk = Omit<KnowledgeChunkRow, "search_text"> & {
   score: number;
+  retrieval_mode: "keyword" | "vector";
 };
 
 export interface KnowledgeChunkRepository {
   listKnowledgeChunks: () => Promise<KnowledgeChunkRow[]>;
+  searchKnowledgeChunksByEmbedding?: (
+    embedding: number[],
+    limit: number,
+  ) => Promise<KnowledgeChunkSearchRow[]>;
+}
+
+export interface KnowledgeEmbeddingProvider {
+  embedQuery: (query: string) => Promise<number[]>;
 }
 
 export interface RetrieveKnowledgeChunksOptions {
   repository?: KnowledgeChunkRepository | undefined;
+  embeddingProvider?: KnowledgeEmbeddingProvider | null | undefined;
 }
 
 export function tokenizeKnowledgeQuery(input: string): string[] {
@@ -89,6 +103,7 @@ export function rankKnowledgeChunks(
       source_type: chunk.source_type,
       tags: chunk.tags,
       score: scoreChunk(chunk, queryTokens),
+      retrieval_mode: "keyword" as const,
     }))
     .filter((chunk) => chunk.score > 0)
     .sort((left, right) => {
@@ -101,6 +116,57 @@ export function rankKnowledgeChunks(
     .slice(0, limit);
 }
 
+function toRetrievedKnowledgeChunks(
+  chunks: KnowledgeChunkSearchRow[],
+): RetrievedKnowledgeChunk[] {
+  return chunks.map((chunk) => ({
+    id: chunk.id,
+    title: chunk.title,
+    category: chunk.category,
+    chunk_text: chunk.chunk_text,
+    source_type: chunk.source_type,
+    tags: chunk.tags,
+    score: chunk.score,
+    retrieval_mode: "vector",
+  }));
+}
+
+function createDefaultEmbeddingProvider(): KnowledgeEmbeddingProvider | null {
+  const env = loadServerEnv();
+
+  if (env.voyageApiKey === undefined) {
+    return null;
+  }
+
+  return createVoyageEmbeddingProvider(env.voyageApiKey);
+}
+
+async function tryRetrieveWithEmbeddings(input: {
+  query: string;
+  limit: number;
+  repository: KnowledgeChunkRepository;
+  embeddingProvider: KnowledgeEmbeddingProvider | null;
+}): Promise<RetrievedKnowledgeChunk[]> {
+  if (
+    input.embeddingProvider === null ||
+    input.repository.searchKnowledgeChunksByEmbedding === undefined
+  ) {
+    return [];
+  }
+
+  try {
+    const queryEmbedding = await input.embeddingProvider.embedQuery(input.query);
+    const chunks = await input.repository.searchKnowledgeChunksByEmbedding(
+      queryEmbedding,
+      input.limit,
+    );
+
+    return toRetrievedKnowledgeChunks(chunks);
+  } catch {
+    return [];
+  }
+}
+
 export async function retrieveKnowledgeChunks(
   query: string,
   limitOrOptions: number | RetrieveKnowledgeChunksOptions = 3,
@@ -111,7 +177,27 @@ export async function retrieveKnowledgeChunks(
     typeof limitOrOptions === "number" ? options : limitOrOptions;
   const repository = resolvedOptions.repository ?? {
     listKnowledgeChunks,
+    searchKnowledgeChunksByEmbedding: (embedding, limit) =>
+      searchKnowledgeChunksByEmbedding({
+        embedding,
+        limit,
+      }),
   };
+  const embeddingProvider =
+    resolvedOptions.embeddingProvider === undefined
+      ? createDefaultEmbeddingProvider()
+      : resolvedOptions.embeddingProvider;
+  const vectorChunks = await tryRetrieveWithEmbeddings({
+    query,
+    limit,
+    repository,
+    embeddingProvider,
+  });
+
+  if (vectorChunks.length > 0) {
+    return vectorChunks;
+  }
+
   const chunks = await repository.listKnowledgeChunks();
 
   return rankKnowledgeChunks(chunks, query, limit);

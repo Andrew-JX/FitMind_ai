@@ -3754,3 +3754,34 @@ Verification:
 
 Notes:
 - The first production smoke attempt sent Chinese JSON through Windows PowerShell without explicit UTF-8 bytes and routed the mixed question as `unsupported`; rerunning with UTF-8 encoded request bytes validated the expected production behavior.
+
+## Phase 4.8C - Pgvector Embedding Retrieval
+
+Completed:
+- Added a pgvector migration for `knowledge_chunks.embedding vector(1024)`, `embedding_model`, and `embedded_at`.
+- Chose Voyage AI `voyage-4-lite` as the accepted embedding provider for Phase 4.8C.
+- Added a minimal Voyage REST embedding client using `fetch`, with `input_type: "document"` for chunks and `input_type: "query"` for user questions.
+- Added DB repository helpers for exact cosine vector search, missing/stale embedding lookup, and embedding updates.
+- Upgraded the knowledge retriever to prefer vector search when `VOYAGE_API_KEY` and chunk embeddings are available.
+- Preserved keyword fallback for local/dev environments without Voyage credentials or embeddings.
+- Added `scripts/embed-knowledge-chunks.ts` and `pnpm --filter @fitmind/server run embed:knowledge` for backfilling seed corpus embeddings.
+- Upgraded knowledge RAG smoke to assert vector retrieval when `VOYAGE_API_KEY` is set.
+- Updated RAG docs, D09 embedding decision, production smoke checklist, and troubleshooting notes.
+
+Verification:
+- Targeted Voyage client, repository, retriever, and migration tests passed.
+- `pnpm --filter @fitmind/server type-check` passed.
+- `pnpm --filter @fitmind/server lint` passed.
+- `pnpm --filter @fitmind/client type-check` passed.
+- `pnpm test:unit` passed: 27 test files, 128 tests.
+- `pnpm lint` passed.
+- `pnpm --filter @fitmind/client run build` passed.
+
+Pending:
+- Run the pgvector migration against production.
+- Set `VOYAGE_API_KEY` in Vercel Production.
+- Run knowledge embedding backfill in the target DB environment.
+- Run production `smoke:knowledge-rag` and the three assistant production prompts after deployment.
+
+Deferred:
+- HNSW / IVFFlat ANN index, reranking, LangChain, LangGraph, MCP, multi-agent behavior, UI redesign, and new Assistant response fields remain out of scope.

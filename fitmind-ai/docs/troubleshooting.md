@@ -119,6 +119,33 @@
 - `[绕过]` — 暂时绕开，未来要修
 - `[已知问题]` — 不打算修，记录为已知限制
 - `[反复出现]` — 同类问题多次发生，需要写规则进 AGENTS.md 防止再发生
+
+## [TXX] [已修复] Windows PowerShell 中文 JSON 请求体未显式 UTF-8 导致 assistant intent 误判
+
+- **日期**：2026-06-07
+- **阶段**：Phase 4.8B.1 - Production Assistant Smoke Closeout
+- **耗时**：约 20 分钟
+
+### 现象
+生产 smoke 中，`卧推没进步是不是训练量不够？` 第一次被 assistant 判成 `unsupported`，而不是预期的 `mixed_tool_rag`。
+
+### 排查过程
+- 先确认 production `/api/health` 正常，DB-backed RAG source 对 `RPE 是什么？` 能返回。
+- 再对比 mixed prompt 请求体，发现问题集中在 Windows PowerShell 构造中文 JSON body 的方式。
+- 使用显式 UTF-8 bytes / `Content-Type: application/json; charset=utf-8` 重新发送后，intent 正确变成 `mixed_tool_rag`，并返回 Sources + workout Evidence。
+
+### 根本原因
+这不是业务逻辑或 intent router 问题，而是 smoke 请求构造问题：Windows PowerShell 对中文 JSON 请求体编码不显式时，生产 API 收到的 prompt 可能不是预期文本。
+
+### 解决方案
+后续 Windows PowerShell 中文 API smoke 统一使用 UTF-8 bytes，或显式设置 `Content-Type: application/json; charset=utf-8`。
+
+### 经验教训
+凡是验证中文 prompt、assistant intent classification、JSON request body、PowerShell `Invoke-RestMethod` / `curl` 差异或生产 AI API 时，都要先排除请求编码问题。
+
+### 面试讲点
+这是一个适合讲“AI 行为误判不一定是模型或业务逻辑问题”的案例。先确认输入字节和请求边界，再谈 prompt / router / RAG 质量，否则很容易在错误层面调参。
+
 ## [T01] [已修复] Auth 阶段 `NodeNext` + JS repository 导致类型解析断裂
 
 - **日期**：2026-04-28
