@@ -3785,3 +3785,34 @@ Pending:
 
 Deferred:
 - HNSW / IVFFlat ANN index, reranking, LangChain, LangGraph, MCP, multi-agent behavior, UI redesign, and new Assistant response fields remain out of scope.
+
+## Phase 4.8C.1 - Vector Backfill and Production Smoke Closeout
+
+Completed:
+- Confirmed Phase 4.8C implementation commit `5d5df2c feat: add pgvector knowledge retrieval` was on `main`.
+- Confirmed `VOYAGE_API_KEY` is configured in the safe local env and Vercel Production without printing secret values.
+- Applied only the existing up migration `20260607090000_add_knowledge_chunk_embeddings` against the target database.
+- Backfilled `knowledge_chunks.embedding` for 9 seed corpus chunks with Voyage `voyage-4-lite`.
+- Ran DB-backed knowledge RAG smoke with `VOYAGE_API_KEY` present.
+- Confirmed the DB smoke returned 3 Sources, top source `RPE 主观用力程度`, and `Retrieval mode: vector`.
+- Triggered a fresh Git-backed Vercel Production deployment with empty commit `96e7ac4 chore: trigger voyage env deployment` so runtime could read the new env var.
+- Verified the production alias `https://fitmind-ai-psi.vercel.app` returned `/api/health` 200.
+- Ran production assistant smoke with UTF-8 JSON request bodies.
+- Verified `RPE 是什么？` routed to `knowledge`, returned Source `RPE 主观用力程度`, and returned no workout Evidence.
+- Verified `卧推没进步是不是训练量不够？` routed to `mixed_tool_rag`, returned 3 Sources with top Source `卧推进步停滞`, and returned Evidence for 2 smoke workout records.
+- Verified `给我讲个笑话` routed to `unsupported` and returned no Sources or Evidence.
+
+Verification:
+- `pnpm --filter @fitmind/server type-check` passed.
+- `pnpm --filter @fitmind/client type-check` passed.
+- `pnpm test:unit` passed: 27 test files, 128 tests.
+- `pnpm lint` passed.
+- `pnpm --filter @fitmind/client run build` passed.
+- `pnpm --filter @fitmind/server run db:migrate` applied only the up migration.
+- `pnpm --filter @fitmind/server run embed:knowledge ../.env` updated 9 embeddings.
+- `pnpm --filter @fitmind/server run smoke:knowledge-rag ../.env` passed with `Retrieval mode: vector`.
+
+Notes:
+- No `VOYAGE_API_KEY`, `DATABASE_URL`, Vercel env values, or raw DB connection strings were printed.
+- `client-dev.pid` and `.history` env-file noise were left uncommitted.
+- HNSW / IVFFlat ANN indexes, reranking, LangChain, LangGraph, MCP, agents, UI changes, auth changes, training CRUD changes, and new Assistant response fields remain out of scope.
