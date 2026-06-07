@@ -3829,6 +3829,7 @@ Implementation status:
 - Added safe structured retrieval logs with `intent`, `retrieval_mode`, top source titles, score summary, and fallback reason. Logs do not include raw prompts, tokens, env values, DB URLs, or workout details.
 - Added deterministic RAG eval helpers and `pnpm --filter @fitmind/server run eval`.
 - Updated knowledge RAG smoke to expect `Retrieval mode: hybrid` when `VOYAGE_API_KEY` is configured.
+- Added `pnpm --filter @fitmind/server run smoke:assistant-production` for UTF-8 production assistant RAG smoke across knowledge, mixed Tool + RAG, and unsupported prompts.
 
 Verification so far:
 - Targeted 4.9 tests passed: repo hygiene, migration intent, repository upsert, ingestion parser, hybrid scoring, retrieval observability, eval behavior, and retriever behavior.
