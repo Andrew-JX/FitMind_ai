@@ -15,7 +15,7 @@ export interface KnowledgeChunkRow {
   title: string;
   category: string;
   chunk_text: string;
-  source_type: "seed";
+  source_type: "seed" | "imported";
   tags: string[];
   search_text: string;
 }
@@ -48,6 +48,35 @@ export interface UpdateKnowledgeChunkEmbeddingInput {
   embedding: number[];
   model: string;
   pool?: DbPoolLike | undefined;
+}
+
+export interface KnowledgeDocumentRow {
+  id: string;
+  slug: string;
+  title: string;
+  category: string;
+  source_type: "seed" | "imported";
+}
+
+export interface UpsertKnowledgeDocumentInput {
+  slug: string;
+  title: string;
+  category: string;
+  sourceType: "seed" | "imported";
+  pool?: DbPoolLike | undefined;
+}
+
+export interface UpsertKnowledgeChunkInput {
+  documentId: string;
+  chunkIndex: number;
+  chunkText: string;
+  tags: string[];
+  searchText: string;
+  pool?: DbPoolLike | undefined;
+}
+
+export interface UpsertKnowledgeChunkResult {
+  id: string;
 }
 
 const require = createRequire(import.meta.url);
@@ -98,6 +127,16 @@ function mapKnowledgeChunkSearchRow(
   return {
     ...mapped,
     score: Number.isFinite(numericScore) ? numericScore : 0,
+  };
+}
+
+function mapKnowledgeDocumentRow(row: KnowledgeDocumentRow): KnowledgeDocumentRow {
+  return {
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    category: row.category,
+    source_type: row.source_type,
   };
 }
 
@@ -225,6 +264,86 @@ export async function updateKnowledgeChunkEmbedding(
       `,
       [input.id, toVectorLiteral(input.embedding), input.model],
     );
+  } finally {
+    if (ownsPool) {
+      await activePool.end?.();
+    }
+  }
+}
+
+export async function upsertKnowledgeDocument(
+  input: UpsertKnowledgeDocumentInput,
+): Promise<KnowledgeDocumentRow> {
+  const activePool = input.pool ?? (await createRepositoryPool());
+  const ownsPool = input.pool === undefined;
+
+  try {
+    const result = await activePool.query(
+      `
+        INSERT INTO knowledge_documents (slug, title, category, source_type)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (slug) DO UPDATE
+        SET
+          title = EXCLUDED.title,
+          category = EXCLUDED.category,
+          source_type = EXCLUDED.source_type
+        RETURNING id, slug, title, category, source_type
+      `,
+      [input.slug, input.title, input.category, input.sourceType],
+    );
+    const row = result.rows[0] as KnowledgeDocumentRow | undefined;
+
+    if (row === undefined) {
+      throw new Error("Knowledge document upsert did not return a row.");
+    }
+
+    return mapKnowledgeDocumentRow(row);
+  } finally {
+    if (ownsPool) {
+      await activePool.end?.();
+    }
+  }
+}
+
+export async function upsertKnowledgeChunk(
+  input: UpsertKnowledgeChunkInput,
+): Promise<UpsertKnowledgeChunkResult> {
+  const activePool = input.pool ?? (await createRepositoryPool());
+  const ownsPool = input.pool === undefined;
+
+  try {
+    const result = await activePool.query(
+      `
+        INSERT INTO knowledge_chunks (
+          document_id,
+          chunk_index,
+          chunk_text,
+          tags,
+          search_text
+        )
+        VALUES ($1, $2, $3, $4::jsonb, $5)
+        ON CONFLICT (document_id, chunk_index) DO UPDATE
+        SET
+          chunk_text = EXCLUDED.chunk_text,
+          tags = EXCLUDED.tags,
+          search_text = EXCLUDED.search_text
+        RETURNING id
+      `,
+      [
+        input.documentId,
+        input.chunkIndex,
+        input.chunkText,
+        JSON.stringify(input.tags),
+        input.searchText,
+      ],
+    );
+    const row = result.rows[0] as { id?: unknown } | undefined;
+
+    if (typeof row?.id !== "string") {
+      throw new Error("Knowledge chunk upsert did not return a row.");
+    }
+
+    return { id: row.id };
   } finally {
     if (ownsPool) {
       await activePool.end?.();

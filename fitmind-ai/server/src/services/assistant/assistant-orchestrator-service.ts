@@ -26,6 +26,7 @@ import {
   type AssistantRoutedIntent,
 } from "./assistant-intent-router.js";
 import { retrieveKnowledgeChunks } from "../rag/knowledge-retriever.js";
+import { logRetrievalEvent } from "../rag/retrieval-observability.js";
 import type {
   AssistantStreamEvent,
   AssistantStreamOptions,
@@ -919,9 +920,18 @@ export async function runMockAssistantTurn(
       state: "retrieving",
     });
 
+    const sources = await retrieveKnowledgeChunks(input.message);
+
+    logRetrievalEvent({
+      intent,
+      retrievalMode: sources[0]?.retrieval_mode ?? "fallback",
+      sources,
+      fallbackReason: sources.length === 0 ? "no_sources" : undefined,
+    });
+
     const answer = composeKnowledgeAnswer({
       message: input.message,
-      sources: await retrieveKnowledgeChunks(input.message),
+      sources,
     });
 
     await emitAnswerEvents(answer, options);
@@ -1049,9 +1059,18 @@ export async function runMockAssistantTurn(
         type: "state",
         state: "retrieving",
       });
+      const sources = await retrieveKnowledgeChunks(input.message);
+
+      logRetrievalEvent({
+        intent,
+        retrievalMode: sources[0]?.retrieval_mode ?? "fallback",
+        sources,
+        fallbackReason: sources.length === 0 ? "no_sources" : undefined,
+      });
+
       answer = composeMixedToolRagAnswer({
         message: input.message,
-        sources: await retrieveKnowledgeChunks(input.message),
+        sources,
         toolEvidence: buildEvidence(providerResponse.tool_name, result),
       });
     } else {

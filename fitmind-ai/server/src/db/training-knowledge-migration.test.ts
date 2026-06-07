@@ -33,4 +33,21 @@ describe("training knowledge migration", () => {
     expect(source).not.toContain("USING hnsw");
     expect(source).not.toContain("USING ivfflat");
   });
+
+  it("adds a stable upsert key for imported knowledge chunks", async () => {
+    const source = await readFile(
+      resolve(
+        process.cwd(),
+        "server/migrations/20260607100000_add_knowledge_chunk_upsert_index.js",
+      ),
+      "utf8",
+    );
+
+    expect(source).toContain("knowledge_chunks");
+    expect(source).toContain("document_id");
+    expect(source).toContain("chunk_index");
+    expect(source).toContain("unique: true");
+    expect(source).not.toContain("USING hnsw");
+    expect(source).not.toContain("USING ivfflat");
+  });
 });

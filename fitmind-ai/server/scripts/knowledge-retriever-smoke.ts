@@ -93,8 +93,8 @@ async function main(): Promise<void> {
     process.env.VOYAGE_API_KEY.trim().length > 0
   ) {
     assert(
-      sources[0]?.retrieval_mode === "vector",
-      "Expected DB-backed knowledge retriever smoke to use vector retrieval when VOYAGE_API_KEY is set.",
+      sources[0]?.retrieval_mode === "hybrid",
+      "Expected DB-backed knowledge retriever smoke to use hybrid retrieval when VOYAGE_API_KEY is set.",
     );
   }
 

@@ -3816,3 +3816,31 @@ Notes:
 - No `VOYAGE_API_KEY`, `DATABASE_URL`, Vercel env values, or raw DB connection strings were printed.
 - `client-dev.pid` and `.history` env-file noise were left uncommitted.
 - HNSW / IVFFlat ANN indexes, reranking, LangChain, LangGraph, MCP, agents, UI changes, auth changes, training CRUD changes, and new Assistant response fields remain out of scope.
+
+## Phase 4.9 - Production RAG Quality and Knowledge Ops
+
+Implementation status:
+- Added repository hygiene ignores for `.history/`, `fitmind-ai/client-dev.pid`, and local env-history filename patterns.
+- Added a stable `(document_id, chunk_index)` unique index migration so knowledge chunks can be upserted by imported fixture slug + chunk index.
+- Added JSON and Markdown knowledge fixture parsing for server-side ingestion.
+- Added `pnpm --filter @fitmind/server run import:knowledge` for upserting local knowledge fixtures and optionally embedding imported chunks with Voyage when `VOYAGE_API_KEY` is present.
+- Upgraded retrieval from 4.8C vector-first fallback to 4.9 hybrid scoring when embeddings are available: `0.7 * normalized_vector_score + 0.3 * normalized_keyword_score`.
+- Preserved keyword-only fallback for environments without Voyage credentials or available embeddings.
+- Added safe structured retrieval logs with `intent`, `retrieval_mode`, top source titles, score summary, and fallback reason. Logs do not include raw prompts, tokens, env values, DB URLs, or workout details.
+- Added deterministic RAG eval helpers and `pnpm --filter @fitmind/server run eval`.
+- Updated knowledge RAG smoke to expect `Retrieval mode: hybrid` when `VOYAGE_API_KEY` is configured.
+
+Verification so far:
+- Targeted 4.9 tests passed: repo hygiene, migration intent, repository upsert, ingestion parser, hybrid scoring, retrieval observability, eval behavior, and retriever behavior.
+- `pnpm --filter @fitmind/server type-check` passed.
+- `pnpm --filter @fitmind/client type-check` passed.
+- `pnpm test:unit` passed: 31 test files, 141 tests.
+- `pnpm lint` passed.
+- `pnpm --filter @fitmind/client run build` passed.
+- `pnpm --filter @fitmind/server run db:migrate` applied only the 4.9 up migration.
+- `pnpm --filter @fitmind/server run embed:knowledge ../.env` confirmed embeddings were already up to date.
+- `pnpm --filter @fitmind/server run smoke:knowledge-rag ../.env` passed with top source `RPE 主观用力程度` and `Retrieval mode: hybrid`.
+- `pnpm --filter @fitmind/server run eval ../.env` passed 15 deterministic RAG eval cases.
+
+Pending closeout:
+- Re-run production health and assistant prompts after deployment.

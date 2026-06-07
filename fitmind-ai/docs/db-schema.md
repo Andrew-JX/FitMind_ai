@@ -374,3 +374,12 @@ ORDER BY weighted_volume DESC;
 | 扩展 A（RAG）   | knowledge_chunks（扩展阶段单独 migration，含 CREATE EXTENSION vector） |
 | 扩展 B（MCP）   | 不新增表                                                     |
 | 扩展 C（Agent） | 可能加 agent_traces 表（记录 ReAct 步骤）                    |
+## 8. Knowledge Operations Notes
+
+Phase 4.9 keeps the Phase 4.8B/4.8C knowledge tables and adds one operational constraint:
+
+- `knowledge_documents.slug` remains the stable document key.
+- `knowledge_chunks(document_id, chunk_index)` is now unique so imported fixtures can upsert chunks without editing seed migrations.
+- `knowledge_chunks.embedding vector(1024)`, `embedding_model`, and `embedded_at` remain nullable so local/dev environments can use keyword fallback.
+- No HNSW or IVFFlat index exists in 4.9. Exact cosine search remains acceptable for the current small corpus.
+- Future knowledge changes should prefer `import:knowledge` fixtures over migration edits unless a schema change is required.

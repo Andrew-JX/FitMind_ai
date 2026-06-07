@@ -14,7 +14,7 @@ export interface AssistantAnswerSource {
   title: string;
   category: string;
   chunk_text: string;
-  source_type: "seed";
+  source_type: "seed" | "imported";
   tags: string[];
 }
 

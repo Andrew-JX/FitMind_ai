@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   rankKnowledgeChunks,
+  rankHybridKnowledgeChunks,
   retrieveKnowledgeChunks,
   tokenizeKnowledgeQuery,
 } from "./knowledge-retriever.js";
@@ -37,15 +38,13 @@ const dbRows = [
 ];
 
 describe("retrieveKnowledgeChunks", () => {
-  it("uses vector retrieval when an embedding provider and vector repository are available", async () => {
+  it("uses hybrid retrieval when an embedding provider and vector repository are available", async () => {
     const chunks = await retrieveKnowledgeChunks("RPE 鏄粈涔堬紵", {
       repository: {
-        listKnowledgeChunks: async () => {
-          throw new Error("keyword fallback should not run");
-        },
+        listKnowledgeChunks: async () => dbRows,
         searchKnowledgeChunksByEmbedding: async (embedding, limit) => {
           expect(embedding).toEqual([0.1, 0.2, 0.3]);
-          expect(limit).toBe(3);
+          expect(limit).toBe(12);
 
           return [
             {
@@ -77,8 +76,8 @@ describe("retrieveKnowledgeChunks", () => {
         chunk_text: "RPE vector source",
         source_type: "seed",
         tags: ["RPE"],
-        score: 0.92,
-        retrieval_mode: "vector",
+        score: 1,
+        retrieval_mode: "hybrid",
       },
     ]);
   });
@@ -118,6 +117,49 @@ describe("retrieveKnowledgeChunks", () => {
 
     expect(joinedTitles).toContain("卧推");
     expect(joinedTitles).toContain("渐进超负荷");
+  });
+});
+
+describe("rankHybridKnowledgeChunks", () => {
+  it("uses vector-heavy 70/30 normalized scoring", () => {
+    const ranked = rankHybridKnowledgeChunks({
+      vectorChunks: [
+        {
+          ...dbRows[0]!,
+          score: 0.8,
+        },
+        {
+          ...dbRows[1]!,
+          score: 0.4,
+        },
+      ],
+      keywordChunks: [
+        {
+          ...dbRows[0]!,
+          score: 1,
+          retrieval_mode: "keyword" as const,
+        },
+        {
+          ...dbRows[1]!,
+          score: 2,
+          retrieval_mode: "keyword" as const,
+        },
+      ],
+      limit: 2,
+    });
+
+    expect(ranked).toEqual([
+      expect.objectContaining({
+        id: "chunk-rpe",
+        score: 0.85,
+        retrieval_mode: "hybrid",
+      }),
+      expect.objectContaining({
+        id: "chunk-bench",
+        score: 0.65,
+        retrieval_mode: "hybrid",
+      }),
+    ]);
   });
 });
 

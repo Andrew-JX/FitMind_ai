@@ -267,4 +267,12 @@ What not to overclaim:
 
 - Phase 4.8B uses DB-backed keyword retrieval.
 - Phase 4.8C upgrades the retriever to Voyage `voyage-4-lite` embeddings plus pgvector exact cosine search.
+- Phase 4.9 upgrades the retriever to hybrid scoring and adds knowledge ingestion/eval operations.
 - This is still not reranking, LangChain, LangGraph, MCP, or multi-agent orchestration.
+
+RAG progression:
+
+- Phase 4.8A: Assistant RAG skeleton and static source shape.
+- Phase 4.8B: DB-backed keyword RAG from `knowledge_documents` / `knowledge_chunks`.
+- Phase 4.8C: Voyage `voyage-4-lite` embeddings plus pgvector `vector(1024)` exact cosine search.
+- Phase 4.9: Hybrid vector + keyword scoring, local fixture ingestion, safe retrieval logs, and deterministic RAG eval.

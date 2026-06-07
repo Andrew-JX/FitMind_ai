@@ -492,3 +492,18 @@ Phase 0.2 需要在不连接真实数据库、也不创建真实业务表 migrat
 ### 面试讲点
 
 > 我在工程早期先把 migration 工具链补齐，但没有急着生成业务表迁移。因为这个阶段的目标是先建立“可演进的工程底座”，而不是提前进入业务实现。之所以选 `node-pg-migrate`，是因为项目的数据层路线本来就是 `node-postgres + 手写 SQL`，它和这条路线一致，不会额外引入 ORM 心智负担。
+## [D18] Phase 4.9 RAG operations path: hybrid retrieval plus fixture ingestion
+
+- **Date**: 2026-06-07
+- **Status**: Accepted
+
+Decision:
+- Keep the public Assistant API and frontend response shape unchanged.
+- Keep `Evidence` reserved for user training data and `Sources` reserved for retrieved training knowledge.
+- Move knowledge maintenance out of migrations by adding a server-side JSON/Markdown fixture ingestion CLI.
+- Use stable upserts: `knowledge_documents.slug` for documents and `(knowledge_chunks.document_id, knowledge_chunks.chunk_index)` for chunks.
+- When embeddings are available, rank with hybrid scoring: `0.7 * normalized_vector_score + 0.3 * normalized_keyword_score`.
+- Keep keyword-only fallback for local/dev environments without `VOYAGE_API_KEY` or embeddings.
+
+Out of scope:
+- LangChain, LangGraph, MCP, agents, reranking, HNSW/IVFFlat ANN indexes, UI/admin screens, auth changes, training CRUD changes, voice changes, and new Assistant response fields.

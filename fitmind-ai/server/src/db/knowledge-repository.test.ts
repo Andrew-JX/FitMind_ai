@@ -5,6 +5,8 @@ import {
   listKnowledgeChunksMissingEmbeddings,
   searchKnowledgeChunksByEmbedding,
   updateKnowledgeChunkEmbedding,
+  upsertKnowledgeChunk,
+  upsertKnowledgeDocument,
 } from "./knowledge-repository.js";
 
 describe("listKnowledgeChunks", () => {
@@ -132,6 +134,75 @@ describe("embedding backfill repository helpers", () => {
       "chunk-1",
       "[0.1,0.2]",
       "voyage-4-lite",
+    ]);
+  });
+});
+
+describe("knowledge ingestion repository helpers", () => {
+  it("upserts knowledge documents by stable slug", async () => {
+    const calls: Array<{ sql: string; params?: readonly unknown[] }> = [];
+
+    const document = await upsertKnowledgeDocument({
+      slug: "bench-plateau",
+      title: "Bench plateau",
+      category: "exercise_progress",
+      sourceType: "imported",
+      pool: {
+        query: async (sql, params) => {
+          calls.push({ sql, params });
+          return {
+            rows: [
+              {
+                id: "document-1",
+                slug: "bench-plateau",
+                title: "Bench plateau",
+                category: "exercise_progress",
+                source_type: "imported",
+              },
+            ],
+          };
+        },
+      },
+    });
+
+    expect(document.id).toBe("document-1");
+    expect(calls[0]?.sql).toContain("ON CONFLICT (slug) DO UPDATE");
+    expect(calls[0]?.params).toEqual([
+      "bench-plateau",
+      "Bench plateau",
+      "exercise_progress",
+      "imported",
+    ]);
+  });
+
+  it("upserts knowledge chunks by document and chunk index without clearing embeddings", async () => {
+    const calls: Array<{ sql: string; params?: readonly unknown[] }> = [];
+
+    const chunk = await upsertKnowledgeChunk({
+      documentId: "document-1",
+      chunkIndex: 0,
+      chunkText: "Bench plateau chunk",
+      tags: ["bench", "plateau"],
+      searchText: "Bench plateau chunk bench plateau",
+      pool: {
+        query: async (sql, params) => {
+          calls.push({ sql, params });
+          return { rows: [{ id: "chunk-1" }] };
+        },
+      },
+    });
+
+    expect(chunk.id).toBe("chunk-1");
+    expect(calls[0]?.sql).toContain(
+      "ON CONFLICT (document_id, chunk_index) DO UPDATE",
+    );
+    expect(calls[0]?.sql).not.toContain("embedding =");
+    expect(calls[0]?.params).toEqual([
+      "document-1",
+      0,
+      "Bench plateau chunk",
+      JSON.stringify(["bench", "plateau"]),
+      "Bench plateau chunk bench plateau",
     ]);
   });
 });

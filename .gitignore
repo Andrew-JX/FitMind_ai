@@ -1,3 +1,7 @@
 .claude/
 fitmind-ai/*.log
 fitmind-ai/*.full.log
+.history/
+fitmind-ai/client-dev.pid
+*.env_*
+.env_*

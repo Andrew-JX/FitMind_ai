@@ -324,3 +324,9 @@ import { loadServerEnv } from "../env.ts";
 
 ### 面试讲点
 - 这是很典型的“前后端本地开发合同漂移”问题：功能代码没坏，但默认配置已经对不上了。定位时不要只盯接口实现，要把 proxy、默认端口、示例 env 当成同一个契约面一起核对。
+## [T06] RAG smoke and env hygiene
+
+- Do not print `.env`, `DATABASE_URL`, `VOYAGE_API_KEY`, Vercel env values, or raw DB connection strings during RAG smoke, ingestion, or eval.
+- Windows PowerShell Chinese JSON smoke requests should send UTF-8 bytes or set `Content-Type: application/json; charset=utf-8`. Otherwise Chinese prompts can arrive corrupted and assistant intent classification can route incorrectly.
+- Treat `fitmind-ai/client-dev.pid`, `.history/`, and local `.env_*` history files as local noise. They should not be committed.
+- If `VOYAGE_API_KEY` is absent, Phase 4.9 should report or behave as keyword fallback. Do not claim hybrid/vector verification unless smoke or eval output proves the retrieval mode.
