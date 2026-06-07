@@ -749,3 +749,44 @@ Fallback boundaries:
 - Phase 4.4 Batch 6D expands the system dictionary and alias map for common Chinese gym movements such as `哑铃推肩`, `坐姿哑铃推肩`, `引体向上`, `侧平举`, `杠铃划船`, `哑铃划船`, `腿屈伸`, `腿弯举`, and `臀推`.
 - Broad aliases such as `推肩`, `划船`, `夹胸`, `飞鸟`, `下拉`, and `弯举` remain ambiguous and must be confirmed by the user before saving.
 - Expanded exercise-muscle contribution weights are deterministic approximations for training load analysis; they are not medical or rehab advice.
+
+------
+
+## Phase 5.0 Addition - Weekly Training Report
+
+### GET /api/training/weekly-report
+
+Returns a deterministic weekly training coach report for the authenticated user.
+
+Authentication:
+
+- Requires `Authorization: Bearer <jwt>`.
+- `user_id` is always read from auth context.
+- `user_id` query/body values are not accepted.
+
+Query:
+
+- `start_date`: `YYYY-MM-DD`
+- `end_date`: `YYYY-MM-DD`
+- `exercise_id`: optional selected exercise UUID
+
+Response data:
+
+- `range`: requested date-only range.
+- `status`: `empty` or `ready`.
+- `totals`: workout count, set count, total reps, total volume, and total weighted volume.
+- `frequency`: range days and normalized workouts per week.
+- `top_exercises`: highest-volume exercises in the selected range.
+- `top_muscle_groups`: highest weighted-volume muscle groups from muscle-load analysis.
+- `low_volume_muscle_groups`: lowest nonzero recorded-volume muscle groups.
+- `selected_exercise_progress`: optional progress summary when `exercise_id` is provided.
+- `recovery_notes`: conservative reminders based on recent recorded workouts only.
+- `limitations`: user-facing boundaries; this is not medical advice or a professional coaching prescription.
+- `evidence`: workout ids, set ids, calculation sources, and calculation rules.
+
+Assistant integration:
+
+- `weekly_report` uses `get_weekly_training_report` and returns Evidence.
+- `plateau_diagnosis` uses exercise progress Evidence plus RAG Sources when an exercise is selected.
+- `next_week_plan` uses weekly report Evidence plus RAG Sources and must describe the output as a draft, not a prescription.
+- Unsupported prompts continue to return no Evidence and no Sources.

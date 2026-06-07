@@ -23,6 +23,18 @@ describe("classifyAssistantIntent", () => {
     );
   });
 
+  it("routes Phase 5 coach product prompts to coach intents", () => {
+    expect(classifyAssistantIntent("帮我做一份本周训练报告").intent).toBe(
+      "weekly_report",
+    );
+    expect(classifyAssistantIntent("卧推平台期怎么诊断").intent).toBe(
+      "plateau_diagnosis",
+    );
+    expect(classifyAssistantIntent("给我一个下周训练草案").intent).toBe(
+      "next_week_plan",
+    );
+  });
+
   it("keeps unsupported prompts out of the training assistant scope", () => {
     expect(classifyAssistantIntent("明天天气怎么样？").intent).toBe(
       "unsupported",

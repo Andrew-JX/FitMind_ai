@@ -243,6 +243,44 @@ async function main(): Promise<void> {
       "RPE prompt should not return workout Evidence.",
     );
 
+    const weekly = await askAssistant(
+      baseUrl,
+      token,
+      "帮我做一份本周训练报告",
+      bench.id,
+    );
+    logAssistantSummary("Weekly report", weekly);
+
+    assert(
+      weekly.intent === "weekly_report",
+      "Weekly report prompt should route to weekly_report.",
+    );
+    assert(
+      weekly.answer.evidence.workout_ids.length > 0,
+      "Weekly report prompt should return workout Evidence.",
+    );
+
+    const plateau = await askAssistant(
+      baseUrl,
+      token,
+      "卧推平台期怎么诊断？",
+      bench.id,
+    );
+    logAssistantSummary("Bench plateau diagnosis", plateau);
+
+    assert(
+      plateau.intent === "plateau_diagnosis",
+      "Bench plateau prompt should route to plateau_diagnosis.",
+    );
+    assert(
+      plateau.answer.sources.length > 0,
+      "Bench plateau prompt should return Sources.",
+    );
+    assert(
+      plateau.answer.evidence.workout_ids.length > 0,
+      "Bench plateau prompt should return workout Evidence.",
+    );
+
     const mixed = await askAssistant(
       baseUrl,
       token,
@@ -264,6 +302,27 @@ async function main(): Promise<void> {
       "Bench plateau prompt should return workout Evidence.",
     );
 
+    const nextWeek = await askAssistant(
+      baseUrl,
+      token,
+      "给我一个下周训练草案，要参考训练容量、渐进超负荷和deload",
+      bench.id,
+    );
+    logAssistantSummary("Next-week plan", nextWeek);
+
+    assert(
+      nextWeek.intent === "next_week_plan",
+      "Next-week plan prompt should route to next_week_plan.",
+    );
+    assert(
+      nextWeek.answer.sources.length > 0,
+      "Next-week plan prompt should return Sources.",
+    );
+    assert(
+      nextWeek.answer.evidence.workout_ids.length > 0,
+      "Next-week plan prompt should return workout Evidence.",
+    );
+
     const unsupported = await askAssistant(baseUrl, token, "给我讲个笑话");
     logAssistantSummary("Unsupported", unsupported);
 
@@ -282,7 +341,9 @@ async function main(): Promise<void> {
 
     console.log("Production assistant RAG smoke passed.");
     console.log(`Base URL: ${baseUrl}`);
-    console.log("Prompts: knowledge, mixed_tool_rag, unsupported");
+    console.log(
+      "Prompts: knowledge, weekly_report, plateau_diagnosis, mixed_tool_rag, next_week_plan, unsupported",
+    );
   } finally {
     await Promise.all(
       workoutIds.map((workoutId) => deleteWorkout(baseUrl, token, workoutId)),

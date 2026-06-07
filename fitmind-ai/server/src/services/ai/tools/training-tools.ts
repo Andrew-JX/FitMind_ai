@@ -13,6 +13,10 @@ import {
   type TrainingSummaryResponseData,
 } from "../../training/training-summary-service.js";
 import {
+  getUserWeeklyTrainingReport,
+  type WeeklyTrainingReportResponseData,
+} from "../../training/weekly-training-report-service.js";
+import {
   isValidDateOnly,
   type AiToolDefinition,
 } from "./tool-types.js";
@@ -39,6 +43,11 @@ const dateRangeSchema = z
 
 const trainingSummaryArgsSchema = dateRangeSchema;
 const recommendationContextArgsSchema = dateRangeSchema;
+const weeklyTrainingReportArgsSchema = dateRangeSchema
+  .extend({
+    exercise_id: z.string().uuid().optional(),
+  })
+  .strict();
 const exerciseProgressArgsSchema = dateRangeSchema
   .extend({
     exercise_id: z.string().uuid(),
@@ -49,6 +58,9 @@ export type GetTrainingSummaryArgs = z.infer<typeof trainingSummaryArgsSchema>;
 export type GetExerciseProgressArgs = z.infer<typeof exerciseProgressArgsSchema>;
 export type GetRecommendationContextArgs = z.infer<
   typeof recommendationContextArgsSchema
+>;
+export type GetWeeklyTrainingReportArgs = z.infer<
+  typeof weeklyTrainingReportArgsSchema
 >;
 
 export const trainingAiTools = [
@@ -86,5 +98,16 @@ export const trainingAiTools = [
   } satisfies AiToolDefinition<
     GetRecommendationContextArgs,
     RecommendationContextResponseData
+  >,
+  {
+    name: "get_weekly_training_report",
+    description:
+      "Return the authenticated user's deterministic weekly training coach report for one inclusive YYYY-MM-DD date range and optional exercise_id.",
+    inputSchema: weeklyTrainingReportArgsSchema,
+    execute: (context, args) =>
+      getUserWeeklyTrainingReport(context.userId, args),
+  } satisfies AiToolDefinition<
+    GetWeeklyTrainingReportArgs,
+    WeeklyTrainingReportResponseData
   >,
 ] as const;

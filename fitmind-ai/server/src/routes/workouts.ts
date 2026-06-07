@@ -11,6 +11,7 @@ import {
   getRecommendationContextController,
   getWorkoutController,
   getTrainingSummaryController,
+  getWeeklyTrainingReportController,
   listWorkoutsController,
   parseWorkoutIntakeController,
   updateSetController,
@@ -36,6 +37,7 @@ workoutsRouter.get(
   "/training/recommendation-context",
   getRecommendationContextController,
 );
+workoutsRouter.get("/training/weekly-report", getWeeklyTrainingReportController);
 workoutsRouter.post(
   "/training/workout-intake/parse",
   parseWorkoutIntakeController,

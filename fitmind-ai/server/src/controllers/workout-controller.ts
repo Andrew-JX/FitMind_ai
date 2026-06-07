@@ -24,6 +24,7 @@ import { getUserExerciseProgress } from "../services/training/exercise-progress-
 import { getUserMuscleLoad } from "../services/training/muscle-load-service.js";
 import { getUserRecommendationContext } from "../services/training/recommendation-context-service.js";
 import { getUserTrainingSummary } from "../services/training/training-summary-service.js";
+import { getUserWeeklyTrainingReport } from "../services/training/weekly-training-report-service.js";
 import { parseUserWorkoutIntakeDraft } from "../services/training/workout-intake-service.js";
 import { createSuccessResponse } from "../utils/api-response.js";
 
@@ -77,6 +78,10 @@ const exerciseProgressQuerySchema = trainingDateRangeSchema.extend({
 });
 
 const assistantInsightsQuerySchema = trainingDateRangeSchema.extend({
+  exercise_id: z.string().uuid().optional(),
+});
+
+const weeklyReportQuerySchema = trainingDateRangeSchema.extend({
   exercise_id: z.string().uuid().optional(),
 });
 
@@ -228,6 +233,31 @@ export async function getRecommendationContextController(
     end_date: typeof req.query.end_date === "string" ? req.query.end_date : "",
   });
   const result = await getUserRecommendationContext(res.locals.userId, query);
+
+  return res.status(200).json(createSuccessResponse(result));
+}
+
+/**
+ * Return a deterministic weekly training coach report for the authenticated user.
+ *
+ * @param req - Express request with date range and optional exercise id.
+ * @param res - Express response with authenticated locals.
+ * @returns JSON weekly training report response.
+ */
+export async function getWeeklyTrainingReportController(
+  req: Request,
+  res: Response<unknown, AuthLocals>,
+) {
+  const query = weeklyReportQuerySchema.parse({
+    exercise_id:
+      typeof req.query.exercise_id === "string"
+        ? req.query.exercise_id
+        : undefined,
+    start_date:
+      typeof req.query.start_date === "string" ? req.query.start_date : "",
+    end_date: typeof req.query.end_date === "string" ? req.query.end_date : "",
+  });
+  const result = await getUserWeeklyTrainingReport(res.locals.userId, query);
 
   return res.status(200).json(createSuccessResponse(result));
 }

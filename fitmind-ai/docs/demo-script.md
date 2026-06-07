@@ -270,6 +270,31 @@ What not to overclaim:
 - Phase 4.9 upgrades the retriever to hybrid scoring and adds knowledge ingestion/eval operations.
 - This is still not reranking, LangChain, LangGraph, MCP, or multi-agent orchestration.
 
+## 11. Phase 5.0 AI Training Coach Productization Flow
+
+Phase 5.0 shifts the demo from "RAG works" to "the assistant can tell a product story."
+
+Stable question sequence:
+
+1. Ask: `帮我做一份本周训练报告`
+2. Show: the answer is routed as `weekly_report` and displays workout Evidence.
+3. Select the demo bench exercise, then ask: `卧推平台期怎么诊断？`
+4. Show: the answer is routed as `plateau_diagnosis` and displays Evidence + Sources.
+5. Ask: `给我一个下周训练草案，要参考训练容量、渐进超负荷和deload`
+6. Show: the answer is routed as `next_week_plan`, includes Evidence + Sources, and clearly says it is a draft rather than a prescription.
+7. Ask: `给我讲个笑话`
+8. Show: unsupported still returns no Evidence and no Sources.
+
+Speaking track:
+
+> Phase 4.9 proved the RAG substrate. Phase 5.0 turns it into a visible AI coach loop: recorded user data becomes Evidence, retrieved training knowledge becomes Sources, and the assistant uses both to produce a diagnosis and next-step draft without pretending to be a medical or professional coaching authority.
+
+What not to overclaim:
+
+- Do not say Phase 5.0 creates a full training program generator.
+- Do not say the next-week plan is a prescription.
+- Do not say Save/Share is implemented; it is deferred to Phase 5.1.
+
 RAG progression:
 
 - Phase 4.8A: Assistant RAG skeleton and static source shape.

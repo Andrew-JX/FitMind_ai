@@ -160,6 +160,45 @@ function summarizeRecommendationContextResult(result: unknown): unknown {
   };
 }
 
+function summarizeWeeklyTrainingReportResult(result: unknown): unknown {
+  if (!isRecord(result)) {
+    return null;
+  }
+
+  const range = result.range;
+  const status = result.status;
+  const totals = result.totals;
+  const frequency = result.frequency;
+  const topExercises = result.top_exercises;
+  const topMuscleGroups = result.top_muscle_groups;
+  const lowVolumeMuscleGroups = result.low_volume_muscle_groups;
+  const evidence = result.evidence;
+
+  return {
+    range: sanitizeForToolLog(range),
+    status: sanitizeForToolLog(status),
+    totals: sanitizeForToolLog(totals),
+    frequency: sanitizeForToolLog(frequency),
+    top_exercise_count: Array.isArray(topExercises)
+      ? topExercises.length
+      : 0,
+    top_muscle_group_count: Array.isArray(topMuscleGroups)
+      ? topMuscleGroups.length
+      : 0,
+    low_volume_muscle_group_count: Array.isArray(lowVolumeMuscleGroups)
+      ? lowVolumeMuscleGroups.length
+      : 0,
+    evidence_workout_count:
+      isRecord(evidence) && Array.isArray(evidence.workout_ids)
+        ? evidence.workout_ids.length
+        : 0,
+    evidence_set_count:
+      isRecord(evidence) && Array.isArray(evidence.set_ids)
+        ? evidence.set_ids.length
+        : 0,
+  };
+}
+
 function summarizeSuccessfulToolOutput(
   toolName: string,
   result: unknown,
@@ -171,6 +210,8 @@ function summarizeSuccessfulToolOutput(
       return summarizeExerciseProgressResult(result);
     case "get_recommendation_context":
       return summarizeRecommendationContextResult(result);
+    case "get_weekly_training_report":
+      return summarizeWeeklyTrainingReportResult(result);
     default:
       return null;
   }

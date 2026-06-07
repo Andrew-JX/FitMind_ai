@@ -12,8 +12,11 @@ export interface AssistantProviderSimulationHint {
 export type AssistantIntentMode =
   | "auto"
   | "training_overview"
+  | "weekly_report"
   | "exercise_progress"
+  | "plateau_diagnosis"
   | "next_training_focus"
+  | "next_week_plan"
   | "muscle_balance"
   | "training_imbalance"
   | "recovery_check"

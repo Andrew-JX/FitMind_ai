@@ -14,14 +14,25 @@ function buildToolArgs(
     end_date: request.assistant_context.end_date,
   };
 
-  if (toolName !== "get_exercise_progress") {
+  if (
+    toolName !== "get_exercise_progress" &&
+    toolName !== "get_weekly_training_report"
+  ) {
     return baseArgs;
   }
 
-  return {
+  const exerciseIdArgs = {
     ...baseArgs,
     exercise_id: request.assistant_context.exercise_id ?? "",
   };
+
+  if (toolName === "get_weekly_training_report") {
+    return request.assistant_context.exercise_id
+      ? exerciseIdArgs
+      : baseArgs;
+  }
+
+  return exerciseIdArgs;
 }
 
 function normalizeMessage(message: string): string {
@@ -29,6 +40,30 @@ function normalizeMessage(message: string): string {
 }
 
 function detectIntentFromMessage(message: string): AssistantIntentMode | null {
+  if (
+    /(本周训练报告|周训练报告|weekly\s*report|weekly\s*training\s*report|训练报告)/iu.test(
+      message,
+    )
+  ) {
+    return "weekly_report";
+  }
+
+  if (
+    /(平台期|停滞诊断|plateau\s*diagnosis|卧推平台|bench\s*plateau)/iu.test(
+      message,
+    )
+  ) {
+    return "plateau_diagnosis";
+  }
+
+  if (
+    /(下周训练草案|下周计划|next[-\s]*week\s*plan|next\s*week\s*draft|训练草案)/iu.test(
+      message,
+    )
+  ) {
+    return "next_week_plan";
+  }
+
   if (
     /(ai 根据什么判断|根据什么判断|怎么看我的训练数据|看到了哪些训练数据|recommendation\s*context|training\s*data|evidence)/iu.test(
       message,
@@ -105,7 +140,11 @@ function buildUnsupportedMessage(): AssistantProviderResponse {
 }
 
 function buildToolCall(
-  toolName: "get_training_summary" | "get_exercise_progress" | "get_recommendation_context",
+  toolName:
+    | "get_training_summary"
+    | "get_exercise_progress"
+    | "get_recommendation_context"
+    | "get_weekly_training_report",
   request: AssistantProviderRequest,
 ): AssistantProviderResponse {
   return {
@@ -138,8 +177,20 @@ function resolveDefaultIntent(
     return buildToolCall("get_exercise_progress", request);
   }
 
+  if (intent === "plateau_diagnosis") {
+    if (!request.assistant_context.exercise_id) {
+      return buildSelectExerciseMessage();
+    }
+
+    return buildToolCall("get_exercise_progress", request);
+  }
+
   if (intent === "training_overview") {
     return buildToolCall("get_training_summary", request);
+  }
+
+  if (intent === "weekly_report" || intent === "next_week_plan") {
+    return buildToolCall("get_weekly_training_report", request);
   }
 
   if (

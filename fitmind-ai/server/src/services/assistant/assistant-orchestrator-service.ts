@@ -41,8 +41,11 @@ import type {
 const assistantModeSchema = z.enum([
   "auto",
   "training_overview",
+  "weekly_report",
   "exercise_progress",
+  "plateau_diagnosis",
   "next_training_focus",
+  "next_week_plan",
   "muscle_balance",
   "training_imbalance",
   "recovery_check",
@@ -145,6 +148,52 @@ interface RecommendationContextResult {
     workout_id: string;
     performed_at: string;
   }>;
+  evidence: {
+    workout_ids: string[];
+    set_ids: string[];
+    calculation_rules: string[];
+  };
+}
+
+interface WeeklyTrainingReportResult {
+  range: {
+    start_date: string;
+    end_date: string;
+  };
+  status: "empty" | "ready";
+  totals: {
+    workout_count: number;
+    set_count: number;
+    total_reps: number;
+    total_volume: number;
+    total_weighted_volume: number;
+  };
+  frequency: {
+    range_days: number;
+    workouts_per_week: number;
+  };
+  top_exercises: Array<{
+    exercise_name: string;
+    set_count: number;
+    total_volume: number;
+  }>;
+  top_muscle_groups: Array<{
+    muscle_group_name: string;
+    contribution_ratio: number;
+  }>;
+  low_volume_muscle_groups: Array<{
+    muscle_group_name: string;
+    contribution_ratio: number;
+  }>;
+  selected_exercise_progress: {
+    exercise_name: string | null;
+    workout_count: number;
+    set_count: number;
+    max_weight_kg: number | null;
+    estimated_1rm_kg: number | null;
+  } | null;
+  recovery_notes: string[];
+  limitations: string[];
   evidence: {
     workout_ids: string[];
     set_ids: string[];
@@ -376,6 +425,129 @@ function buildExerciseProgressAnswer(
   };
 }
 
+function buildWeeklyTrainingReportAnswer(
+  result: WeeklyTrainingReportResult,
+): AssistantAnswerCore {
+  const topExercise = result.top_exercises[0];
+  const topMuscleGroup = result.top_muscle_groups[0];
+  const lowVolumeGroup = result.low_volume_muscle_groups[0];
+
+  if (result.status === "empty") {
+    return {
+      summary:
+        "This weekly report does not have enough recorded workouts yet. Add a few workouts with sets, reps, and weights, then I can summarize frequency, volume, main lifts, and muscle distribution.",
+      bullets: [
+        `Range: ${result.range.start_date} to ${result.range.end_date}.`,
+        "Recorded workouts: 0.",
+        "No exercise or muscle distribution evidence is available in this range.",
+      ],
+      evidence: buildEvidence("get_weekly_training_report", result),
+    };
+  }
+
+  return {
+    summary: `This week has ${result.totals.workout_count} recorded workouts, ${result.totals.set_count} sets, ${result.totals.total_reps} reps, and about ${result.totals.total_volume} kg total volume.`,
+    bullets: [
+      `Frequency: about ${result.frequency.workouts_per_week} workouts per week across ${result.frequency.range_days} days.`,
+      topExercise
+        ? `Main exercise by volume: ${topExercise.exercise_name}, ${topExercise.set_count} sets, about ${topExercise.total_volume} kg.`
+        : "No clear top exercise is available.",
+      topMuscleGroup
+        ? `Most represented muscle group: ${topMuscleGroup.muscle_group_name} at about ${formatPercent(topMuscleGroup.contribution_ratio)} of weighted volume.`
+        : "No clear top muscle group is available.",
+      lowVolumeGroup
+        ? `Lower recorded volume area: ${lowVolumeGroup.muscle_group_name} at about ${formatPercent(lowVolumeGroup.contribution_ratio)}.`
+        : "No lower-volume muscle group is available yet.",
+    ],
+    evidence: buildEvidence("get_weekly_training_report", result),
+  };
+}
+
+function buildPlateauDiagnosisAnswer(input: {
+  message: string;
+  result: ExerciseProgressResult;
+  sources: Awaited<ReturnType<typeof retrieveKnowledgeChunks>>;
+}): AssistantStructuredAnswer {
+  const evidence = buildEvidence("get_exercise_progress", input.result);
+  const exerciseName = input.result.exercise.exercise_name ?? "selected exercise";
+  const sources = input.sources.map((source) => ({
+    id: source.id,
+    title: source.title,
+    category: source.category,
+    chunk_text: source.chunk_text,
+    source_type: source.source_type,
+    tags: source.tags,
+  }));
+
+  return {
+    summary: `${exerciseName} plateau diagnosis should stay conservative: I can compare your recorded exercise trend, then use training knowledge sources to explain likely levers such as volume, intensity, recovery, and progression.`,
+    bullets: [
+      `Evidence: ${input.result.totals.workout_count} workouts, ${input.result.totals.set_count} sets, max weight ${formatMetricKg(input.result.totals.max_weight_kg)}, estimated 1RM ${formatMetricKg(input.result.totals.estimated_1rm_kg)}.`,
+      input.result.totals.workout_count < 3
+        ? "The sample is small, so this is not enough to call a true plateau."
+        : "The sample is enough for a useful first diagnosis, but short-term performance noise still matters.",
+      sources.length > 0
+        ? `Sources: ${sources.map((source) => source.title).join(", ")}.`
+        : "No knowledge sources were retrieved for this diagnosis.",
+    ],
+    conclusion:
+      "A plateau diagnosis should not assume volume is the only cause. Compare frequency, total hard sets, load progression, RPE, technique quality, and recovery before changing the plan.",
+    recommendation:
+      "For the next step, adjust only one lever at a time: add a small amount of weekly volume, improve progression consistency, or reduce fatigue if recent sessions were high effort.",
+    evidence,
+    sources,
+    intent: "plateau_diagnosis",
+    limitations: [
+      "This is a training-data diagnosis, not medical advice or a professional coaching prescription.",
+      "Pain, injury, sleep, soreness, and technique quality are not fully captured by workout logs.",
+    ],
+  };
+}
+
+function buildNextWeekPlanAnswer(input: {
+  result: WeeklyTrainingReportResult;
+  sources: Awaited<ReturnType<typeof retrieveKnowledgeChunks>>;
+}): AssistantStructuredAnswer {
+  const evidence = buildEvidence("get_weekly_training_report", input.result);
+  const topMuscleGroup = input.result.top_muscle_groups[0];
+  const lowVolumeGroup = input.result.low_volume_muscle_groups[0];
+  const sources = input.sources.map((source) => ({
+    id: source.id,
+    title: source.title,
+    category: source.category,
+    chunk_text: source.chunk_text,
+    source_type: source.source_type,
+    tags: source.tags,
+  }));
+
+  return {
+    summary:
+      "Here is a conservative next-week training draft based on your recorded Evidence and retrieved training Sources. Treat it as a planning draft, not a prescription.",
+    bullets: [
+      `Keep the weekly structure close to the current baseline: ${input.result.totals.workout_count} recorded workouts and ${input.result.totals.set_count} sets in the selected range.`,
+      topMuscleGroup
+        ? `Avoid adding much more volume to the already-dominant area: ${topMuscleGroup.muscle_group_name}.`
+        : "No dominant muscle group was detected, so keep the draft balanced.",
+      lowVolumeGroup
+        ? `Add a small, controlled emphasis to the lower recorded-volume area: ${lowVolumeGroup.muscle_group_name}.`
+        : "No lower-volume area was detected; use normal balanced training slots.",
+      "Use moderate effort for most work and change only one variable at a time: sets, load, reps, or rest.",
+    ],
+    conclusion:
+      "The safest product behavior is a next-step draft grounded in Evidence and Sources, not a full coaching prescription.",
+    recommendation:
+      "Draft next week with similar frequency, slightly better balance, and one focused progression target. Re-check after the next logged week.",
+    evidence,
+    sources,
+    intent: "next_week_plan",
+    limitations: [
+      "This is not medical advice, rehab guidance, or a professional coaching prescription.",
+      "Do not follow the draft through pain, numbness, or unusual fatigue.",
+      "The draft only reflects logged workouts and retrieved general training knowledge.",
+    ],
+  };
+}
+
 function buildRecommendationContextAnswer(
   mode: AssistantIntentMode,
   message: string,
@@ -577,7 +749,15 @@ function getToolDefinitionForMode(
         description: "Return one deterministic training range summary.",
         input_fields: ["start_date", "end_date"],
       };
+    case "weekly_report":
+    case "next_week_plan":
+      return {
+        name: "get_weekly_training_report",
+        description: "Return one deterministic weekly training coach report.",
+        input_fields: ["start_date", "end_date", "exercise_id"],
+      };
     case "exercise_progress":
+    case "plateau_diagnosis":
       return {
         name: "get_exercise_progress",
         description: "Return deterministic progress data for one exercise.",
@@ -607,8 +787,14 @@ function resolveRoutedIntent(
   switch (input.mode) {
     case "training_overview":
       return "summary";
+    case "weekly_report":
+      return "weekly_report";
     case "exercise_progress":
       return "progress";
+    case "plateau_diagnosis":
+      return "plateau_diagnosis";
+    case "next_week_plan":
+      return "next_week_plan";
     case "next_training_focus":
     case "recovery_check":
       return "recommendation";
@@ -633,6 +819,12 @@ function resolveExecutionModeForIntent(
   }
 
   switch (intent) {
+    case "weekly_report":
+      return "weekly_report";
+    case "plateau_diagnosis":
+      return input.exercise_id ? "plateau_diagnosis" : "exercise_progress";
+    case "next_week_plan":
+      return "next_week_plan";
     case "summary":
     case "exercise_history":
       return "training_overview";
@@ -659,6 +851,7 @@ function getAllowedToolDefinitions(
     getToolDefinitionForMode(mode),
     getToolDefinitionForMode("training_overview"),
     getToolDefinitionForMode("exercise_progress"),
+    getToolDefinitionForMode("weekly_report"),
     getToolDefinitionForMode("next_training_focus"),
   ];
 
@@ -850,6 +1043,10 @@ function buildToolAnswer(
 
   if (toolName === "get_exercise_progress") {
     return buildExerciseProgressAnswer(result as ExerciseProgressResult);
+  }
+
+  if (toolName === "get_weekly_training_report") {
+    return buildWeeklyTrainingReportAnswer(result as WeeklyTrainingReportResult);
   }
 
   return buildRecommendationContextAnswer(
@@ -1073,6 +1270,43 @@ export async function runMockAssistantTurn(
         sources,
         toolEvidence: buildEvidence(providerResponse.tool_name, result),
       });
+    } else if (intent === "plateau_diagnosis") {
+      await emitEvent(options, {
+        type: "state",
+        state: "retrieving",
+      });
+      const sources = await retrieveKnowledgeChunks(input.message);
+
+      logRetrievalEvent({
+        intent,
+        retrievalMode: sources[0]?.retrieval_mode ?? "fallback",
+        sources,
+        fallbackReason: sources.length === 0 ? "no_sources" : undefined,
+      });
+
+      answer = buildPlateauDiagnosisAnswer({
+        message: input.message,
+        result: result as ExerciseProgressResult,
+        sources,
+      });
+    } else if (intent === "next_week_plan") {
+      await emitEvent(options, {
+        type: "state",
+        state: "retrieving",
+      });
+      const sources = await retrieveKnowledgeChunks(input.message);
+
+      logRetrievalEvent({
+        intent,
+        retrievalMode: sources[0]?.retrieval_mode ?? "fallback",
+        sources,
+        fallbackReason: sources.length === 0 ? "no_sources" : undefined,
+      });
+
+      answer = buildNextWeekPlanAnswer({
+        result: result as WeeklyTrainingReportResult,
+        sources,
+      });
     } else {
       answer = normalizeStructuredAnswer(
         buildToolAnswer(
@@ -1242,6 +1476,10 @@ function formatMetricKg(value: number | null): string {
   }
 
   return `${value.toLocaleString()} kg`;
+}
+
+function formatPercent(value: number): string {
+  return `${(value * 100).toFixed(1)}%`;
 }
 
 function getDaysSince(value: string): number {

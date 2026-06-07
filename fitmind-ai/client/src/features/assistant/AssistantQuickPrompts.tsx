@@ -26,6 +26,36 @@ export function AssistantQuickPrompts(props: AssistantQuickPromptsProps) {
   const selectedExerciseName = props.selectedExerciseName?.trim() || "当前动作";
   const prompts: PromptDefinition[] = [
     {
+      description:
+        "Summarize this week's frequency, volume, main lifts, muscle distribution, and evidence.",
+      prompt: {
+        mode: "weekly_report",
+        message: "帮我做一份本周训练报告",
+      },
+      title: "本周训练报告",
+    },
+    {
+      description: props.selectedExerciseName
+        ? `Diagnose whether ${selectedExerciseName} is plateauing using workout Evidence and training Sources.`
+        : "Diagnose a plateau for the selected exercise using workout Evidence and training Sources.",
+      disabled: !props.selectedExerciseId,
+      helper: "Select an exercise in Analysis first, or use the demo bench exercise.",
+      prompt: {
+        mode: "plateau_diagnosis",
+        message: `${selectedExerciseName}平台期怎么诊断？`,
+      },
+      title: "平台期诊断",
+    },
+    {
+      description:
+        "Draft a conservative next-week plan from Evidence + Sources without turning it into a coaching prescription.",
+      prompt: {
+        mode: "next_week_plan",
+        message: "给我一个下周训练草案",
+      },
+      title: "下周训练草案",
+    },
+    {
       description: "快速看最近训练次数、组数、训练量和当前主要训练动作。",
       prompt: {
         mode: "training_overview",

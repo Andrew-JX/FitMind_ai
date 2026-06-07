@@ -1,4 +1,7 @@
 export type AssistantRoutedIntent =
+  | "weekly_report"
+  | "plateau_diagnosis"
+  | "next_week_plan"
   | "summary"
   | "progress"
   | "imbalance"
@@ -24,6 +27,13 @@ const RECOMMENDATION_PATTERN = /今天|下次|练什么|适合练|建议/u;
 const HISTORY_PATTERN = /上次|什么时候|历史|记录/u;
 const EVIDENCE_PATTERN = /根据什么|依据|为什么|证据|判断/u;
 
+const WEEKLY_REPORT_PATTERN =
+  /本周训练报告|周训练报告|weekly\s*report|weekly\s*training\s*report|训练报告/u;
+const PLATEAU_DIAGNOSIS_PATTERN =
+  /平台期|停滞诊断|plateau\s*diagnosis|卧推平台|bench\s*plateau/u;
+const NEXT_WEEK_PLAN_PATTERN =
+  /下周训练草案|下周计划|next[-\s]*week\s*plan|next\s*week\s*draft|训练草案/u;
+
 export function classifyAssistantIntent(
   message: string,
 ): AssistantIntentClassification {
@@ -37,6 +47,27 @@ export function classifyAssistantIntent(
   }
 
   const asksKnowledge = KNOWLEDGE_PATTERN.test(normalizedMessage);
+  if (WEEKLY_REPORT_PATTERN.test(normalizedMessage)) {
+    return {
+      intent: "weekly_report",
+      reason: "The question asks for a weekly training report.",
+    };
+  }
+
+  if (PLATEAU_DIAGNOSIS_PATTERN.test(normalizedMessage)) {
+    return {
+      intent: "plateau_diagnosis",
+      reason: "The question asks for plateau diagnosis.",
+    };
+  }
+
+  if (NEXT_WEEK_PLAN_PATTERN.test(normalizedMessage)) {
+    return {
+      intent: "next_week_plan",
+      reason: "The question asks for a next-week training draft.",
+    };
+  }
+
   if (asksKnowledge && PROGRESS_PATTERN.test(normalizedMessage)) {
     return {
       intent: "mixed_tool_rag",
