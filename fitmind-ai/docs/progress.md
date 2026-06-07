@@ -3734,3 +3734,23 @@ Verification:
 
 Deferred:
 - Embeddings, pgvector, semantic search, reranking, LangChain, LangGraph, MCP, multi-agent behavior, auth changes, training CRUD changes, voice changes, and UI redesign remain out of scope.
+
+## Phase 4.8B.1 - Production Assistant Smoke Closeout
+
+Completed:
+- Verified `https://fitmind-ai-psi.vercel.app/api/health` returns `200` after the 4.8B Git-triggered production deployment.
+- Ran production assistant smoke with a temporary UTF-8 API test account and two bench workout records.
+- Verified `RPE 是什么？` routes to `knowledge`, returns one DB-backed Source, and returns no training Evidence.
+- Verified `卧推没进步是不是训练量不够？` routes to `mixed_tool_rag`, returns three Sources, and returns Evidence for two smoke workout records.
+- Verified `给我讲个笑话` routes to `unsupported` and returns no Sources or Evidence.
+
+Verification:
+- `pnpm --filter @fitmind/server type-check` passed.
+- `pnpm --filter @fitmind/client type-check` passed.
+- `pnpm test:unit` passed: 26 test files, 118 tests.
+- `pnpm --filter @fitmind/client run build` passed.
+- `pnpm lint` passed.
+- Production smoke top Sources: `RPE 主观用力程度` for the knowledge question and `卧推进步停滞` for the mixed question.
+
+Notes:
+- The first production smoke attempt sent Chinese JSON through Windows PowerShell without explicit UTF-8 bytes and routed the mixed question as `unsupported`; rerunning with UTF-8 encoded request bytes validated the expected production behavior.
