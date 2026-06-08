@@ -57,7 +57,7 @@ function detectIntentFromMessage(message: string): AssistantIntentMode | null {
   }
 
   if (
-    /(下周训练草案|下周计划|next[-\s]*week\s*plan|next\s*week\s*draft|训练草案)/iu.test(
+    /(下周训练草案|下周训练的草案|下周训练草稿|下周训练的草稿|下周训练草程|下周训练的草程|下周训练计划|下周训练安排|下周计划|下周我怎么练|下周怎么练|下周我练什么|帮我安排下周训练|下周训练建议|给我一个下周训练建议|next[-\s]*week\s*plan|next\s*week\s*draft|训练草案)/iu.test(
       message,
     )
   ) {

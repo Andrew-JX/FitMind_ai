@@ -1302,7 +1302,9 @@ export async function runMockAssistantTurn(
         type: "state",
         state: "retrieving",
       });
-      const sources = await retrieveKnowledgeChunks(input.message);
+      const sources = await retrieveKnowledgeChunks(
+        `${input.message} 训练容量 渐进超负荷 deload`,
+      );
 
       logRetrievalEvent({
         intent,
