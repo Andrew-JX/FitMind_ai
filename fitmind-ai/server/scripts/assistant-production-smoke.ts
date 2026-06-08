@@ -38,6 +38,7 @@ interface AssistantTurnData {
   intent: string;
   answer: {
     summary: string;
+    bullets: string[];
     evidence: {
       workout_ids: string[];
     };
@@ -184,12 +185,18 @@ function logAssistantSummary(label: string, data: AssistantTurnData): void {
 }
 
 function assertNoEnglishTemplate(data: AssistantTurnData, label: string): void {
+  const answerText = [data.answer.summary, ...data.answer.bullets].join("\n");
+
   assert(
     !/(This week has|Frequency:|Main exercise by volume|plateau diagnosis should stay conservative|next-week training draft)/u.test(
-      data.answer.summary,
+      answerText,
     ),
     `${label} should not expose English deterministic template text.`,
   );
+}
+
+function getAssistantAnswerText(data: AssistantTurnData): string {
+  return [data.answer.summary, ...data.answer.bullets].join("\n");
 }
 
 async function main(): Promise<void> {
@@ -270,6 +277,22 @@ async function main(): Promise<void> {
       "PRE typo prompt should not return workout Evidence.",
     );
 
+    const preUpperTypo = await askAssistant(baseUrl, token, "PRE是什么");
+    logAssistantSummary("PRE uppercase typo", preUpperTypo);
+
+    assert(
+      preUpperTypo.intent === "knowledge",
+      "PRE uppercase typo prompt should route to knowledge.",
+    );
+    assert(
+      preUpperTypo.answer.sources.some((source) => source.title.includes("RPE")),
+      "PRE uppercase typo prompt should include an RPE source.",
+    );
+    assert(
+      preUpperTypo.answer.evidence.workout_ids.length === 0,
+      "PRE uppercase typo prompt should not return workout Evidence.",
+    );
+
     const weekly = await askAssistant(
       baseUrl,
       token,
@@ -285,6 +308,11 @@ async function main(): Promise<void> {
     assert(
       weekly.answer.evidence.workout_ids.length > 0,
       "Weekly report prompt should return workout Evidence.",
+    );
+    assert(
+      getAssistantAnswerText(weekly).includes("本周训练频率") &&
+        getAssistantAnswerText(weekly).includes("平均训练频率"),
+      "Weekly report should separate this-week frequency from range-average frequency.",
     );
     assertNoEnglishTemplate(weekly, "Weekly report");
 
@@ -334,7 +362,7 @@ async function main(): Promise<void> {
     const nextWeek = await askAssistant(
       baseUrl,
       token,
-      "给我一个下周训练草案，要参考训练容量、渐进超负荷和deload",
+      "给我一个下周训练的草程",
       bench.id,
     );
     logAssistantSummary("Next-week plan", nextWeek);

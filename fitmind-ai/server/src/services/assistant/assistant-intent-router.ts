@@ -32,12 +32,22 @@ const WEEKLY_REPORT_PATTERN =
 const PLATEAU_DIAGNOSIS_PATTERN =
   /平台期|停滞诊断|plateau\s*diagnosis|卧推平台|bench\s*plateau/u;
 const NEXT_WEEK_PLAN_PATTERN =
-  /下周训练草案|下周计划|next[-\s]*week\s*plan|next\s*week\s*draft|训练草案/u;
+  /下周训练草案|下周训练的草案|下周训练草稿|下周训练的草稿|下周训练草程|下周训练的草程|下周训练计划|下周训练安排|下周计划|下周我怎么练|下周怎么练|下周我练什么|帮我安排下周训练|下周训练建议|给我一个下周训练建议|next[-\s]*week\s*plan|next\s*week\s*draft|训练草案/u;
+
+const RPE_KNOWLEDGE_PATTERN =
+  /^(?:pre|rpe)(?:是)?(?:什么|啥|什么意思|怎么理解)[？?]?$/u;
+const SUBJECTIVE_EFFORT_KNOWLEDGE_PATTERN =
+  /主观用力(?:程度)?(?:是)?(?:什么|啥|什么意思|怎么理解)[？?]?/u;
+
+function normalizeCompactMessage(message: string): string {
+  return message.trim().toLowerCase().replace(/\s+/gu, "");
+}
 
 export function classifyAssistantIntent(
   message: string,
 ): AssistantIntentClassification {
   const normalizedMessage = message.trim();
+  const compactMessage = normalizeCompactMessage(message);
 
   if (!normalizedMessage || UNSUPPORTED_PATTERN.test(normalizedMessage)) {
     return {
@@ -46,7 +56,11 @@ export function classifyAssistantIntent(
     };
   }
 
-  const asksKnowledge = KNOWLEDGE_PATTERN.test(normalizedMessage);
+  const asksRpeKnowledge =
+    RPE_KNOWLEDGE_PATTERN.test(compactMessage) ||
+    SUBJECTIVE_EFFORT_KNOWLEDGE_PATTERN.test(compactMessage);
+  const asksKnowledge =
+    asksRpeKnowledge || KNOWLEDGE_PATTERN.test(normalizedMessage);
   if (WEEKLY_REPORT_PATTERN.test(normalizedMessage)) {
     return {
       intent: "weekly_report",

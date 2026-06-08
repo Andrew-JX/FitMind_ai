@@ -19,8 +19,13 @@ describe("classifyAssistantIntent", () => {
   it("routes knowledge and mixed questions to RAG-aware intents", () => {
     expect(classifyAssistantIntent("RPE 是什么？").intent).toBe("knowledge");
     expect(classifyAssistantIntent("Pre是什么").intent).toBe("knowledge");
+    expect(classifyAssistantIntent("PRE是什么").intent).toBe("knowledge");
+    expect(classifyAssistantIntent("pre 是什么？").intent).toBe("knowledge");
     expect(classifyAssistantIntent("PRE 是什么？").intent).toBe("knowledge");
     expect(classifyAssistantIntent("主观用力是什么？").intent).toBe("knowledge");
+    expect(classifyAssistantIntent("主观用力程度是什么？").intent).toBe(
+      "knowledge",
+    );
     expect(classifyAssistantIntent("卧推没进步是不是训练量不够？").intent).toBe(
       "mixed_tool_rag",
     );
@@ -34,6 +39,15 @@ describe("classifyAssistantIntent", () => {
       "plateau_diagnosis",
     );
     expect(classifyAssistantIntent("给我一个下周训练草案").intent).toBe(
+      "next_week_plan",
+    );
+    expect(classifyAssistantIntent("给我一个下周训练的草程").intent).toBe(
+      "next_week_plan",
+    );
+    expect(classifyAssistantIntent("下周我怎么练").intent).toBe(
+      "next_week_plan",
+    );
+    expect(classifyAssistantIntent("帮我安排下周训练").intent).toBe(
       "next_week_plan",
     );
   });

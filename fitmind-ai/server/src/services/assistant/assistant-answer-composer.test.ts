@@ -70,6 +70,8 @@ describe("assistant answer composer", () => {
     expect(answer.evidence.tool_names).toEqual([]);
     expect(answer.sources).toEqual([]);
     expect(answer.summary).toContain("训练记录");
+    expect(answer.summary).toContain("周训练报告");
+    expect(answer.summary).toContain("下周训练草案");
     expect(answer.summary).not.toContain("unsupported");
     expect(answer.limitations.join(" ")).not.toContain("unsupported");
   });
