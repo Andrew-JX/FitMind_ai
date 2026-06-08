@@ -3881,3 +3881,29 @@ Out of scope:
 
 Notes:
 - `client-dev.pid` remained local uncommitted noise and was not included in Phase 5.0 commits.
+
+## Phase 5.1 - Assistant Insight Save and Demo Packaging Closeout
+
+Closed:
+- Added persisted Assistant saved insights for `weekly_report`, `plateau_diagnosis`, and `next_week_plan` replies.
+- Added authenticated save, list, detail, and delete APIs under `/api/assistant/insights`.
+- Added Assistant Save / Copy controls and saved insight history in the existing Assistant workspace.
+- Demo seed now includes three saved insights for the demo account.
+- Copy text uses stable plain-text fields for type, summary, Evidence counts, Sources, and limitations.
+
+Verification:
+- Implementation commit `1ed02e4 feat: add assistant saved insights and polish coach ux` was pushed to `origin/main`.
+- Production `/api/health` returned 200 with status `ok`.
+- `pnpm db:migrate` reported no pending migrations after `assistant_saved_insights` was applied.
+- `pnpm --filter @fitmind/server run smoke:assistant-saved-insights` passed.
+
+Saved-insights smoke coverage:
+- Eligible Assistant replies can be saved.
+- Saved insights list and detail are scoped to the authenticated user.
+- Saved insights can be deleted by owner.
+- Unsupported replies and cross-user message IDs are rejected.
+- Generated copy text includes type, summary, Evidence count, Sources, and limitations.
+
+Out of scope:
+- No public share links, auth redesign, UI redesign, LangChain, LangGraph, MCP, agents, voice changes, or RAG architecture changes were added.
+- Assistant response shape and Evidence/Sources semantics remained unchanged.

@@ -180,7 +180,7 @@ export function buildAssistantInsightShareText(input: {
 }): string {
   const sourceLines =
     input.snapshot.sources.length === 0
-      ? ["- 无"]
+      ? ["- None"]
       : input.snapshot.sources.map((source) =>
           source.category
             ? `- ${source.title} (${source.category})`
@@ -188,29 +188,28 @@ export function buildAssistantInsightShareText(input: {
         );
   const limitationLines =
     input.snapshot.limitations.length === 0
-      ? ["- 无"]
+      ? ["- None"]
       : input.snapshot.limitations.map((limitation) => `- ${limitation}`);
 
   return [
     `FitMind Insight: ${input.title}`,
-    `类型：${formatInsightTypeLabel(input.snapshot.intent)}`,
+    `Type: ${input.snapshot.intent}`,
     "",
-    "总结：",
+    "Summary:",
     input.summary,
     "",
     "Evidence:",
-    `- 训练：${input.snapshot.evidence.workout_count}`,
-    `- 组数：${input.snapshot.evidence.set_count}`,
-    `- 工具：${input.snapshot.evidence.tool_names.join("、") || "无"}`,
+    `- Workouts: ${input.snapshot.evidence.workout_count}`,
+    `- Sets: ${input.snapshot.evidence.set_count}`,
+    `- Tools: ${input.snapshot.evidence.tool_names.join(", ") || "None"}`,
     "",
     "Sources:",
     ...sourceLines,
     "",
-    "限制：",
+    "Limitations:",
     ...limitationLines,
   ].join("\n");
 }
-
 function buildAssistantSavedInsightSnapshot(input: {
   intent: AssistantSavedInsightType;
   messageText: string;
@@ -247,10 +246,6 @@ function buildInsightTitle(insightType: AssistantSavedInsightType): string {
     case "next_week_plan":
       return "下周训练草案";
   }
-}
-
-function formatInsightTypeLabel(insightType: AssistantSavedInsightType): string {
-  return buildInsightTitle(insightType);
 }
 
 interface ParsedAssistantOutput {
@@ -388,3 +383,4 @@ function isAssistantSavedInsightType(
     value === "next_week_plan"
   );
 }
+

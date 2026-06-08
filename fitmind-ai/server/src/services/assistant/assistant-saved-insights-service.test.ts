@@ -265,11 +265,13 @@ describe("assistant saved insights service", () => {
       title: "Next-week Plan Draft",
     });
 
-    expect(text).toContain("类型：下周训练草案");
+    expect(text).toContain("Type: next_week_plan");
     expect(text).toContain("Keep next week conservative.");
-    expect(text).toContain("训练：4");
-    expect(text).toContain("组数：16");
+    expect(text).toContain("Workouts: 4");
+    expect(text).toContain("Sets: 16");
+    expect(text).toContain("Sources:");
     expect(text).toContain("Volume Landmarks");
+    expect(text).toContain("Limitations:");
     expect(text).toContain("Draft only, not medical advice.");
   });
 });
