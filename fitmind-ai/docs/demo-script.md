@@ -293,7 +293,7 @@ What not to overclaim:
 
 - Do not say Phase 5.0 creates a full training program generator.
 - Do not say the next-week plan is a prescription.
-- Do not say Save/Share is implemented; it is deferred to Phase 5.1.
+- Phase 5.1 adds save/history/copy-text only; do not claim public sharing links.
 
 RAG progression:
 
@@ -301,3 +301,34 @@ RAG progression:
 - Phase 4.8B: DB-backed keyword RAG from `knowledge_documents` / `knowledge_chunks`.
 - Phase 4.8C: Voyage `voyage-4-lite` embeddings plus pgvector `vector(1024)` exact cosine search.
 - Phase 4.9: Hybrid vector + keyword scoring, local fixture ingestion, safe retrieval logs, and deterministic RAG eval.
+
+## 12. Phase 5.1 Saved Insight Demo Flow
+
+Phase 5.1 packages the coach loop so the output can be reviewed after the chat turn.
+
+Setup:
+
+- Run `pnpm seed:assistant-demo` after migrations.
+- The demo account now includes three saved insights: weekly report, bench plateau diagnosis, and next-week plan draft.
+
+Stable demo sequence:
+
+1. Open the Assistant workspace and point out the `Saved insights` panel.
+2. Show the seeded weekly report, plateau diagnosis, and next-week draft entries.
+3. Use `Copy saved insight text` on one entry and explain that sharing is plain text only, with no public link.
+4. Ask a new eligible prompt such as `帮我做一份本周训练报告`.
+5. Click `Save insight` on the assistant reply.
+6. Show the saved item appearing in history.
+7. Click `Copy insight text` on the chat reply or saved item.
+8. Ask an unsupported prompt such as `给我讲个笑话` and show that no save action appears.
+
+Speaking track:
+
+> Phase 5.0 made the AI coach flow visible. Phase 5.1 makes the result durable: a user can save a weekly report, plateau diagnosis, or next-week draft, then copy a clean text summary that preserves the Evidence/Sources separation without exposing raw workout payloads.
+
+What not to overclaim:
+
+- No public share URL.
+- No anonymous access.
+- No Save/Share for unsupported or generic knowledge answers.
+- No raw workout/set dumps in copy text.

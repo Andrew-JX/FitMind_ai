@@ -383,3 +383,31 @@ Phase 4.9 keeps the Phase 4.8B/4.8C knowledge tables and adds one operational co
 - `knowledge_chunks.embedding vector(1024)`, `embedding_model`, and `embedded_at` remain nullable so local/dev environments can use keyword fallback.
 - No HNSW or IVFFlat index exists in 4.9. Exact cosine search remains acceptable for the current small corpus.
 - Future knowledge changes should prefer `import:knowledge` fixtures over migration edits unless a schema change is required.
+
+## 9. Assistant Saved Insights
+
+Phase 5.1 adds `assistant_saved_insights` for persisted assistant reply snapshots.
+
+Columns:
+
+- `id uuid primary key`
+- `user_id uuid not null references users(id) on delete cascade`
+- `message_id uuid references messages(id) on delete set null`
+- `insight_type varchar(40) not null`
+- `title varchar(160) not null`
+- `summary text not null`
+- `structured_snapshot jsonb not null`
+- `share_text text not null`
+- `created_at timestamptz not null default now()`
+- `updated_at timestamptz not null default now()`
+
+Constraints and indexes:
+
+- `insight_type` is limited to `weekly_report`, `plateau_diagnosis`, and `next_week_plan`.
+- `message_id` is unique when present, so saving the same assistant reply updates the existing insight.
+- `(user_id, created_at)` supports recent-history listing.
+
+Safety:
+
+- Saved snapshots keep aggregate Evidence counts, tool names, Source titles/categories, limitations, and a structured output subset.
+- Copy text must not include raw workout/set payload dumps or secrets.

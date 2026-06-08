@@ -36,6 +36,10 @@ export function tokenizeKnowledgeQuery(input: string): string[] {
   const normalizedInput = input.trim().toLowerCase();
   const tokens = new Set<string>();
 
+  if (/\bpre\b/iu.test(normalizedInput)) {
+    tokens.add("rpe");
+  }
+
   for (const match of normalizedInput.matchAll(/[a-z0-9]+/giu)) {
     tokens.add(match[0].toLowerCase());
   }

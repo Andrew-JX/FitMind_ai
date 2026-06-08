@@ -187,6 +187,13 @@ describe("rankKnowledgeChunks", () => {
     expect(ranked[0]?.retrieval_mode).toBe("keyword");
   });
 
+  it("ranks RPE first for a PRE typo question", () => {
+    const ranked = rankKnowledgeChunks(dbRows, "Pre是什么");
+
+    expect(ranked[0]?.id).toBe("chunk-rpe");
+    expect(ranked[0]?.score).toBeGreaterThan(0);
+  });
+
   it("ranks bench and progressive overload sources for a mixed bench question", () => {
     const ranked = rankKnowledgeChunks(dbRows, "卧推没进步是不是训练量不够？");
 

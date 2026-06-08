@@ -1,16 +1,24 @@
 import { Badge } from "../../components/Badge";
 import { Icon } from "../../components/Icon";
+import { IconButton } from "../../components/IconButton";
 import { useTheme } from "../../theme/ThemeContext";
+import { isAssistantMessageSaveEligible } from "./assistant-saved-insights";
 import type { AssistantChatMessage } from "./assistant-types";
 
 export interface AssistantMessageBubbleProps {
+  isSaved?: boolean | undefined;
+  isSaving?: boolean | undefined;
   message: AssistantChatMessage;
+  onCopyInsight?: ((message: AssistantChatMessage) => void) | undefined;
+  onSaveInsight?: ((message: AssistantChatMessage) => void) | undefined;
 }
 
 export function AssistantMessageBubble(props: AssistantMessageBubbleProps) {
   const { message } = props;
   const { theme } = useTheme();
   const isAssistant = message.role === "assistant";
+  const showDebugMetadata =
+    import.meta.env.DEV && import.meta.env.VITE_ASSISTANT_DEBUG === "true";
 
   return (
     <article style={bubbleLayoutStyle}>
@@ -19,15 +27,31 @@ export function AssistantMessageBubble(props: AssistantMessageBubbleProps) {
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={metaRowStyle}>
-          <span style={nameStyle(theme)}>
-            {isAssistant ? "训练助手" : "你"}
-          </span>
+          <span style={nameStyle(theme)}>{isAssistant ? "训练助手" : "你"}</span>
           {message.isStreaming ? <Badge tone="info">生成中</Badge> : null}
         </div>
         <div style={bubbleStyle(theme, isAssistant)}>
           <p style={messageTextStyle}>{message.text || "..."}</p>
           {isAssistant ? (
-            <AssistantMessageEvidenceSummary message={message} />
+            <AssistantMessageEvidenceSummary
+              message={message}
+              showDebugMetadata={showDebugMetadata}
+            />
+          ) : null}
+          {isAssistantMessageSaveEligible(message) ? (
+            <div style={actionRowStyle}>
+              <IconButton
+                disabled={props.isSaving || props.isSaved}
+                icon={props.isSaved ? "check" : "plus"}
+                label={props.isSaved ? "洞察已保存" : "保存洞察"}
+                onClick={() => props.onSaveInsight?.(message)}
+              />
+              <IconButton
+                icon="copy"
+                label="复制洞察文本"
+                onClick={() => props.onCopyInsight?.(message)}
+              />
+            </div>
           ) : null}
         </div>
       </div>
@@ -37,6 +61,7 @@ export function AssistantMessageBubble(props: AssistantMessageBubbleProps) {
 
 function AssistantMessageEvidenceSummary(props: {
   message: AssistantChatMessage;
+  showDebugMetadata: boolean;
 }) {
   const { message } = props;
   const hasEvidence =
@@ -46,13 +71,18 @@ function AssistantMessageEvidenceSummary(props: {
   const hasSources = (message.sources?.length ?? 0) > 0;
   const hasLimitations = (message.limitations?.length ?? 0) > 0;
 
-  if (!hasEvidence && !hasSources && !hasLimitations && !message.intent) {
+  if (
+    !hasEvidence &&
+    !hasSources &&
+    !hasLimitations &&
+    !(props.showDebugMetadata && message.intent)
+  ) {
     return null;
   }
 
   return (
     <div style={structuredOutputStyle}>
-      {message.intent ? (
+      {props.showDebugMetadata && message.intent ? (
         <div style={structuredLineStyle}>Intent: {message.intent}</div>
       ) : null}
       {hasEvidence ? (
@@ -60,16 +90,16 @@ function AssistantMessageEvidenceSummary(props: {
           <summary style={summaryStyle}>Evidence</summary>
           <ul style={listStyle}>
             {message.evidence?.toolNames.length ? (
-              <li>Tools: {message.evidence.toolNames.join("、")}</li>
+              <li>工具：{message.evidence.toolNames.join("、")}</li>
             ) : null}
             {message.evidence?.workoutIds.length ? (
-              <li>Workouts: {message.evidence.workoutIds.length} 条</li>
+              <li>训练：{message.evidence.workoutIds.length} 条</li>
             ) : null}
             {message.evidence?.setIds.length ? (
-              <li>Sets: {message.evidence.setIds.length} 条</li>
+              <li>组数：{message.evidence.setIds.length} 条</li>
             ) : null}
             {message.evidence?.calculationRules.length ? (
-              <li>Rules: {message.evidence.calculationRules.join("、")}</li>
+              <li>规则：{message.evidence.calculationRules.join("、")}</li>
             ) : null}
           </ul>
         </details>
@@ -192,4 +222,11 @@ const listStyle: React.CSSProperties = {
   lineHeight: 1.6,
   margin: "8px 0 0",
   paddingLeft: 18,
+};
+
+const actionRowStyle: React.CSSProperties = {
+  display: "flex",
+  gap: 8,
+  justifyContent: "flex-end",
+  marginTop: 10,
 };

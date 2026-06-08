@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { Badge } from "../../components/Badge";
 import { Card } from "../../components/Card";
 import { useTheme } from "../../theme/ThemeContext";
@@ -5,6 +7,7 @@ import type {
   AssistantMode,
   AssistantPromptSuggestion,
 } from "./assistant-types";
+import { splitAssistantQuickPrompts } from "./assistant-quick-prompts";
 
 export interface AssistantQuickPromptsProps {
   activeMode: AssistantMode;
@@ -23,91 +26,16 @@ interface PromptDefinition {
 
 export function AssistantQuickPrompts(props: AssistantQuickPromptsProps) {
   const { theme } = useTheme();
+  const [showMorePrompts, setShowMorePrompts] = useState(false);
   const selectedExerciseName = props.selectedExerciseName?.trim() || "当前动作";
-  const prompts: PromptDefinition[] = [
-    {
-      description:
-        "Summarize this week's frequency, volume, main lifts, muscle distribution, and evidence.",
-      prompt: {
-        mode: "weekly_report",
-        message: "帮我做一份本周训练报告",
-      },
-      title: "本周训练报告",
-    },
-    {
-      description: props.selectedExerciseName
-        ? `Diagnose whether ${selectedExerciseName} is plateauing using workout Evidence and training Sources.`
-        : "Diagnose a plateau for the selected exercise using workout Evidence and training Sources.",
-      disabled: !props.selectedExerciseId,
-      helper: "Select an exercise in Analysis first, or use the demo bench exercise.",
-      prompt: {
-        mode: "plateau_diagnosis",
-        message: `${selectedExerciseName}平台期怎么诊断？`,
-      },
-      title: "平台期诊断",
-    },
-    {
-      description:
-        "Draft a conservative next-week plan from Evidence + Sources without turning it into a coaching prescription.",
-      prompt: {
-        mode: "next_week_plan",
-        message: "给我一个下周训练草案",
-      },
-      title: "下周训练草案",
-    },
-    {
-      description: "快速看最近训练次数、组数、训练量和当前主要训练动作。",
-      prompt: {
-        mode: "training_overview",
-        message: "最近训练总览",
-      },
-      title: "最近训练总览",
-    },
-    {
-      description: "基于最近记录，先给一个保守的下一次训练方向建议。",
-      prompt: {
-        mode: "next_training_focus",
-        message: "我今天练什么？",
-      },
-      title: "我今天练什么？",
-    },
-    {
-      description: "看最近训练量分布，判断胸部相关训练是否已经比较集中。",
-      prompt: {
-        mode: "muscle_balance",
-        message: "我胸练得够吗？",
-      },
-      title: "我胸练得够吗？",
-    },
-    {
-      description: "判断最近训练是不是明显集中在少数动作或同一类部位。",
-      prompt: {
-        mode: "training_imbalance",
-        message: "我是不是偏科？",
-      },
-      title: "我是不是偏科？",
-    },
-    {
-      description: props.selectedExerciseName
-        ? `分析 ${selectedExerciseName} 的重量变化、最高重量和估算最大重量。`
-        : "分析当前选中动作的重量变化、最高重量和估算最大重量。",
-      disabled: !props.selectedExerciseId,
-      helper: "请先去“分析”页选中一个动作。",
-      prompt: {
-        mode: "exercise_progress",
-        message: `分析一下${selectedExerciseName}的进展。`,
-      },
-      title: "当前动作进展",
-    },
-    {
-      description: "解释这些建议背后具体参考了哪些训练记录和计算规则。",
-      prompt: {
-        mode: "evidence_explain",
-        message: "智能助手根据什么判断？",
-      },
-      title: "智能助手根据什么判断？",
-    },
-  ];
+  const prompts = buildPromptDefinitions({
+    selectedExerciseId: props.selectedExerciseId,
+    selectedExerciseName,
+  });
+  const promptGroups = splitAssistantQuickPrompts(prompts);
+  const visiblePrompts = showMorePrompts
+    ? [...promptGroups.primary, ...promptGroups.more]
+    : promptGroups.primary;
 
   return (
     <Card>
@@ -115,14 +43,14 @@ export function AssistantQuickPrompts(props: AssistantQuickPromptsProps) {
         <div>
           <h3 style={sectionTitleStyle}>快捷问题</h3>
           <p style={sectionCopyStyle(theme)}>
-            这些只是示例问法。你也可以直接输入自然训练问题，助手会先判断意图，再读取训练数据或检索训练知识。
+            先从核心教练问题开始，也可以直接输入自己的训练问题。
           </p>
         </div>
-        <Badge tone="neutral">示例问题</Badge>
+        <Badge tone="neutral">建议</Badge>
       </div>
 
       <div style={promptListStyle}>
-        {prompts.map((prompt) => {
+        {visiblePrompts.map((prompt) => {
           const isActive = props.activeMode === prompt.prompt.mode;
 
           return (
@@ -155,8 +83,102 @@ export function AssistantQuickPrompts(props: AssistantQuickPromptsProps) {
           );
         })}
       </div>
+
+      {promptGroups.more.length > 0 ? (
+        <button
+          onClick={() => setShowMorePrompts((currentValue) => !currentValue)}
+          style={moreButtonStyle(theme)}
+          type="button"
+        >
+          {showMorePrompts ? "收起问题" : "更多问题"}
+        </button>
+      ) : null}
     </Card>
   );
+}
+
+function buildPromptDefinitions(input: {
+  selectedExerciseId?: string | null | undefined;
+  selectedExerciseName: string;
+}): PromptDefinition[] {
+  return [
+    {
+      description: "总结本周训练频率、总量、主要动作、肌群分布和 Evidence。",
+      prompt: {
+        mode: "weekly_report",
+        message: "帮我做一份本周训练报告",
+      },
+      title: "本周训练报告",
+    },
+    {
+      description: "结合训练 Evidence 和知识 Sources，保守诊断动作是否进入平台期。",
+      disabled: !input.selectedExerciseId,
+      helper: "请先在分析页选择一个重点动作。",
+      prompt: {
+        mode: "plateau_diagnosis",
+        message: `${input.selectedExerciseName}平台期怎么诊断？`,
+      },
+      title: "平台期诊断",
+    },
+    {
+      description: "基于 Evidence + Sources 生成下周训练草案，不把它当作处方。",
+      prompt: {
+        mode: "next_week_plan",
+        message: "给我一个下周训练草案",
+      },
+      title: "下周训练草案",
+    },
+    {
+      description: "快速查看最近训练次数、组数、训练量和主要动作。",
+      prompt: {
+        mode: "training_overview",
+        message: "最近训练总览",
+      },
+      title: "最近训练总览",
+    },
+    {
+      description: "根据最近记录，给出保守的下一次训练方向。",
+      prompt: {
+        mode: "next_training_focus",
+        message: "我今天练什么？",
+      },
+      title: "我今天练什么？",
+    },
+    {
+      description: "查看训练量分布，判断胸部相关训练是否比较集中。",
+      prompt: {
+        mode: "muscle_balance",
+        message: "我胸练得够吗？",
+      },
+      title: "我胸练得够吗？",
+    },
+    {
+      description: "判断最近训练是否明显集中在少数动作或同一类部位。",
+      prompt: {
+        mode: "training_imbalance",
+        message: "我是不是偏科？",
+      },
+      title: "我是不是偏科？",
+    },
+    {
+      description: `分析 ${input.selectedExerciseName} 的重量变化、最高重量和估算 1RM。`,
+      disabled: !input.selectedExerciseId,
+      helper: "请先在分析页选择一个动作。",
+      prompt: {
+        mode: "exercise_progress",
+        message: `分析一下${input.selectedExerciseName}的进展。`,
+      },
+      title: "当前动作进展",
+    },
+    {
+      description: "解释这些建议背后参考了哪些训练记录和计算规则。",
+      prompt: {
+        mode: "evidence_explain",
+        message: "智能助手根据什么判断？",
+      },
+      title: "判断依据",
+    },
+  ];
 }
 
 const sectionHeaderStyle: React.CSSProperties = {
@@ -242,5 +264,22 @@ function promptHelperStyle(
     color: theme.colors.orange,
     fontSize: 11,
     lineHeight: 1.5,
+  };
+}
+
+function moreButtonStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.surf2,
+    border: `1px solid ${theme.colors.bdr}`,
+    borderRadius: theme.radius.control,
+    color: theme.colors.tx2,
+    cursor: "pointer",
+    fontSize: 13,
+    fontWeight: 700,
+    marginTop: 12,
+    padding: "10px 12px",
+    width: "100%",
   };
 }

@@ -288,6 +288,18 @@ export function useAssistantChat(token: string | null): UseAssistantChatResult {
       if (event.session_id) {
         setSessionId(event.session_id);
       }
+      if (event.message_id) {
+        setMessages((currentMessages) =>
+          currentMessages.map((message) =>
+            message.id === assistantMessageId
+              ? {
+                  ...message,
+                  messageId: event.message_id,
+                }
+              : message,
+          ),
+        );
+      }
       setActiveToolCall((currentValue) =>
         currentValue?.status === "running" ? null : currentValue,
       );

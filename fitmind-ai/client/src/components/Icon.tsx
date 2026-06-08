@@ -13,6 +13,7 @@ export type IconName =
   | "user"
   | "clock"
   | "eye"
+  | "copy"
   | "trash"
   | "refresh"
   | "check"
@@ -165,6 +166,15 @@ function renderPath(name: IconName): React.ReactNode {
       <>
         <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" />
         <circle cx="12" cy="12" r="3" />
+      </>
+    );
+  }
+
+  if (name === "copy") {
+    return (
+      <>
+        <rect height="12" rx="2" width="12" x="8" y="8" />
+        <path d="M4 16V6a2 2 0 0 1 2-2h10" />
       </>
     );
   }

@@ -18,6 +18,9 @@ describe("classifyAssistantIntent", () => {
 
   it("routes knowledge and mixed questions to RAG-aware intents", () => {
     expect(classifyAssistantIntent("RPE 是什么？").intent).toBe("knowledge");
+    expect(classifyAssistantIntent("Pre是什么").intent).toBe("knowledge");
+    expect(classifyAssistantIntent("PRE 是什么？").intent).toBe("knowledge");
+    expect(classifyAssistantIntent("主观用力是什么？").intent).toBe("knowledge");
     expect(classifyAssistantIntent("卧推没进步是不是训练量不够？").intent).toBe(
       "mixed_tool_rag",
     );

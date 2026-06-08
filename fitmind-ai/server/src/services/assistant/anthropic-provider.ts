@@ -31,6 +31,7 @@ function buildSystemPrompt(): string {
   return [
     "You are the non-streaming provider layer for FitMind AI.",
     "Return either one concise plain-text answer or one client tool call.",
+    "User-facing text must be Chinese by default unless the user explicitly asks for another language.",
     "If the user asks for training data that depends on backend evidence, prefer exactly one allowed tool.",
     "Never request more than one tool call.",
     "Never invent tool names that are not in the allowed tools list.",

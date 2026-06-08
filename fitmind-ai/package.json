@@ -14,6 +14,7 @@
     "smoke:auth": "pnpm --filter @fitmind/server run smoke:auth",
     "smoke:assistant": "pnpm --filter @fitmind/server run smoke:assistant",
     "smoke:assistant-insights": "pnpm --filter @fitmind/server run smoke:assistant-insights",
+    "smoke:assistant-saved-insights": "pnpm --filter @fitmind/server run smoke:assistant-saved-insights",
     "smoke:muscle-load": "pnpm --filter @fitmind/server run smoke:muscle-load",
     "smoke:training": "pnpm --filter @fitmind/server run smoke:training",
     "smoke:workout-intake": "pnpm --filter @fitmind/server run smoke:workout-intake",

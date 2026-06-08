@@ -176,6 +176,86 @@ export async function hasChatSessionById(
 }
 
 /**
+ * Load one chat message for the provided user id.
+ *
+ * @param messageId - Message id.
+ * @param userId - Authenticated user id.
+ * @param pool - Optional shared database pool.
+ * @returns Matching message row or null.
+ */
+export async function findChatMessageByIdForUser(
+  messageId: string,
+  userId: string,
+  pool?: DbPoolLike,
+): Promise<ChatMessageRow | null> {
+  const activePool = pool ?? (await createRepositoryPool());
+  const ownsPool = pool === undefined;
+
+  try {
+    const result = await activePool.query(
+      `
+        SELECT
+          m.id,
+          m.session_id,
+          m.role,
+          m.content,
+          m.structured_output,
+          m.usage,
+          m.metadata,
+          m.token_input,
+          m.token_output,
+          m.created_at
+        FROM messages m
+        JOIN chat_sessions s ON s.id = m.session_id
+        WHERE m.id = $1
+          AND s.user_id = $2
+        LIMIT 1
+      `,
+      [messageId, userId],
+    );
+
+    return (result.rows[0] as ChatMessageRow | undefined) ?? null;
+  } finally {
+    if (ownsPool) {
+      await activePool.end?.();
+    }
+  }
+}
+
+/**
+ * Check whether a chat message exists regardless of ownership.
+ *
+ * @param messageId - Message id.
+ * @param pool - Optional shared database pool.
+ * @returns True when the message id exists.
+ */
+export async function hasChatMessageById(
+  messageId: string,
+  pool?: DbPoolLike,
+): Promise<boolean> {
+  const activePool = pool ?? (await createRepositoryPool());
+  const ownsPool = pool === undefined;
+
+  try {
+    const result = await activePool.query(
+      `
+        SELECT id
+        FROM messages
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [messageId],
+    );
+
+    return result.rows.length > 0;
+  } finally {
+    if (ownsPool) {
+      await activePool.end?.();
+    }
+  }
+}
+
+/**
  * Insert one chat message row and advance the parent session timestamp.
  *
  * @param input - Message payload.

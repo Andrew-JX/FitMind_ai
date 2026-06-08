@@ -121,15 +121,15 @@ export function composeUnsupportedAnswer(
 
   return {
     summary:
-      "我现在主要能分析你的训练记录、动作进展、训练趋势和基础训练知识。这个问题暂时不在支持范围内。",
+      "这个问题暂时超出了 FitMind 训练助手的范围。我可以继续帮你分析训练记录、动作进展、训练趋势，或解释 RPE、训练量、渐进超负荷这类基础训练知识。",
     bullets: [
-      "可以问我：最近卧推有没有进步、这周训练量够不够、RPE 是什么、我根据什么判断。",
+      "你可以问：最近卧推有没有进步、这周训练量够不够、RPE 是什么、我根据什么判断。",
     ],
-    conclusion: "这个问题暂时不在 FitMind 训练助手支持范围内。",
-    recommendation: "请换成训练记录、动作进展或训练知识相关的问题。",
+    conclusion: "FitMind 当前专注于训练记录解释和训练知识问答。",
+    recommendation: "换成训练记录、动作进展、训练量、恢复或训练知识相关的问题，我会更有帮助。",
     evidence: emptyEvidence,
     sources: [],
     intent: "unsupported",
-    limitations: ["unsupported 问题不会调用训练工具，也不会生成泛化生活建议。"],
+    limitations: ["这类问题不会调用训练工具，也不会生成泛化生活建议。"],
   };
 }

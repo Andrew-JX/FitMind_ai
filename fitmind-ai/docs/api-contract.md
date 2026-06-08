@@ -790,3 +790,96 @@ Assistant integration:
 - `plateau_diagnosis` uses exercise progress Evidence plus RAG Sources when an exercise is selected.
 - `next_week_plan` uses weekly report Evidence plus RAG Sources and must describe the output as a draft, not a prescription.
 - Unsupported prompts continue to return no Evidence and no Sources.
+
+------
+
+## Phase 5.1 Addition - Assistant Saved Insights
+
+Saved insights persist selected Assistant replies for authenticated users. This is copy-text sharing only: no public URLs, no anonymous access, and no Assistant answer-shape change.
+
+Eligible assistant intents:
+
+- `weekly_report`
+- `plateau_diagnosis`
+- `next_week_plan`
+
+### POST /api/assistant/insights
+
+Saves one eligible assistant reply.
+
+Authentication:
+
+- Requires `Authorization: Bearer <jwt>`.
+- `message_id` must belong to the authenticated user's chat session.
+
+Request:
+
+```json
+{
+  "message_id": "uuid"
+}
+```
+
+Response 201 data:
+
+- `id`: saved insight id.
+- `message_id`: original assistant message id, or `null` for seeded demo snapshots.
+- `insight_type`: `weekly_report`, `plateau_diagnosis`, or `next_week_plan`.
+- `title`: stable display title.
+- `summary`: assistant answer summary text.
+- `structured_snapshot`: durable display snapshot with message text, intent, Evidence counts/tool names, Source titles/categories, limitations, and a structured output subset.
+- `share_text`: stable copy-text summary with intent, summary, Evidence counts, Source titles, and limitations.
+- `created_at` / `updated_at`.
+
+Rejects:
+
+- user messages.
+- unsupported / knowledge / mixed / generic assistant replies.
+- missing message ids.
+- cross-user message ids.
+
+### GET /api/assistant/insights
+
+Lists the authenticated user's recent saved insights.
+
+Response 200:
+
+```json
+{
+  "ok": true,
+  "data": {
+    "items": [
+      {
+        "id": "uuid",
+        "message_id": "uuid",
+        "insight_type": "weekly_report",
+        "title": "Weekly Training Report",
+        "summary": "...",
+        "share_text": "...",
+        "created_at": "2026-06-08T00:00:00.000Z",
+        "updated_at": "2026-06-08T00:00:00.000Z"
+      }
+    ]
+  }
+}
+```
+
+### GET /api/assistant/insights/:id
+
+Returns one saved insight for the authenticated user.
+
+### DELETE /api/assistant/insights/:id
+
+Deletes one saved insight for the authenticated user.
+
+Response 200:
+
+```json
+{
+  "ok": true,
+  "data": {
+    "deleted": true,
+    "id": "uuid"
+  }
+}
+```

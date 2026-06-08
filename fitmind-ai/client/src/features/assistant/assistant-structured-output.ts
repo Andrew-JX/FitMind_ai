@@ -47,6 +47,7 @@ export function mergeStructuredOutputIntoMessage(
           evidence: normalizeEvidence(output),
           intent: output.intent,
           limitations: output.answer?.limitations ?? [],
+          messageId: output.message_id ?? message.messageId,
           sources: normalizeSources(output),
         }
       : message,

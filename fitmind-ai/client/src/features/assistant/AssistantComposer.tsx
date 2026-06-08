@@ -20,7 +20,7 @@ export function AssistantComposer(props: AssistantComposerProps) {
       <div style={{ flex: 1 }}>
         <textarea
           onChange={(event) => props.onChangeMessage(event.target.value)}
-          placeholder="例如：为什么建议我练背？这周训练量是不是太少？我今天还能练胸吗？"
+          placeholder="例如：为什么建议我练背？这周训练量是不是太少？RPE 是什么？"
           rows={3}
           style={textareaStyle(theme)}
           value={props.message}
@@ -55,7 +55,9 @@ export function AssistantComposer(props: AssistantComposerProps) {
   );
 }
 
-function composerStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function composerStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     alignItems: "flex-end",
     backgroundColor: theme.colors.surf,
@@ -67,7 +69,9 @@ function composerStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPr
   };
 }
 
-function textareaStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function textareaStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf2,
     border: `1px solid ${theme.colors.bdr2}`,

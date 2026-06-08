@@ -33,6 +33,22 @@ interface DemoWorkoutInput {
   }>;
 }
 
+interface DemoSavedInsightInput {
+  insightType: "weekly_report" | "plateau_diagnosis" | "next_week_plan";
+  title: string;
+  summary: string;
+  evidence: {
+    workoutCount: number;
+    setCount: number;
+    toolNames: string[];
+  };
+  sources: Array<{
+    title: string;
+    category: string;
+  }>;
+  limitations: string[];
+}
+
 const DEMO_USER_EMAIL = "assistant-demo@fitmind.local";
 const DEMO_USER_DISPLAY_NAME = "Assistant Demo User";
 const DEMO_USER_PASSWORD = "Passw0rd!";
@@ -244,6 +260,114 @@ function buildDemoWorkouts(exercises: DemoExerciseMap): DemoWorkoutInput[] {
   ];
 }
 
+function buildShareText(input: DemoSavedInsightInput): string {
+  const sourceLines =
+    input.sources.length === 0
+      ? ["- 无"]
+      : input.sources.map((source) => `- ${source.title} (${source.category})`);
+  const limitationLines =
+    input.limitations.length === 0
+      ? ["- 无"]
+      : input.limitations.map((limitation) => `- ${limitation}`);
+
+  return [
+    `FitMind Insight: ${input.title}`,
+    `类型：${formatDemoInsightType(input.insightType)}`,
+    "",
+    "总结：",
+    input.summary,
+    "",
+    "Evidence:",
+    `- 训练：${input.evidence.workoutCount}`,
+    `- 组数：${input.evidence.setCount}`,
+    `- 工具：${input.evidence.toolNames.join("、") || "无"}`,
+    "",
+    "Sources:",
+    ...sourceLines,
+    "",
+    "限制：",
+    ...limitationLines,
+  ].join("\n");
+}
+
+function formatDemoInsightType(
+  insightType: DemoSavedInsightInput["insightType"],
+): string {
+  switch (insightType) {
+    case "weekly_report":
+      return "本周训练报告";
+    case "plateau_diagnosis":
+      return "平台期诊断";
+    case "next_week_plan":
+      return "下周训练草案";
+  }
+}
+
+function buildDemoSavedInsights(): DemoSavedInsightInput[] {
+  return [
+    {
+      insightType: "weekly_report",
+      title: "Demo 本周训练报告",
+      summary:
+        "Demo 数据展示了 5 次训练：胸推动作占比较高，同时保留了轻量腿部记录和足够的组数来解释频率与分布。",
+      evidence: {
+        workoutCount: 5,
+        setCount: 12,
+        toolNames: ["get_weekly_training_report"],
+      },
+      sources: [],
+      limitations: [
+        "这是基于 demo 聚合训练数据生成的保存快照。",
+      ],
+    },
+    {
+      insightType: "plateau_diagnosis",
+      title: "Demo 卧推平台期诊断",
+      summary:
+        "Demo 卧推数据接近停滞，所以诊断会先比较频率、有效组数、重量推进和恢复，再考虑是否调整训练量。",
+      evidence: {
+        workoutCount: 3,
+        setCount: 6,
+        toolNames: ["get_exercise_progress"],
+      },
+      sources: [
+        {
+          title: "渐进超负荷与平台期检查",
+          category: "training_principles",
+        },
+        {
+          title: "训练量参考区间",
+          category: "programming",
+        },
+      ],
+      limitations: [
+        "这是训练数据诊断，不是医疗建议或专业教练处方。",
+      ],
+    },
+    {
+      insightType: "next_week_plan",
+      title: "Demo 下周训练草案",
+      summary:
+        "下周草案会保持接近当前频率，避免胸推动作大幅加量，并小幅补一点拉类或腿部训练关注。",
+      evidence: {
+        workoutCount: 5,
+        setCount: 12,
+        toolNames: ["get_weekly_training_report"],
+      },
+      sources: [
+        {
+          title: "推进时一次只调整一个变量",
+          category: "programming",
+        },
+      ],
+      limitations: [
+        "这只是训练草案，不是医疗建议或专业教练处方。",
+        "草案只反映已记录训练和通用训练知识。",
+      ],
+    },
+  ];
+}
+
 async function upsertDemoUser(): Promise<{ id: string; email: string }> {
   const pool = createDbPool();
 
@@ -288,6 +412,14 @@ async function replaceDemoTrainingData(
     await client.query(
       `
         DELETE FROM tool_call_logs
+        WHERE user_id = $1
+      `,
+      [userId],
+    );
+
+    await client.query(
+      `
+        DELETE FROM assistant_saved_insights
         WHERE user_id = $1
       `,
       [userId],
@@ -352,6 +484,49 @@ async function replaceDemoTrainingData(
           ],
         );
       }
+    }
+
+    for (const insight of buildDemoSavedInsights()) {
+      const structuredSnapshot = {
+        message_text: insight.summary,
+        intent: insight.insightType,
+        evidence: {
+          workout_count: insight.evidence.workoutCount,
+          set_count: insight.evidence.setCount,
+          tool_names: insight.evidence.toolNames,
+          calculation_rule_count: 2,
+        },
+        sources: insight.sources,
+        limitations: insight.limitations,
+        structured_output: {
+          intent: insight.insightType,
+          answer_summary: insight.summary,
+          answer_bullets: [],
+        },
+      };
+
+      await client.query(
+        `
+          INSERT INTO assistant_saved_insights (
+            user_id,
+            message_id,
+            insight_type,
+            title,
+            summary,
+            structured_snapshot,
+            share_text
+          )
+          VALUES ($1, NULL, $2, $3, $4, $5::jsonb, $6)
+        `,
+        [
+          userId,
+          insight.insightType,
+          insight.title,
+          insight.summary,
+          JSON.stringify(structuredSnapshot),
+          buildShareText(insight),
+        ],
+      );
     }
 
     await client.query("COMMIT");

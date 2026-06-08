@@ -3,14 +3,18 @@ import type { AssistantChatMessage } from "./assistant-types";
 import { AssistantMessageBubble } from "./AssistantMessageBubble";
 
 export interface AssistantMessageListProps {
+  isMessageSaved?: ((message: AssistantChatMessage) => boolean) | undefined;
+  isMessageSaving?: ((message: AssistantChatMessage) => boolean) | undefined;
   messages: AssistantChatMessage[];
+  onCopyInsight?: ((message: AssistantChatMessage) => void) | undefined;
+  onSaveInsight?: ((message: AssistantChatMessage) => void) | undefined;
 }
 
 export function AssistantMessageList(props: AssistantMessageListProps) {
   if (props.messages.length === 0) {
     return (
       <StateNotice
-        description="你可以先看上面的主动洞察，再继续追问为什么这样判断、今天适合练什么，或者某个动作有没有进步。"
+        description="可以先看上面的训练洞察，再继续追问判断依据、今天适合练什么，或某个动作有没有进步。"
         icon="bot"
         title="从一个训练追问开始"
       />
@@ -20,7 +24,14 @@ export function AssistantMessageList(props: AssistantMessageListProps) {
   return (
     <div style={listStyle}>
       {props.messages.map((message) => (
-        <AssistantMessageBubble key={message.id} message={message} />
+        <AssistantMessageBubble
+          isSaved={props.isMessageSaved?.(message)}
+          isSaving={props.isMessageSaving?.(message)}
+          key={message.id}
+          message={message}
+          onCopyInsight={props.onCopyInsight}
+          onSaveInsight={props.onSaveInsight}
+        />
       ))}
     </div>
   );

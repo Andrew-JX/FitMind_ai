@@ -37,6 +37,7 @@ interface WorkoutDetailData {
 interface AssistantTurnData {
   intent: string;
   answer: {
+    summary: string;
     evidence: {
       workout_ids: string[];
     };
@@ -45,6 +46,7 @@ interface AssistantTurnData {
       category: string;
       chunk_text: string;
     }>;
+    limitations: string[];
   };
 }
 
@@ -181,6 +183,15 @@ function logAssistantSummary(label: string, data: AssistantTurnData): void {
   }
 }
 
+function assertNoEnglishTemplate(data: AssistantTurnData, label: string): void {
+  assert(
+    !/(This week has|Frequency:|Main exercise by volume|plateau diagnosis should stay conservative|next-week training draft)/u.test(
+      data.answer.summary,
+    ),
+    `${label} should not expose English deterministic template text.`,
+  );
+}
+
 async function main(): Promise<void> {
   const baseUrl = process.argv[2] ?? DEFAULT_BASE_URL;
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -243,6 +254,22 @@ async function main(): Promise<void> {
       "RPE prompt should not return workout Evidence.",
     );
 
+    const preTypo = await askAssistant(baseUrl, token, "Pre是什么");
+    logAssistantSummary("PRE typo", preTypo);
+
+    assert(
+      preTypo.intent === "knowledge",
+      "PRE typo prompt should route to knowledge.",
+    );
+    assert(
+      preTypo.answer.sources.some((source) => source.title.includes("RPE")),
+      "PRE typo prompt should include an RPE source.",
+    );
+    assert(
+      preTypo.answer.evidence.workout_ids.length === 0,
+      "PRE typo prompt should not return workout Evidence.",
+    );
+
     const weekly = await askAssistant(
       baseUrl,
       token,
@@ -259,6 +286,7 @@ async function main(): Promise<void> {
       weekly.answer.evidence.workout_ids.length > 0,
       "Weekly report prompt should return workout Evidence.",
     );
+    assertNoEnglishTemplate(weekly, "Weekly report");
 
     const plateau = await askAssistant(
       baseUrl,
@@ -280,6 +308,7 @@ async function main(): Promise<void> {
       plateau.answer.evidence.workout_ids.length > 0,
       "Bench plateau prompt should return workout Evidence.",
     );
+    assertNoEnglishTemplate(plateau, "Bench plateau diagnosis");
 
     const mixed = await askAssistant(
       baseUrl,
@@ -322,6 +351,7 @@ async function main(): Promise<void> {
       nextWeek.answer.evidence.workout_ids.length > 0,
       "Next-week plan prompt should return workout Evidence.",
     );
+    assertNoEnglishTemplate(nextWeek, "Next-week plan");
 
     const unsupported = await askAssistant(baseUrl, token, "给我讲个笑话");
     logAssistantSummary("Unsupported", unsupported);
@@ -337,6 +367,10 @@ async function main(): Promise<void> {
     assert(
       unsupported.answer.evidence.workout_ids.length === 0,
       "Unsupported prompt should not return Evidence.",
+    );
+    assert(
+      !unsupported.answer.limitations.join(" ").includes("unsupported"),
+      "Unsupported user-facing limitations should not expose raw intent names.",
     );
 
     console.log("Production assistant RAG smoke passed.");

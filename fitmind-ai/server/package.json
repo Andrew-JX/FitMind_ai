@@ -19,6 +19,7 @@
     "smoke:assistant-mock": "pnpm run smoke:assistant",
     "smoke:assistant-production": "tsx scripts/assistant-production-smoke.ts",
     "smoke:assistant-insights": "tsx scripts/assistant-insights-api-smoke.ts",
+    "smoke:assistant-saved-insights": "tsx scripts/assistant-saved-insights-smoke.ts",
     "smoke:knowledge-rag": "tsx scripts/knowledge-retriever-smoke.ts",
     "smoke:muscle-load": "tsx scripts/muscle-load-api-smoke.ts",
     "smoke:training": "tsx scripts/training-summary-api-smoke.ts && tsx scripts/recommendation-context-api-smoke.ts && tsx scripts/exercise-progress-api-smoke.ts",

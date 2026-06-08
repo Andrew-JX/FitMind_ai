@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { Card } from "../../components/Card";
 import { StateNotice } from "../../components/StateNotice";
 import { useTheme } from "../../theme/ThemeContext";
@@ -5,7 +7,14 @@ import { createDefaultAssistantRange } from "./assistant-date-range";
 import { AssistantComposer } from "./AssistantComposer";
 import { AssistantMessageList } from "./AssistantMessageList";
 import { AssistantQuickPrompts } from "./AssistantQuickPrompts";
+import { AssistantSavedInsightsPanel } from "./AssistantSavedInsightsPanel";
+import {
+  buildAssistantInsightCopyText,
+  isAssistantMessageSaveEligible,
+} from "./assistant-saved-insights";
+import { saveAssistantInsight } from "./assistant-saved-insights-api";
 import type {
+  AssistantChatMessage,
   AssistantChatRequestPayload,
   AssistantPromptSuggestion,
 } from "./assistant-types";
@@ -23,15 +32,27 @@ export interface AssistantChatPanelProps {
 export function AssistantChatPanel(props: AssistantChatPanelProps) {
   const { chat } = props;
   const { theme } = useTheme();
+  const [savedMessageIds, setSavedMessageIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [savingMessageIds, setSavingMessageIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [savedInsightsRefreshKey, setSavedInsightsRefreshKey] = useState(0);
+  const [insightStatusText, setInsightStatusText] = useState<string | null>(
+    null,
+  );
   const message = props.promptSuggestion?.message ?? "";
   const mode = props.promptSuggestion?.mode ?? "auto";
+  const requiresSelectedExercise =
+    mode === "exercise_progress" || mode === "plateau_diagnosis";
 
   async function handleSubmit(
     event: React.FormEvent<HTMLFormElement>,
   ): Promise<void> {
     event.preventDefault();
 
-    if (mode === "exercise_progress" && !props.selectedExerciseId) {
+    if (requiresSelectedExercise && !props.selectedExerciseId) {
       return;
     }
 
@@ -42,17 +63,65 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
       start_date: range.start_date,
       end_date: range.end_date,
       exercise_id:
-        mode === "exercise_progress"
+        requiresSelectedExercise || mode === "weekly_report"
           ? (props.selectedExerciseId ?? undefined)
           : undefined,
       session_id: chat.sessionId ?? undefined,
     };
+
+    props.onPromptSuggestionChange({
+      message: "",
+      mode,
+    });
 
     await chat.sendMessage(payload);
   }
 
   function applyQuickPrompt(nextPrompt: AssistantPromptSuggestion): void {
     props.onPromptSuggestionChange(nextPrompt);
+  }
+
+  async function handleSaveInsight(
+    assistantMessage: AssistantChatMessage,
+  ): Promise<void> {
+    if (!props.token || !isAssistantMessageSaveEligible(assistantMessage)) {
+      return;
+    }
+
+    setSavingMessageIds((currentValues) => {
+      const nextValues = new Set(currentValues);
+      nextValues.add(assistantMessage.messageId);
+      return nextValues;
+    });
+    setInsightStatusText(null);
+
+    try {
+      await saveAssistantInsight(props.token, assistantMessage.messageId);
+      setSavedMessageIds((currentValues) => {
+        const nextValues = new Set(currentValues);
+        nextValues.add(assistantMessage.messageId);
+        return nextValues;
+      });
+      setSavedInsightsRefreshKey((currentValue) => currentValue + 1);
+      setInsightStatusText("洞察已保存。");
+    } catch {
+      setInsightStatusText("洞察保存失败。");
+    } finally {
+      setSavingMessageIds((currentValues) => {
+        const nextValues = new Set(currentValues);
+        nextValues.delete(assistantMessage.messageId);
+        return nextValues;
+      });
+    }
+  }
+
+  async function handleCopyInsight(
+    assistantMessage: AssistantChatMessage,
+  ): Promise<void> {
+    await navigator.clipboard.writeText(
+      buildAssistantInsightCopyText(assistantMessage),
+    );
+    setInsightStatusText("洞察文本已复制。");
   }
 
   return (
@@ -64,11 +133,11 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
         selectedExerciseName={props.selectedExerciseName}
       />
 
-      {mode === "exercise_progress" && !props.selectedExerciseId ? (
+      {requiresSelectedExercise && !props.selectedExerciseId ? (
         <StateNotice
-          description="如果你想继续追问某个动作的估算最大重量、重量变化或最近进展，请先去“分析”页选中对应动作。"
+          description="请先在分析页选择一个重点动作，再追问动作进展或平台期诊断。"
           icon="target"
-          title="当前还没有选中动作"
+          title="还没有选择重点动作"
           tone="warning"
         />
       ) : null}
@@ -78,12 +147,36 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
           <div>
             <h3 style={{ margin: 0 }}>继续追问</h3>
             <p style={copyStyle(theme)}>
-              可以直接自然追问训练记录、动作进展或训练知识。上面的按钮只是示例，不是唯一问法。
+              可以直接追问训练记录、动作进展或训练知识。上面的按钮只是示例。
             </p>
           </div>
-          <AssistantMessageList messages={chat.messages} />
+          <AssistantMessageList
+            isMessageSaved={(assistantMessage) =>
+              typeof assistantMessage.messageId === "string" &&
+              savedMessageIds.has(assistantMessage.messageId)
+            }
+            isMessageSaving={(assistantMessage) =>
+              typeof assistantMessage.messageId === "string" &&
+              savingMessageIds.has(assistantMessage.messageId)
+            }
+            messages={chat.messages}
+            onCopyInsight={(assistantMessage) =>
+              void handleCopyInsight(assistantMessage)
+            }
+            onSaveInsight={(assistantMessage) =>
+              void handleSaveInsight(assistantMessage)
+            }
+          />
+          {insightStatusText ? (
+            <p style={insightStatusStyle(theme)}>{insightStatusText}</p>
+          ) : null}
         </section>
       </Card>
+
+      <AssistantSavedInsightsPanel
+        refreshKey={savedInsightsRefreshKey}
+        token={props.token}
+      />
 
       <AssistantComposer
         canRetry={chat.messages.length > 0}
@@ -103,7 +196,7 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
 
       {chat.errorMessage ? (
         <StateNotice
-          description="可以重试这次追问，或先回到训练 / 分析页确认最新记录已经刷新。"
+          description="可以重试这次追问，或先确认最新训练记录已经保存。"
           title="助手响应失败"
           tone="error"
         />
@@ -130,5 +223,15 @@ function copyStyle(
     fontSize: 13,
     lineHeight: 1.6,
     margin: "8px 0 0",
+  };
+}
+
+function insightStatusStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    color: theme.colors.tx3,
+    fontSize: 12,
+    margin: 0,
   };
 }

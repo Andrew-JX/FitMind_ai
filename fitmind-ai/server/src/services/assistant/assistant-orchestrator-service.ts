@@ -212,6 +212,7 @@ export interface MockAssistantTurnInput {
 
 export interface MockAssistantTurnResponseData {
   session_id: string;
+  message_id?: string | undefined;
   mode: string;
   assistant_type: "deterministic_mock";
   intent: AssistantRoutedIntent;
@@ -435,29 +436,29 @@ function buildWeeklyTrainingReportAnswer(
   if (result.status === "empty") {
     return {
       summary:
-        "This weekly report does not have enough recorded workouts yet. Add a few workouts with sets, reps, and weights, then I can summarize frequency, volume, main lifts, and muscle distribution.",
+        "这段时间还没有足够的训练记录生成周报。先记录几次包含组数、次数和重量的训练后，我就能总结频率、训练量、主要动作和肌群分布。",
       bullets: [
-        `Range: ${result.range.start_date} to ${result.range.end_date}.`,
-        "Recorded workouts: 0.",
-        "No exercise or muscle distribution evidence is available in this range.",
+        `统计范围：${result.range.start_date} 到 ${result.range.end_date}。`,
+        "当前记录训练次数：0 次。",
+        "这个范围内还没有可用于动作或肌群分布分析的 Evidence。",
       ],
       evidence: buildEvidence("get_weekly_training_report", result),
     };
   }
 
   return {
-    summary: `This week has ${result.totals.workout_count} recorded workouts, ${result.totals.set_count} sets, ${result.totals.total_reps} reps, and about ${result.totals.total_volume} kg total volume.`,
+    summary: `本周共记录 ${result.totals.workout_count} 次训练，${result.totals.set_count} 组，${result.totals.total_reps} 次，总训练量约 ${result.totals.total_volume} kg。`,
     bullets: [
-      `Frequency: about ${result.frequency.workouts_per_week} workouts per week across ${result.frequency.range_days} days.`,
+      `训练频率：在 ${result.frequency.range_days} 天内，折算约每周 ${result.frequency.workouts_per_week} 次训练。`,
       topExercise
-        ? `Main exercise by volume: ${topExercise.exercise_name}, ${topExercise.set_count} sets, about ${topExercise.total_volume} kg.`
-        : "No clear top exercise is available.",
+        ? `本周主要训练动作是 ${topExercise.exercise_name}，共 ${topExercise.set_count} 组，总量约 ${topExercise.total_volume} kg。`
+        : "当前还没有明显的主要训练动作。",
       topMuscleGroup
-        ? `Most represented muscle group: ${topMuscleGroup.muscle_group_name} at about ${formatPercent(topMuscleGroup.contribution_ratio)} of weighted volume.`
-        : "No clear top muscle group is available.",
+        ? `记录中占比最高的肌群是 ${topMuscleGroup.muscle_group_name}，约 ${formatPercent(topMuscleGroup.contribution_ratio)}。`
+        : "当前还没有明显占比最高的肌群。",
       lowVolumeGroup
-        ? `Lower recorded volume area: ${lowVolumeGroup.muscle_group_name} at about ${formatPercent(lowVolumeGroup.contribution_ratio)}.`
-        : "No lower-volume muscle group is available yet.",
+        ? `记录较少的肌群是 ${lowVolumeGroup.muscle_group_name}，约 ${formatPercent(lowVolumeGroup.contribution_ratio)}。`
+        : "当前还没有可识别的低记录量肌群。",
     ],
     evidence: buildEvidence("get_weekly_training_report", result),
   };
@@ -480,26 +481,26 @@ function buildPlateauDiagnosisAnswer(input: {
   }));
 
   return {
-    summary: `${exerciseName} plateau diagnosis should stay conservative: I can compare your recorded exercise trend, then use training knowledge sources to explain likely levers such as volume, intensity, recovery, and progression.`,
+    summary: `${exerciseName} 的平台期诊断需要保持保守：我会先比较你的动作训练趋势，再结合训练知识 Sources 解释训练量、强度、恢复和渐进方式这些可能影响因素。`,
     bullets: [
-      `Evidence: ${input.result.totals.workout_count} workouts, ${input.result.totals.set_count} sets, max weight ${formatMetricKg(input.result.totals.max_weight_kg)}, estimated 1RM ${formatMetricKg(input.result.totals.estimated_1rm_kg)}.`,
+      `Evidence：${input.result.totals.workout_count} 次相关训练，${input.result.totals.set_count} 组，最高重量 ${formatMetricKg(input.result.totals.max_weight_kg)}，估算 1RM ${formatMetricKg(input.result.totals.estimated_1rm_kg)}。`,
       input.result.totals.workout_count < 3
-        ? "The sample is small, so this is not enough to call a true plateau."
-        : "The sample is enough for a useful first diagnosis, but short-term performance noise still matters.",
+        ? "样本还偏少，所以不能直接判定为真正的平台期。"
+        : "样本已经可以做初步诊断，但短期表现波动仍然需要考虑。",
       sources.length > 0
-        ? `Sources: ${sources.map((source) => source.title).join(", ")}.`
-        : "No knowledge sources were retrieved for this diagnosis.",
+        ? `Sources：${sources.map((source) => source.title).join("、")}。`
+        : "这次诊断没有检索到可用训练知识来源。",
     ],
     conclusion:
-      "A plateau diagnosis should not assume volume is the only cause. Compare frequency, total hard sets, load progression, RPE, technique quality, and recovery before changing the plan.",
+      "平台期诊断不能默认训练量就是唯一原因。调整计划前，应该同时比较频率、有效组数、重量推进、RPE、动作质量和恢复。",
     recommendation:
-      "For the next step, adjust only one lever at a time: add a small amount of weekly volume, improve progression consistency, or reduce fatigue if recent sessions were high effort.",
+      "下一步建议一次只调整一个变量：小幅增加周训练量、提高渐进一致性，或在近期强度很高时先降低疲劳。",
     evidence,
     sources,
     intent: "plateau_diagnosis",
     limitations: [
-      "This is a training-data diagnosis, not medical advice or a professional coaching prescription.",
-      "Pain, injury, sleep, soreness, and technique quality are not fully captured by workout logs.",
+      "这是基于训练数据的诊断，不是医疗建议或专业教练处方。",
+      "疼痛、伤病、睡眠、酸痛和动作质量无法完全从训练日志中判断。",
     ],
   };
 }
@@ -522,28 +523,28 @@ function buildNextWeekPlanAnswer(input: {
 
   return {
     summary:
-      "Here is a conservative next-week training draft based on your recorded Evidence and retrieved training Sources. Treat it as a planning draft, not a prescription.",
+      "下面是一份基于你的训练 Evidence 和训练知识 Sources 的保守下周训练草案。请把它当作规划草案，而不是处方。",
     bullets: [
-      `Keep the weekly structure close to the current baseline: ${input.result.totals.workout_count} recorded workouts and ${input.result.totals.set_count} sets in the selected range.`,
+      `周结构先接近当前基线：所选范围内记录了 ${input.result.totals.workout_count} 次训练和 ${input.result.totals.set_count} 组。`,
       topMuscleGroup
-        ? `Avoid adding much more volume to the already-dominant area: ${topMuscleGroup.muscle_group_name}.`
-        : "No dominant muscle group was detected, so keep the draft balanced.",
+        ? `已经占比较高的肌群是 ${topMuscleGroup.muscle_group_name}，下周不要再大幅加量。`
+        : "当前没有明显占比最高的肌群，下周草案可以保持均衡。",
       lowVolumeGroup
-        ? `Add a small, controlled emphasis to the lower recorded-volume area: ${lowVolumeGroup.muscle_group_name}.`
-        : "No lower-volume area was detected; use normal balanced training slots.",
-      "Use moderate effort for most work and change only one variable at a time: sets, load, reps, or rest.",
+        ? `记录较少的肌群是 ${lowVolumeGroup.muscle_group_name}，可以小幅、可控地补一点关注。`
+        : "当前没有明显低记录量肌群，按正常均衡训练安排即可。",
+      "大多数训练保持中等努力，一次只改一个变量：组数、重量、次数或休息。",
     ],
     conclusion:
-      "The safest product behavior is a next-step draft grounded in Evidence and Sources, not a full coaching prescription.",
+      "更安全的产品行为是给出基于 Evidence 和 Sources 的下一步草案，而不是完整训练处方。",
     recommendation:
-      "Draft next week with similar frequency, slightly better balance, and one focused progression target. Re-check after the next logged week.",
+      "下周可以保持相近频率，略微改善分布，并只设定一个重点推进目标。记录完下一周后再复盘。",
     evidence,
     sources,
     intent: "next_week_plan",
     limitations: [
-      "This is not medical advice, rehab guidance, or a professional coaching prescription.",
-      "Do not follow the draft through pain, numbness, or unusual fatigue.",
-      "The draft only reflects logged workouts and retrieved general training knowledge.",
+      "这不是医疗建议、康复指导或专业教练处方。",
+      "如果出现疼痛、麻木或异常疲劳，不要硬按草案执行。",
+      "这份草案只反映已记录训练和检索到的通用训练知识。",
     ],
   };
 }
@@ -945,7 +946,7 @@ async function persistMockTurnMessages(input: {
   sessionId: string;
   request: MockAssistantTurnInput;
   response: MockAssistantTurnResponseData;
-}): Promise<void> {
+}): Promise<string> {
   await createChatMessage({
     sessionId: input.sessionId,
     role: "user",
@@ -960,7 +961,7 @@ async function persistMockTurnMessages(input: {
     },
   });
 
-  await createChatMessage({
+  const assistantMessage = await createChatMessage({
     sessionId: input.sessionId,
     role: "assistant",
     content: buildAssistantMessageContent(input.response.answer),
@@ -972,6 +973,8 @@ async function persistMockTurnMessages(input: {
       tool_names: input.response.answer.evidence.tool_names,
     },
   });
+
+  return assistantMessage.id;
 }
 
 async function emitEvent(
@@ -1093,11 +1096,12 @@ export async function runMockAssistantTurn(
       answer,
     };
 
-    await persistMockTurnMessages({
+    const messageId = await persistMockTurnMessages({
       sessionId: resolvedSession.sessionId,
       request: input,
       response,
     });
+    response.message_id = messageId;
 
     await emitEvent(options, {
       type: "structured_output",
@@ -1105,6 +1109,7 @@ export async function runMockAssistantTurn(
     });
     await emitEvent(options, {
       type: "done",
+      message_id: messageId,
       session_id: resolvedSession.sessionId,
     });
 
@@ -1142,11 +1147,12 @@ export async function runMockAssistantTurn(
       answer,
     };
 
-    await persistMockTurnMessages({
+    const messageId = await persistMockTurnMessages({
       sessionId: resolvedSession.sessionId,
       request: input,
       response,
     });
+    response.message_id = messageId;
 
     await emitEvent(options, {
       type: "structured_output",
@@ -1154,6 +1160,7 @@ export async function runMockAssistantTurn(
     });
     await emitEvent(options, {
       type: "done",
+      message_id: messageId,
       session_id: resolvedSession.sessionId,
     });
 
@@ -1332,11 +1339,12 @@ export async function runMockAssistantTurn(
     answer,
   };
 
-  await persistMockTurnMessages({
+  const messageId = await persistMockTurnMessages({
     sessionId: resolvedSession.sessionId,
     request: input,
     response,
   });
+  response.message_id = messageId;
 
   await emitEvent(options, {
     type: "structured_output",
@@ -1345,6 +1353,7 @@ export async function runMockAssistantTurn(
 
   await emitEvent(options, {
     type: "done",
+    message_id: messageId,
     session_id: resolvedSession.sessionId,
   });
 

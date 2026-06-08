@@ -62,6 +62,7 @@ export type AssistantMessageRole = "user" | "assistant";
 
 export interface AssistantChatMessage {
   id: string;
+  messageId?: string | undefined;
   role: AssistantMessageRole;
   text: string;
   evidence?: AssistantMessageEvidence | undefined;
@@ -97,6 +98,7 @@ export interface AssistantMessageSource {
 
 export interface AssistantStructuredOutput {
   intent?: string | undefined;
+  message_id?: string | undefined;
   answer?:
     | {
         evidence?:
