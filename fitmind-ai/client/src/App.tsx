@@ -11,6 +11,7 @@ import {
   setToken,
   useAuth,
 } from "./features/auth/use-auth";
+import { FeedbackButton } from "./features/feedback/FeedbackButton";
 import { AnalysisView } from "./features/training/AnalysisView";
 import { TrainingView } from "./features/training/TrainingView";
 import { useExerciseSearch } from "./features/training/use-exercise-search";
@@ -87,6 +88,12 @@ export function App() {
       activeTab={activeTab}
       onClearAuth={auth.clearAuth}
       onSelectTab={setActiveTab}
+      secondaryAction={
+        <FeedbackButton
+          sourceRoute={getSourceRoute(activeTab)}
+          token={auth.token ?? ""}
+        />
+      }
       subtitle="基于真实训练日志的可追溯 AI 训练分析助手"
       userLabel={auth.user.display_name ?? auth.user.email}
     >
@@ -198,6 +205,18 @@ export function App() {
     setSelectedProgressExerciseName(exerciseName);
     setActiveTab("analysis");
   }
+}
+
+function getSourceRoute(activeTab: AppTabKey): string {
+  if (activeTab === "analysis") {
+    return "/analysis";
+  }
+
+  if (activeTab === "assistant") {
+    return "/assistant";
+  }
+
+  return "/training";
 }
 
 function tabSectionStyle(isActive: boolean): React.CSSProperties {

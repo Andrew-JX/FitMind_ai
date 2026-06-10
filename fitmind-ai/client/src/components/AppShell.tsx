@@ -10,6 +10,7 @@ export interface AppShellProps {
   children: React.ReactNode;
   onClearAuth: () => void;
   onSelectTab: (tab: AppTabKey) => void;
+  secondaryAction?: React.ReactNode | undefined;
   subtitle: string;
   userLabel: string;
 }
@@ -109,7 +110,9 @@ export function AppShell(props: AppShellProps) {
           >
             当前用户：{props.userLabel}
           </div>
-          <button
+          <div style={{ alignItems: "center", display: "flex", gap: 8 }}>
+            {props.secondaryAction}
+            <button
             onClick={props.onClearAuth}
             style={{
               backgroundColor: theme.colors.surf2,
@@ -125,7 +128,8 @@ export function AppShell(props: AppShellProps) {
             type="button"
           >
             退出登录
-          </button>
+            </button>
+          </div>
         </div>
       </header>
 

@@ -3,6 +3,7 @@ import { ZodError } from "zod";
 
 import { assistantRouter } from "./routes/assistant.js";
 import { authRouter } from "./routes/auth.js";
+import { feedbackRouter } from "./routes/feedback.js";
 import { healthRouter } from "./routes/health.js";
 import { apiRouter } from "./routes/api.js";
 import { workoutsRouter } from "./routes/workouts.js";
@@ -18,6 +19,7 @@ export function createApp() {
   app.use("/api/health", healthRouter);
   app.use("/api", apiRouter);
   app.use("/api", assistantRouter);
+  app.use("/api", feedbackRouter);
   app.use("/api", workoutsRouter);
 
   app.use(

@@ -15,11 +15,17 @@ vi.mock("./services/training/workout-service.js", () => ({
   updateUserWorkoutSet: vi.fn(),
 }));
 
+vi.mock("./services/product-feedback-service.js", () => ({
+  submitProductFeedback: vi.fn(),
+}));
+
 import { createApp } from "./app.js";
 import { verifyJwt } from "./services/auth/jwt.js";
+import { submitProductFeedback } from "./services/product-feedback-service.js";
 import { HttpError } from "./utils/http-error.js";
 
 const mockedVerifyJwt = vi.mocked(verifyJwt);
+const mockedSubmitProductFeedback = vi.mocked(submitProductFeedback);
 
 describe("createApp", () => {
   const app = createApp();
@@ -137,5 +143,20 @@ describe("createApp", () => {
         message: "Missing Authorization header.",
       },
     });
+  });
+
+  it("keeps unauthenticated feedback access guarded at the app boundary", async () => {
+    const response = await request("/api/feedback", {
+      body: JSON.stringify({
+        rating: 5,
+      }),
+      headers: {
+        "content-type": "application/json",
+      },
+      method: "POST",
+    });
+
+    expect(response.status).toBe(401);
+    expect(mockedSubmitProductFeedback).not.toHaveBeenCalled();
   });
 });
