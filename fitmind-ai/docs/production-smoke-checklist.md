@@ -53,6 +53,15 @@ Use this checklist before sending the app to an interviewer, friend, or recruite
 - [ ] Confirm the assistant either answers with training context or shows a scoped error state.
 - [ ] Confirm unsupported/general prompts do not get presented as medical or unrestricted advice.
 
+## Product Feedback
+
+- [ ] Confirm the Feedback button is visible only after login.
+- [ ] Submit rating-only feedback.
+- [ ] Submit message-only feedback.
+- [ ] Submit rating + message feedback.
+- [ ] Confirm empty feedback is blocked in the UI or returns the Chinese validation error from `/api/feedback`.
+- [ ] Confirm `product_feedback.user_id` is the authenticated user id, not a client-provided body value.
+
 ## Mobile Readiness
 
 - [ ] Login screen fits a narrow mobile viewport.

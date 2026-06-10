@@ -3907,3 +3907,29 @@ Saved-insights smoke coverage:
 Out of scope:
 - No public share links, auth redesign, UI redesign, LangChain, LangGraph, MCP, agents, voice changes, or RAG architecture changes were added.
 - Assistant response shape and Evidence/Sources semantics remained unchanged.
+
+## Phase 5.2A - Product Feedback Button Closeout
+
+Closed:
+- Added a lightweight authenticated product feedback entry in the logged-in AppShell header.
+- Users can submit rating-only, message-only, or rating + message feedback; empty feedback is rejected.
+- Added `POST /api/feedback` with user ownership from JWT auth context only.
+- Added `product_feedback` persistence with rating, message, source route, user agent, and created timestamp.
+- Kept the feature isolated from Assistant router/orchestrator/composer, RAG, and tool execution paths.
+
+Verification:
+- Implementation commit `1ae8108 feat: add product feedback button` was pushed to `origin/main`.
+- Local verification passed: server type-check, client type-check, `pnpm type-check`, `pnpm test` with 172 tests, `pnpm lint`, and client build.
+- Applied the `20260610090000_create_product_feedback` migration to the target database.
+- Production `/api/health` returned 200 with status `ok`.
+- Production feedback smoke passed for rating-only, message-only, rating + message, and empty-submit rejection.
+- Production DB check confirmed the smoke feedback rows exist and their `user_id` values match the authenticated smoke user.
+
+Feedback visibility:
+- There is no admin UI or profile feedback list yet.
+- Feedback is currently visible by querying the `product_feedback` table, typically ordered by `created_at DESC`.
+
+Out of scope:
+- No feedback admin page, personal profile page, analytics dashboard, or feedback list UI was added.
+- No Assistant core routing, orchestration, composition, RAG, LangChain, LangGraph, MCP, agents, or tool-executor changes were added.
+- `client-dev.pid` remained local uncommitted noise.
