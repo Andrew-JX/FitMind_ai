@@ -94,6 +94,57 @@ Use this checklist before sending the app to an interviewer, friend, or recruite
 - Action in Batch 7B.1: keep token memory-only, add email-only remember convenience, and add visible voice Done / Cancel controls.
 - Android Chrome: pending real-device validation.
 
+## Cookie Session (Phase 5.3 Batch 1) — 真机回归
+
+> 部署后先确认新版本已上线：登录页底部文案应为「登录状态保存在安全的 HttpOnly 会话 cookie 中，刷新页面后会自动保持登录。」（旧版写的是"仅保存在内存中"）。看到新文案才说明 Vercel 已部署最新构建。
+
+- [ ] 手机浏览器打开 `https://fitmind-ai-psi.vercel.app/`，注册 / 登录一个测试账号。
+- [ ] **关键**：登录后**下拉刷新 / 重新加载页面** → 仍保持登录，不回登录页（这是 Batch 1 的核心修复）。
+- [ ] 关闭标签页后重新打开同一 URL → 仍登录（7 天内）。
+- [ ] 点「退出登录」→ 回到登录页；再刷新 → 仍是登录页（cookie 已清）。
+- [ ] 在隐私 / 无痕窗口打开 → 显示登录页（无会话 cookie）。
+
+## Phase 5.3 Batch 3 — 真机性能测试流程
+
+目标：实测并回填 `PROJECT_BRIEF.md §11` 的指标。下面三种方法按"准确度 / 便利度"排序，按需选用。
+
+### 方法 A — Lighthouse 移动端（首屏类指标，最可复现，建议写进 README 的就是这个）
+
+1. 任意桌面 Chrome 打开 `https://fitmind-ai-psi.vercel.app/`。
+2. DevTools（F12）→ Lighthouse 面板 → 设备选 **Mobile** → 勾 Performance → Analyze page load。
+3. 记录：First Contentful Paint、Largest Contentful Paint、Speed Index、Time to Interactive。
+   - 用 **LCP / TTI** 对照 §11 的「首屏加载 < 2s」。
+
+### 方法 B — 安卓手机真机 + 远程调试（API / SSE 类指标最准）
+
+1. 手机开「开发者选项 → USB 调试」，USB 连电脑。
+2. 桌面 Chrome 打开 `chrome://inspect` → 找到手机上的标签页 → inspect。
+3. 在弹出的 DevTools 用 **Network** 面板在真机上操作并读时延：
+   - **训练日志列表（100 条）**：先用账号造 ~100 条训练（可跑 `pnpm seed:assistant-demo` 或手动多记几条），切到训练 tab，看 `GET /api/workouts` 的 Time（目标 < 500ms）。
+   - **AI 首 token TTFT**：在助手里发一句（如「帮我做一份本周训练报告」），看 `POST /api/assistant/stream-turn` 从发起到**第一个 SSE chunk** 的时间（目标 < 1.5s）。
+   - **Tool Calling 端到端**：同一次请求从发起到 `done` 事件 / 回答渲染完成的总时长（目标 < 5s）。
+   - **SSE 渲染流畅度**：Performance 面板录一段流式回答，看有无明显掉帧（目标接近 60fps）。
+
+> iPhone 真机需要 Mac + Safari「开发」菜单做 Web Inspector，方法同理。
+
+### 方法 C — 纯手机粗测（没有电脑时）
+
+- 首屏：秒表掐"点开链接 → 看到登录页"的时间。
+- TTFT / Tool 端到端：秒表掐"发消息 → 出现第一个字"和"→ 回答结束"。
+- 仅作量级参考（"约 Ns"），README 正式数字仍建议用方法 A/B。
+
+### 结果记录（实测后回填，删掉 TBD）
+
+| 指标 | 目标 | 实测 | 方法 | 设备 / 网络 |
+| --- | --- | --- | --- | --- |
+| 首屏加载（LCP/TTI） | < 2s | TBD | | |
+| AI 首 token TTFT | < 1.5s | TBD | | |
+| Tool Calling 端到端 | < 5s | TBD | | |
+| SSE 渲染流畅度 | ~60fps | TBD | | |
+| 训练日志列表（~100 条） | < 500ms | TBD | | |
+
+> 回填后，把达标的数字同步到 `README.md` 与 `docs/project-study-guide.md`（面试稿），并在本表标注测试日期 / 机型 / 网络（Wi-Fi / 4G）。注意：助手 TTFT / Tool 端到端依赖 `ASSISTANT_PROVIDER`——线上若用 mock 则偏快，用真实 Anthropic 才是真实体验，记录时注明 provider。
+
 ## Verification Notes
 
 - `pnpm test` is the unit-test lane only.

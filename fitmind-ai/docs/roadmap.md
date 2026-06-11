@@ -32,9 +32,9 @@
 
 - **Batch 1 — 鉴权持久化　✅ 已完成（2026-06-11）**：内存 token → HttpOnly + SameSite=Lax cookie 会话，刷新不掉线，兑现 `PROJECT_BRIEF §10.2`。中间件优先 cookie、回退 Bearer（smoke 脚本仍可跑），新增 `POST /api/auth/logout`，前端 `credentials:"include"` + 加载时 `/me` 恢复会话。决策见 `ai-decisions.md` D19。
 - **Batch 2 — 浏览器 E2E　✅ 已完成（2026-06-11）**：引入 Playwright（mock 后端，无需 DB/密钥），固化鉴权会话流程（cookie 恢复 / 刷新保持 / 登录 / 登出 / 无会话）为自动化用例，浏览器验证了 Batch 1。`pnpm test:e2e`。训练·分析·助手的全流程 E2E 留作后续。
-- **Batch 3 — 性能实测**：补齐 `PROJECT_BRIEF §11` 的 TTFT / Tool 端到端 / 列表加载真实数字，写回 README 与面试稿。
+- **Batch 3 — 性能实测　🟡 流程就绪，待真机回填**：测试流程已写入 `production-smoke-checklist.md`（Lighthouse 移动端 / 安卓远程调试 / 纯手机粗测三法 + 结果表）。等在真机 / 线上跑一轮，把 `§11` 的 TTFT / Tool 端到端 / 列表加载数字回填到结果表，再同步 README 与面试稿。
 
-完成标准：刷新不掉线；E2E 主流程绿灯；`§11` 指标有真实测量值。
+完成标准：刷新不掉线 ✅；E2E 主流程绿灯 ✅；`§11` 指标有真实测量值（待回填）。
 
 ---
 

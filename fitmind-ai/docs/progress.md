@@ -4013,3 +4013,22 @@ Notes:
 - E2E 定位为客户端确定性回归（mock 后端），CI 友好；真实后端链路仍靠 `server/scripts/*-smoke.ts`。
 - 训练 / 分析 / 助手的全流程 E2E（需要 mock 更多端点或真实后端）留作后续批次。
 - 待办（Phase 5.3 剩余）：Batch 3 性能实测（TTFT / Tool 端到端 / 列表加载，回填 `PROJECT_BRIEF §11` 与 README）。
+
+## 2026-06-11 Phase 5.3 Batch 3 - 真机性能测试流程（待回填数字）
+
+Closed:
+- 按用户要求，Batch 3 先交付"真机测试流程"而非自建测量工具（真实性能数字需在真机 / 线上才有说服力）。
+- 在 `docs/production-smoke-checklist.md` 新增两节：
+  - 「Cookie Session (Phase 5.3 Batch 1) — 真机回归」：手机浏览器验证刷新保持登录 / 重开保持 / 登出清 cookie / 无痕显示登录页；并给出"看登录页新文案确认 Vercel 已部署最新构建"的判断方法。
+  - 「Phase 5.3 Batch 3 — 真机性能测试流程」：Lighthouse 移动端 / 安卓 USB 远程调试 / 纯手机粗测三种方法对应 §11 各指标，附待回填结果表。
+- `git push origin main`（3 个提交：Batch 1 / Batch 2 / 清理+文档）已推送，触发 Vercel 部署，供真机测试。
+
+改动文件：
+- `docs/production-smoke-checklist.md`、`docs/roadmap.md`（Batch 3 标记"流程就绪/待回填"）、`docs/progress.md`。
+
+Verification:
+- 文档型交付；真实性能数字待用户在真机 / 线上跑一轮后回填结果表，再同步 README 与 `project-study-guide.md`。
+
+Notes:
+- 助手 TTFT / Tool 端到端依赖 `ASSISTANT_PROVIDER`：线上若为 mock 则偏快，记录时需注明 provider。
+- Phase 5.3 三批：Batch 1（鉴权持久化）✅、Batch 2（浏览器 E2E）✅、Batch 3（性能实测）流程就绪、数字待回填。
