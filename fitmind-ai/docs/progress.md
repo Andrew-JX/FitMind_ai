@@ -4032,3 +4032,31 @@ Verification:
 Notes:
 - 助手 TTFT / Tool 端到端依赖 `ASSISTANT_PROVIDER`：线上若为 mock 则偏快，记录时需注明 provider。
 - Phase 5.3 三批：Batch 1（鉴权持久化）✅、Batch 2（浏览器 E2E）✅、Batch 3（性能实测）流程就绪、数字待回填。
+
+## 2026-06-11 修复 - 语音多动作解析 & cookie 会话后数据不加载
+
+### A. 语音/录入「多个动作只加一个」（server 解析器）
+根因：`workout-intake-parser.ts` 的 `normalizeIntakeText` 把 `，,、` 归一成**空格**，而只有 `;。.；\n` 才是 segment 分隔符——所以"卧推60公斤8个，深蹲100公斤5个"被并成一个 segment，只解析出第一个动作（语音识别文字是全的，解析丢了后面的）。
+
+修复：
+- `，,、` 改成归一为 `;`（分隔符）；动作名后紧跟组数的片段由既有合并逻辑回填，不会误拆。
+- 新增 `splitRunOnExerciseSegment`：对无标点的连续语音（"卧推60kg8reps深蹲100kg5reps"）按已知动作短语切分，且**仅当两个动作短语之间出现过组数/重量上下文才切**，避免把单个多字动作名拆开。
+- 新增 2 个测试（逗号分隔、无标点连读），解析器测试 20→22 全过。
+
+### B. cookie 会话恢复后「训练记录没了、助手用不了」（client 回归）
+根因（Batch 1 引入）：改成 HttpOnly cookie 会话后，关闭重开时 `auth.token` 为 `null`（JS 读不到 cookie 里的 JWT），而 `useWorkouts` / `useTrainingSummary` 用 `if (!token) return` 门控、`useAssistantChat` 用 `if (!token)` 拒绝——于是会话在、数据全不加载。"退出重登就好"是因为登录会写回内存 token。
+
+修复：
+- `use-auth.ts` 新增导出常量 `COOKIE_SESSION_TOKEN`，`bootstrap()` 成功时把 `activeToken` 置为该哨兵值。请求靠 cookie（`credentials:"include"`）鉴权，哨兵只作"已登录"开关、作为无害 bearer 发出（服务端优先用 cookie，从不校验它），客户端从不解码 token 值（已 grep 确认）。
+- 新增 E2E 回归用例「cookie 恢复会话后仍发起 `GET /api/workouts`」，E2E 5→6 全过。
+
+改动文件：
+- A：`server/src/services/training/workout-intake-parser.ts`、`workout-intake-parser.test.ts`。
+- B：`client/src/features/auth/use-auth.ts`、`client/e2e/auth-session.spec.ts`。
+
+Verification:
+- `pnpm test:unit`：176 全过（解析器 +2）。`pnpm test:e2e`：6/6。`pnpm lint` / `pnpm type-check`：通过。
+
+Notes:
+- 无标点连读多动作为 best-effort（仅在动作短语间有组数/重量时切分）；带标点 / 自然停顿的语音是主路径，已稳。
+- 待办（按用户选择 A+B 先做）：Batch C — 记录页右下"+"手势 FAB（长按反馈 / 上滑语音 / 右滑动作库）+ 语音解析结果追加到当前 draft。
