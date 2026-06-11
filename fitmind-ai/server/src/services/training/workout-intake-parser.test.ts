@@ -120,6 +120,68 @@ describe("workout-intake-parser", () => {
     });
   });
 
+  it("splits exercises joined by 和 / 还有 connectors", () => {
+    const result = parseWorkoutIntakeDraft(
+      {
+        text: "杠铃卧推60公斤8次和坐姿划船50公斤10次",
+        performed_at: "2026-05-29T10:00:00.000Z",
+      },
+      exerciseDictionary,
+    );
+
+    expect(result.draft.exercises).toHaveLength(2);
+    expect(result.draft.exercises[0]?.matched_exercise_id).toBe(
+      "11111111-1111-4111-8111-111111111111",
+    );
+    expect(result.draft.exercises[1]?.matched_exercise_id).toBe(
+      "33333333-3333-4333-8333-333333333333",
+    );
+  });
+
+  it("converts pounds to kilograms", () => {
+    const result = parseWorkoutIntakeDraft(
+      {
+        text: "杠铃卧推4组75磅8次",
+        performed_at: "2026-05-29T10:00:00.000Z",
+      },
+      exerciseDictionary,
+    );
+
+    expect(result.draft.exercises[0]?.sets).toHaveLength(4);
+    expect(result.draft.exercises[0]?.sets[0]).toMatchObject({
+      weight_kg: 34,
+      reps: 8,
+    });
+  });
+
+  it("merges an announce-then-detail utterance into one entry per exercise", () => {
+    const result = parseWorkoutIntakeDraft(
+      {
+        text: "做了杠铃卧推和坐姿划船，其中杠铃卧推3组60公斤8次，坐姿划船3组50公斤10次",
+        performed_at: "2026-05-29T10:00:00.000Z",
+      },
+      exerciseDictionary,
+    );
+
+    expect(result.draft.exercises).toHaveLength(2);
+    expect(result.draft.exercises[0]).toMatchObject({
+      matched_exercise_id: "11111111-1111-4111-8111-111111111111",
+      sets: [
+        { weight_kg: 60, reps: 8 },
+        { weight_kg: 60, reps: 8 },
+        { weight_kg: 60, reps: 8 },
+      ],
+    });
+    expect(result.draft.exercises[1]).toMatchObject({
+      matched_exercise_id: "33333333-3333-4333-8333-333333333333",
+      sets: [
+        { weight_kg: 50, reps: 10 },
+        { weight_kg: 50, reps: 10 },
+        { weight_kg: 50, reps: 10 },
+      ],
+    });
+  });
+
   it("parses common weight and rep formats", () => {
     const result = parseWorkoutIntakeDraft(
       {

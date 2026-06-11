@@ -10,6 +10,7 @@ import {
 import {
   matchExercise,
   type ExerciseMatchingDictionaryItem,
+  type ExerciseMatchResult,
 } from "./exercise-matching-service.js";
 import { parseWorkoutDateHint } from "./workout-intake-date-parser.js";
 
@@ -91,7 +92,7 @@ export function parseWorkoutIntakeDraft(
     input.performed_at ? "request_performed_at" : "server_default",
   );
   const segments = splitExerciseSegments(normalizedText, exerciseDictionary);
-  const exercises = segments
+  const parsedExercises = segments
     .map((segment) => {
       const inputName = extractExerciseName(segment, exerciseDictionary);
       const match = matchExercise(inputName, exerciseDictionary);
@@ -105,6 +106,7 @@ export function parseWorkoutIntakeDraft(
       };
     })
     .filter((exercise) => exercise.input_name.length > 0);
+  const exercises = mergeIntakeExercises(parsedExercises);
   const unresolvedItems: UnresolvedItem[] = [];
 
   for (const exercise of exercises) {
@@ -176,8 +178,16 @@ function normalizeIntakeText(value: string): string {
     .replace(/\u4e2a|\u6b21/giu, "reps")
     .replace(/[\u00d7\uff0a*]/gu, "x")
     .replace(/\u7136\u540e|\u63a5\u7740/giu, ";")
+    // List connectors join multiple exercises; treat them as segment breaks.
+    .replace(/\u8fd8\u6709|\u4ee5\u53ca|\u548c/gu, ";")
     .replace(/[.\u3002;\uff1b\n\r]/gu, ";")
     .replaceAll(decimalPlaceholder, ".")
+    // Convert pounds to kilograms (drafts store weight_kg).
+    .replace(
+      /(\d+(?:\.\d+)?)\s*(?:\u78c5|lbs?)/giu,
+      (_match, pounds: string) =>
+        `${(Number(pounds) * 0.45359237).toFixed(1)}kg`,
+    )
     // Commas / pause marks separate exercises, so treat them as segment breaks.
     // A name-only segment followed by its sets is re-merged in splitExerciseSegments.
     .replace(/[,，、]/gu, ";")
@@ -232,6 +242,66 @@ function splitExerciseSegments(
   }
 
   return segments;
+}
+
+type ParsedIntakeExercise = ExerciseMatchResult & {
+  input_name: string;
+  incomplete_sets: ParsedSegmentSets["incomplete_sets"];
+  sets: ParsedSegmentSets["sets"];
+};
+
+/**
+ * Merge exercises that refer to the same movement into a single entry.
+ *
+ * @param exercises - Parsed exercises in document order.
+ * @returns Deduplicated exercises with their sets combined.
+ *
+ * @remarks
+ * Natural speech often names exercises up front ("I did A and B") and then
+ * describes each one's sets later. Those produce a name-only entry plus a
+ * detailed entry for the same movement; merging by matched id (or normalized
+ * input name) collapses them and concatenates sets. A concrete match is kept
+ * over an earlier ambiguous/unresolved mention.
+ */
+function mergeIntakeExercises(
+  exercises: ParsedIntakeExercise[],
+): ParsedIntakeExercise[] {
+  const byKey = new Map<string, ParsedIntakeExercise>();
+  const merged: ParsedIntakeExercise[] = [];
+
+  for (const exercise of exercises) {
+    const key =
+      exercise.matched_exercise_id ??
+      normalizeExercisePhrase(exercise.input_name);
+    const existing = byKey.get(key);
+
+    if (existing === undefined) {
+      const copy: ParsedIntakeExercise = {
+        ...exercise,
+        sets: [...exercise.sets],
+        incomplete_sets: [...exercise.incomplete_sets],
+      };
+      byKey.set(key, copy);
+      merged.push(copy);
+      continue;
+    }
+
+    existing.sets.push(...exercise.sets);
+    existing.incomplete_sets.push(...exercise.incomplete_sets);
+
+    if (
+      existing.match_status !== "matched" &&
+      exercise.match_status === "matched"
+    ) {
+      existing.match_status = exercise.match_status;
+      existing.matched_exercise_id = exercise.matched_exercise_id;
+      existing.matched_exercise_name = exercise.matched_exercise_name;
+      existing.candidate_exercises = exercise.candidate_exercises;
+      existing.input_name = exercise.input_name;
+    }
+  }
+
+  return merged;
 }
 
 /**
