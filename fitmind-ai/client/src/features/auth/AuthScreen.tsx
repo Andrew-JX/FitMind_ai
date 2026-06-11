@@ -269,7 +269,7 @@ export function AuthScreen(props: AuthScreenProps) {
             marginTop: 14,
           }}
         >
-          登录令牌仅保存在内存中；应用被系统结束后需要重新登录。
+          登录状态保存在安全的 HttpOnly 会话 cookie 中，刷新页面后会自动保持登录。
         </p>
       </section>
     </main>

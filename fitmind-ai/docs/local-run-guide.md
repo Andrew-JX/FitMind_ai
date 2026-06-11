@@ -139,6 +139,27 @@ cd client
 .\node_modules\.bin\vite.cmd build
 ```
 
+## 8.5 Browser E2E (Playwright)
+
+客户端浏览器 E2E 用 Playwright，**mock 后端**（route interception），不需要运行 API server、数据库或密钥。Playwright 会自己拉起 Vite dev server 再跑 Chromium headless。
+
+首次需要下载浏览器二进制（约 110MB，仅一次）：
+
+```bash
+pnpm --filter @fitmind/client exec playwright install chromium
+```
+
+运行 E2E：
+
+```bash
+pnpm test:e2e
+# 或：pnpm --filter @fitmind/client run test:e2e
+```
+
+- 用例位置：`client/e2e/*.spec.ts`，mock 工具：`client/e2e/support/mock-api.ts`，配置：`client/playwright.config.ts`。
+- 当前覆盖：鉴权会话流程（加载时 cookie 会话恢复、刷新保持登录、登录、登出、无会话回登录页）。
+- 训练 / 分析 / 助手的全流程 E2E 留待后续批次；真实后端链路继续靠 `server/scripts/*-smoke.ts`。
+
 ## 9. Known Windows Issues
 
 ### `vite/esbuild spawn EPERM`

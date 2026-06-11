@@ -5,6 +5,12 @@ dist/
 build/
 coverage/
 
+# Playwright E2E artifacts
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
 .env
 .env.*
 !.env.example
