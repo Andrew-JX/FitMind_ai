@@ -9,10 +9,13 @@ const serverEnvSchema = z.object({
   PORT: z.coerce.number().int().positive().default(DEFAULT_PORT),
   DATABASE_URL: z.string().min(1).optional(),
   JWT_SECRET: z.string().min(1).optional(),
-  ASSISTANT_PROVIDER: z.enum(["mock", "anthropic"]).default("mock"),
+  // `.catch("mock")` keeps an unknown/typo provider value from throwing and
+  // taking down every request that loads env (e.g. auth); it degrades to mock.
+  ASSISTANT_PROVIDER: z.enum(["mock", "anthropic"]).default("mock").catch("mock"),
   WORKOUT_INTAKE_LLM_PROVIDER: z
     .enum(["off", "mock", "anthropic", "gemini"])
-    .default("mock"),
+    .default("mock")
+    .catch("mock"),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
   GEMINI_API_KEY: z.string().min(1).optional(),
   VOYAGE_API_KEY: z.string().min(1).optional(),
