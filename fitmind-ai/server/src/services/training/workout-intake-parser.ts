@@ -214,6 +214,26 @@ function parseChineseNumber(value: string): number {
   return CHINESE_NUMERALS.get(value) ?? 0;
 }
 
+/**
+ * Whether a segment is only set details (weight/reps/group) with no exercise
+ * name left after stripping set tokens and oral filler words.
+ *
+ * @param segment - A normalized segment.
+ * @returns True when nothing name-like remains (so it belongs to the prior exercise).
+ */
+function isSetOnlyFragment(segment: string): boolean {
+  const remainder = segment
+    .replace(/\d+(?:\.\d+)?\s*kg/giu, " ")
+    .replace(/\d+\s*reps?/giu, " ")
+    .replace(/\d+\s*组/gu, " ")
+    .replace(/\d+/gu, " ")
+    .replace(CONTEXT_WORDS_PATTERN, " ")
+    .replace(/[x是的了各\s,，、:：]/giu, "")
+    .trim();
+
+  return remainder.length === 0;
+}
+
 function splitExerciseSegments(
   value: string,
   exerciseDictionary: WorkoutIntakeExerciseDictionaryItem[],
@@ -232,8 +252,16 @@ function splitExerciseSegments(
 
     const hasKnownExercise =
       findKnownExercisePhrase(segment, exerciseDictionary) !== null;
-
-    if (!hasKnownExercise && segments.length > 0 && containsSetContext(segment)) {
+    // A "set-only" fragment (e.g. "60kg8reps" or "每组70公斤" after a comma)
+    // carries no exercise name, so it belongs to the previous exercise. But a
+    // delimited segment that DOES have a name — even an unrecognized one like
+    // "深蹲100kg5reps" — is its own exercise and must not be absorbed.
+    if (
+      !hasKnownExercise &&
+      isSetOnlyFragment(segment) &&
+      segments.length > 0 &&
+      containsSetContext(segment)
+    ) {
       segments[segments.length - 1] = `${segments[segments.length - 1]} ${segment}`;
       continue;
     }

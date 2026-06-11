@@ -4099,3 +4099,18 @@ Notes:
 Verification:
 - `pnpm --filter @fitmind/server type-check`、`pnpm test:unit`（179）、`pnpm lint`：通过。
 - Gemini 适配器为网络调用，未做单测（与 anthropic 适配器一致，靠 hybrid parser 的注入式 mock 覆盖逻辑）；真实效果需用户填 key 后线上验证。
+
+## 2026-06-11 修复 - 空 env 搞崩登录 & 第二个动作被吞
+
+### A. 空 `ANTHROPIC_API_KEY` 导致登录 "Request validation failed"
+线上探测发现：Vercel 上 `ANTHROPIC_API_KEY` 被设成空字符串，`z.string().min(1).optional()`（optional 只允许 undefined、不允许空串）→ 每次读 env（含登录查库）都抛 ZodError → 全站登录报 VALIDATION_ERROR。修复：新增 `optionalSecret`（`z.preprocess` 把空/纯空白串视为未设置），应用到 DATABASE_URL/JWT_SECRET/ANTHROPIC/GEMINI/VOYAGE；并给 provider 枚举加 `.catch("mock")`。新增 `env.test.ts`（4 例）。
+
+### B. 逗号分隔的第二个动作被并进第一个
+线上探测 `杠铃卧推60公斤8次，深蹲100公斤5次` 返回**一个** 杠铃卧推带两组。根因：`splitExerciseSegments` 的"集合碎片回填上一个动作"逻辑，对**词典里不认识的动作名**（深蹲）也生效——只要该段有重量/次数就被吞进上一个动作。修复：仅当该段是"纯组数碎片"（剥掉重量/次数/组/口语填充词后无残留名字）才回填；带名字的段（即便未匹配，如深蹲）保留为独立动作。新增 `isSetOnlyFragment`，新增 1 个解析器测试；修复未破坏既有跨子句合并用例（解析器 26/26、整体单测 184）。
+
+Verification:
+- 登录：线上重测注册/登录正常（从 400 恢复）。
+- `pnpm test:unit`（184）、`pnpm lint`、`pnpm --filter @fitmind/server type-check`：通过。
+
+Notes:
+- 深蹲若不在生产词典/别名里，会作为"待确认动作"出现（带正确组数），用户手动选对动作即可；开 Gemini 后由 LLM 直接匹配更顺。

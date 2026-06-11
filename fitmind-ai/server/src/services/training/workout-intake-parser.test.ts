@@ -182,6 +182,28 @@ describe("workout-intake-parser", () => {
     });
   });
 
+  it("keeps an unrecognized second exercise instead of absorbing it into the first", () => {
+    // 深蹲 is intentionally absent from the dictionary; its sets must not be
+    // merged into the preceding bench press.
+    const result = parseWorkoutIntakeDraft(
+      {
+        text: "杠铃卧推60公斤8次，深蹲100公斤5次",
+        performed_at: "2026-05-29T10:00:00.000Z",
+      },
+      exerciseDictionary,
+    );
+
+    expect(result.draft.exercises).toHaveLength(2);
+    expect(result.draft.exercises[0]).toMatchObject({
+      matched_exercise_id: "11111111-1111-4111-8111-111111111111",
+      sets: [{ weight_kg: 60, reps: 8 }],
+    });
+    expect(result.draft.exercises[1]?.input_name).toContain("深蹲");
+    expect(result.draft.exercises[1]?.sets).toEqual([
+      { weight_kg: 100, reps: 5, rpe: null, intensity_label: null },
+    ]);
+  });
+
   it("parses common weight and rep formats", () => {
     const result = parseWorkoutIntakeDraft(
       {
