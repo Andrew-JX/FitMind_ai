@@ -13,7 +13,10 @@ import { authMiddleware } from "./auth-middleware.js";
 
 const mockedVerifyJwt = vi.mocked(verifyJwt);
 
-async function makeRequest(authorizationHeader?: string | undefined): Promise<{
+async function makeRequest(
+  authorizationHeader?: string | undefined,
+  cookieHeader?: string | undefined,
+): Promise<{
   status: number;
   payload: unknown;
 }> {
@@ -70,6 +73,10 @@ async function makeRequest(authorizationHeader?: string | undefined): Promise<{
       headers.set("Authorization", authorizationHeader);
     }
 
+    if (cookieHeader !== undefined) {
+      headers.set("Cookie", cookieHeader);
+    }
+
     const response = await fetch(`http://127.0.0.1:${address.port}/secure`, {
       headers,
     });
@@ -88,7 +95,7 @@ describe("auth-middleware", () => {
     vi.clearAllMocks();
   });
 
-  it("rejects requests without an authorization header", async () => {
+  it("rejects requests without a cookie or authorization header", async () => {
     const result = await makeRequest();
 
     expect(result.status).toBe(401);
@@ -96,7 +103,7 @@ describe("auth-middleware", () => {
       ok: false,
       error: {
         code: "UNAUTHORIZED",
-        message: "Missing Authorization header.",
+        message: "Missing authentication credentials.",
       },
     });
   });
@@ -145,5 +152,36 @@ describe("auth-middleware", () => {
         userId: "11111111-1111-4111-8111-111111111111",
       },
     });
+  });
+
+  it("passes through a valid session cookie", async () => {
+    mockedVerifyJwt.mockResolvedValueOnce({
+      userId: "22222222-2222-4222-8222-222222222222",
+    });
+
+    const result = await makeRequest(undefined, "fitmind_token=good-cookie");
+
+    expect(mockedVerifyJwt).toHaveBeenCalledWith("good-cookie");
+    expect(result.status).toBe(200);
+    expect(result.payload).toEqual({
+      ok: true,
+      data: {
+        userId: "22222222-2222-4222-8222-222222222222",
+      },
+    });
+  });
+
+  it("prefers the session cookie over the authorization header", async () => {
+    mockedVerifyJwt.mockResolvedValueOnce({
+      userId: "33333333-3333-4333-8333-333333333333",
+    });
+
+    const result = await makeRequest(
+      "Bearer header-token",
+      "fitmind_token=cookie-token",
+    );
+
+    expect(mockedVerifyJwt).toHaveBeenCalledWith("cookie-token");
+    expect(result.status).toBe(200);
   });
 });

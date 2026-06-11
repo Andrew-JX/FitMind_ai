@@ -9,7 +9,7 @@
 ### 1.1 请求
 
 - Content-Type: `application/json`（除 SSE 端点）
-- Authorization: `Bearer <jwt>`（除登录 / 注册）
+- 鉴权（除登录 / 注册 / 登出）：浏览器走 **HttpOnly 会话 cookie**（`fitmind_token`，登录 / 注册时由后端 `Set-Cookie` 写入，请求需 `credentials: "include"`）；服务端脚本 / 非浏览器客户端可继续用 `Authorization: Bearer <jwt>` 作为兜底。中间件优先读 cookie，缺失时回退 Bearer。
 - 时间统一用 ISO 8601 UTC 字符串
 
 ### 1.2 响应
@@ -82,7 +82,7 @@ GET /api/workouts?cursor=<id>&limit=20
 }
 ```
 
-**Response 201**：
+**Response 201**：同时通过 `Set-Cookie` 写入 HttpOnly 会话 cookie（`fitmind_token`，`HttpOnly; SameSite=Lax; Path=/`，生产环境追加 `Secure`，有效期 7 天）。响应体仍返回 `token` 供非浏览器客户端使用。
 
 ```json
 {
@@ -102,7 +102,7 @@ GET /api/workouts?cursor=<id>&limit=20
 { "email": "...", "password": "..." }
 ```
 
-**Response 200**：返回同 register。
+**Response 200**：返回同 register（同样 `Set-Cookie` 写入会话 cookie）。
 
 ### GET /api/auth/me
 
@@ -116,7 +116,13 @@ GET /api/workouts?cursor=<id>&limit=20
 
 ### POST /api/auth/logout
 
-（生产化用 HttpOnly Cookie 后）清除 cookie。 MVP 阶段前端清掉 token 即可，后端可不实现。
+清除 HttpOnly 会话 cookie（`Set-Cookie` 过期）。无需鉴权，幂等。
+
+**Response 200**：
+
+```json
+{ "ok": true, "data": { "success": true } }
+```
 
 ------
 

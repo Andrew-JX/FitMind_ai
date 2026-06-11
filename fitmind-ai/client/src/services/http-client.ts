@@ -68,6 +68,8 @@ export async function requestJson<TResponse, TBody = undefined>(
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
       signal,
+      // Send/receive the HttpOnly auth session cookie on every request.
+      credentials: "include",
     });
   } catch (error) {
     throw createNetworkError(error);

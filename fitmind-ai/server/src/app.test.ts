@@ -77,7 +77,7 @@ describe("createApp", () => {
       ok: false,
       error: {
         code: "UNAUTHORIZED",
-        message: "Missing Authorization header.",
+        message: "Missing authentication credentials.",
       },
     });
   });
@@ -140,7 +140,7 @@ describe("createApp", () => {
       ok: false,
       error: {
         code: "UNAUTHORIZED",
-        message: "Missing Authorization header.",
+        message: "Missing authentication credentials.",
       },
     });
   });

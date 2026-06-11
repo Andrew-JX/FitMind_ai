@@ -23,3 +23,7 @@ export interface AuthSuccessData {
 export interface MeResponseData {
   user: AuthUserDto;
 }
+
+export interface LogoutResponseData {
+  success: boolean;
+}

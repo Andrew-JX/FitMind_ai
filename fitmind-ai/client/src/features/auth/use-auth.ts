@@ -10,6 +10,7 @@ import { HttpClientError } from "../../services/http-client";
 import {
   fetchCurrentUser,
   loginWithEmail,
+  logoutRequest,
   registerWithEmail,
 } from "./auth-api";
 
@@ -27,8 +28,10 @@ export interface AuthState {
 }
 
 export interface UseAuthResult extends AuthState {
+  bootstrap: () => Promise<void>;
   clearAuth: () => void;
   login: (input: LoginRequest) => Promise<void>;
+  logout: () => Promise<void>;
   refreshAuth: () => Promise<void>;
   register: (input: RegisterRequest) => Promise<void>;
   setToken: (nextToken: string) => Promise<void>;
@@ -42,9 +45,14 @@ let activeErrorMessage: string | null = null;
 const listeners = new Set<(state: AuthState) => void>();
 
 /**
- * Exposes the client-side auth session using an in-memory token only.
+ * Exposes the client-side auth session backed by an HttpOnly cookie.
  *
- * @returns Auth state plus helpers for setting, clearing, and validating the token
+ * @returns Auth state plus helpers for bootstrapping, logging in/out, and validating the session
+ *
+ * @remarks
+ * The auth credential lives in an HttpOnly cookie the browser sends automatically,
+ * so the session survives reloads. The in-memory token is retained only as a
+ * transient convenience for the current tab.
  */
 export function useAuth(): UseAuthResult {
   const [state, setState] = useState<AuthState>(getSnapshot);
@@ -59,12 +67,59 @@ export function useAuth(): UseAuthResult {
 
   return {
     ...state,
+    bootstrap,
     clearAuth,
     login,
+    logout,
     refreshAuth,
     register,
     setToken,
   };
+}
+
+/**
+ * Restores an existing session from the HttpOnly cookie on app load.
+ *
+ * @returns Resolves after `/api/auth/me` confirms or denies an active session
+ *
+ * @remarks
+ * A missing or invalid cookie is the normal first-visit case and resolves to
+ * the anonymous state without surfacing an error.
+ */
+export async function bootstrap(): Promise<void> {
+  activeStatus = "authenticating";
+  activeErrorMessage = null;
+  notify();
+
+  try {
+    const response = await fetchCurrentUser();
+
+    activeUser = response.user;
+    activeStatus = "authenticated";
+    activeErrorMessage = null;
+    notify();
+  } catch {
+    activeToken = null;
+    activeUser = null;
+    activeStatus = "anonymous";
+    activeErrorMessage = null;
+    notify();
+  }
+}
+
+/**
+ * Ends the session by clearing the server cookie and local auth state.
+ *
+ * @returns Resolves after the logout request settles and local state is cleared
+ */
+export async function logout(): Promise<void> {
+  try {
+    await logoutRequest();
+  } catch {
+    // Clear local state even if the network logout call fails.
+  }
+
+  clearAuth();
 }
 
 /**

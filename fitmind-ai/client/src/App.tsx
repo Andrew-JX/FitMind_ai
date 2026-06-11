@@ -4,6 +4,7 @@ import { AppShell, type AppTabKey } from "./components/AppShell";
 import { AssistantWorkspace } from "./features/assistant/AssistantWorkspace";
 import { AuthScreen } from "./features/auth/AuthScreen";
 import {
+  bootstrap,
   clearAuth,
   login,
   refreshAuth,
@@ -48,6 +49,21 @@ export function App() {
   const [progressRefreshSignal, setProgressRefreshSignal] = useState(0);
   const [analysisRefreshSignal, setAnalysisRefreshSignal] = useState(0);
   const [assistantRefreshSignal, setAssistantRefreshSignal] = useState(0);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
+
+  useEffect(() => {
+    let isActive = true;
+
+    void bootstrap().finally(() => {
+      if (isActive) {
+        setIsBootstrapping(false);
+      }
+    });
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!import.meta.env.DEV) {
@@ -72,6 +88,14 @@ export function App() {
     };
   }, []);
 
+  if (isBootstrapping && auth.status !== "authenticated") {
+    return (
+      <div style={bootstrapScreenStyle} role="status" aria-live="polite">
+        正在恢复登录状态…
+      </div>
+    );
+  }
+
   if (!(auth.status === "authenticated" && auth.user)) {
     return (
       <AuthScreen
@@ -86,7 +110,7 @@ export function App() {
   return (
     <AppShell
       activeTab={activeTab}
-      onClearAuth={auth.clearAuth}
+      onClearAuth={auth.logout}
       onSelectTab={setActiveTab}
       secondaryAction={
         <FeedbackButton
@@ -226,3 +250,12 @@ function tabSectionStyle(isActive: boolean): React.CSSProperties {
     paddingBottom: 16,
   };
 }
+
+const bootstrapScreenStyle: React.CSSProperties = {
+  display: "grid",
+  placeItems: "center",
+  minHeight: "100vh",
+  padding: 24,
+  color: "#94a3b8",
+  fontSize: 14,
+};

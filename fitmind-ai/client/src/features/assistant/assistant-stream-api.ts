@@ -44,6 +44,8 @@ export async function streamAssistantChat(
       headers,
       body: JSON.stringify(payload),
       signal: options.signal,
+      // Send the HttpOnly auth session cookie alongside the bearer fallback.
+      credentials: "include",
     });
   } catch (error) {
     throw createNetworkError(error);

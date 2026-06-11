@@ -507,3 +507,25 @@ Decision:
 
 Out of scope:
 - LangChain, LangGraph, MCP, agents, reranking, HNSW/IVFFlat ANN indexes, UI/admin screens, auth changes, training CRUD changes, voice changes, and new Assistant response fields.
+
+## [D19] Phase 5.3 鉴权持久化：HttpOnly 会话 cookie
+
+- **Date**: 2026-06-11
+- **Status**: Accepted
+
+背景：
+- 之前 token 只存在前端内存里，刷新即掉线；与 `PROJECT_BRIEF.md §10.2` 承诺的生产安全方案（HttpOnly Cookie）不一致。
+
+Decision：
+- 登录 / 注册时后端把同一枚 JWT 通过 `Set-Cookie` 写入 HttpOnly 会话 cookie（`fitmind_token`，`HttpOnly; SameSite=Lax; Path=/`，生产环境追加 `Secure`，`maxAge` 7 天，与 JWT 过期一致）。
+- `authMiddleware` 优先从 cookie 读 token，缺失时回退 `Authorization: Bearer`，让 `server/scripts/*-smoke.ts` 等非浏览器客户端继续可用；响应体仍返回 `token`。
+- 新增 `POST /api/auth/logout` 清除 cookie（无需鉴权、幂等）。
+- 前端所有请求（含 SSE `stream-turn`）改用 `credentials: "include"`；应用加载时调 `/api/auth/me` 用 cookie 恢复会话；登出调 `/logout` 再清本地状态。
+- 不引入 `cookie-parser` 依赖：用 Express 内置 `res.cookie`/`res.clearCookie` 写、手写一个 `Cookie` 头解析器读。
+
+CSRF 立场：
+- `SameSite=Lax` 阻止跨站 POST/fetch 携带 cookie，叠加同源部署（Vercel 同时托管 app/API），对本项目已足够。
+- 双提交 CSRF token 等更强方案推迟，待引入跨站场景时再做。
+
+Out of scope（本次不做）：
+- access/refresh 双 token 轮转、token 黑名单/吊销、多设备会话管理、CSRF token、把鉴权切到独立鉴权服务。

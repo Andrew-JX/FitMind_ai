@@ -7,6 +7,7 @@ import {
   register,
 } from "../services/auth/auth-service.js";
 import { createSuccessResponse } from "../utils/api-response.js";
+import { clearAuthCookie, setAuthCookie } from "../utils/auth-cookie.js";
 
 type AuthLocals = {
   userId: string;
@@ -23,6 +24,8 @@ export async function registerController(req: Request, res: Response) {
   const input = registerSchema.parse(req.body);
   const result = await register(input);
 
+  setAuthCookie(res, result.token);
+
   return res.status(201).json(createSuccessResponse(result));
 }
 
@@ -37,7 +40,22 @@ export async function loginController(req: Request, res: Response) {
   const input = loginSchema.parse(req.body);
   const result = await login(input);
 
+  setAuthCookie(res, result.token);
+
   return res.status(200).json(createSuccessResponse(result));
+}
+
+/**
+ * Clear the auth session cookie and end the current session.
+ *
+ * @param _req - Express request.
+ * @param res - Express response.
+ * @returns JSON logout response.
+ */
+export async function logoutController(_req: Request, res: Response) {
+  clearAuthCookie(res);
+
+  return res.status(200).json(createSuccessResponse({ success: true }));
 }
 
 /**
