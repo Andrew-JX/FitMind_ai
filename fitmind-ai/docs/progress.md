@@ -3933,3 +3933,83 @@ Out of scope:
 - No feedback admin page, personal profile page, analytics dashboard, or feedback list UI was added.
 - No Assistant core routing, orchestration, composition, RAG, LangChain, LangGraph, MCP, agents, or tool-executor changes were added.
 - `client-dev.pid` remained local uncommitted noise.
+
+## Phase 5.2A.1 - Agent Documentation Sync Rule
+
+Closed:
+- Tightened the Claude Code handoff rules so every task must include a document-impact audit before the final response.
+- Made documentation updates mandatory when behavior, contracts, process, operations, or user-visible workflows change.
+- Added a routing table that maps API, DB, Assistant, RAG, frontend, local run, troubleshooting, and process changes to the docs that should be checked and usually updated.
+- Clarified that the user does not need to enumerate every related document; the agent must infer the affected contracts and docs from the codebase.
+- Added a required final-response `Docs:` line for updated docs and intentionally skipped docs with reasons.
+
+Verification:
+- Docs-only update.
+- Targeted handoff content was reviewed after patching.
+
+Notes:
+- `AGENTS.md` still contains historical encoding damage. The durable operational rule is now centralized in `docs/CLAUDE_CODE_HANDOFF.md`; cleaning or rewriting `AGENTS.md` should be a separate controlled task.
+
+## 2026-06-11 仓库整理 + 文档收敛
+
+Closed:
+- 清理被 git 跟踪但已 gitignore 的开发垃圾文件（`*.pid`、`*-smoke*.log`、`server-dev.*.log`、`tmp-start-server-browser-smoke.ps1`）及工作区未跟踪日志。
+- 文档入口收敛为单一 `AGENTS.md`：删除根目录 `AI_WORKFLOW.md`（通用协作随笔）与刚生成、与现有文档大量重复的 `docs/CLAUDE_CODE_HANDOFF.md`；把"当前状态"与"文档同步规则"两节并入 `AGENTS.md`，精简开工前必读清单。
+- 修正 `README.md` 指向已删 handoff 的悬空链接，改指 `AGENTS.md`。
+- 新增前瞻文档 `docs/roadmap.md`（与回顾向的 `progress.md` 配对），并挂入 README。
+
+Notes:
+- 此前 `CLAUDE_CODE_HANDOFF.md` 声称 `AGENTS.md` 有乱码，经核对 `AGENTS.md` 为干净中文，未沿用该说法。
+
+## 2026-06-11 Phase 5.3 Batch 1 - 鉴权持久化（HttpOnly 会话 cookie）
+
+Closed:
+- 登录 / 注册时后端通过 `Set-Cookie` 写入 HttpOnly 会话 cookie（`fitmind_token`，`HttpOnly; SameSite=Lax; Path=/`，生产追加 `Secure`，7 天，与 JWT 过期一致）；响应体仍返回 `token` 兜底。
+- `authMiddleware` 改为优先读 cookie、缺失回退 `Authorization: Bearer`，`server/scripts/*-smoke.ts` 等非浏览器客户端继续可用。
+- 新增 `POST /api/auth/logout` 清除 cookie（无需鉴权、幂等）。
+- 新增 `server/src/utils/auth-cookie.ts`（不引入 `cookie-parser`：用内置 `res.cookie`/`res.clearCookie` 写、手写 `Cookie` 头解析读）。
+- 前端：`http-client` 与 `assistant-stream-api` 改用 `credentials: "include"`；`use-auth` 新增 `bootstrap()`（加载时调 `/me` 用 cookie 恢复会话）与 `logout()`；`App.tsx` 挂载时 bootstrap，加恢复中 loading gate，退出按钮改走真正的 `/logout`。
+- 解决"刷新即掉线"，兑现 `PROJECT_BRIEF §10.2` 的生产鉴权方案。
+
+改动文件：
+- 服务端：`server/src/utils/auth-cookie.ts`（新）、`auth-middleware.ts`、`auth-controller.ts`、`routes/auth.ts`、`shared/src/auth.ts`、测试 `auth-middleware.test.ts` + `app.test.ts`。
+- 前端：`client/src/services/http-client.ts`、`features/auth/auth-api.ts`、`features/auth/use-auth.ts`、`features/assistant/assistant-stream-api.ts`、`App.tsx`。
+- 文档：`api-contract.md`、`ai-decisions.md`（D19）、`AGENTS.md` §11、`roadmap.md`。
+
+Verification:
+- `pnpm --filter @fitmind/server type-check`、`pnpm --filter @fitmind/client type-check`：通过。
+- `pnpm --filter @fitmind/client lint`：通过。
+- `pnpm test:unit`：40 文件 / 174 用例全过（含新增 cookie 鉴权用例）。
+- `pnpm --filter @fitmind/client build`：通过。
+- `pnpm format:check`：仓库级既有格式欠债（约 118 文件，含本次未触碰文件）导致 fail；本次新增代码符合 Prettier；已另起后台任务统一修复。
+
+Notes:
+- CSRF：靠 `SameSite=Lax` + 同源部署，双提交 token 推迟（见 D19）。
+- 未做：access/refresh 双 token、CSRF token、会话吊销 —— 留待后续。
+- 待办（Phase 5.3 后续批次）：Batch 2 浏览器 E2E、Batch 3 性能实测。
+
+## 2026-06-11 Phase 5.3 Batch 2 - 浏览器 E2E（Playwright + mock 后端）
+
+Closed:
+- 引入 Playwright（`@fitmind/client` devDependency `@playwright/test`），mock 后端 / route interception，E2E 不需要 API server、数据库或密钥；Playwright 自起 Vite dev server 跑 Chromium headless。
+- 新增 `client/playwright.config.ts`、`client/e2e/auth-session.spec.ts`、`client/e2e/support/mock-api.ts`。
+- 覆盖鉴权会话流程（浏览器层验证 Batch 1）：加载时 `/me` cookie 会话恢复、刷新后保持登录、登录进入应用壳、登出回登录页、无会话显示登录页。
+- 新增脚本：根 `pnpm test:e2e` → `pnpm --filter @fitmind/client run test:e2e`（`playwright test`）。
+- `.gitignore` 忽略 Playwright 产物（`test-results/`、`playwright-report/` 等）。
+- 顺手修正 `AuthScreen` 过时文案（原"登录令牌仅保存在内存中…需要重新登录"已被 Batch 1 推翻），改为"登录状态保存在 HttpOnly 会话 cookie，刷新后自动保持登录"。
+
+改动文件：
+- 新增：`client/playwright.config.ts`、`client/e2e/auth-session.spec.ts`、`client/e2e/support/mock-api.ts`。
+- 修改：`client/package.json`（devDep + `test:e2e`）、根 `package.json`（`test:e2e` 透传）、`pnpm-lock.yaml`、`.gitignore`、`client/src/features/auth/AuthScreen.tsx`（文案）。
+- 文档：`docs/local-run-guide.md`（§8.5 E2E 运行说明）、`roadmap.md`、`AGENTS.md` §11。
+
+Verification:
+- `pnpm --filter @fitmind/client exec playwright install chromium`：成功（首次下载浏览器二进制）。
+- `pnpm test:e2e`：**5/5 用例通过**（Chromium headless）。
+- `pnpm --filter @fitmind/client type-check`：通过（`client/tsconfig.json` 只含 `src/**`，e2e 由 Playwright 自行编译，不进现有门禁）。
+- `eslint` 与 `prettier` 对新增 e2e 文件：通过。
+
+Notes:
+- E2E 定位为客户端确定性回归（mock 后端），CI 友好；真实后端链路仍靠 `server/scripts/*-smoke.ts`。
+- 训练 / 分析 / 助手的全流程 E2E（需要 mock 更多端点或真实后端）留作后续批次。
+- 待办（Phase 5.3 剩余）：Batch 3 性能实测（TTFT / Tool 端到端 / 列表加载，回填 `PROJECT_BRIEF §11` 与 README）。

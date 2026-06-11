@@ -6,17 +6,17 @@
 
 ## 0. 任务开始前必读清单
 
-每次新对话，按以下顺序读完文档再开工：
+本文件是**唯一入口**。开工前只需读两层：
 
-1. 本文件（AGENTS.md）
-2. `docs/PROJECT_BRIEF.md` — 项目定位与三层架构
-3. `docs/architecture.md` — 前后端分层
-4. 任务相关的领域文档：
+1. 本文件（AGENTS.md）—— 项目定位、分层规则、当前状态、文档同步规则都在这里。
+2. **与本次任务直接相关的那一份领域文档**（按需，不要全读）：
    - 改后端路由 / API → `docs/api-contract.md`
    - 改数据库 → `docs/db-schema.md`
-   - 涉及 AI / Tool Calling → `docs/ai-decisions.md`
+   - 涉及 AI / Tool Calling / RAG → `docs/ai-decisions.md`
+   - 改前端 UI → `docs/UI_SPEC.md`
+   - 需要历史背景 → `docs/PROJECT_BRIEF.md`、`docs/architecture.md`
 
-读完后，**先用 5 条以内的要点总结你理解到的项目约束**，再等用户给具体任务。
+不需要每次都把 docs/ 通读一遍，也不需要先写"5 条总结"。直接读相关文件 + 看目标代码附近的现有实现和测试，然后动手。不确定再问。
 
 ------
 
@@ -290,6 +290,48 @@ export async function getFatigueScore(
 
 - 项目规则发生变化时，**先更新本文件**，再让 AI 用新规则工作
 - 如果你（AI 助手）发现规则有矛盾或缺失，**主动提出**，让用户更新本文件
+
+## 11. 当前状态与部署（current state）
+
+> 这一节是项目的"现状快照"，改动较大的能力时同步更新这里。
+
+- **线上地址**：`https://fitmind-ai-psi.vercel.app/`
+- **部署**：Vercel 托管 app/API 合并运行时；PostgreSQL 存用户、训练、消息、知识 chunk、saved insights、feedback。客户端走相对 `/api`，Vercel 上 `VITE_API_BASE_URL` 可留空。
+- **已落地的主流程**：训练日志 CRUD + 自然语言录入、确定性训练分析（summary / progress / muscle-load / recommendation-context / weekly-report）、SSE 助手（intent 路由 + 确定性工具 + RAG + 周报/平台期诊断/下周计划）、saved insights、产品反馈、可安装 PWA 壳。
+- **RAG**：DB 存知识 chunk，Voyage `voyage-4-lite` + pgvector `vector(1024)`，有 embedding 时用 `0.7*向量 + 0.3*关键词` 混合打分，否则关键词兜底。
+- **鉴权**：HttpOnly + SameSite=Lax 会话 cookie（`fitmind_token`，7 天），刷新不掉线；中间件优先读 cookie、回退 Bearer（保留给 smoke 脚本）。详见 `ai-decisions.md`。
+- **测试**：单测 Vitest（`pnpm test:unit`）；浏览器 E2E 用 Playwright + mock 后端覆盖鉴权会话流程（`pnpm test:e2e`，见 `client/e2e/`）；DB 后端链路靠 `server/scripts/*-smoke.ts`。训练·分析·助手的全流程 E2E 仍待补。
+- **当前限制**：无 saved-insight 分享链接；无离线编辑/同步；无知识管理后台；无 ANN 索引；**刻意不引入** LangChain / LangGraph / MCP / 多 Agent。
+
+验证命令以 `README.md` 为准；docs-only 改动跑 `pnpm format:check`，完整门禁跑 `pnpm verify`（E2E 需另跑 `pnpm test:e2e`）。
+
+------
+
+## 12. 文档同步规则（每次改动必做）
+
+文档不是事后清理。**每次任务在收尾前都要做一次"文档影响审查"**：代码、行为、数据结构、流程或运维方式变了，就在同一次改动里更新对应文档；如果确实不用更新，在最终回复里说明原因。不要等用户单独说"顺便更新文档"。
+
+按改动区域对照下表，更新命中的文档（`docs/progress.md` 几乎总是要追加一条）：
+
+| 改动区域 | 需要检查/更新的文档 |
+| --- | --- |
+| 产品定位 / 范围 / 阶段计划 / 重大能力 | `docs/PROJECT_BRIEF.md`、`README.md`、本文件第 11 节 |
+| API 路由 / 请求 / 响应 / 错误 / 鉴权 / SSE 事件 | `docs/api-contract.md`、受影响的 `shared/src/**` |
+| 数据库表 / 列 / 索引 / 迁移 / seed / 归属 | `docs/db-schema.md` |
+| 助手 intent / 工具 / provider / prompt / 结构化输出 / Evidence·Sources 语义 | `docs/ai-decisions.md`、`docs/api-contract.md`、`docs/demo-script.md`、`docs/production-smoke-checklist.md` |
+| RAG 检索 / 知识导入 / embedding / eval | `docs/ai-decisions.md`、`docs/db-schema.md`、`docs/production-smoke-checklist.md` |
+| 前端 UI / 交互 / tab / 布局 / 工作流耦合 | `docs/UI_SPEC.md`、`docs/frontend-current-state.md`、`docs/demo-script.md` |
+| 本地运行 / env / 端口 / 验证 / 部署 / smoke 命令 | `docs/local-run-guide.md`、`docs/production-smoke-checklist.md`、`README.md` |
+| 阻塞性或反复出现的故障 | `docs/troubleshooting.md` |
+| Agent / 流程 / 规则本身 | 本文件（AGENTS.md） |
+
+最终回复里带一行文档结论，例如：
+
+```text
+文档：已更新 <files>；未更新 <files>，因为 <原因>。
+```
+
+------
 
 ## 前端开发规则
 

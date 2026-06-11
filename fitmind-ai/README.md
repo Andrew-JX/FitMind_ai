@@ -79,6 +79,8 @@ AI layer:
 
 ## Key Documents
 
+- AI assistant rules / entry point: [AGENTS.md](AGENTS.md)
+- Roadmap (forward-looking plan): [docs/roadmap.md](docs/roadmap.md)
 - Local run guide: [docs/local-run-guide.md](docs/local-run-guide.md)
 - Demo script: [docs/demo-script.md](docs/demo-script.md)
 - Production smoke checklist: [docs/production-smoke-checklist.md](docs/production-smoke-checklist.md)
