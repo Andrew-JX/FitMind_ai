@@ -2,7 +2,11 @@ import { z } from "zod";
 
 import { loadServerEnv } from "../../env.js";
 
-export type WorkoutIntakeLlmProviderMode = "off" | "mock" | "anthropic";
+export type WorkoutIntakeLlmProviderMode =
+  | "off"
+  | "mock"
+  | "anthropic"
+  | "gemini";
 
 export type WorkoutIntakeLlmRawParser = (input: {
   text: string;
@@ -71,6 +75,10 @@ export function createWorkoutIntakeLlmParser(
 
   if (provider === "anthropic") {
     return parseWithAnthropicWorkoutIntakeLlm;
+  }
+
+  if (provider === "gemini") {
+    return parseWithGeminiWorkoutIntakeLlm;
   }
 
   return parseWithMockWorkoutIntakeLlm;
@@ -186,6 +194,61 @@ async function parseWithAnthropicWorkoutIntakeLlm(input: {
   const text = payload.content
     ?.filter((block) => block.type === "text" && typeof block.text === "string")
     .map((block) => block.text?.trim() ?? "")
+    .join("\n")
+    .trim();
+
+  if (!text) {
+    throw new Error("Workout intake LLM returned no text output.");
+  }
+
+  return text;
+}
+
+async function parseWithGeminiWorkoutIntakeLlm(input: {
+  text: string;
+}): Promise<string> {
+  const env = loadServerEnv();
+
+  if (env.geminiApiKey === undefined) {
+    throw new Error("GEMINI_API_KEY is required for workout intake LLM parsing.");
+  }
+
+  const model = "gemini-2.0-flash";
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-goog-api-key": env.geminiApiKey,
+      },
+      body: JSON.stringify({
+        system_instruction: {
+          parts: [{ text: buildWorkoutIntakeSystemPrompt() }],
+        },
+        contents: [{ role: "user", parts: [{ text: input.text }] }],
+        generationConfig: {
+          maxOutputTokens: 1000,
+          responseMimeType: "application/json",
+          temperature: 0,
+        },
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Workout intake LLM request failed with HTTP ${response.status}.`,
+    );
+  }
+
+  const payload = (await response.json()) as {
+    candidates?: Array<{
+      content?: { parts?: Array<{ text?: string }> };
+    }>;
+  };
+  const text = payload.candidates?.[0]?.content?.parts
+    ?.map((part) => part.text?.trim() ?? "")
     .join("\n")
     .trim();
 

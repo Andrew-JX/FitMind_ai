@@ -11,9 +11,10 @@ const serverEnvSchema = z.object({
   JWT_SECRET: z.string().min(1).optional(),
   ASSISTANT_PROVIDER: z.enum(["mock", "anthropic"]).default("mock"),
   WORKOUT_INTAKE_LLM_PROVIDER: z
-    .enum(["off", "mock", "anthropic"])
+    .enum(["off", "mock", "anthropic", "gemini"])
     .default("mock"),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  GEMINI_API_KEY: z.string().min(1).optional(),
   VOYAGE_API_KEY: z.string().min(1).optional(),
 });
 
@@ -23,8 +24,9 @@ export interface ServerEnv {
   databaseUrl?: string | undefined;
   jwtSecret?: string | undefined;
   assistantProvider: "mock" | "anthropic";
-  workoutIntakeLlmProvider: "off" | "mock" | "anthropic";
+  workoutIntakeLlmProvider: "off" | "mock" | "anthropic" | "gemini";
   anthropicApiKey?: string | undefined;
+  geminiApiKey?: string | undefined;
   voyageApiKey?: string | undefined;
 }
 
@@ -41,6 +43,7 @@ export function loadServerEnv(
     assistantProvider: parsed.ASSISTANT_PROVIDER,
     workoutIntakeLlmProvider: parsed.WORKOUT_INTAKE_LLM_PROVIDER,
     anthropicApiKey: parsed.ANTHROPIC_API_KEY,
+    geminiApiKey: parsed.GEMINI_API_KEY,
     voyageApiKey: parsed.VOYAGE_API_KEY,
   };
 }

@@ -4084,3 +4084,18 @@ Verification:
 Notes:
 - 规则路径仍有上限：动作名"换词复述"（如"单手绳索下拉" vs "手绳索下拉"）匹配不到同一 key 时不会合并，会留一个待确认项——真正鲁棒靠 Path A。
 - mock 兜底仍只返回 1 个动作（未改）；规则路径已能直接产出多动作，兜底很少触发。
+
+## 2026-06-11 录入解析新增 Gemini provider（免费 LLM 兜底）
+
+用户不想为 Anthropic 付费，选择免费的 Google Gemini。新增 `gemini` provider，作为录入解析的免费 LLM 兜底（自由口语 / 多动作 / 磅 / 先报后述）。
+
+改动：
+- `env.ts`：`WORKOUT_INTAKE_LLM_PROVIDER` 枚举加 `gemini`；新增 `GEMINI_API_KEY`（可选）；`ServerEnv` + `loadServerEnv` 暴露 `geminiApiKey`。
+- `workout-intake-llm-parser.ts`：`WorkoutIntakeLlmProviderMode` 加 `gemini`；新增 `parseWithGeminiWorkoutIntakeLlm`（`gemini-2.0-flash`，`generateContent`，`x-goog-api-key` 头，`responseMimeType: application/json` + `temperature: 0`，复用同一 system prompt）；在 `createWorkoutIntakeLlmParser` 接入。
+- `.env.example`：补 `GEMINI_API_KEY` 与 provider 说明。
+
+启用：Vercel 设 `WORKOUT_INTAKE_LLM_PROVIDER=gemini` + `GEMINI_API_KEY=<key>`，Redeploy。
+
+Verification:
+- `pnpm --filter @fitmind/server type-check`、`pnpm test:unit`（179）、`pnpm lint`：通过。
+- Gemini 适配器为网络调用，未做单测（与 anthropic 适配器一致，靠 hybrid parser 的注入式 mock 覆盖逻辑）；真实效果需用户填 key 后线上验证。
