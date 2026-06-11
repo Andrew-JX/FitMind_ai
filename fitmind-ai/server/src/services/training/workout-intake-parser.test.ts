@@ -74,6 +74,52 @@ describe("workout-intake-parser", () => {
     });
   });
 
+  it("splits multiple exercises separated only by a comma", () => {
+    const result = parseWorkoutIntakeDraft(
+      {
+        text: "哑铃卧推60公斤8个，坐姿划船50公斤12个",
+        performed_at: "2026-05-29T10:00:00.000Z",
+      },
+      exerciseDictionary,
+    );
+
+    expect(result.draft.exercises).toHaveLength(2);
+    expect(result.draft.exercises[0]).toMatchObject({
+      input_name: "哑铃卧推",
+      match_status: "matched",
+      matched_exercise_id: "22222222-2222-4222-8222-222222222222",
+      sets: [{ weight_kg: 60, reps: 8 }],
+    });
+    expect(result.draft.exercises[1]).toMatchObject({
+      input_name: "坐姿划船",
+      match_status: "matched",
+      matched_exercise_id: "33333333-3333-4333-8333-333333333333",
+      sets: [{ weight_kg: 50, reps: 12 }],
+    });
+  });
+
+  it("splits a run-on multi-exercise utterance with no punctuation", () => {
+    const result = parseWorkoutIntakeDraft(
+      {
+        text: "哑铃卧推60公斤8个坐姿划船50公斤12个",
+        performed_at: "2026-05-29T10:00:00.000Z",
+      },
+      exerciseDictionary,
+    );
+
+    expect(result.draft.exercises).toHaveLength(2);
+    expect(result.draft.exercises[0]).toMatchObject({
+      input_name: "哑铃卧推",
+      matched_exercise_id: "22222222-2222-4222-8222-222222222222",
+      sets: [{ weight_kg: 60, reps: 8 }],
+    });
+    expect(result.draft.exercises[1]).toMatchObject({
+      input_name: "坐姿划船",
+      matched_exercise_id: "33333333-3333-4333-8333-333333333333",
+      sets: [{ weight_kg: 50, reps: 12 }],
+    });
+  });
+
   it("parses common weight and rep formats", () => {
     const result = parseWorkoutIntakeDraft(
       {

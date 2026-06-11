@@ -178,7 +178,9 @@ function normalizeIntakeText(value: string): string {
     .replace(/\u7136\u540e|\u63a5\u7740/giu, ";")
     .replace(/[.\u3002;\uff1b\n\r]/gu, ";")
     .replaceAll(decimalPlaceholder, ".")
-    .replace(/[,，、]/gu, " ")
+    // Commas / pause marks separate exercises, so treat them as segment breaks.
+    // A name-only segment followed by its sets is re-merged in splitExerciseSegments.
+    .replace(/[,，、]/gu, ";")
     .replace(/\s+/gu, " ")
     .trim();
 }
@@ -209,7 +211,8 @@ function splitExerciseSegments(
   const rawSegments = value
     .split(";")
     .map((segment) => segment.trim())
-    .filter((segment) => segment.length > 0);
+    .filter((segment) => segment.length > 0)
+    .flatMap((segment) => splitRunOnExerciseSegment(segment, exerciseDictionary));
   const segments: string[] = [];
 
   for (const segment of rawSegments) {
@@ -229,6 +232,77 @@ function splitExerciseSegments(
   }
 
   return segments;
+}
+
+/**
+ * Split a delimiter-free run-on segment that lists multiple exercises.
+ *
+ * @param segment - A single normalized segment (no `;` delimiters).
+ * @param exerciseDictionary - Exercise dictionary used to locate known phrases.
+ * @returns One or more sub-segments, each beginning at an exercise phrase.
+ *
+ * @remarks
+ * Handles continuous speech like "卧推50kg8reps深蹲100kg5reps" that arrives
+ * without punctuation. To avoid splitting a single multi-word exercise name, a
+ * cut is only made before a later exercise phrase when set context (weight /
+ * reps / 组) appeared since the previous cut.
+ */
+function splitRunOnExerciseSegment(
+  segment: string,
+  exerciseDictionary: WorkoutIntakeExerciseDictionaryItem[],
+): string[] {
+  const candidates = buildExercisePhraseCandidates(exerciseDictionary);
+  const lowerSegment = segment.toLowerCase();
+  const phraseStarts: number[] = [];
+
+  for (let index = 0; index < segment.length; ) {
+    const matched = candidates.find(
+      (candidate) =>
+        candidate.length > 0 &&
+        lowerSegment.startsWith(candidate.toLowerCase(), index),
+    );
+
+    if (matched) {
+      phraseStarts.push(index);
+      index += matched.length;
+      continue;
+    }
+
+    index += 1;
+  }
+
+  if (phraseStarts.length <= 1) {
+    return [segment];
+  }
+
+  const cutPoints = [0];
+
+  for (let position = 1; position < phraseStarts.length; position += 1) {
+    const previousCut = cutPoints[cutPoints.length - 1] ?? 0;
+    const between = segment.slice(previousCut, phraseStarts[position]);
+
+    if (containsSetContext(between)) {
+      cutPoints.push(phraseStarts[position] ?? 0);
+    }
+  }
+
+  if (cutPoints.length <= 1) {
+    return [segment];
+  }
+
+  const pieces: string[] = [];
+
+  for (let index = 0; index < cutPoints.length; index += 1) {
+    const start = cutPoints[index] ?? 0;
+    const end = cutPoints[index + 1] ?? segment.length;
+    const piece = segment.slice(start, end).trim();
+
+    if (piece.length > 0) {
+      pieces.push(piece);
+    }
+  }
+
+  return pieces;
 }
 
 function parseSets(segment: string, isBodyweightExercise: boolean): ParsedSegmentSets {
