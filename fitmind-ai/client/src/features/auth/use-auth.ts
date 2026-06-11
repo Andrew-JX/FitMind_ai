@@ -37,6 +37,18 @@ export interface UseAuthResult extends AuthState {
   setToken: (nextToken: string) => Promise<void>;
 }
 
+/**
+ * Opaque marker stored in `token` when the session is restored from the
+ * HttpOnly cookie (whose JWT is not readable by JS).
+ *
+ * @remarks
+ * Requests authenticate via the cookie (`credentials: "include"`), so the
+ * in-memory token is now only a truthy "authenticated" gate for data hooks.
+ * This sentinel is sent as a harmless bearer that the server ignores in favor
+ * of the cookie, and it is never decoded on the client.
+ */
+export const COOKIE_SESSION_TOKEN = "cookie-session";
+
 let activeToken: string | null = null;
 let activeUser: AuthUserDto | null = null;
 let activeStatus: AuthStatus = "anonymous";
@@ -94,6 +106,9 @@ export async function bootstrap(): Promise<void> {
   try {
     const response = await fetchCurrentUser();
 
+    // The real JWT lives in the HttpOnly cookie; store a sentinel so data hooks
+    // that gate on a truthy token still load while the cookie carries auth.
+    activeToken = COOKIE_SESSION_TOKEN;
     activeUser = response.user;
     activeStatus = "authenticated";
     activeErrorMessage = null;

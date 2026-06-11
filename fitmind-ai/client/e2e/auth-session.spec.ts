@@ -17,6 +17,25 @@ test.describe("auth session (HttpOnly cookie)", () => {
     );
   });
 
+  test("loads training data after a cookie-restored session (no in-memory token)", async ({
+    page,
+  }) => {
+    await installApiMocks(page, { authenticated: true });
+
+    // Regression guard: when the session is restored from the cookie there is no
+    // in-memory token, so data hooks must still fire (they authenticate via the
+    // cookie). Before the fix, a null token gated these requests out entirely.
+    const workoutsRequest = page.waitForRequest(
+      (request) =>
+        request.url().includes("/api/workouts") && request.method() === "GET",
+    );
+
+    await page.goto("/");
+
+    await expect(page.getByText(LOGOUT_BUTTON)).toBeVisible();
+    await workoutsRequest;
+  });
+
   test("keeps the session after a full page reload", async ({ page }) => {
     await installApiMocks(page, { authenticated: true });
     await page.goto("/");
