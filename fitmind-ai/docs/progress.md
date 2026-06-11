@@ -4060,3 +4060,27 @@ Verification:
 Notes:
 - 无标点连读多动作为 best-effort（仅在动作短语间有组数/重量时切分）；带标点 / 自然停顿的语音是主路径，已稳。
 - 待办（按用户选择 A+B 先做）：Batch C — 记录页右下"+"手势 FAB（长按反馈 / 上滑语音 / 右滑动作库）+ 语音解析结果追加到当前 draft。
+
+## 2026-06-11 语音多动作 2 - 自由口语解析增强（规则 + LLM 两路）
+
+背景：用户用自然口语"做了高位下拉和坐姿器械划船还有单手绳索下拉，其中高位下拉做了3组每组80公斤8次…手绳索下拉4组75磅9次"，仍只识别一个。根因三层叠加：`和/还有` 未分隔、"先报清单再分述"产生重复动作、`磅` 未转换。另查到 mock 兜底解析器写死只返回 1 个动作，故 mock 线上无法靠兜底救。用户选择「两个都要」。
+
+Path B（规则解析器，免费、对 mock 线上即生效）：
+- `normalizeIntakeText`：`和/还有/以及` 作分隔符；`磅/lbs` 按 1lb=0.4536kg 转 `kg`（draft 存 weight_kg）。
+- 新增 `mergeIntakeExercises`：按 `matched_exercise_id`（无匹配时按归一 input_name）合并同一动作，合并 sets——"先报清单（无组数）+ 再分述（带组数）"自动去重为每个动作一条。"具体匹配"优先于先前的"模糊/未匹配"提及。
+- 新增 3 个测试（连接词分隔、磅→公斤、announce-then-detail 合并）；解析器 22→25，整体单测 176→179 全过。
+
+Path A（Anthropic 智能解析，需用户在 Vercel 开启）：
+- `buildWorkoutIntakeSystemPrompt` 增补两条：解析所有动作并把"先报后述"合并为每动作一条；`磅/lbs`→kg。
+- `.env.example` 补 `WORKOUT_INTAKE_LLM_PROVIDER`（mock/off/anthropic）与 `ASSISTANT_PROVIDER` 说明。
+- 启用方式：Vercel 环境变量设 `WORKOUT_INTAKE_LLM_PROVIDER=anthropic` + `ANTHROPIC_API_KEY`，即可用 Claude 解析自由口语（多动作 / 磅 / 先报后述）。
+
+改动文件：
+- `server/src/services/training/workout-intake-parser.ts` + `.test.ts`、`workout-intake-llm-parser.ts`、`.env.example`。
+
+Verification:
+- `pnpm test:unit`：179 全过。`pnpm lint` / `pnpm type-check`：通过。
+
+Notes:
+- 规则路径仍有上限：动作名"换词复述"（如"单手绳索下拉" vs "手绳索下拉"）匹配不到同一 key 时不会合并，会留一个待确认项——真正鲁棒靠 Path A。
+- mock 兜底仍只返回 1 个动作（未改）；规则路径已能直接产出多动作，兜底很少触发。
