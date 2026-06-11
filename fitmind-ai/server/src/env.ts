@@ -2,13 +2,28 @@ import { z } from "zod";
 
 const DEFAULT_PORT = 3000;
 
+/**
+ * Optional secret/string env var that treats an empty or whitespace-only value
+ * as "not set".
+ *
+ * @remarks
+ * A blank env var (common on hosting dashboards, e.g. an empty
+ * `ANTHROPIC_API_KEY`) would otherwise fail `.min(1)` and throw on every
+ * request that loads env, surfacing as a confusing "Request validation failed".
+ */
+const optionalSecret = z.preprocess(
+  (value) =>
+    typeof value === "string" && value.trim() === "" ? undefined : value,
+  z.string().min(1).optional(),
+);
+
 const serverEnvSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),
   PORT: z.coerce.number().int().positive().default(DEFAULT_PORT),
-  DATABASE_URL: z.string().min(1).optional(),
-  JWT_SECRET: z.string().min(1).optional(),
+  DATABASE_URL: optionalSecret,
+  JWT_SECRET: optionalSecret,
   // `.catch("mock")` keeps an unknown/typo provider value from throwing and
   // taking down every request that loads env (e.g. auth); it degrades to mock.
   ASSISTANT_PROVIDER: z.enum(["mock", "anthropic"]).default("mock").catch("mock"),
@@ -16,9 +31,9 @@ const serverEnvSchema = z.object({
     .enum(["off", "mock", "anthropic", "gemini"])
     .default("mock")
     .catch("mock"),
-  ANTHROPIC_API_KEY: z.string().min(1).optional(),
-  GEMINI_API_KEY: z.string().min(1).optional(),
-  VOYAGE_API_KEY: z.string().min(1).optional(),
+  ANTHROPIC_API_KEY: optionalSecret,
+  GEMINI_API_KEY: optionalSecret,
+  VOYAGE_API_KEY: optionalSecret,
 });
 
 export interface ServerEnv {
