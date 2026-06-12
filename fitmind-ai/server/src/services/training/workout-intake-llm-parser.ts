@@ -12,36 +12,35 @@ export type WorkoutIntakeLlmRawParser = (input: {
   text: string;
 }) => Promise<string>;
 
-const llmWorkoutIntakeSetSchema = z
-  .object({
-    weight_kg: z.number().nonnegative(),
-    reps: z.number().int().positive(),
-  })
-  .strict();
+// Lenient on purpose: LLM JSON rarely matches a strict schema exactly (omitted
+// empty arrays, stringified numbers, extra fields), so coerce/default instead of
+// rejecting the whole response and silently falling back to the rule parser.
+const llmWorkoutIntakeSetSchema = z.object({
+  weight_kg: z.coerce.number().nonnegative(),
+  reps: z.coerce.number().int().positive(),
+});
 
-const llmWorkoutIntakeIncompleteSetSchema = z
-  .object({
-    group_count: z.number().int().positive().nullable(),
-    weight_kg: z.number().positive().nullable(),
-    reps: z.number().int().positive().nullable(),
-    missing_fields: z.array(z.enum(["weight_kg", "reps"])).min(1),
-  })
-  .strict();
+const llmWorkoutIntakeIncompleteSetSchema = z.object({
+  group_count: z.coerce.number().int().positive().nullable().default(null),
+  weight_kg: z.coerce.number().positive().nullable().default(null),
+  reps: z.coerce.number().int().positive().nullable().default(null),
+  missing_fields: z.array(z.enum(["weight_kg", "reps"])).default([]),
+});
 
-export const llmWorkoutIntakeOutputSchema = z
-  .object({
-    exercises: z.array(
-      z
-        .object({
-          spoken_name: z.string().trim().min(1),
-          sets: z.array(llmWorkoutIntakeSetSchema),
-          incomplete_sets: z.array(llmWorkoutIntakeIncompleteSetSchema),
-        })
-        .strict(),
-    ),
-    warnings: z.array(z.string().min(1)),
-  })
-  .strict();
+export const llmWorkoutIntakeOutputSchema = z.object({
+  exercises: z
+    .array(
+      z.object({
+        spoken_name: z.string().trim().min(1),
+        sets: z.array(llmWorkoutIntakeSetSchema).default([]),
+        incomplete_sets: z
+          .array(llmWorkoutIntakeIncompleteSetSchema)
+          .default([]),
+      }),
+    )
+    .default([]),
+  warnings: z.array(z.string().min(1)).default([]),
+});
 
 export type LlmWorkoutIntakeOutput = z.infer<
   typeof llmWorkoutIntakeOutputSchema

@@ -64,8 +64,12 @@ export async function parseHybridWorkoutIntakeDraft(
     }
 
     return buildResponseFromLlmOutput(input, ruleResult, exerciseDictionary, llmOutput);
-  } catch {
-    return markFallbackUnavailable(ruleResult, [FALLBACK_FAILURE_WARNING]);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+
+    return markFallbackUnavailable(ruleResult, [
+      `${FALLBACK_FAILURE_WARNING}（${reason}）`,
+    ]);
   }
 }
 

@@ -270,12 +270,12 @@ describe("parseHybridWorkoutIntakeDraft", () => {
     );
 
     expect(result.evidence.source).toBe("rule_parser_llm_unavailable");
-    expect(result.evidence.fallback_warnings).toEqual([
+    expect(result.evidence.fallback_warnings[0]).toContain(
       "\u667a\u80fd\u89e3\u6790\u7ed3\u679c\u672a\u901a\u8fc7\u6821\u9a8c\uff0c\u5df2\u8fd4\u56de\u4fdd\u5b88\u89c4\u5219\u89e3\u6790\u8349\u7a3f\u3002",
-    ]);
+    );
   });
 
-  it("rejects LLM output that includes database exercise ids", async () => {
+  it("ignores an LLM-provided exercise id and re-matches against the dictionary", async () => {
     const result = await parseHybridWorkoutIntakeDraft(
       createInput(
         "\u6211\u4eca\u5929\u505a\u4e86\u4e0a\u659c\u54d1\u94c3\u5367\u63a8\u505a\u4e86\u4e09\u7ec4\u6bcf\u7ec4\u662f27.5\u516c\u65a4 \u6bcf\u7ec4\u7684\u6b21\u6570\u662f8",
@@ -286,7 +286,8 @@ describe("parseHybridWorkoutIntakeDraft", () => {
           JSON.stringify({
             exercises: [
               {
-                exercise_id: "22222222-2222-4222-8222-222222222222",
+                // Bogus id that must be ignored; the real match comes from the dictionary.
+                exercise_id: "99999999-9999-4999-8999-999999999999",
                 spoken_name: "\u4e0a\u659c\u54d1\u94c3\u5367\u63a8",
                 sets: [{ reps: 8, weight_kg: 27.5 }],
                 incomplete_sets: [],
@@ -298,9 +299,9 @@ describe("parseHybridWorkoutIntakeDraft", () => {
       },
     );
 
-    expect(result.evidence.source).toBe("rule_parser_llm_unavailable");
-    expect(result.evidence.fallback_warnings).toEqual([
-      "\u667a\u80fd\u89e3\u6790\u7ed3\u679c\u672a\u901a\u8fc7\u6821\u9a8c\uff0c\u5df2\u8fd4\u56de\u4fdd\u5b88\u89c4\u5219\u89e3\u6790\u8349\u7a3f\u3002",
-    ]);
+    expect(result.evidence.source).toBe("llm_structured_fallback");
+    expect(result.draft.exercises[0]?.matched_exercise_id).toBe(
+      "22222222-2222-4222-8222-222222222222",
+    );
   });
 });
