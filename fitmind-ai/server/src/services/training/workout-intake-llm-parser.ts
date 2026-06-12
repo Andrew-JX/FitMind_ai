@@ -6,7 +6,8 @@ export type WorkoutIntakeLlmProviderMode =
   | "off"
   | "mock"
   | "anthropic"
-  | "gemini";
+  | "gemini"
+  | "groq";
 
 export type WorkoutIntakeLlmRawParser = (input: {
   text: string;
@@ -78,6 +79,10 @@ export function createWorkoutIntakeLlmParser(
 
   if (provider === "gemini") {
     return parseWithGeminiWorkoutIntakeLlm;
+  }
+
+  if (provider === "groq") {
+    return parseWithGroqWorkoutIntakeLlm;
   }
 
   return parseWithMockWorkoutIntakeLlm;
@@ -255,6 +260,60 @@ async function parseWithGeminiWorkoutIntakeLlm(input: {
     ?.map((part) => part.text?.trim() ?? "")
     .join("\n")
     .trim();
+
+  if (!text) {
+    throw new Error("Workout intake LLM returned no text output.");
+  }
+
+  return text;
+}
+
+async function parseWithGroqWorkoutIntakeLlm(input: {
+  text: string;
+}): Promise<string> {
+  const env = loadServerEnv();
+
+  if (env.groqApiKey === undefined) {
+    throw new Error("GROQ_API_KEY is required for workout intake LLM parsing.");
+  }
+
+  const model = env.groqModel ?? "llama-3.3-70b-versatile";
+  const requestInit: RequestInit = {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${env.groqApiKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 1000,
+      temperature: 0,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: buildWorkoutIntakeSystemPrompt() },
+        { role: "user", content: input.text },
+      ],
+    }),
+  };
+  const url = "https://api.groq.com/openai/v1/chat/completions";
+
+  // Retry once on a transient rate limit (free-tier per-minute limit).
+  let response = await fetch(url, requestInit);
+  if (response.status === 429) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    response = await fetch(url, requestInit);
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `Workout intake LLM request failed with HTTP ${response.status} (model ${model}).`,
+    );
+  }
+
+  const payload = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const text = payload.choices?.[0]?.message?.content?.trim();
 
   if (!text) {
     throw new Error("Workout intake LLM returned no text output.");
