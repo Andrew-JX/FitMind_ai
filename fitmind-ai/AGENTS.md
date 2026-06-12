@@ -300,10 +300,13 @@ export async function getFatigueScore(
 - **已落地的主流程**：训练日志 CRUD + 自然语言录入、确定性训练分析（summary / progress / muscle-load / recommendation-context / weekly-report）、SSE 助手（intent 路由 + 确定性工具 + RAG + 周报/平台期诊断/下周计划）、saved insights、产品反馈、可安装 PWA 壳。
 - **RAG**：DB 存知识 chunk，Voyage `voyage-4-lite` + pgvector `vector(1024)`，有 embedding 时用 `0.7*向量 + 0.3*关键词` 混合打分，否则关键词兜底。
 - **鉴权**：HttpOnly + SameSite=Lax 会话 cookie（`fitmind_token`，7 天），刷新不掉线；中间件优先读 cookie、回退 Bearer（保留给 smoke 脚本）。详见 `ai-decisions.md`。
+- **语音/文本录入**：规则解析器（多动作 / 连接词 / 磅→kg / 先报后述合并）+ 可选 LLM 兜底（`WORKOUT_INTAKE_LLM_PROVIDER`= `mock`/`off`/`gemini`/`groq`/`anthropic`）；未匹配/多候选动作在语音页先确认，已匹配才进 composer。
 - **测试**：单测 Vitest（`pnpm test:unit`）；浏览器 E2E 用 Playwright + mock 后端覆盖鉴权会话流程（`pnpm test:e2e`，见 `client/e2e/`）；DB 后端链路靠 `server/scripts/*-smoke.ts`。训练·分析·助手的全流程 E2E 仍待补。
 - **当前限制**：无 saved-insight 分享链接；无离线编辑/同步；无知识管理后台；无 ANN 索引；**刻意不引入** LangChain / LangGraph / MCP / 多 Agent。
 
 验证命令以 `README.md` 为准；docs-only 改动跑 `pnpm format:check`，完整门禁跑 `pnpm verify`（E2E 需另跑 `pnpm test:e2e`）。
+
+**后续待办清单见 `docs/roadmap.md §1.6`**（开新窗口接手时先读那里）。
 
 ------
 

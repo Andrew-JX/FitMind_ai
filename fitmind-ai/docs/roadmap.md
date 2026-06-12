@@ -3,7 +3,7 @@
 > 前瞻文档：记录"接下来要做什么"。与 `docs/progress.md`（回顾，逐批次记录已做的事）配成一对。
 > 阶段编号沿用 `PROJECT_BRIEF.md §7` 与 `docs/progress.md` 的 Phase 体系。
 >
-> Last updated: 2026-06-11
+> Last updated: 2026-06-13
 
 ---
 
@@ -21,8 +21,40 @@
 
 - 扩展 B（MCP Server）——刻意推迟，未做。
 - 扩展 C（多步 ReAct 训练计划）——只做了单轮版本，缺多步循环 + trace 可视化。
-- 打磨阶段——`§11` 性能数字未实测；无浏览器 E2E。
-- 生产健壮性欠债——鉴权仍是内存 token（刷新掉线），与 `§10.2` 的生产方案不一致。
+- 打磨阶段——`§11` 性能精确数字未回填（主观达标）。
+- 语音录入"记录页内"入口 + 手势 FAB（见下方待办 B）。
+
+---
+
+## 1.5 近期增量（Phase 5.3 之后，2026-06-12~13）
+
+已完成并上线（详见 `progress.md` 对应条目）：
+
+- **鉴权持久化**：HttpOnly cookie 会话，刷新/重开保持登录；修复 cookie 恢复会话后 `token=null` 导致"训练记录没了、助手用不了"的回归（`use-auth` 哨兵 token）。
+- **登录崩溃修复**：空字符串 env（如空 `ANTHROPIC_API_KEY`）→ `optionalSecret` 视为未设置；provider 枚举 `.catch("mock")`，配置错误不再整站崩。
+- **语音多动作解析**：逗号/`和`·`还有`·`以及`连接词分隔、`磅`→kg、"先报清单再分述"按动作合并去重、词典外的第二个动作不再被吞、`isSetOnlyFragment` 只回填纯组数碎片。
+- **录入 LLM 兜底**：新增 `gemini` 与 `groq` provider（OpenAI 兼容），schema 改宽容、失败原因回传 `fallback_warnings`、429 重试 + 模型可配（`GEMINI_MODEL`/`GROQ_MODEL`）。
+- **候选确认移到语音页**：未匹配/多候选动作在语音页先确认（选候选或移除），只有已匹配的才进 composer；词典外垃圾进不了训练。
+
+---
+
+## 1.6 待办任务清单（开新窗口优先接手）
+
+> 新窗口先读 `AGENTS.md`（含当前状态 + 文档同步规则），再按需读领域文档。部署 = push 到 `main`，Vercel 自动部署。线上验证可用 curl 注册取 token 再打 `/api/training/workout-intake/parse`，看返回的 `evidence.source`。
+
+- **A. 配置 Groq 让自由口语 LLM 解析生效（仅需用户操作，代码已就绪）** 🔴
+  - Vercel 设 `WORKOUT_INTAKE_LLM_PROVIDER=groq` + `GROQ_API_KEY`（console.groq.com 免费 key）→ Redeploy。
+  - 之前 Gemini 免费层对该账号持续 429，故改用 Groq。配好后线上探测应见 `source: llm_structured_fallback`。
+- **B. Batch C：记录页手势 FAB（让"记录页内"也能语音）** 🟠 较大前端
+  - composer 右下"+"：长按有反馈（震动/视觉）→ 上滑=语音输入、右滑=进动作库。
+  - 语音解析结果**追加到当前 draft**（而非新建/替换），并复用 1.6 的语音页候选确认流。
+- **C. 录入确认页：未匹配动作支持"搜动作库替换"** 🟡
+  - 现在未匹配（无候选）只能"移除"；加一个在确认页直接搜词典选动作的入口。
+- **D. 性能精确数字回填** 🟢
+  - 按 `production-smoke-checklist.md` 的 Lighthouse/远程调试流程实测 `§11`，回填结果表 + README + 面试稿。
+- **E. Prettier 格式欠债（~118 文件）** ⚪
+  - `pnpm verify` 的 `format:check` 红是历史欠债；`npx prettier --write .` 统一修复并加 `.gitattributes`/`endOfLine` 防复发（注意 Windows CRLF）。
+- **F. 中期方向**：Phase 6.0 多步 Agent、6.1 MCP（见下）。
 
 ---
 
