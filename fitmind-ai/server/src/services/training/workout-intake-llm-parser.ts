@@ -212,32 +212,37 @@ async function parseWithGeminiWorkoutIntakeLlm(input: {
     throw new Error("GEMINI_API_KEY is required for workout intake LLM parsing.");
   }
 
-  const model = "gemini-2.0-flash";
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-    {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-goog-api-key": env.geminiApiKey,
-      },
-      body: JSON.stringify({
-        system_instruction: {
-          parts: [{ text: buildWorkoutIntakeSystemPrompt() }],
-        },
-        contents: [{ role: "user", parts: [{ text: input.text }] }],
-        generationConfig: {
-          maxOutputTokens: 1000,
-          responseMimeType: "application/json",
-          temperature: 0,
-        },
-      }),
+  const model = env.geminiModel ?? "gemini-2.0-flash";
+  const requestInit: RequestInit = {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-goog-api-key": env.geminiApiKey,
     },
-  );
+    body: JSON.stringify({
+      system_instruction: {
+        parts: [{ text: buildWorkoutIntakeSystemPrompt() }],
+      },
+      contents: [{ role: "user", parts: [{ text: input.text }] }],
+      generationConfig: {
+        maxOutputTokens: 1000,
+        responseMimeType: "application/json",
+        temperature: 0,
+      },
+    }),
+  };
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+
+  // Retry once on a transient rate limit (free-tier per-minute limit).
+  let response = await fetch(url, requestInit);
+  if (response.status === 429) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    response = await fetch(url, requestInit);
+  }
 
   if (!response.ok) {
     throw new Error(
-      `Workout intake LLM request failed with HTTP ${response.status}.`,
+      `Workout intake LLM request failed with HTTP ${response.status} (model ${model}).`,
     );
   }
 

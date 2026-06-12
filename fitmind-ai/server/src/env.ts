@@ -33,6 +33,7 @@ const serverEnvSchema = z.object({
     .catch("mock"),
   ANTHROPIC_API_KEY: optionalSecret,
   GEMINI_API_KEY: optionalSecret,
+  GEMINI_MODEL: optionalSecret,
   VOYAGE_API_KEY: optionalSecret,
 });
 
@@ -45,6 +46,7 @@ export interface ServerEnv {
   workoutIntakeLlmProvider: "off" | "mock" | "anthropic" | "gemini";
   anthropicApiKey?: string | undefined;
   geminiApiKey?: string | undefined;
+  geminiModel?: string | undefined;
   voyageApiKey?: string | undefined;
 }
 
@@ -62,6 +64,7 @@ export function loadServerEnv(
     workoutIntakeLlmProvider: parsed.WORKOUT_INTAKE_LLM_PROVIDER,
     anthropicApiKey: parsed.ANTHROPIC_API_KEY,
     geminiApiKey: parsed.GEMINI_API_KEY,
+    geminiModel: parsed.GEMINI_MODEL,
     voyageApiKey: parsed.VOYAGE_API_KEY,
   };
 }
