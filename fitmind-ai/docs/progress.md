@@ -4114,3 +4114,22 @@ Verification:
 
 Notes:
 - 深蹲若不在生产词典/别名里，会作为"待确认动作"出现（带正确组数），用户手动选对动作即可；开 Gemini 后由 LLM 直接匹配更顺。
+
+## 2026-06-11 语音录入 - 候选确认移到语音页（不让未确认动作进 composer）
+
+用户反馈：未匹配/多候选的动作（如"高位下拉 / 直臂下压"）现在直接进了"添加动作"页才提示确认；希望未确认前不进 composer，确认这一步在语音页完成。
+
+修复（`WorkoutIntakePanel.tsx`）：
+- 解析后若有 `match_status !== "matched"` 的动作，不再直接 `onDraftParsed`，而是打开新的"确认识别到的动作"resolution sheet：
+  - 已匹配：显示"已匹配：xx"。
+  - 多候选（ambiguous）：列出候选按钮，点选即确认为该动作；也可移除。
+  - 未识别（无候选）：只能"移除"（不让词典外的垃圾进训练）。
+- 全部确认后点"加入训练"，只把已选定（matched）的动作传给 composer；composer 不再出现"需要确认候选"提示。全部已匹配时仍直接进 composer（行为不变）。
+- 新增 Groq provider（`8195a63`，因 Gemini 免费层对该账号持续 429）。
+
+Verification:
+- `pnpm --filter @fitmind/client type-check` / `lint` / `build`：通过。
+
+Notes:
+- 未匹配（无候选）目前只提供"移除"，暂不支持在该页直接搜动作库替换——后续可加。
+- 仍需用户在 Vercel 配 `WORKOUT_INTAKE_LLM_PROVIDER=groq` + `GROQ_API_KEY` 才能让自由口语走 LLM；规则解析 + 本次确认流对结构化语音已可用。

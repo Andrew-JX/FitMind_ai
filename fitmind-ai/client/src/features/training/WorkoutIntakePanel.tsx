@@ -14,6 +14,10 @@ import {
 
 type IntakeStatus = "idle" | "parsing" | "error";
 
+type ExerciseResolution =
+  | { type: "keep"; exerciseId: string; exerciseName: string }
+  | { type: "remove" };
+
 export interface WorkoutIntakePanelProps {
   onDraftParsed: (draft: WorkoutIntakeDraft) => void;
   token: string | null;
@@ -25,6 +29,17 @@ const COPY = {
   inputLabel: "训练描述",
   modalHelp: "语音识别可能有误，请先检查文字；如果还没说完，可以继续语音补充。",
   modalTitle: "确认训练内容",
+  resolveTitle: "确认识别到的动作",
+  resolveHelp: "有动作需要先确认是哪一个，确认后才会加入训练记录。",
+  resolveApply: "加入训练",
+  resolveAmbiguous: "请选择具体动作：",
+  resolveUnmatched: "没有识别到标准动作，可移除该动作。",
+  resolveRemove: "移除",
+  resolveReselect: "重选",
+  resolveMatched: "已匹配",
+  resolveSelected: "已选择",
+  resolveRemoved: "已移除",
+  resolveEmpty: "没有可加入的动作，请至少确认一个，或点取消。",
   parse: "生成训练记录",
   parsing: "识别中...",
   placeholder: "例如：今天杠铃卧推三组 60x10 65x8 70x6，高位下拉两组 45x12。",
@@ -48,6 +63,13 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
   const [isVoiceOverlayOpen, setIsVoiceOverlayOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [status, setStatus] = useState<IntakeStatus>("idle");
+  const [pendingDraft, setPendingDraft] = useState<WorkoutIntakeDraft | null>(
+    null,
+  );
+  const [resolutions, setResolutions] = useState<
+    Record<number, ExerciseResolution>
+  >({});
+  const [resolveError, setResolveError] = useState<string | null>(null);
   const speechRecognition = useSpeechRecognition();
 
   const isBusy = status === "parsing";
@@ -72,13 +94,105 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
         performed_at: formatLocalIsoWithOffset(new Date()),
         text: text.trim(),
       });
-      props.onDraftParsed(response.draft);
+
+      const draft = response.draft;
+      const needsResolution = draft.exercises.some(
+        (exercise) => exercise.match_status !== "matched",
+      );
+
+      if (needsResolution) {
+        // Confirm ambiguous/unrecognized exercises here, before the composer.
+        setPendingDraft(draft);
+        setResolutions(buildInitialResolutions(draft));
+        setResolveError(null);
+        setStatus("idle");
+        setIsModalOpen(false);
+        return;
+      }
+
+      props.onDraftParsed(draft);
       resetIntakeState();
       setIsModalOpen(false);
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
       setStatus("error");
     }
+  }
+
+  function chooseCandidate(
+    index: number,
+    exerciseId: string,
+    exerciseName: string,
+  ) {
+    setResolveError(null);
+    setResolutions((current) => ({
+      ...current,
+      [index]: { type: "keep", exerciseId, exerciseName },
+    }));
+  }
+
+  function removeExerciseAt(index: number) {
+    setResolveError(null);
+    setResolutions((current) => ({
+      ...current,
+      [index]: { type: "remove" },
+    }));
+  }
+
+  function clearResolution(index: number) {
+    setResolveError(null);
+    setResolutions((current) => {
+      const next = { ...current };
+      delete next[index];
+      return next;
+    });
+  }
+
+  function handleApplyResolution() {
+    if (!pendingDraft) {
+      return;
+    }
+
+    const allResolved = pendingDraft.exercises.every(
+      (_, index) => resolutions[index] !== undefined,
+    );
+
+    if (!allResolved) {
+      setResolveError(COPY.resolveEmpty);
+      return;
+    }
+
+    const exercises = pendingDraft.exercises
+      .map((exercise, index) => ({ exercise, resolution: resolutions[index] }))
+      .filter(
+        (entry): entry is {
+          exercise: (typeof pendingDraft.exercises)[number];
+          resolution: Extract<ExerciseResolution, { type: "keep" }>;
+        } => entry.resolution?.type === "keep",
+      )
+      .map(({ exercise, resolution }) => ({
+        ...exercise,
+        candidate_exercises: [],
+        match_confidence: 1,
+        match_status: "matched" as const,
+        matched_exercise_id: resolution.exerciseId,
+        matched_exercise_name: resolution.exerciseName,
+      }));
+
+    if (exercises.length === 0) {
+      setResolveError(COPY.resolveEmpty);
+      return;
+    }
+
+    props.onDraftParsed({ ...pendingDraft, exercises });
+    closeResolution();
+    resetIntakeState();
+  }
+
+  function closeResolution() {
+    setPendingDraft(null);
+    setResolutions({});
+    setResolveError(null);
   }
 
   function handleVoiceStart() {
@@ -245,6 +359,143 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
       </ActionSheet>
 
       <ActionSheet
+        closeOnBackdrop={false}
+        description={COPY.resolveHelp}
+        footer={
+          <div style={actionGridStyle}>
+            <Button
+              onClick={() => {
+                closeResolution();
+                resetIntakeState();
+              }}
+              type="button"
+              variant="secondary"
+            >
+              {COPY.cancel}
+            </Button>
+            <Button onClick={handleApplyResolution} type="button">
+              {COPY.resolveApply}
+            </Button>
+          </div>
+        }
+        onClose={() => {
+          closeResolution();
+          resetIntakeState();
+        }}
+        open={pendingDraft !== null}
+        title={COPY.resolveTitle}
+      >
+        <div style={resolveListStyle}>
+          {pendingDraft?.exercises.map((exercise, index) => {
+            const resolution = resolutions[index];
+
+            return (
+              <div
+                key={`${exercise.input_name}-${index}`}
+                style={{ ...resolveRowStyle, borderColor: theme.colors.bdr }}
+              >
+                <div style={resolveRowHeaderStyle}>
+                  <span style={{ color: theme.colors.tx, fontWeight: 700 }}>
+                    {exercise.input_name}
+                  </span>
+                  <span style={{ color: theme.colors.tx3, fontSize: 12 }}>
+                    {summarizeSets(exercise)}
+                  </span>
+                </div>
+
+                {resolution?.type === "keep" ? (
+                  <div style={resolveStatusRowStyle}>
+                    <span style={{ color: theme.colors.ac, fontSize: 13 }}>
+                      {exercise.match_status === "matched"
+                        ? COPY.resolveMatched
+                        : COPY.resolveSelected}
+                      ：{resolution.exerciseName}
+                    </span>
+                    {exercise.match_status !== "matched" ? (
+                      <button
+                        onClick={() => clearResolution(index)}
+                        style={resolveLinkStyle(theme)}
+                        type="button"
+                      >
+                        {COPY.resolveReselect}
+                      </button>
+                    ) : null}
+                  </div>
+                ) : resolution?.type === "remove" ? (
+                  <div style={resolveStatusRowStyle}>
+                    <span style={{ color: theme.colors.tx3, fontSize: 13 }}>
+                      {COPY.resolveRemoved}
+                    </span>
+                    <button
+                      onClick={() => clearResolution(index)}
+                      style={resolveLinkStyle(theme)}
+                      type="button"
+                    >
+                      {COPY.resolveReselect}
+                    </button>
+                  </div>
+                ) : exercise.candidate_exercises.length > 0 ? (
+                  <div style={resolveChoicesStyle}>
+                    <span style={{ color: theme.colors.tx2, fontSize: 12 }}>
+                      {COPY.resolveAmbiguous}
+                    </span>
+                    <div style={resolveCandidateGridStyle}>
+                      {exercise.candidate_exercises.map((candidate) => (
+                        <Button
+                          key={candidate.exercise_id}
+                          onClick={() =>
+                            chooseCandidate(
+                              index,
+                              candidate.exercise_id,
+                              candidate.exercise_name,
+                            )
+                          }
+                          type="button"
+                          variant="secondary"
+                        >
+                          {candidate.exercise_name}
+                        </Button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => removeExerciseAt(index)}
+                      style={resolveLinkStyle(theme)}
+                      type="button"
+                    >
+                      {COPY.resolveRemove}
+                    </button>
+                  </div>
+                ) : (
+                  <div style={resolveChoicesStyle}>
+                    <span style={{ color: theme.colors.orange, fontSize: 12 }}>
+                      {COPY.resolveUnmatched}
+                    </span>
+                    <Button
+                      onClick={() => removeExerciseAt(index)}
+                      type="button"
+                      variant="secondary"
+                    >
+                      {COPY.resolveRemove}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {resolveError ? (
+          <div style={{ marginTop: 12 }}>
+            <StateNotice
+              description={resolveError}
+              title={COPY.resolveTitle}
+              tone="warning"
+            />
+          </div>
+        ) : null}
+      </ActionSheet>
+
+      <ActionSheet
         description={COPY.speechRelease}
         footer={
           <div style={actionGridStyle}>
@@ -330,6 +581,40 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
   );
 }
 
+function buildInitialResolutions(
+  draft: WorkoutIntakeDraft,
+): Record<number, ExerciseResolution> {
+  const initial: Record<number, ExerciseResolution> = {};
+
+  draft.exercises.forEach((exercise, index) => {
+    if (exercise.match_status === "matched" && exercise.matched_exercise_id) {
+      initial[index] = {
+        type: "keep",
+        exerciseId: exercise.matched_exercise_id,
+        exerciseName: exercise.matched_exercise_name ?? exercise.input_name,
+      };
+    }
+  });
+
+  return initial;
+}
+
+function summarizeSets(
+  exercise: WorkoutIntakeDraft["exercises"][number],
+): string {
+  if (exercise.sets.length > 0) {
+    const first = exercise.sets[0];
+
+    return `${exercise.sets.length} 组 · ${first?.weight_kg ?? 0}kg×${first?.reps ?? 0}`;
+  }
+
+  if (exercise.incomplete_sets.length > 0) {
+    return `${exercise.incomplete_sets.length} 组 · 待补全`;
+  }
+
+  return "暂无组数";
+}
+
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -357,6 +642,59 @@ const triggerActionsStyle: React.CSSProperties = {
   gap: 10,
   gridTemplateColumns: "minmax(0, 1fr)",
 };
+
+const resolveListStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 12,
+};
+
+const resolveRowStyle: React.CSSProperties = {
+  border: "1px solid",
+  borderRadius: 12,
+  display: "grid",
+  gap: 8,
+  padding: 12,
+};
+
+const resolveRowHeaderStyle: React.CSSProperties = {
+  alignItems: "baseline",
+  display: "flex",
+  gap: 8,
+  justifyContent: "space-between",
+};
+
+const resolveStatusRowStyle: React.CSSProperties = {
+  alignItems: "center",
+  display: "flex",
+  gap: 12,
+  justifyContent: "space-between",
+};
+
+const resolveChoicesStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 8,
+};
+
+const resolveCandidateGridStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 8,
+  gridTemplateColumns: "repeat(auto-fit, minmax(0, 1fr))",
+};
+
+function resolveLinkStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    background: "none",
+    border: "none",
+    color: theme.colors.tx3,
+    cursor: "pointer",
+    fontSize: 12,
+    justifySelf: "end",
+    padding: 0,
+    textDecoration: "underline",
+  };
+}
 
 const micButtonStyle: React.CSSProperties = {
   alignItems: "center",
