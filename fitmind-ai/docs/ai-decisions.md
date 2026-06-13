@@ -572,3 +572,26 @@ Decision：
 
 Out of scope（本次不做）：
 - 前端"✓ 数据已核对"徽章展示；校验非数字的语义声明（如"训练量上升"这类定性判断）；把 faithfulness 落独立表。
+
+## [D22] 离线 Eval 套件 + 回归门禁（assistant-eval，Slice 2）
+
+- **Date**: 2026-06-14
+- **Status**: Accepted（数据集 + 评测器 + runner + `pnpm eval` + 单测已落地）
+
+背景：
+- 面试高频问题"你怎么知道它对 / 不回归？"此前没有标准答案。需要一个可离线复现、零成本的 eval 套件，把"对不对"变成可量化、可门禁的指标。
+
+Decision：
+- 新增 `server/src/services/assistant/assistant-eval.ts`：golden 数据集（`AssistantIntentEvalCase` { message, mode, expectedIntent, mustCiteEvidence?, shouldRefuse? } + `FaithfulnessEvalCase` { answer, toolOutputs, expectedStatus }）+ 三个纯函数评测器。
+- **评测项（全部 mock-first、无 DB）**：
+  ① intent 路由准确率——对每条跑 `classifyAssistantIntent`（纯函数）比对 expectedIntent，覆盖 summary/progress/weekly_report/plateau_diagnosis/next_week_plan/recommendation/imbalance/evidence/exercise_history/knowledge/mixed_tool_rag/unsupported。
+  ② 关键回归断言——`shouldRefuse` 的必须路由到 unsupported；`mustCiteEvidence` 的不能落到 unsupported/knowledge（证据绑定回归）。
+  ③ faithfulness 通过率——复用 Slice 1 的 `verifyAnswerFaithfulness` 对「答案 + 工具输出」fixtures 打分（含编造 999kg → flagged）。
+- **runner**：`server/scripts/run-eval.ts`（tsx），根 `pnpm eval` 委托到 server 跑；打印每项 pass/fail + 分项分数 + Overall，**任一项未达 100% → 非零退出**，可进 CI。
+- **为何 mock-first / 离线 / 零成本**：与项目定位一致——核心可评测的部分（intent 路由、faithfulness）都是确定性纯函数，不需要调任何付费模型即可复现回归。门禁因此能无密钥、无 DB、在任意 CI 跑。
+- **LLM-as-judge（叙述质量）默认 off**：保留干净 seam（`NarrativeJudge` 接口 + `runAssistantEval({ narrativeJudge })` 可选注入），但默认不注入、不调用任何模型，保持零成本。接真实 provider（Slice 7）后可注入一个调模型的实现给叙述质量打分，无需改评测框架。
+- **门禁阈值**用命名常量 `REQUIRED_PASS_RATE`（确定性套件期望全过）。
+- 与现有 `server` 的 `eval`（rag-eval，DB-backed RAG 检索质量）并存、互不影响：新套件是无 DB 的助手层 eval，挂在根 `pnpm eval`。
+
+Out of scope（本次不做）：
+- 真正注入 LLM judge 跑叙述质量（等接真实模型）；把 eval 接进 CI workflow（先本地可跑）；mustCiteEvidence 的"端到端真出 evidence"校验（需 orchestrator + DB，当前以路由层近似）。

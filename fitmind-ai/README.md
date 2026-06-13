@@ -120,6 +120,10 @@ Optional:
 - `pnpm test`
   - Unit-test lane only
   - Does not prove real DB-backed flows
+- `pnpm eval`
+  - Offline assistant eval suite (mock-first, no DB, zero cost): intent-routing accuracy + refusal/evidence regressions + faithfulness pass-rate (reuses the Slice 1 verifier)
+  - Prints a per-check report and **exits non-zero on any regression** — safe to wire into CI as a gate
+  - Narrative LLM-as-judge is an opt-in seam, off by default to stay zero-cost (see `docs/ai-decisions.md` D22)
 - `pnpm smoke:auth`
   - Real auth app path
   - Requires `DATABASE_URL`

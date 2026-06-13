@@ -130,10 +130,11 @@ saved-insight 分享链接、知识管理后台、离线编辑 / 同步。优先
   - 验收：✅ 新增校验器 + 单测（含"编造数字被抓到"用例）；✅ `structured_output` 带 faithfulness 字段；✅ 门禁全绿（type-check / lint / 200 单测）；✅ 不改既有答案文案逻辑（只增校验）。
   - 后续：前端"✓ 数据已核对"徽章展示（留给后续片）。
 
-- **Slice 2 — Eval 套件 + 回归门禁　🟠**
-  - 做什么：golden 数据集（问题 → 期望 intent / 必引证据 / 该不该拒答），离线跑 intent 路由准确率 + faithfulness 通过率 + 关键回归，`pnpm eval` 命令；先本地可跑，再考虑进 CI。叙述类可选 LLM-as-judge（缓存、可关、默认 off 保持零成本）。
+- **Slice 2 — Eval 套件 + 回归门禁　✅ 2026-06-14 完成**
+  - 做什么：golden 数据集（问题 → 期望 intent / 必引证据 / 该不该拒答），离线跑 intent 路由准确率 + faithfulness 通过率 + 关键回归，`pnpm eval` 命令；先本地可跑，再考虑进 CI。叙述类可选 LLM-as-judge（可关、默认 off 保持零成本）。
+  - 落地：新增 `server/src/services/assistant/assistant-eval.ts`（13 条 intent golden + 3 条 faithfulness fixtures + 三个纯函数评测器 + NarrativeJudge seam）+ 单测；`server/scripts/run-eval.ts` runner，根 `pnpm eval` 委托到 server，打印分项报告、回归非零退出。复用 Slice 1 的 `verifyAnswerFaithfulness` 做 faithfulness 打分。决策见 `ai-decisions.md` D22。
   - 价值：AI 面试↑↑↑（"你怎么知道它对/不回归"的标准答案）｜成本：低-中（主要是写数据集）｜依赖：复用 Slice 1 的校验器作为 faithfulness 打分。
-  - 验收：`pnpm eval` 产出可读报告（每项通过/失败 + 汇总分）；≥1 条 mock 可复现实例集；门禁全绿。
+  - 验收：✅ `pnpm eval` 产出可读报告（每项通过/失败 + 汇总分）；✅ mock 可复现数据集（无 DB）；✅ 回归非零退出；✅ 门禁全绿（209 单测）。
 
 - **Slice 3 — 可执行下周计划·生成器（产品 #1，闭环第一步）　🟠**
   - 纯函数 `weekly + progress (+ 档案) → 具体方案（动作 × 组 × 次 × 目标重量）`，先在助手答案 / agent synthesis 里结构化展示，**先不落库**。可单测。

@@ -4255,3 +4255,24 @@ Notes:
 - 护栏先于真实模型就位：mock 不编造、真实模型会编造，Slice 7 接真实大模型后这道护栏 + Slice 2 的 faithfulness 通过率指标正是兜住编造的关键。
 - 前端"✓ 数据已核对"徽章留给后续 Slice；本片不碰 client（optional 字段向前兼容）。
 - 下一片：§8 Slice 2（Eval 套件 + 回归门禁，复用本片校验器做 faithfulness 打分）。
+
+## 2026-06-14 §8 Slice 2 - 离线 Eval 套件 + 回归门禁
+
+回答"你怎么知道它对 / 不回归"——可离线复现、零成本的助手 eval 套件 + `pnpm eval` 门禁。详见 `ai-decisions.md` D22。前置依赖 Slice 1 的 faithfulness 校验器。
+
+改动：
+- `server/src/services/assistant/assistant-eval.ts`（新）：golden 数据集 + 三个纯函数评测器（mock-first、无 DB）。① `evaluateIntentRouting`：13 条 `AssistantIntentEvalCase` 跑 `classifyAssistantIntent` 比对 expectedIntent，覆盖 12 个 intent。② `evaluateRefusalRegression`：`shouldRefuse`→必须 unsupported、`mustCiteEvidence`→不能 unsupported/knowledge。③ `evaluateFaithfulness`：3 条「答案+工具输出」fixtures 复用 `verifyAnswerFaithfulness`（含编造 999kg→flagged）。`runAssistantEval` 汇总，门禁阈值命名常量 `REQUIRED_PASS_RATE`。`NarrativeJudge` 接口为 LLM-as-judge seam，默认不注入、不调模型（零成本）。
+- `assistant-eval.test.ts`（新，9 例）：golden 全过（回归 guard）、judge 默认不跑 / 注入后增项 / 拒绝则整体 fail、各评测器误标检测。
+- `server/scripts/run-eval.ts`（新，tsx runner）：打印分项 PASS/FAIL + 百分比 + Overall，`!passed` → `process.exit(1)`。
+- `package.json`（根）：加 `"eval": "pnpm --filter @fitmind/server exec tsx scripts/run-eval.ts"`（无 DB / 无密钥 / 零成本）。
+
+Verification:
+- `pnpm --filter @fitmind/server type-check` / `lint` / `test:unit`（209）：通过。
+- `pnpm eval`：intent_routing 13/13、refusal_regression 12/12、faithfulness 3/3，Overall PASS。
+
+文档：`ai-decisions.md` D22、`README.md`（Verification 加 `pnpm eval` 用法 + 门禁说明）、`roadmap.md §8` Slice 2 标 ✅、本条。
+
+Notes:
+- 与 server 已有的 `eval`（rag-eval，DB-backed 检索质量）并存互不影响；新套件挂根 `pnpm eval`，是无 DB 的助手层 eval。
+- LLM-as-judge 留 seam 默认 off；接真实 provider（Slice 7）后注入即可给叙述质量打分。
+- 下一片：§8 Slice 3（可执行下周计划生成器，纯函数 weekly+progress→具体方案，先不落库）。
