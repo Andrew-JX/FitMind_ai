@@ -919,3 +919,45 @@ Response 200:
   }
 }
 ```
+
+## Slice 4 Addition - Athlete Profile
+
+薄运动员档案，一人一档（user_id 主键，upsert）；注入 next-week-plan agent 做个性化 + 安全提示。鉴权必填（cookie/Bearer）。
+
+### GET /api/athlete-profile
+
+Returns the authenticated user's profile, or `null` when none saved yet.
+
+Response 200:
+
+```json
+{
+  "ok": true,
+  "data": {
+    "profile": {
+      "goal": "hypertrophy",
+      "weeklyDays": 4,
+      "availableEquipment": ["barbell", "dumbbell"],
+      "injuryConstraints": ["knee"],
+      "updatedAt": "2026-06-14T00:00:00.000Z"
+    }
+  }
+}
+```
+
+### PUT /api/athlete-profile
+
+Validates (zod, `.strict()`) and upserts the profile. Body:
+
+```json
+{
+  "goal": "strength | hypertrophy | endurance | general_fitness",
+  "weeklyDays": 1,
+  "availableEquipment": ["barbell", "dumbbell", "machine", "cable", "bodyweight", "kettlebell"],
+  "injuryConstraints": ["knee"]
+}
+```
+
+- `weeklyDays` 1–7；`goal` 受控枚举；`availableEquipment` 受控词表；`injuryConstraints` 自由标签（service 归一化小写 + 去重，≤10 个 / 每个 ≤40 字）。
+- 不接受请求体里的 `user_id` 等额外字段（`.strict()` 拒绝）。
+- Response 200 返回与 GET 相同的 `{ profile }` 结构。

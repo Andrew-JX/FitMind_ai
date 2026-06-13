@@ -2,6 +2,7 @@ import express from "express";
 import { ZodError } from "zod";
 
 import { assistantRouter } from "./routes/assistant.js";
+import { athleteProfileRouter } from "./routes/athlete-profile.js";
 import { authRouter } from "./routes/auth.js";
 import { feedbackRouter } from "./routes/feedback.js";
 import { healthRouter } from "./routes/health.js";
@@ -20,6 +21,7 @@ export function createApp() {
   app.use("/api", apiRouter);
   app.use("/api", assistantRouter);
   app.use("/api", feedbackRouter);
+  app.use("/api", athleteProfileRouter);
   app.use("/api", workoutsRouter);
 
   app.use(
