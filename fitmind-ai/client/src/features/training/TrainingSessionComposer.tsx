@@ -326,12 +326,7 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
           </button>
 
           {!fabGesture.isOpen ? (
-            <>
-              <span aria-hidden="true" style={fabPulseStyle(theme)} />
-              <span aria-hidden="true" style={fabHoldHintStyle(theme)}>
-                长按
-              </span>
-            </>
+            <span aria-hidden="true" style={fabPulseStyle(theme)} />
           ) : null}
 
           <button
@@ -1460,10 +1455,6 @@ const FAB_KEYFRAMES = `
     70% { opacity: 0; }
     100% { transform: scale(1.7); opacity: 0; }
   }
-  @keyframes fitmindFabHoldHint {
-    0%, 100% { opacity: 0.32; transform: translateY(2px); }
-    50% { opacity: 1; transform: translateY(0); }
-  }
 `;
 
 const FAB_SATELLITE_OFFSET_PX = 72;
@@ -1562,27 +1553,6 @@ function fabPulseStyle(
     right: 0,
     width: 56,
     zIndex: 1,
-  };
-}
-
-function fabHoldHintStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-): React.CSSProperties {
-  return {
-    animation: "fitmindFabHoldHint 2600ms ease-in-out infinite",
-    backgroundColor: theme.colors.surf,
-    border: `1px solid ${theme.colors.bdr2}`,
-    borderRadius: theme.radius.pill,
-    bottom: "calc(100% + 8px)",
-    boxShadow: theme.shadows.card,
-    color: theme.colors.tx2,
-    fontSize: 11,
-    fontWeight: 700,
-    padding: "4px 8px",
-    pointerEvents: "none",
-    position: "absolute",
-    right: 0,
-    whiteSpace: "nowrap",
   };
 }
 
