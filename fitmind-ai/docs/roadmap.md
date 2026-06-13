@@ -74,9 +74,15 @@
 
 ---
 
-## 3. Phase 6.0 — Agent / 多步 ReAct 训练计划　🟠 中期 / 高面试价值
+## 3. Phase 6.0 — Agent / 多步 ReAct 训练计划　🔵 进行中
 
-原计划"扩展 C"。把单轮 next-week-plan 升级为多步 ReAct 循环（查容量 → 找弱项 → 查进展 → 生成计划），并提供 trace 可视化。是项目从 "Tool Calling" 跨到 "Agent" 的关键一跃。
+原计划"扩展 C"。把单轮 next-week-plan 升级为多步 ReAct 循环（查容量 → 找弱项 → 查进展 → 检索知识 → 生成计划），并提供 trace 可视化。是项目从 "Tool Calling" 跨到 "Agent" 的关键一跃。
+
+分批推进：
+
+- **Batch 6.0-1 — 后端 agent 核心　✅ 2026-06-14**：新增 `server/src/services/agent/`：`react-planner-types.ts`（trace / step / 事件类型）+ `next-week-plan-agent.ts`（确定性 ReAct 策略，注入 `runTool`/`retrieve`/`onStep`/`now`，可单测）+ 4 例单测。策略基于观察分支：空数据第一步即停（`no_data`）；无指定动作则跳过单动作进展；按周频率给"巩固/加量/维持"建议；证据跨步聚合。尚未接入 orchestrator。
+- **Batch 6.0-2 — 接线 + SSE 契约**：`assistant-stream-types.ts` 加 `agent_step_started/finished` 事件 + `planning` 状态；`assistant-orchestrator-service.ts` 把 `next_week_plan` 改走 agent，trace 进 `structured_output`；更新 `api-contract.md` / `ai-decisions.md`。
+- **Batch 6.0-3 — 前端 trace 可视化**：`assistant-types.ts` + `use-assistant-chat.ts` 接事件累积 trace，新增 `AssistantAgentTrace.tsx` 时间线，挂载渲染。
 
 ---
 

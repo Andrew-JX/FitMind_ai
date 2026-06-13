@@ -4182,3 +4182,19 @@ UX：中=收起、上=语音、左=动作库；滑动或点卫星均可；轻点
 Verification:
 - `pnpm type-check`、`pnpm lint`、`pnpm test:unit`（187）：通过。
 - 手势/动画需真机手测（长按分裂、上/左滑高亮松手、点卫星、点空白收起、脉冲提示）。
+
+## 2026-06-14 Phase 6.0 Batch 1 - 多步 ReAct 训练计划 agent 核心（未接线）
+
+把单轮 next-week-plan 升级为多步 Agent 的第一批：落地后端 agent 核心，可单测，暂未接入助手流。
+
+改动（新增 `server/src/services/agent/`）：
+- `react-planner-types.ts`：trace / step / 事件类型。`AgentTraceStep`（index/kind/title/thought/tool_name/observation/status/duration_ms）、`AgentTrace`（goal/steps/max_steps/stop_reason）、`AgentStepEvent`（started/finished 两相，供 SSE）、`NextWeekPlanAgentDeps`（注入 `runTool`/`retrieve`/`onStep`/`now`）。
+- `next-week-plan-agent.ts`：确定性 ReAct 策略。步骤：查容量(get_weekly_training_report) → 找弱项(get_recommendation_context) → 查进展(get_exercise_progress，仅在指定动作时，否则记一条 skipped 步骤) → 检索知识(RAG) → 生成草案。基于观察分支：空数据第一步即停（stop_reason=no_data）；按周频率给"巩固/加量/维持"策略；证据(workout_ids/set_ids/calculation_rules)跨步去重聚合；次要工具失败不致命（safe 步骤记 error 后继续到 synthesis）。阈值用命名 module 常量（HIGH/LOW_WEEKLY_FREQUENCY、AGENT_MAX_STEPS），与 weekly-training-report-service 的现有约定一致。
+- `next-week-plan-agent.test.ts`：4 例（全流程跳过进展 / 指定动作查进展 / 空数据早停 / 次要工具失败仍合成），注入式 mock，无 DB。
+
+Verification:
+- `pnpm --filter @fitmind/server type-check`、`pnpm lint`、`pnpm test:unit`（191，+4）：通过。
+
+Notes:
+- 这一批不改任何线上行为（agent 还没被 orchestrator 调用）。Batch 2 接线 + SSE 事件 + 契约文档；Batch 3 前端 trace 时间线。
+- 期间还顺手去掉了 FAB 的"长按"小标（保留脉冲光环），见上一条 commit。
