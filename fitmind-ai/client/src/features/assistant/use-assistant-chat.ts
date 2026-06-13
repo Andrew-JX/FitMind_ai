@@ -5,11 +5,16 @@ import { streamAssistantChat } from "./assistant-stream-api";
 import { mergeStructuredOutputIntoMessage } from "./assistant-structured-output";
 import type {
   AssistantActiveToolCall,
+  AssistantAgentStepKind,
+  AssistantAgentStepStatus,
+  AssistantAgentTrace,
+  AssistantAgentTraceStep,
   AssistantChatMessage,
   AssistantChatRequestPayload,
   AssistantProvider,
   AssistantChatStatus,
   AssistantStreamEvent,
+  AssistantStructuredOutput,
 } from "./assistant-types";
 
 export interface UseAssistantChatResult {
@@ -256,6 +261,32 @@ export function useAssistantChat(token: string | null): UseAssistantChatResult {
       return;
     }
 
+    if (event.type === "agent_step_started") {
+      setStatus("planning");
+      setMessages((currentMessages) =>
+        upsertAgentStep(currentMessages, assistantMessageId, {
+          index: event.index,
+          kind: event.kind,
+          title: event.title,
+          thought: event.thought,
+          toolName: event.tool_name,
+          status: "running",
+        }),
+      );
+      return;
+    }
+
+    if (event.type === "agent_step_finished") {
+      setMessages((currentMessages) =>
+        patchAgentStep(currentMessages, assistantMessageId, event.index, {
+          status: event.status,
+          durationMs: event.duration_ms,
+          observation: event.observation,
+        }),
+      );
+      return;
+    }
+
     if (event.type === "answer_delta") {
       setStatus("answering");
       setMessages((currentMessages) =>
@@ -272,13 +303,24 @@ export function useAssistantChat(token: string | null): UseAssistantChatResult {
     }
 
     if (event.type === "structured_output") {
-      setMessages((currentMessages) =>
-        mergeStructuredOutputIntoMessage(
+      setMessages((currentMessages) => {
+        const merged = mergeStructuredOutputIntoMessage(
           currentMessages,
           assistantMessageId,
           event.output,
-        ),
-      );
+        );
+        const trace = mapStructuredAgentTrace(event.output);
+
+        if (!trace) {
+          return merged;
+        }
+
+        return merged.map((message) =>
+          message.id === assistantMessageId
+            ? { ...message, agentTrace: trace }
+            : message,
+        );
+      });
       return;
     }
 
@@ -308,14 +350,19 @@ export function useAssistantChat(token: string | null): UseAssistantChatResult {
       return;
     }
 
-    setIsStreaming(false);
-    setStatus("error");
-    setErrorMessage(event.message);
-    setActiveToolCall((currentValue) =>
-      currentValue?.status === "running" ? null : currentValue,
-    );
-    activeAbortControllerRef.current = null;
-    finalizeAssistantMessage(assistantMessageId);
+    if (event.type === "error") {
+      setIsStreaming(false);
+      setStatus("error");
+      setErrorMessage(event.message);
+      setActiveToolCall((currentValue) =>
+        currentValue?.status === "running" ? null : currentValue,
+      );
+      activeAbortControllerRef.current = null;
+      finalizeAssistantMessage(assistantMessageId);
+      return;
+    }
+
+    // Forward-compatible: ignore any event types this client does not know yet.
   }
 
   function finalizeAssistantMessage(assistantMessageId: string): void {
@@ -331,6 +378,110 @@ export function useAssistantChat(token: string | null): UseAssistantChatResult {
       ),
     );
   }
+}
+
+function upsertAgentStep(
+  messages: AssistantChatMessage[],
+  messageId: string,
+  step: AssistantAgentTraceStep,
+): AssistantChatMessage[] {
+  return messages.map((message) => {
+    if (message.id !== messageId) {
+      return message;
+    }
+
+    const currentSteps = message.agentTrace?.steps ?? [];
+    const existingIndex = currentSteps.findIndex(
+      (candidate) => candidate.index === step.index,
+    );
+    const nextSteps =
+      existingIndex >= 0
+        ? currentSteps.map((candidate, index) =>
+            index === existingIndex ? { ...candidate, ...step } : candidate,
+          )
+        : [...currentSteps, step];
+
+    return {
+      ...message,
+      agentTrace: {
+        ...(message.agentTrace ?? {}),
+        steps: nextSteps,
+      },
+    };
+  });
+}
+
+function patchAgentStep(
+  messages: AssistantChatMessage[],
+  messageId: string,
+  index: number,
+  patch: Partial<AssistantAgentTraceStep>,
+): AssistantChatMessage[] {
+  return messages.map((message) => {
+    if (message.id !== messageId || !message.agentTrace) {
+      return message;
+    }
+
+    return {
+      ...message,
+      agentTrace: {
+        ...message.agentTrace,
+        steps: message.agentTrace.steps.map((step) =>
+          step.index === index ? { ...step, ...patch } : step,
+        ),
+      },
+    };
+  });
+}
+
+function mapStructuredAgentTrace(
+  output: AssistantStructuredOutput,
+): AssistantAgentTrace | null {
+  const trace = output.agent_trace;
+
+  if (!trace || !Array.isArray(trace.steps)) {
+    return null;
+  }
+
+  const steps: AssistantAgentTraceStep[] = trace.steps.map((step, index) => ({
+    index: typeof step.index === "number" ? step.index : index + 1,
+    kind: normalizeAgentStepKind(step.kind),
+    title: step.title ?? "",
+    thought: step.thought ?? "",
+    toolName: step.tool_name ?? null,
+    observation: step.observation,
+    status: normalizeAgentStepStatus(step.status),
+    durationMs: step.duration_ms,
+  }));
+
+  return {
+    goal: trace.goal,
+    steps,
+    stopReason: trace.stop_reason,
+  };
+}
+
+function normalizeAgentStepKind(value: string | undefined): AssistantAgentStepKind {
+  if (value === "tool" || value === "retrieval" || value === "synthesis") {
+    return value;
+  }
+
+  return "tool";
+}
+
+function normalizeAgentStepStatus(
+  value: string | undefined,
+): AssistantAgentStepStatus {
+  if (
+    value === "running" ||
+    value === "success" ||
+    value === "error" ||
+    value === "skipped"
+  ) {
+    return value;
+  }
+
+  return "success";
 }
 
 function getReadableErrorMessage(error: unknown): string {

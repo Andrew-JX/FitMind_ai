@@ -1,6 +1,7 @@
 export type AssistantChatStatus =
   | "idle"
   | "thinking"
+  | "planning"
   | "tool_calling"
   | "retrieving"
   | "answering"
@@ -38,7 +39,12 @@ export interface AssistantPromptSuggestion {
 export type AssistantStreamEvent =
   | {
       type: "state";
-      state: "thinking" | "tool_calling" | "retrieving" | "answering";
+      state:
+        | "thinking"
+        | "planning"
+        | "tool_calling"
+        | "retrieving"
+        | "answering";
     }
   | { type: "session"; session_id: string }
   | { type: "provider_selected"; provider: "mock" | "anthropic" }
@@ -49,6 +55,21 @@ export type AssistantStreamEvent =
       status: "success" | "error";
       duration_ms: number;
     }
+  | {
+      type: "agent_step_started";
+      index: number;
+      kind: AssistantAgentStepKind;
+      title: string;
+      thought: string;
+      tool_name: string | null;
+    }
+  | {
+      type: "agent_step_finished";
+      index: number;
+      status: AssistantAgentStepStatus;
+      duration_ms: number;
+      observation: string;
+    }
   | { type: "answer_delta"; text: string }
   | { type: "structured_output"; output: AssistantStructuredOutput }
   | {
@@ -57,6 +78,30 @@ export type AssistantStreamEvent =
       session_id?: string | undefined;
     }
   | { type: "error"; code: string; message: string };
+
+export type AssistantAgentStepKind = "tool" | "retrieval" | "synthesis";
+export type AssistantAgentStepStatus =
+  | "running"
+  | "success"
+  | "error"
+  | "skipped";
+
+export interface AssistantAgentTraceStep {
+  index: number;
+  kind: AssistantAgentStepKind;
+  title: string;
+  thought: string;
+  toolName: string | null;
+  observation?: string | undefined;
+  status: AssistantAgentStepStatus;
+  durationMs?: number | undefined;
+}
+
+export interface AssistantAgentTrace {
+  goal?: string | undefined;
+  steps: AssistantAgentTraceStep[];
+  stopReason?: string | undefined;
+}
 
 export type AssistantMessageRole = "user" | "assistant";
 
@@ -70,6 +115,7 @@ export interface AssistantChatMessage {
   isStreaming?: boolean | undefined;
   limitations?: string[] | undefined;
   sources?: AssistantMessageSource[] | undefined;
+  agentTrace?: AssistantAgentTrace | undefined;
 }
 
 export interface AssistantActiveToolCall {
@@ -99,6 +145,24 @@ export interface AssistantMessageSource {
 export interface AssistantStructuredOutput {
   intent?: string | undefined;
   message_id?: string | undefined;
+  agent_trace?:
+    | {
+        goal?: string | undefined;
+        stop_reason?: string | undefined;
+        steps?:
+          | Array<{
+              index?: number | undefined;
+              kind?: string | undefined;
+              title?: string | undefined;
+              thought?: string | undefined;
+              tool_name?: string | null | undefined;
+              observation?: string | undefined;
+              status?: string | undefined;
+              duration_ms?: number | undefined;
+            }>
+          | undefined;
+      }
+    | undefined;
   answer?:
     | {
         evidence?:

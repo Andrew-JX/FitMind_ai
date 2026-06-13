@@ -4198,3 +4198,24 @@ Verification:
 Notes:
 - 这一批不改任何线上行为（agent 还没被 orchestrator 调用）。Batch 2 接线 + SSE 事件 + 契约文档；Batch 3 前端 trace 时间线。
 - 期间还顺手去掉了 FAB 的"长按"小标（保留脉冲光环），见上一条 commit。
+
+## 2026-06-14 Phase 6.0 Batch 2 - 多步 ReAct agent 接线 + SSE 事件
+
+把 Batch 1 的 agent 核心接进助手流，next_week_plan 线上即走多步规划。
+
+后端：
+- `assistant-stream-types.ts`：state 加 `planning`；新增 `agent_step_started`（index/kind/title/thought/tool_name）与 `agent_step_finished`（index/status/duration_ms/observation）事件。
+- `assistant-orchestrator-service.ts`：`intent === "next_week_plan"` 早返回到 `runNextWeekPlanAgentTurn`——发 provider_selected + state:planning，跑 `runNextWeekPlanAgent`，注入 `runTool=executeAiTool`、`retrieve=retrieveKnowledgeChunks`(包一层 logRetrievalEvent)、`onStep→SSE`；trace 写进 `MockAssistantTurnResponseData.agent_trace`，随 structured_output 持久化。tool 校验失败 → 400，其它 → AGENT_ERROR 并发 error 事件。删掉旧单轮 `buildNextWeekPlanAnswer` 与其 provider 分支（已死代码）。
+
+前端：
+- `assistant-types.ts`：status/state 加 `planning`；AssistantStreamEvent 加两个 agent_step 事件；新增 `AssistantAgentTrace`/`AssistantAgentTraceStep` 类型；`AssistantChatMessage.agentTrace`；`AssistantStructuredOutput.agent_trace`。
+- `use-assistant-chat.ts`：agent_step_started→setStatus(planning)+upsert 运行中步骤；finished→patch 步骤状态/观察；structured_output 额外把 `agent_trace` 映射到 message.agentTrace（权威值）；**关键修复**：末尾 else 原本把任何未识别事件当成 error（读 event.message），改成只处理 `type==="error"`、未知事件忽略——否则新事件会打挂旧客户端。
+- `AssistantStatusRail.tsx`：planning 复用 thinking pill + 加规划文案（避免改动 shared 的 StatusPill 枚举）。
+
+Verification:
+- `pnpm type-check`、`pnpm lint`、`pnpm test:unit`（191）：通过。
+- 真机验证：助手里问"帮我规划下周训练"（mode=next_week_plan 或自动路由命中），应看到 planning 状态 + 多步事件；trace 暂未渲染（Batch 3 做时间线 UI），但答案与证据已是多步聚合结果。
+
+Notes:
+- 客户端与服务端同批改，保证部署任一时刻不破（旧客户端遇新事件已能忽略）。
+- Batch 3：`AssistantAgentTrace.tsx` 时间线 + 挂载渲染。

@@ -400,6 +400,34 @@ data: {"code":"AI_PROVIDER_ERROR","message":"upstream timeout"}
 
 - 这个接口不能用 `EventSource`（GET-only），必须 fetch + ReadableStream
 - 鉴权用 `Authorization` header（同其他接口）
+
+> 实现说明：当前线上端点是 `POST /api/assistant/stream-turn`，实际事件名是
+> `state` / `session` / `provider_selected` / `tool_call_started` / `tool_call_finished` /
+> `answer_delta` / `structured_output` / `done` / `error`（上方示例是早期草案命名，待整段重写）。
+
+**多步 Agent 事件（Phase 6.0，`next_week_plan` intent）**：
+
+`next_week_plan` 走多步 ReAct 规划器，额外发以下事件，并新增 `state: "planning"`：
+
+```
+event: state
+data: {"state":"planning"}
+
+event: agent_step_started
+data: {"index":1,"kind":"tool","title":"查训练容量","thought":"...","tool_name":"get_weekly_training_report"}
+
+event: agent_step_finished
+data: {"index":1,"status":"success","duration_ms":12,"observation":"训练 4 次 / 40 组；约每周 4 次；..."}
+
+...（找弱项 / 查进展 / 检索知识 / 生成草案，共最多 5 步）
+
+event: structured_output
+data: {"intent":"next_week_plan","answer":{...},"agent_trace":{"goal":"...","max_steps":5,"stop_reason":"completed","steps":[...]}}
+```
+
+- `kind`：`tool` | `retrieval` | `synthesis`；`status`：`success` | `error` | `skipped`。
+- `agent_trace` 随 `structured_output` 一并持久化到消息，可在历史里重渲染 trace 时间线。
+- 前端对未知事件类型必须**忽略**（向前兼容），不能当成错误处理。
 - 客户端可通过 `AbortController` 中断；后端要妥善处理 connection close
 
 ### GET /api/sessions

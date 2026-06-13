@@ -1,6 +1,6 @@
 import { Badge } from "../../components/Badge";
 import { Card } from "../../components/Card";
-import { StatusPill } from "../../components/StatusPill";
+import { StatusPill, type StatusTone } from "../../components/StatusPill";
 import { useTheme } from "../../theme/ThemeContext";
 import type { AssistantChatStatus, AssistantProvider } from "./assistant-types";
 
@@ -18,7 +18,7 @@ export function AssistantStatusRail(props: AssistantStatusRailProps) {
       <div style={topRowStyle}>
         <div>
           <p style={labelStyle(theme)}>当前状态</p>
-          <StatusPill status={props.status} />
+          <StatusPill status={toPillTone(props.status)} />
         </div>
         <div style={metaColumnStyle}>
           <Badge tone="analysis">{formatProvider(props.provider)}</Badge>
@@ -44,6 +44,11 @@ function formatProvider(provider: AssistantProvider | null): string {
   return "准备中";
 }
 
+function toPillTone(status: AssistantChatStatus): StatusTone {
+  // The status rail has no dedicated planning tone; reuse the thinking pill.
+  return status === "planning" ? "thinking" : status;
+}
+
 function getStatusCopy(status: AssistantChatStatus): string {
   if (status === "idle") {
     return "准备好了，可以开始新的训练问题。";
@@ -51,6 +56,10 @@ function getStatusCopy(status: AssistantChatStatus): string {
 
   if (status === "thinking") {
     return "正在理解问题，并准备查看相关训练记录。";
+  }
+
+  if (status === "planning") {
+    return "正在多步规划：依次查看训练量、弱项和进展。";
   }
 
   if (status === "tool_calling") {

@@ -81,8 +81,8 @@
 分批推进：
 
 - **Batch 6.0-1 — 后端 agent 核心　✅ 2026-06-14**：新增 `server/src/services/agent/`：`react-planner-types.ts`（trace / step / 事件类型）+ `next-week-plan-agent.ts`（确定性 ReAct 策略，注入 `runTool`/`retrieve`/`onStep`/`now`，可单测）+ 4 例单测。策略基于观察分支：空数据第一步即停（`no_data`）；无指定动作则跳过单动作进展；按周频率给"巩固/加量/维持"建议；证据跨步聚合。尚未接入 orchestrator。
-- **Batch 6.0-2 — 接线 + SSE 契约**：`assistant-stream-types.ts` 加 `agent_step_started/finished` 事件 + `planning` 状态；`assistant-orchestrator-service.ts` 把 `next_week_plan` 改走 agent，trace 进 `structured_output`；更新 `api-contract.md` / `ai-decisions.md`。
-- **Batch 6.0-3 — 前端 trace 可视化**：`assistant-types.ts` + `use-assistant-chat.ts` 接事件累积 trace，新增 `AssistantAgentTrace.tsx` 时间线，挂载渲染。
+- **Batch 6.0-2 — 接线 + SSE 契约　✅ 2026-06-14**：`assistant-stream-types.ts` 加 `planning` 状态 + `agent_step_started/finished` 事件；`assistant-orchestrator-service.ts` 把 `next_week_plan` 改走 agent（早返回分支，注入 `executeAiTool`/`retrieveKnowledgeChunks`+log/`onStep→SSE`），trace 进 `structured_output` 并持久化，删掉旧单轮 `buildNextWeekPlanAnswer`；客户端 `assistant-types.ts`/`use-assistant-chat.ts` 接事件累积 trace + 未知事件忽略（向前兼容），`AssistantStatusRail` 加 planning 文案；`api-contract.md` + `ai-decisions.md`（D20）已更。
+- **Batch 6.0-3 — 前端 trace 可视化**：新增 `AssistantAgentTrace.tsx` 时间线组件，在消息气泡里挂载渲染 `message.agentTrace`（thought→action→observation + 状态）。
 
 ---
 

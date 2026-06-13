@@ -529,3 +529,21 @@ CSRF 立场：
 
 Out of scope（本次不做）：
 - access/refresh 双 token 轮转、token 黑名单/吊销、多设备会话管理、CSRF token、把鉴权切到独立鉴权服务。
+
+## [D20] Phase 6.0 多步 ReAct 训练计划 agent（next_week_plan）
+
+- **Date**: 2026-06-14
+- **Status**: Accepted（Batch 1 核心 + Batch 2 接线已落地，Batch 3 前端可视化进行中）
+
+背景：
+- 原 `next_week_plan` 是单轮：provider 选 1 个工具（get_weekly_training_report）→ 执行 → RAG → 拼装答案。要把项目从 "Tool Calling" 推进到 "Agent"，需要多步循环 + trace 可视化（PROJECT_BRIEF 扩展 C / roadmap §3）。
+
+Decision：
+- 新增 `server/src/services/agent/`，对 `next_week_plan` intent 用**确定性 ReAct 策略**（非 LLM 选工具）跑多步：查容量(get_weekly_training_report) → 找弱项(get_recommendation_context) → 查进展(get_exercise_progress，仅在指定动作时，否则记 skipped 步) → 检索知识(RAG) → 生成草案(synthesis)。
+- 为何确定性而非让模型自由编排：与项目"不套壳、证据绑定、mock-first 可离线可单测"的定位一致；多步循环 + thought→action→observation 的 trace + 跨步证据聚合本身就是 Agent 的价值，步骤选择是否由 LLM 驱动可后续在 anthropic provider 上叠加。
+- 策略基于观察分支：空数据第一步即停（stop_reason=no_data）；按周训练频率给"巩固/加量/维持"建议（阈值 HIGH=5、LOW=2 次/周，命名 module 常量）；次要工具失败不致命（记 error 步后继续合成）。
+- 依赖注入（runTool/retrieve/onStep/now），agent 不直接碰 DB，便于单测；orchestrator 注入 `executeAiTool` 与 `retrieveKnowledgeChunks`（后者包一层 logRetrievalEvent 保留可观测性）。
+- SSE 新增 `state:"planning"` + `agent_step_started` / `agent_step_finished` 事件；`agent_trace` 随 `structured_output` 持久化进消息，历史可重渲染。前端对未知事件类型一律忽略（向前兼容），避免新事件打挂旧客户端。
+
+Out of scope（本次不做）：
+- 让 LLM 自由决定下一步工具（真正的开放式 ReAct）；多 intent 共用 agent；agent 步数上限自适应；trace 落独立表（现仅存在消息 structuredOutput 里）。

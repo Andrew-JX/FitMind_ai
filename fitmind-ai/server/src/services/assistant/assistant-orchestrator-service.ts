@@ -12,6 +12,8 @@ import {
   AiToolValidationError,
   isValidDateOnly,
 } from "../ai/tools/tool-types.js";
+import { runNextWeekPlanAgent } from "../agent/next-week-plan-agent.js";
+import type { AgentTrace } from "../agent/react-planner-types.js";
 import { runAssistantProvider } from "./provider-adapter.js";
 import { getConfiguredAssistantProvider } from "./provider-config.js";
 import {
@@ -222,6 +224,7 @@ export interface MockAssistantTurnResponseData {
     duration_ms: number;
   }>;
   answer: AssistantStructuredAnswer;
+  agent_trace?: AgentTrace | undefined;
 }
 
 interface PersistedTextBlock {
@@ -502,50 +505,6 @@ function buildPlateauDiagnosisAnswer(input: {
     limitations: [
       "这是基于训练数据的诊断，不是医疗建议或专业教练处方。",
       "疼痛、伤病、睡眠、酸痛和动作质量无法完全从训练日志中判断。",
-    ],
-  };
-}
-
-function buildNextWeekPlanAnswer(input: {
-  result: WeeklyTrainingReportResult;
-  sources: Awaited<ReturnType<typeof retrieveKnowledgeChunks>>;
-}): AssistantStructuredAnswer {
-  const evidence = buildEvidence("get_weekly_training_report", input.result);
-  const topMuscleGroup = input.result.top_muscle_groups[0];
-  const lowVolumeGroup = input.result.low_volume_muscle_groups[0];
-  const sources = input.sources.map((source) => ({
-    id: source.id,
-    title: source.title,
-    category: source.category,
-    chunk_text: source.chunk_text,
-    source_type: source.source_type,
-    tags: source.tags,
-  }));
-
-  return {
-    summary:
-      "下面是一份基于你的训练 Evidence 和训练知识 Sources 的保守下周训练草案。请把它当作规划草案，而不是处方。",
-    bullets: [
-      `周结构先接近当前基线：所选范围内记录了 ${input.result.totals.workout_count} 次训练和 ${input.result.totals.set_count} 组。`,
-      topMuscleGroup
-        ? `已经占比较高的肌群是 ${topMuscleGroup.muscle_group_name}，下周不要再大幅加量。`
-        : "当前没有明显占比最高的肌群，下周草案可以保持均衡。",
-      lowVolumeGroup
-        ? `记录较少的肌群是 ${lowVolumeGroup.muscle_group_name}，可以小幅、可控地补一点关注。`
-        : "当前没有明显低记录量肌群，按正常均衡训练安排即可。",
-      "大多数训练保持中等努力，一次只改一个变量：组数、重量、次数或休息。",
-    ],
-    conclusion:
-      "更安全的产品行为是给出基于 Evidence 和 Sources 的下一步草案，而不是完整训练处方。",
-    recommendation:
-      "下周可以保持相近频率，略微改善分布，并只设定一个重点推进目标。记录完下一周后再复盘。",
-    evidence,
-    sources,
-    intent: "next_week_plan",
-    limitations: [
-      "这不是医疗建议、康复指导或专业教练处方。",
-      "如果出现疼痛、麻木或异常疲劳，不要硬按草案执行。",
-      "这份草案只反映已记录训练和检索到的通用训练知识。",
     ],
   };
 }
@@ -1168,6 +1127,16 @@ export async function runMockAssistantTurn(
     return response;
   }
 
+  if (intent === "next_week_plan") {
+    return runNextWeekPlanAgentTurn({
+      userId,
+      input,
+      intent,
+      sessionId: resolvedSession.sessionId,
+      options,
+    });
+  }
+
   const providerRequest = buildProviderRequest(input, executionMode);
 
   await emitEvent(options, {
@@ -1297,26 +1266,6 @@ export async function runMockAssistantTurn(
         result: result as ExerciseProgressResult,
         sources,
       });
-    } else if (intent === "next_week_plan") {
-      await emitEvent(options, {
-        type: "state",
-        state: "retrieving",
-      });
-      const sources = await retrieveKnowledgeChunks(
-        `${input.message} 训练容量 渐进超负荷 deload`,
-      );
-
-      logRetrievalEvent({
-        intent,
-        retrievalMode: sources[0]?.retrieval_mode ?? "fallback",
-        sources,
-        fallbackReason: sources.length === 0 ? "no_sources" : undefined,
-      });
-
-      answer = buildNextWeekPlanAnswer({
-        result: result as WeeklyTrainingReportResult,
-        sources,
-      });
     } else {
       answer = normalizeStructuredAnswer(
         buildToolAnswer(
@@ -1358,6 +1307,128 @@ export async function runMockAssistantTurn(
     type: "done",
     message_id: messageId,
     session_id: resolvedSession.sessionId,
+  });
+
+  return response;
+}
+
+async function runNextWeekPlanAgentTurn(args: {
+  userId: string;
+  input: MockAssistantTurnInput;
+  intent: AssistantRoutedIntent;
+  sessionId: string;
+  options: AssistantStreamOptions | undefined;
+}): Promise<MockAssistantTurnResponseData> {
+  const { userId, input, intent, sessionId, options } = args;
+
+  await emitEvent(options, {
+    type: "provider_selected",
+    provider: getConfiguredAssistantProvider(),
+  });
+  await emitEvent(options, {
+    type: "state",
+    state: "planning",
+  });
+
+  let agentOutput: Awaited<ReturnType<typeof runNextWeekPlanAgent>>;
+
+  try {
+    agentOutput = await runNextWeekPlanAgent(
+      {
+        message: input.message,
+        startDate: input.start_date,
+        endDate: input.end_date,
+        exerciseId: input.exercise_id ?? null,
+      },
+      {
+        runTool: (toolName, toolArgs) =>
+          executeAiTool({ userId }, toolName, toolArgs),
+        retrieve: async (query) => {
+          const sources = await retrieveKnowledgeChunks(query);
+
+          logRetrievalEvent({
+            intent,
+            retrievalMode: sources[0]?.retrieval_mode ?? "fallback",
+            sources,
+            fallbackReason: sources.length === 0 ? "no_sources" : undefined,
+          });
+
+          return sources;
+        },
+        onStep: async (event) => {
+          if (event.phase === "started") {
+            await emitEvent(options, {
+              type: "agent_step_started",
+              index: event.index,
+              kind: event.kind,
+              title: event.title,
+              thought: event.thought,
+              tool_name: event.tool_name,
+            });
+            return;
+          }
+
+          await emitEvent(options, {
+            type: "agent_step_finished",
+            index: event.index,
+            status: event.status,
+            duration_ms: event.duration_ms,
+            observation: event.observation,
+          });
+        },
+      },
+    );
+  } catch (error) {
+    if (error instanceof AiToolValidationError) {
+      await emitEvent(options, {
+        type: "error",
+        code: error.code,
+        message: error.message,
+      });
+
+      throw createValidationHttpError(error);
+    }
+
+    const message =
+      error instanceof Error ? error.message : "Next-week-plan agent failed.";
+
+    await emitEvent(options, {
+      type: "error",
+      code: "AGENT_ERROR",
+      message,
+    });
+
+    throw error;
+  }
+
+  await emitAnswerEvents(agentOutput.answer, options);
+
+  const response: MockAssistantTurnResponseData = {
+    session_id: sessionId,
+    mode: input.mode,
+    assistant_type: "deterministic_mock",
+    intent,
+    tool_calls: agentOutput.tool_calls,
+    answer: agentOutput.answer,
+    agent_trace: agentOutput.trace,
+  };
+
+  const messageId = await persistMockTurnMessages({
+    sessionId,
+    request: input,
+    response,
+  });
+  response.message_id = messageId;
+
+  await emitEvent(options, {
+    type: "structured_output",
+    output: response,
+  });
+
+  await emitEvent(options, {
+    type: "done",
+    message_id: messageId,
+    session_id: sessionId,
   });
 
   return response;
