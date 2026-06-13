@@ -315,6 +315,7 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
           title="语音追加动作"
         >
           <WorkoutIntakePanel
+            exerciseLibraryProps={props.exerciseLibraryProps}
             onDraftParsed={handleAppendIntakeDraft}
             token={props.token}
           />

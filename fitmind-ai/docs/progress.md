@@ -4153,3 +4153,18 @@ Verification:
 Notes:
 - roadmap §1.6 任务 B 完成；任务 A（配 Groq）用户已在 Vercel 配好。
 - 任务 C（未匹配动作在确认页搜词典替换）仍未做。
+
+## 2026-06-13 录入确认页 - 未匹配动作支持"搜动作库替换"（roadmap §1.6 任务 C）
+
+之前语音/文本录入的"确认识别到的动作"页里，未识别（无候选）的动作只能"移除"。本批次加了"搜动作库替换"入口，复用现成的 `ExerciseLibraryScreen`（与 composer 内"替换动作"同一套 UI）。
+
+改动：
+- `WorkoutIntakePanel.tsx`：新增 `exerciseLibraryProps: ExercisePickerProps` prop 与 `searchingIndex` 状态。未匹配分支加"搜动作库替换"主按钮、多候选分支加"都不是？搜动作库"次入口；点开后用 `createPortal` 在 body 上挂一个 `position:fixed inset:0`（z-index 顶格）的全屏壳渲染 `ExerciseLibraryScreen`（`mode="replace"`，自带 `onSearch` 懒加载词典），选中即 `chooseCandidate(index, id, name)` 把该行确认为 matched。`closeResolution` 一并清 `searchingIndex`。
+- `TrainingView.tsx` / `TrainingSessionComposer.tsx`：两处调用点传入 `exerciseLibraryProps`（分别来自 `props.exercisePickerProps` 与 `props.exerciseLibraryProps`）。
+
+Verification:
+- `pnpm type-check`、`pnpm lint`、`pnpm test:unit`（187）：通过。
+- 无新增纯函数逻辑，未加单测；交互需手测（确认页点"搜动作库替换"→ 选动作 → 该行变"已选择" → 加入训练）。
+
+Notes:
+- roadmap §1.6 任务 C 完成。任务 B（手势 FAB）同日已上线；本次 B+C 一起部署便于手机端联测。

@@ -50,8 +50,8 @@
   - composer 右下"+"：长按震动 + 视觉提示 → 上滑=语音追加、右滑=动作库；点按/键盘保留开动作库。
   - 语音解析结果**追加到当前 draft**（合并同动作组 / 新动作追加 / id 重排），复用 `WorkoutIntakePanel` 候选确认流。
   - 余项（可选后续）：上滑即自动录音（给 `WorkoutIntakePanel` 加 `autoStart`）。
-- **C. 录入确认页：未匹配动作支持"搜动作库替换"** 🟡
-  - 现在未匹配（无候选）只能"移除"；加一个在确认页直接搜词典选动作的入口。
+- **C. 录入确认页：未匹配动作支持"搜动作库替换"** ✅ 2026-06-13 完成
+  - 未匹配分支加"搜动作库替换"、多候选分支加"都不是？搜动作库"，复用 `ExerciseLibraryScreen`（`mode="replace"`，portal 全屏）选词典动作即确认为 matched。
 - **D. 性能精确数字回填** 🟢
   - 按 `production-smoke-checklist.md` 的 Lighthouse/远程调试流程实测 `§11`，回填结果表 + README + 面试稿。
 - **E. Prettier 格式欠债（~118 文件）** ⚪

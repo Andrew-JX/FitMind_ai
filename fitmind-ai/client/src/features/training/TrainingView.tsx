@@ -73,6 +73,7 @@ export function TrainingView(props: TrainingViewProps) {
         title="语音记录训练"
       >
         <WorkoutIntakePanel
+          exerciseLibraryProps={props.exercisePickerProps}
           onDraftParsed={(draft) => {
             setPendingInitialDraft(
               mapWorkoutIntakeDraftToSessionInitialDraft(

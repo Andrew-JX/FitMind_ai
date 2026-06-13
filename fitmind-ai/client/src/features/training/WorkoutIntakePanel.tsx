@@ -1,10 +1,16 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
+
+import type { ExercisePickerProps } from "./ExercisePicker";
+import type { DictionaryExercise } from "./dictionary-api";
 
 import { ActionSheet } from "../../components/ActionSheet";
 import { Button } from "../../components/Button";
 import { Icon } from "../../components/Icon";
 import { StateNotice } from "../../components/StateNotice";
 import { useTheme } from "../../theme/ThemeContext";
+import { ExerciseLibraryScreen } from "./ExerciseLibraryScreen";
+import { getExerciseDisplayName } from "./exercise-display";
 import { appendSpeechTranscript } from "./speech-recognition-utils";
 import { useSpeechRecognition } from "./use-speech-recognition";
 import {
@@ -19,6 +25,7 @@ type ExerciseResolution =
   | { type: "remove" };
 
 export interface WorkoutIntakePanelProps {
+  exerciseLibraryProps: ExercisePickerProps;
   onDraftParsed: (draft: WorkoutIntakeDraft) => void;
   token: string | null;
 }
@@ -33,7 +40,9 @@ const COPY = {
   resolveHelp: "有动作需要先确认是哪一个，确认后才会加入训练记录。",
   resolveApply: "加入训练",
   resolveAmbiguous: "请选择具体动作：",
-  resolveUnmatched: "没有识别到标准动作，可移除该动作。",
+  resolveUnmatched: "没有识别到标准动作，可在动作库中选择，或移除该动作。",
+  resolveSearch: "搜动作库替换",
+  resolveSearchOther: "都不是？搜动作库",
   resolveRemove: "移除",
   resolveReselect: "重选",
   resolveMatched: "已匹配",
@@ -70,6 +79,7 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
     Record<number, ExerciseResolution>
   >({});
   const [resolveError, setResolveError] = useState<string | null>(null);
+  const [searchingIndex, setSearchingIndex] = useState<number | null>(null);
   const speechRecognition = useSpeechRecognition();
 
   const isBusy = status === "parsing";
@@ -139,6 +149,15 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
     }));
   }
 
+  function handleSelectLibraryExercise(exercise: DictionaryExercise) {
+    if (searchingIndex === null) {
+      return;
+    }
+
+    chooseCandidate(searchingIndex, exercise.id, getExerciseDisplayName(exercise));
+    setSearchingIndex(null);
+  }
+
   function clearResolution(index: number) {
     setResolveError(null);
     setResolutions((current) => {
@@ -193,6 +212,7 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
     setPendingDraft(null);
     setResolutions({});
     setResolveError(null);
+    setSearchingIndex(null);
   }
 
   function handleVoiceStart() {
@@ -457,26 +477,43 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
                         </Button>
                       ))}
                     </div>
-                    <button
-                      onClick={() => removeExerciseAt(index)}
-                      style={resolveLinkStyle(theme)}
-                      type="button"
-                    >
-                      {COPY.resolveRemove}
-                    </button>
+                    <div style={resolveUnmatchedActionsStyle}>
+                      <button
+                        onClick={() => setSearchingIndex(index)}
+                        style={resolveLinkStyle(theme)}
+                        type="button"
+                      >
+                        {COPY.resolveSearchOther}
+                      </button>
+                      <button
+                        onClick={() => removeExerciseAt(index)}
+                        style={resolveLinkStyle(theme)}
+                        type="button"
+                      >
+                        {COPY.resolveRemove}
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div style={resolveChoicesStyle}>
                     <span style={{ color: theme.colors.orange, fontSize: 12 }}>
                       {COPY.resolveUnmatched}
                     </span>
-                    <Button
-                      onClick={() => removeExerciseAt(index)}
-                      type="button"
-                      variant="secondary"
-                    >
-                      {COPY.resolveRemove}
-                    </Button>
+                    <div style={resolveCandidateGridStyle}>
+                      <Button
+                        onClick={() => setSearchingIndex(index)}
+                        type="button"
+                      >
+                        {COPY.resolveSearch}
+                      </Button>
+                      <Button
+                        onClick={() => removeExerciseAt(index)}
+                        type="button"
+                        variant="secondary"
+                      >
+                        {COPY.resolveRemove}
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -577,6 +614,22 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
           ) : null}
         </div>
       </ActionSheet>
+
+      {searchingIndex !== null
+        ? createPortal(
+            <div style={libraryOverlayStyle}>
+              <ExerciseLibraryScreen
+                {...props.exerciseLibraryProps}
+                isOpen
+                mode="replace"
+                onClose={() => setSearchingIndex(null)}
+                onSelectExercise={handleSelectLibraryExercise}
+                token={props.token}
+              />
+            </div>,
+            document.body,
+          )
+        : null}
     </>
   );
 }
@@ -673,6 +726,19 @@ const resolveStatusRowStyle: React.CSSProperties = {
 const resolveChoicesStyle: React.CSSProperties = {
   display: "grid",
   gap: 8,
+};
+
+const resolveUnmatchedActionsStyle: React.CSSProperties = {
+  alignItems: "center",
+  display: "flex",
+  gap: 12,
+  justifyContent: "flex-end",
+};
+
+const libraryOverlayStyle: React.CSSProperties = {
+  inset: 0,
+  position: "fixed",
+  zIndex: 2147483647,
 };
 
 const resolveCandidateGridStyle: React.CSSProperties = {
