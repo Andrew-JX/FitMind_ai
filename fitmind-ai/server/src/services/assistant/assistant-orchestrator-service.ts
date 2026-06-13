@@ -13,7 +13,10 @@ import {
   isValidDateOnly,
 } from "../ai/tools/tool-types.js";
 import { runNextWeekPlanAgent } from "../agent/next-week-plan-agent.js";
-import type { AgentTrace } from "../agent/react-planner-types.js";
+import type {
+  AgentTrace,
+  NextWeekPlanDraft,
+} from "../agent/react-planner-types.js";
 import {
   enforceFaithfulnessInDev,
   verifyAnswerFaithfulness,
@@ -231,6 +234,7 @@ export interface MockAssistantTurnResponseData {
   answer: AssistantStructuredAnswer;
   agent_trace?: AgentTrace | undefined;
   faithfulness?: AnswerFaithfulnessResult | undefined;
+  plan?: NextWeekPlanDraft | undefined;
 }
 
 interface PersistedTextBlock {
@@ -1442,6 +1446,7 @@ async function runNextWeekPlanAgentTurn(args: {
     answer: agentOutput.answer,
     agent_trace: agentOutput.trace,
     faithfulness,
+    plan: agentOutput.plan,
   };
 
   const messageId = await persistMockTurnMessages({

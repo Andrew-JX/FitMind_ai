@@ -14,7 +14,12 @@ import type {
   NextWeekPlanAgentDeps,
   NextWeekPlanAgentInput,
   NextWeekPlanAgentOutput,
+  ProgressionMode,
 } from "./react-planner-types.js";
+import {
+  generateNextWeekPlan,
+  type NextWeekPlanGeneratorInput,
+} from "./next-week-plan-generator.js";
 
 const AGENT_GOAL = "基于训练记录与知识，规划一份保守的下周训练草案";
 const AGENT_MAX_STEPS = 5;
@@ -22,8 +27,6 @@ const AGENT_MAX_STEPS = 5;
 const HIGH_WEEKLY_FREQUENCY = 5;
 /** workouts/week at or below this leaves room to add a session. */
 const LOW_WEEKLY_FREQUENCY = 2;
-
-type ProgressionMode = "consolidate" | "add_frequency" | "maintain";
 
 interface StepAccumulator {
   steps: AgentTraceStep[];
@@ -127,10 +130,57 @@ export async function runNextWeekPlanAgent(
     sources,
   });
 
+  // Structured executable draft (动作 × 组 × 次 × 目标重量); rides on structured_output.
+  const plan = generateNextWeekPlan(
+    buildGeneratorInput({ weeklyResult, weakArea, progressionMode, progressResult }),
+  );
+
   return {
     trace: buildTrace(accumulator.steps, "completed"),
     tool_calls: accumulator.toolCalls,
     answer,
+    plan,
+  };
+}
+
+function buildGeneratorInput(context: {
+  weeklyResult: unknown;
+  weakArea: string | null;
+  progressionMode: ProgressionMode;
+  progressResult: unknown;
+}): NextWeekPlanGeneratorInput {
+  const weekly = asRecord(context.weeklyResult);
+  const topExercises = asArray(weekly?.top_exercises)
+    .map((item) => {
+      const record = asRecord(item);
+      const exerciseName = readString(record?.exercise_name);
+
+      return exerciseName === null
+        ? null
+        : { exerciseName, setCount: readNumber(record?.set_count) ?? 0 };
+    })
+    .filter(
+      (item): item is { exerciseName: string; setCount: number } =>
+        item !== null,
+    );
+
+  const progress = asRecord(context.progressResult);
+  const exercise = asRecord(progress?.exercise);
+  const totals = asRecord(progress?.totals);
+  const focusName = readString(exercise?.exercise_name);
+
+  return {
+    progressionMode: context.progressionMode,
+    weakArea: context.weakArea,
+    topExercises,
+    focusExercise:
+      focusName === null
+        ? null
+        : {
+            exerciseName: focusName,
+            estimated1RmKg: readNumber(totals?.estimated_1rm_kg),
+            maxWeightKg: readNumber(totals?.max_weight_kg),
+          },
   };
 }
 

@@ -38,10 +38,37 @@ export interface AgentToolCallSummary {
   duration_ms: number;
 }
 
+/** How next week leans relative to the recent baseline (drives sets + guidance). */
+export type ProgressionMode = "consolidate" | "add_frequency" | "maintain";
+
+/** One prescribed exercise in the executable draft. `target_weight_kg` is null when no weight baseline exists (never fabricated). */
+export interface PlannedExercise {
+  exercise_name: string;
+  sets: number;
+  rep_min: number;
+  rep_max: number;
+  target_weight_kg: number | null;
+  basis: string;
+}
+
+/**
+ * Deterministic executable next-week draft (动作 × 组 × 次 × 目标重量).
+ *
+ * Structured-only: it rides on `structured_output`, never inlined into the
+ * answer text, so the Slice 1 faithfulness check does not see its derived
+ * numbers. 先不落库（this slice does not persist it as a planned-workout model）.
+ */
+export interface NextWeekPlanDraft {
+  strategy: ProgressionMode;
+  exercises: PlannedExercise[];
+  notes: string[];
+}
+
 export interface NextWeekPlanAgentOutput {
   trace: AgentTrace;
   tool_calls: AgentToolCallSummary[];
   answer: AssistantStructuredAnswer;
+  plan?: NextWeekPlanDraft | undefined;
 }
 
 /** Live event emitted while the loop runs, mirroring the persisted trace steps. */

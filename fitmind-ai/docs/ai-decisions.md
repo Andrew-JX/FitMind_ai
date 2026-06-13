@@ -595,3 +595,25 @@ Decision：
 
 Out of scope（本次不做）：
 - 真正注入 LLM judge 跑叙述质量（等接真实模型）；把 eval 接进 CI workflow（先本地可跑）；mustCiteEvidence 的"端到端真出 evidence"校验（需 orchestrator + DB，当前以路由层近似）。
+
+## [D23] 可执行下周计划生成器（next-week-plan-generator，Slice 3）
+
+- **Date**: 2026-06-14
+- **Status**: Accepted（纯函数生成器 + 单测 + 接入 agent synthesis + structured_output 已落地；先不落库）
+
+背景：
+- 产品闭环第一步：助手不该只解释数据，还要给出**可执行**的下周方案（动作 × 组 × 次 × 目标重量）。这是 PM 维度的产品价值，也要守住"证据绑定、确定性、不编造"的定位。
+
+Decision：
+- 新增 `server/src/services/agent/next-week-plan-generator.ts`：纯函数 `generateNextWeekPlan(input) → NextWeekPlanDraft`，输入是从 weekly report / exercise progress 提取后的干净结构（progressionMode / weakArea / topExercises / focusExercise 的重量基线），无 LLM、无 DB、可单测。
+- **方案合成规则（确定性，命名常量）**：每个动作 `sets` 由进展策略决定（`SETS_BY_MODE`：consolidate/maintain=3、add_frequency=4）；次数区间固定 `WORKING_REP_MIN~MAX`=6~10；focus 动作目标重量 = 取整(估算 1RM × `TARGET_INTENSITY_PCT_OF_1RM`=0.72) 到 `WEIGHT_ROUNDING_KG`=2.5kg；无 1RM 时退化用近期最高重量，再无基线则 `target_weight_kg=null` 并提示"沿用上次重量"。最多 `MAX_PLANNED_EXERCISES`=4 个动作。
+- **绝不编造重量**：没有真实重量基线就给 null + 文案提示，而不是凭空算一个 kg。这是定位的硬约束。
+- **结构化、不内联进答案文本**：草案作为 `NextWeekPlanDraft` 挂在 agent 输出 → `MockAssistantTurnResponseData.plan` → `structured_output`（与 `agent_trace`/`faithfulness` 同款 optional 字段），**不**写进 answer 的 summary/bullets。这样 Slice 1 的 faithfulness 数字扫描看不到这些**派生**目标重量，不会误标——派生数字本就不在工具输出里。这是与 D21 的关键交互。
+- **先不落库**：本片只生成 + 结构化展示（structured_output 持久化随消息），不引入 planned-workout 数据模型、不接"接受计划"。那是 Slice 5。
+- ProgressionMode 类型从 agent 内部提升到 `react-planner-types.ts` 共享给生成器。
+
+与未来的关系：
+- Slice 4（运动员档案）会把目标 / 器械 / 伤病喂进生成器输入，让 sets/强度/动作选择更个性化更安全；Slice 5 把本草案接成 app 里的「计划训练」并记录依从度。生成器的纯函数签名预留了 `(+ 档案)` 扩展位。
+
+Out of scope（本次不做）：
+- 前端结构化渲染草案卡片；落库为 planned workout；按器械 / 伤病约束筛动作；多动作各自的 1RM 基线（weekly top_exercises 不带单动作重量，故非 focus 动作目标重量保持 null）。

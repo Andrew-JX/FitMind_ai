@@ -136,9 +136,11 @@ saved-insight 分享链接、知识管理后台、离线编辑 / 同步。优先
   - 价值：AI 面试↑↑↑（"你怎么知道它对/不回归"的标准答案）｜成本：低-中（主要是写数据集）｜依赖：复用 Slice 1 的校验器作为 faithfulness 打分。
   - 验收：✅ `pnpm eval` 产出可读报告（每项通过/失败 + 汇总分）；✅ mock 可复现数据集（无 DB）；✅ 回归非零退出；✅ 门禁全绿（209 单测）。
 
-- **Slice 3 — 可执行下周计划·生成器（产品 #1，闭环第一步）　🟠**
+- **Slice 3 — 可执行下周计划·生成器（产品 #1，闭环第一步）　✅ 2026-06-14 完成**
   - 纯函数 `weekly + progress (+ 档案) → 具体方案（动作 × 组 × 次 × 目标重量）`，先在助手答案 / agent synthesis 里结构化展示，**先不落库**。可单测。
+  - 落地：新增 `server/src/services/agent/next-week-plan-generator.ts`（`generateNextWeekPlan` 纯函数：sets 由策略定、6~10 次、focus 目标重量=取整(估算1RM×72%)到2.5kg、无基线给 null 不编造、最多 4 动作，全命名常量）+ 6 例单测；接入 `next-week-plan-agent.ts` synthesis，`NextWeekPlanDraft` 经 agent 输出 → `MockAssistantTurnResponseData.plan` → structured_output 持久化（结构化、不内联进答案文本，故不触发 Slice 1 faithfulness 误标）。决策见 `ai-decisions.md` D23。
   - 价值：产品↑↑ / PM 面试↑｜成本：中｜依赖：6.0 agent 已有。
+  - 后续：前端结构化渲染草案卡片；档案注入（Slice 4）；落库 + 依从度（Slice 5）。
 
 - **Slice 4 — 运动员档案（薄）+ 注入 agent　🟡**
   - 目标 / 每周天数 / 器械 / 伤病约束，持久化 + CRUD + 注入 agent 上下文。

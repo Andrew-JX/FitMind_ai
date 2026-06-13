@@ -4276,3 +4276,27 @@ Notes:
 - 与 server 已有的 `eval`（rag-eval，DB-backed 检索质量）并存互不影响；新套件挂根 `pnpm eval`，是无 DB 的助手层 eval。
 - LLM-as-judge 留 seam 默认 off；接真实 provider（Slice 7）后注入即可给叙述质量打分。
 - 下一片：§8 Slice 3（可执行下周计划生成器，纯函数 weekly+progress→具体方案，先不落库）。
+
+## 2026-06-14 §8 Slice 3 - 可执行下周计划生成器
+
+产品闭环第一步：助手不只解释数据，还给出可执行的下周方案（动作 × 组 × 次 × 目标重量）。纯函数、确定性、不编造、先不落库。详见 `ai-decisions.md` D23。
+
+改动：
+- `server/src/services/agent/next-week-plan-generator.ts`（新）：`generateNextWeekPlan(input) → NextWeekPlanDraft`。sets 由 `SETS_BY_MODE`（consolidate/maintain=3、add_frequency=4）；次数固定 6~10；focus 目标重量=取整(估算1RM×`TARGET_INTENSITY_PCT_OF_1RM`=0.72)到 `WEIGHT_ROUNDING_KG`=2.5kg，无 1RM 退化用近期最高重量，再无基线 `target_weight_kg=null`（不编造）；最多 `MAX_PLANNED_EXERCISES`=4 动作；弱项进 notes。全命名常量。
+- `next-week-plan-generator.test.ts`（新，6 例）：1RM→2.5kg 取整目标重量、无基线不编造、退化用 max weight、focus 去重、上限 4、add_frequency 加组 + 弱项进 notes。
+- `react-planner-types.ts`：`ProgressionMode` 从 agent 提升到此共享；新增 `PlannedExercise` / `NextWeekPlanDraft`；`NextWeekPlanAgentOutput` 加 `plan?`。
+- `next-week-plan-agent.ts`：synthesis 后 `buildGeneratorInput`（从 weekly top_exercises + progress 1RM/maxWeight 提取）→ `generateNextWeekPlan`，plan 进 output（no_data 路径不带）。
+- `assistant-orchestrator-service.ts`：`MockAssistantTurnResponseData` 加 `plan?: NextWeekPlanDraft`，agent 路径从 `agentOutput.plan` 带上，随 structured_output 持久化。
+
+关键设计：plan 是**结构化字段、不内联进答案文本**（summary/bullets 不变），所以 Slice 1 的 faithfulness 数字扫描看不到这些派生目标重量、不会误标——这是与 D21 的关键交互。
+
+Verification:
+- `pnpm type-check`、`pnpm --filter @fitmind/server lint`、`pnpm test:unit`（215）：通过。
+- `pnpm eval`：13/13 + 12/12 + 3/3 Overall PASS（未回归）。
+
+文档：`ai-decisions.md` D23、`api-contract.md`（structured_output.plan）、`AGENTS.md §11`（Agent + AI 护栏/评估现状）、`roadmap.md §8` Slice 3 标 ✅、本条。
+
+Notes:
+- 先不落库（不引入 planned-workout 模型 / 不接"接受计划"）——那是 Slice 5；档案注入是 Slice 4，生成器纯函数签名已预留扩展位。
+- 前端结构化渲染草案卡片留作后续 Slice（本片不碰 client）。
+- 下一片：§8 Slice 4（运动员档案薄模型 + 注入 agent）。

@@ -422,11 +422,12 @@ data: {"index":1,"status":"success","duration_ms":12,"observation":"训练 4 次
 ...（找弱项 / 查进展 / 检索知识 / 生成草案，共最多 5 步）
 
 event: structured_output
-data: {"intent":"next_week_plan","answer":{...},"agent_trace":{"goal":"...","max_steps":5,"stop_reason":"completed","steps":[...]}}
+data: {"intent":"next_week_plan","answer":{...},"agent_trace":{...},"plan":{"strategy":"maintain","exercises":[{"exercise_name":"Barbell Bench Press","sets":3,"rep_min":6,"rep_max":10,"target_weight_kg":72.5,"basis":"基于估算 1RM ..."}],"notes":["..."]}}
 ```
 
 - `kind`：`tool` | `retrieval` | `synthesis`；`status`：`success` | `error` | `skipped`。
 - `agent_trace` 随 `structured_output` 一并持久化到消息，可在历史里重渲染 trace 时间线。
+- `structured_output` 在 `next_week_plan` agent 路径可选带 `plan`：确定性生成的可执行下周草案 `{ strategy, exercises[{ exercise_name, sets, rep_min, rep_max, target_weight_kg, basis }], notes[] }`（见 `ai-decisions.md` D23）。`target_weight_kg` 仅在有真实重量基线（估算 1RM / 近期最高重量）时给出，否则为 `null`（不编造）。**结构化字段、不内联进答案文本**——因此不进入 faithfulness 数字扫描。本片先不落库；前端结构化渲染留作后续 Slice。
 - `structured_output` 可选带 `faithfulness`：`{ status: "verified" | "flagged", checkedNumbers, unverifiedClaims[] }`（运行时确定性 faithfulness 校验结果，见 `ai-decisions.md` D21）。常规工具路径与 `next_week_plan` agent 路径会带；knowledge/unsupported 等无工具数据的路径不带。仅标注、不改答案文案。前端可据此渲染"数据已核对"徽章（后续 Slice）。
 - 前端对未知事件类型必须**忽略**（向前兼容），不能当成错误处理。
 - 客户端可通过 `AbortController` 中断；后端要妥善处理 connection close
