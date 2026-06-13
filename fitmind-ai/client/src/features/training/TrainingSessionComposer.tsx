@@ -38,7 +38,7 @@ import {
   getExerciseCategoryLabel as getDisplayExerciseCategoryLabel,
   getExerciseDisplayName,
 } from "./exercise-display";
-import { useFabGesture, type FabGestureDirection } from "./use-fab-gesture";
+import { useFabGesture, type FabAction } from "./use-fab-gesture";
 import { WorkoutIntakePanel } from "./WorkoutIntakePanel";
 import type { WorkoutIntakeDraft } from "./workout-intake-api";
 import {
@@ -84,10 +84,7 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
   const [appendNotice, setAppendNotice] = useState<string | null>(null);
   const mode = props.mode ?? "create_active";
   const isActiveSession = mode === "create_active";
-  const fabGesture = useFabGesture({
-    onSwipe: handleFabSwipe,
-    onTap: () => void handleOpenLibrary(),
-  });
+  const fabGesture = useFabGesture({ onSelect: handleFabSelect });
 
   useEffect(() => {
     if (!props.isOpen || !isActiveSession || !isRunning) {
@@ -285,26 +282,71 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
           </label>
         </main>
 
-        <div style={fabWrapStyle}>
-          {fabGesture.isActive ? (
-            <div aria-hidden="true" style={fabHintStackStyle}>
-              <div style={fabHintStyle(theme, fabGesture.direction === "up")}>
-                <Icon name="mic" size={15} />
-                <span>上滑 · 语音追加</span>
-              </div>
-              <div style={fabHintStyle(theme, fabGesture.direction === "right")}>
-                <Icon name="chevron-right" size={15} />
-                <span>右滑 · 动作库</span>
-              </div>
-            </div>
-          ) : null}
+        <style>{FAB_KEYFRAMES}</style>
+
+        {fabGesture.isOpen ? (
           <button
-            aria-label="添加动作（长按可上滑语音追加、右滑打开动作库）"
-            style={fabStyle(theme, fabGesture.isActive)}
+            aria-label="收起"
+            onClick={fabGesture.close}
+            style={fabDialBackdropStyle}
+            tabIndex={-1}
             type="button"
-            {...fabGesture.handlers}
+          />
+        ) : null}
+
+        <div style={fabWrapStyle}>
+          <button
+            aria-label="语音追加动作"
+            onClick={() => fabGesture.select("voice")}
+            style={fabSatelliteStyle(
+              theme,
+              "voice",
+              fabGesture.isOpen,
+              fabGesture.activeAction === "voice",
+            )}
+            tabIndex={fabGesture.isOpen ? 0 : -1}
+            type="button"
           >
-            <Icon name={fabGesture.isActive ? "mic" : "plus"} size={24} />
+            <Icon name="mic" size={20} />
+          </button>
+
+          <button
+            aria-label="打开动作库"
+            onClick={() => fabGesture.select("library")}
+            style={fabSatelliteStyle(
+              theme,
+              "library",
+              fabGesture.isOpen,
+              fabGesture.activeAction === "library",
+            )}
+            tabIndex={fabGesture.isOpen ? 0 : -1}
+            type="button"
+          >
+            <Icon name="dumbbell" size={20} />
+          </button>
+
+          {!fabGesture.isOpen ? (
+            <>
+              <span aria-hidden="true" style={fabPulseStyle(theme)} />
+              <span aria-hidden="true" style={fabHoldHintStyle(theme)}>
+                长按
+              </span>
+            </>
+          ) : null}
+
+          <button
+            aria-label={
+              fabGesture.isOpen
+                ? "收起"
+                : "添加动作（长按展开：上滑语音、左滑动作库）"
+            }
+            style={fabStyle(theme, fabGesture.isOpen)}
+            type="button"
+            {...fabGesture.buttonHandlers}
+          >
+            <span style={fabPlusIconStyle(fabGesture.isOpen)}>
+              <Icon name="plus" size={24} />
+            </span>
           </button>
         </div>
 
@@ -436,8 +478,8 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
     setIsLibraryOpen(true);
   }
 
-  function handleFabSwipe(direction: FabGestureDirection): void {
-    if (direction === "up") {
+  function handleFabSelect(action: FabAction): void {
+    if (action === "voice") {
       setDuplicateNotice(null);
       setErrorMessage(null);
       setAppendNotice(null);
@@ -1412,9 +1454,33 @@ const fabWrapStyle: React.CSSProperties = {
   zIndex: 210,
 };
 
+const FAB_KEYFRAMES = `
+  @keyframes fitmindFabPulse {
+    0% { transform: scale(1); opacity: 0.5; }
+    70% { opacity: 0; }
+    100% { transform: scale(1.7); opacity: 0; }
+  }
+  @keyframes fitmindFabHoldHint {
+    0%, 100% { opacity: 0.32; transform: translateY(2px); }
+    50% { opacity: 1; transform: translateY(0); }
+  }
+`;
+
+const FAB_SATELLITE_OFFSET_PX = 72;
+
+const fabDialBackdropStyle: React.CSSProperties = {
+  background: "transparent",
+  border: "none",
+  cursor: "default",
+  inset: 0,
+  padding: 0,
+  position: "absolute",
+  zIndex: 205,
+};
+
 function fabStyle(
   theme: ReturnType<typeof useTheme>["theme"],
-  isActive = false,
+  isOpen = false,
 ): React.CSSProperties {
   return {
     alignItems: "center",
@@ -1427,39 +1493,95 @@ function fabStyle(
     display: "inline-flex",
     height: 56,
     justifyContent: "center",
+    position: "relative",
     touchAction: "none",
-    transform: isActive ? "scale(1.08)" : "scale(1)",
-    transition: "transform 120ms ease",
+    transform: isOpen ? "scale(1.02)" : "scale(1)",
+    transition: "transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1)",
     width: 56,
+    zIndex: 2,
   };
 }
 
-const fabHintStackStyle: React.CSSProperties = {
-  bottom: "calc(100% + 12px)",
-  display: "grid",
-  gap: 8,
-  justifyItems: "end",
-  position: "absolute",
-  right: 0,
-};
+function fabPlusIconStyle(isOpen: boolean): React.CSSProperties {
+  return {
+    alignItems: "center",
+    display: "inline-flex",
+    justifyContent: "center",
+    transform: isOpen ? "rotate(135deg)" : "rotate(0deg)",
+    transition: "transform 240ms cubic-bezier(0.34, 1.56, 0.64, 1)",
+  };
+}
 
-function fabHintStyle(
+function fabSatelliteStyle(
   theme: ReturnType<typeof useTheme>["theme"],
+  kind: FabAction,
+  isOpen: boolean,
   isActive: boolean,
 ): React.CSSProperties {
+  const openTransform =
+    kind === "voice"
+      ? `translateY(-${FAB_SATELLITE_OFFSET_PX}px) scale(1)`
+      : `translateX(-${FAB_SATELLITE_OFFSET_PX}px) scale(1)`;
+
   return {
     alignItems: "center",
     backgroundColor: isActive ? theme.colors.ac : theme.colors.surf,
     border: `1px solid ${isActive ? theme.colors.ac : theme.colors.bdr2}`,
-    borderRadius: theme.radius.pill,
+    borderRadius: 999,
+    bottom: 4,
     boxShadow: theme.shadows.card,
-    color: isActive ? theme.colors.acText : theme.colors.tx2,
+    color: isActive ? theme.colors.acText : theme.colors.tx,
+    cursor: "pointer",
     display: "inline-flex",
-    fontSize: 12,
+    height: 48,
+    justifyContent: "center",
+    opacity: isOpen ? 1 : 0,
+    pointerEvents: isOpen ? "auto" : "none",
+    position: "absolute",
+    right: 4,
+    transform: isOpen ? openTransform : "translate(0, 0) scale(0.3)",
+    transition:
+      "transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 200ms ease, background-color 120ms ease",
+    transitionDelay: isOpen && kind === "voice" ? "40ms" : "0ms",
+    width: 48,
+    zIndex: 1,
+  };
+}
+
+function fabPulseStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    animation: "fitmindFabPulse 1900ms ease-out infinite",
+    border: `2px solid ${theme.colors.ac}`,
+    borderRadius: 999,
+    bottom: 0,
+    height: 56,
+    pointerEvents: "none",
+    position: "absolute",
+    right: 0,
+    width: 56,
+    zIndex: 1,
+  };
+}
+
+function fabHoldHintStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    animation: "fitmindFabHoldHint 2600ms ease-in-out infinite",
+    backgroundColor: theme.colors.surf,
+    border: `1px solid ${theme.colors.bdr2}`,
+    borderRadius: theme.radius.pill,
+    bottom: "calc(100% + 8px)",
+    boxShadow: theme.shadows.card,
+    color: theme.colors.tx2,
+    fontSize: 11,
     fontWeight: 700,
-    gap: 6,
-    padding: "8px 12px",
-    transition: "background-color 120ms ease, color 120ms ease",
+    padding: "4px 8px",
+    pointerEvents: "none",
+    position: "absolute",
+    right: 0,
     whiteSpace: "nowrap",
   };
 }

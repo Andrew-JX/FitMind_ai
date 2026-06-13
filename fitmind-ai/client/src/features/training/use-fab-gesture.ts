@@ -1,20 +1,22 @@
 import { useRef, useState } from "react";
 
-export type FabGestureDirection = "up" | "right";
+export type FabAction = "voice" | "library";
 
 export interface UseFabGestureOptions {
-  /** Fired on a plain tap / keyboard activation (no swipe, no long press). */
-  onTap: () => void;
-  /** Fired when the finger is released after swiping past the threshold. */
-  onSwipe: (direction: FabGestureDirection) => void;
+  /** Fired when an action is chosen by swipe-release, satellite tap, or quick tap. */
+  onSelect: (action: FabAction) => void;
 }
 
 export interface UseFabGestureResult {
-  /** Whether the gesture overlay (direction hints) should be visible. */
-  isActive: boolean;
-  /** Direction currently targeted by the in-progress swipe, or null. */
-  direction: FabGestureDirection | null;
-  handlers: {
+  /** Whether the speed-dial is split open. */
+  isOpen: boolean;
+  /** Action currently targeted by an in-progress swipe, or null. */
+  activeAction: FabAction | null;
+  /** Collapse the speed-dial back into a single button. */
+  close: () => void;
+  /** Choose an action (used by the satellite buttons); also collapses. */
+  select: (action: FabAction) => void;
+  buttonHandlers: {
     onClick: () => void;
     onPointerCancel: () => void;
     onPointerDown: (event: React.PointerEvent<HTMLElement>) => void;
@@ -23,29 +25,52 @@ export interface UseFabGestureResult {
   };
 }
 
-const LONG_PRESS_MS = 220;
-const SWIPE_THRESHOLD_PX = 28;
-const TAP_MAX_MOVE_PX = 10;
+const LONG_PRESS_MS = 200;
+const OPEN_MOVE_PX = 14;
+const SELECT_THRESHOLD_PX = 30;
+const TAP_MOVE_MAX_PX = 10;
+/** Quick tap with no committed direction falls back to opening the library. */
+const DEFAULT_TAP_ACTION: FabAction = "library";
 
 /**
- * Hold-and-swipe gesture controller for a floating action button.
+ * Speed-dial gesture controller for the composer's floating action button.
  *
- * A quick tap (or keyboard/click activation) runs {@link UseFabGestureOptions.onTap};
- * holding the button reveals direction hints (with haptic feedback), and releasing
- * after swiping up or right runs {@link UseFabGestureOptions.onSwipe}.
+ * Holding (or decisively dragging) the button splits it open into satellite
+ * actions; swiping up targets voice and swiping left targets the library, and
+ * releasing on a target runs {@link UseFabGestureOptions.onSelect}. A quick tap
+ * runs the default library action without opening the dial.
  *
- * @param options - Tap and swipe callbacks
- * @returns Reactive gesture state plus pointer/click handlers to spread onto the button
+ * @param options - Action select callback
+ * @returns Reactive speed-dial state plus pointer/click handlers for the button
  */
 export function useFabGesture(options: UseFabGestureOptions): UseFabGestureResult {
-  const [isActive, setIsActive] = useState(false);
-  const [direction, setDirection] = useState<FabGestureDirection | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeAction, setActiveAction] = useState<FabAction | null>(null);
 
   const startRef = useRef<{ x: number; y: number } | null>(null);
   const longPressTimerRef = useRef<number | null>(null);
-  const longPressFiredRef = useRef(false);
+  const openedThisPressRef = useRef(false);
   const suppressClickRef = useRef(false);
-  const directionRef = useRef<FabGestureDirection | null>(null);
+  const isOpenRef = useRef(false);
+  const actionRef = useRef<FabAction | null>(null);
+
+  function setOpen(next: boolean): void {
+    isOpenRef.current = next;
+    setIsOpen(next);
+  }
+
+  function setAction(next: FabAction | null): void {
+    if (actionRef.current === next) {
+      return;
+    }
+
+    actionRef.current = next;
+    setActiveAction(next);
+
+    if (next !== null) {
+      vibrate(8);
+    }
+  }
 
   function clearLongPressTimer(): void {
     if (longPressTimerRef.current !== null) {
@@ -54,38 +79,32 @@ export function useFabGesture(options: UseFabGestureOptions): UseFabGestureResul
     }
   }
 
-  function reset(): void {
-    clearLongPressTimer();
-    startRef.current = null;
-    longPressFiredRef.current = false;
-    directionRef.current = null;
-    setIsActive(false);
-    setDirection(null);
-  }
-
-  function reveal(): void {
-    setIsActive(true);
-  }
-
-  function updateDirection(next: FabGestureDirection | null): void {
-    if (directionRef.current === next) {
+  function openDial(): void {
+    if (isOpenRef.current) {
       return;
     }
 
-    directionRef.current = next;
-    setDirection(next);
+    openedThisPressRef.current = true;
+    setOpen(true);
+    vibrate(12);
+  }
 
-    if (next !== null) {
-      vibrate(8);
-    }
+  function close(): void {
+    clearLongPressTimer();
+    setOpen(false);
+    setAction(null);
+  }
+
+  function select(action: FabAction): void {
+    close();
+    options.onSelect(action);
   }
 
   function handlePointerDown(event: React.PointerEvent<HTMLElement>): void {
     startRef.current = { x: event.clientX, y: event.clientY };
-    longPressFiredRef.current = false;
+    openedThisPressRef.current = false;
     suppressClickRef.current = false;
-    directionRef.current = null;
-    setDirection(null);
+    setAction(null);
 
     try {
       event.currentTarget.setPointerCapture(event.pointerId);
@@ -94,11 +113,7 @@ export function useFabGesture(options: UseFabGestureOptions): UseFabGestureResul
     }
 
     clearLongPressTimer();
-    longPressTimerRef.current = window.setTimeout(() => {
-      longPressFiredRef.current = true;
-      reveal();
-      vibrate(12);
-    }, LONG_PRESS_MS);
+    longPressTimerRef.current = window.setTimeout(openDial, LONG_PRESS_MS);
   }
 
   function handlePointerMove(event: React.PointerEvent<HTMLElement>): void {
@@ -112,22 +127,23 @@ export function useFabGesture(options: UseFabGestureOptions): UseFabGestureResul
     const deltaY = event.clientY - start.y;
     const distance = Math.hypot(deltaX, deltaY);
 
-    if (distance > SWIPE_THRESHOLD_PX && !isActive) {
-      // A quick flick reveals the hints without waiting for the long-press timer.
-      reveal();
+    if (!isOpenRef.current && distance > OPEN_MOVE_PX) {
+      // A decisive drag splits the dial open without waiting for the timer.
+      clearLongPressTimer();
+      openDial();
     }
 
-    if (distance <= SWIPE_THRESHOLD_PX) {
-      updateDirection(null);
+    if (!isOpenRef.current || distance <= SELECT_THRESHOLD_PX) {
+      setAction(null);
       return;
     }
 
     if (Math.abs(deltaY) >= Math.abs(deltaX)) {
-      updateDirection(deltaY < 0 ? "up" : null);
+      setAction(deltaY < 0 ? "voice" : null);
       return;
     }
 
-    updateDirection(deltaX > 0 ? "right" : null);
+    setAction(deltaX < 0 ? "library" : null);
   }
 
   function handlePointerUp(event: React.PointerEvent<HTMLElement>): void {
@@ -140,25 +156,33 @@ export function useFabGesture(options: UseFabGestureOptions): UseFabGestureResul
     }
 
     const start = startRef.current;
-    const resolvedDirection = directionRef.current;
+    const resolvedAction = actionRef.current;
     const distance = start
       ? Math.hypot(event.clientX - start.x, event.clientY - start.y)
       : 0;
 
-    if (resolvedDirection !== null) {
+    startRef.current = null;
+
+    if (resolvedAction !== null) {
+      // Swiped to a target and released: activate it.
       suppressClickRef.current = true;
       vibrate(14);
-      options.onSwipe(resolvedDirection);
-    } else if (longPressFiredRef.current || distance > TAP_MAX_MOVE_PX) {
-      // Held in place or dragged without committing to a direction: cancel.
-      suppressClickRef.current = true;
+      select(resolvedAction);
+      return;
     }
 
-    reset();
+    if (openedThisPressRef.current || distance > TAP_MOVE_MAX_PX) {
+      // Opened the dial (now awaiting a satellite tap) or dragged without a
+      // committed direction: swallow the trailing click, keep current state.
+      suppressClickRef.current = true;
+      setAction(null);
+    }
   }
 
   function handlePointerCancel(): void {
-    reset();
+    clearLongPressTimer();
+    startRef.current = null;
+    setAction(null);
   }
 
   function handleClick(): void {
@@ -167,13 +191,20 @@ export function useFabGesture(options: UseFabGestureOptions): UseFabGestureResul
       return;
     }
 
-    options.onTap();
+    if (isOpenRef.current) {
+      close();
+      return;
+    }
+
+    options.onSelect(DEFAULT_TAP_ACTION);
   }
 
   return {
-    direction,
-    isActive,
-    handlers: {
+    activeAction,
+    isOpen,
+    close,
+    select,
+    buttonHandlers: {
       onClick: handleClick,
       onPointerCancel: handlePointerCancel,
       onPointerDown: handlePointerDown,

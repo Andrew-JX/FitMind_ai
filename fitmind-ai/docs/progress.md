@@ -4168,3 +4168,17 @@ Verification:
 
 Notes:
 - roadmap §1.6 任务 C 完成。任务 B（手势 FAB）同日已上线；本次 B+C 一起部署便于手机端联测。
+
+## 2026-06-13 手势 FAB 重设计 - 速拨"细胞分裂" + 长按提示（任务 B 迭代）
+
+用户反馈：FAB 在右下角无法右滑，方向应改"上滑 + 左滑"；交互要更炫（从加号"细胞分裂"成三个按钮 上/中/左）；长按完不要再显示"上移/左移"文字；静止时要让用户知道"可长按"。
+
+改动：
+- `use-fab-gesture.ts`（重写）：从"滑动提示"hook 改为**速拨手势**。`onSelect(action: "voice" | "library")` 单回调；长按（200ms）或果断拖动（>14px）触发分裂 `isOpen`；上滑→voice、左滑→library（阈值 30px），松手即选；快速轻点 → 默认 `library`。暴露 `isOpen`/`activeAction`/`select`/`close`/`buttonHandlers`，满足"滑动松手选"或"分裂后点卫星选"两种路径。
+- `TrainingSessionComposer.tsx`：FAB 区重渲染——两颗卫星按钮（mic / dumbbell）`position:absolute` 从中心 `scale(0.3)` 用回弹缓动 `cubic-bezier(0.34,1.56,0.64,1)` + 错峰弹到上/左（细胞分裂感）；中心"+"图标旋转 135° 成 ×；静止时脉冲光环 `fitmindFabPulse` + 呼吸"长按"小标 `fitmindFabHoldHint`；`isOpen` 时加透明 backdrop 点击收起。去掉旧的"上滑/右滑"文字提示与 `fabHint*` 样式。
+
+UX：中=收起、上=语音、左=动作库；滑动或点卫星均可；轻点保留开动作库。iOS Safari 无震动（`navigator.vibrate` 不支持），靠光环 + 卫星动效反馈。
+
+Verification:
+- `pnpm type-check`、`pnpm lint`、`pnpm test:unit`（187）：通过。
+- 手势/动画需真机手测（长按分裂、上/左滑高亮松手、点卫星、点空白收起、脉冲提示）。
