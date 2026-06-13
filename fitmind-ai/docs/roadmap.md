@@ -122,11 +122,13 @@ saved-insight 分享链接、知识管理后台、离线编辑 / 同步。优先
 
 执行顺序（ROI 高→低）：
 
-- **Slice 1 — 运行时 faithfulness 校验　🔴 下一个做**
-  - 做什么：助手返回结构化答案前，确定性校验答案 bullets/conclusion/recommendation 里出现的**数字与引用**都能在本轮工具输出（evidence / 工具 result）里找到；找不到则标注（`unverified_claims`）或在 dev 下抛出，并在 `evidence` 上挂一个 `faithfulness` 结果。
+- **Slice 1 — 运行时 faithfulness 校验　✅ 2026-06-14 完成**
+  - 做什么：助手返回结构化答案前，确定性校验答案 summary/bullets/conclusion/recommendation 里出现的**数字与引用**都能在本轮工具输出里找到；找不到则标注（`unverifiedClaims`），dev 下可选抛出，并在 `structured_output` 上挂一个 `faithfulness` 结果。
+  - 落地：新增 `server/src/services/assistant/answer-faithfulness.ts`（`verifyAnswerFaithfulness` + `enforceFaithfulnessInDev`，宽松可接受集合：原始值 + 数组长度 + 字符串内嵌数字 + ratio×100，带容差）+ 单测（含编造 999kg 被抓、toLocaleString/percent 不误报、UUID 引用校验）；`assistant-orchestrator-service.ts` 常规工具路径与 `next_week_plan` agent 路径（包 `runTool` 捕获聚合结果集）均接线，response 加 optional `faithfulness` 字段随 structured_output 持久化。决策见 `ai-decisions.md` D21。
   - 为什么排第一：纯后端、可单测、零预算、最自包含，直接把"证据绑定"从设计口号变成**被强制校验的不变量**。PM 和 AI 工程都能讲。
   - 价值：信任↑ / AI 面试↑↑｜成本：低｜依赖：无。
-  - 验收：新增校验器 + 单测（含"编造数字被抓到"用例）；`structured_output` 带 faithfulness 字段；门禁全绿；不改既有答案文案逻辑（只增校验）。
+  - 验收：✅ 新增校验器 + 单测（含"编造数字被抓到"用例）；✅ `structured_output` 带 faithfulness 字段；✅ 门禁全绿（type-check / lint / 200 单测）；✅ 不改既有答案文案逻辑（只增校验）。
+  - 后续：前端"✓ 数据已核对"徽章展示（留给后续片）。
 
 - **Slice 2 — Eval 套件 + 回归门禁　🟠**
   - 做什么：golden 数据集（问题 → 期望 intent / 必引证据 / 该不该拒答），离线跑 intent 路由准确率 + faithfulness 通过率 + 关键回归，`pnpm eval` 命令；先本地可跑，再考虑进 CI。叙述类可选 LLM-as-judge（缓存、可关、默认 off 保持零成本）。

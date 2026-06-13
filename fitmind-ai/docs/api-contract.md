@@ -427,6 +427,7 @@ data: {"intent":"next_week_plan","answer":{...},"agent_trace":{"goal":"...","max
 
 - `kind`：`tool` | `retrieval` | `synthesis`；`status`：`success` | `error` | `skipped`。
 - `agent_trace` 随 `structured_output` 一并持久化到消息，可在历史里重渲染 trace 时间线。
+- `structured_output` 可选带 `faithfulness`：`{ status: "verified" | "flagged", checkedNumbers, unverifiedClaims[] }`（运行时确定性 faithfulness 校验结果，见 `ai-decisions.md` D21）。常规工具路径与 `next_week_plan` agent 路径会带；knowledge/unsupported 等无工具数据的路径不带。仅标注、不改答案文案。前端可据此渲染"数据已核对"徽章（后续 Slice）。
 - 前端对未知事件类型必须**忽略**（向前兼容），不能当成错误处理。
 - 客户端可通过 `AbortController` 中断；后端要妥善处理 connection close
 

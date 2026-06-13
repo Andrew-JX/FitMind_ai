@@ -14,6 +14,11 @@ import {
 } from "../ai/tools/tool-types.js";
 import { runNextWeekPlanAgent } from "../agent/next-week-plan-agent.js";
 import type { AgentTrace } from "../agent/react-planner-types.js";
+import {
+  enforceFaithfulnessInDev,
+  verifyAnswerFaithfulness,
+  type AnswerFaithfulnessResult,
+} from "./answer-faithfulness.js";
 import { runAssistantProvider } from "./provider-adapter.js";
 import { getConfiguredAssistantProvider } from "./provider-config.js";
 import {
@@ -225,6 +230,7 @@ export interface MockAssistantTurnResponseData {
   }>;
   answer: AssistantStructuredAnswer;
   agent_trace?: AgentTrace | undefined;
+  faithfulness?: AnswerFaithfulnessResult | undefined;
 }
 
 interface PersistedTextBlock {
@@ -1166,6 +1172,7 @@ export async function runMockAssistantTurn(
   }
 
   const toolCalls: MockAssistantTurnResponseData["tool_calls"] = [];
+  const toolOutputs: unknown[] = [];
   let answer: AssistantStructuredAnswer;
 
   if (providerResponse.kind === "message") {
@@ -1201,6 +1208,7 @@ export async function runMockAssistantTurn(
         status: "success",
         duration_ms: durationMs,
       });
+      toolOutputs.push(result);
       await emitEvent(options, {
         type: "tool_call_finished",
         tool_name: providerResponse.tool_name,
@@ -1282,6 +1290,14 @@ export async function runMockAssistantTurn(
     await emitAnswerEvents(answer, options);
   }
 
+  const faithfulness =
+    toolOutputs.length > 0
+      ? verifyAnswerFaithfulness(answer, toolOutputs)
+      : undefined;
+  if (faithfulness) {
+    enforceFaithfulnessInDev(faithfulness);
+  }
+
   const response: MockAssistantTurnResponseData = {
     session_id: resolvedSession.sessionId,
     mode: input.mode,
@@ -1289,6 +1305,7 @@ export async function runMockAssistantTurn(
     intent,
     tool_calls: toolCalls,
     answer,
+    faithfulness,
   };
 
   const messageId = await persistMockTurnMessages({
@@ -1331,6 +1348,8 @@ async function runNextWeekPlanAgentTurn(args: {
   });
 
   let agentOutput: Awaited<ReturnType<typeof runNextWeekPlanAgent>>;
+  // 聚合 agent 跨步实际执行过的工具结果集，供 faithfulness 校验使用。
+  const capturedToolOutputs: unknown[] = [];
 
   try {
     agentOutput = await runNextWeekPlanAgent(
@@ -1341,8 +1360,11 @@ async function runNextWeekPlanAgentTurn(args: {
         exerciseId: input.exercise_id ?? null,
       },
       {
-        runTool: (toolName, toolArgs) =>
-          executeAiTool({ userId }, toolName, toolArgs),
+        runTool: async (toolName, toolArgs) => {
+          const result = await executeAiTool({ userId }, toolName, toolArgs);
+          capturedToolOutputs.push(result);
+          return result;
+        },
         retrieve: async (query) => {
           const sources = await retrieveKnowledgeChunks(query);
 
@@ -1403,6 +1425,14 @@ async function runNextWeekPlanAgentTurn(args: {
 
   await emitAnswerEvents(agentOutput.answer, options);
 
+  const faithfulness =
+    capturedToolOutputs.length > 0
+      ? verifyAnswerFaithfulness(agentOutput.answer, capturedToolOutputs)
+      : undefined;
+  if (faithfulness) {
+    enforceFaithfulnessInDev(faithfulness);
+  }
+
   const response: MockAssistantTurnResponseData = {
     session_id: sessionId,
     mode: input.mode,
@@ -1411,6 +1441,7 @@ async function runNextWeekPlanAgentTurn(args: {
     tool_calls: agentOutput.tool_calls,
     answer: agentOutput.answer,
     agent_trace: agentOutput.trace,
+    faithfulness,
   };
 
   const messageId = await persistMockTurnMessages({

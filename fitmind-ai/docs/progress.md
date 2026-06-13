@@ -4235,3 +4235,23 @@ Verification:
 Notes:
 - Phase 6.0（多步 ReAct 训练计划 + trace 可视化）三批全部完成；roadmap §3 标 ✅。
 - 后续可选：让 LLM 真正驱动选工具（开放式 ReAct）、6.1 MCP、性能数字回填（任务 D）、Prettier 欠债（任务 E）。
+
+## 2026-06-14 §8 Slice 1 - 运行时 faithfulness 校验
+
+把"答案里的数字都来自真实工具输出"从设计口号变成被强制校验的不变量（确定性、无 LLM、零成本、标注不拦截）。详见 `ai-decisions.md` D21。
+
+改动：
+- `server/src/services/assistant/answer-faithfulness.ts`（新）：`verifyAnswerFaithfulness(answer, toolOutputs)` → `{ status: "verified"|"flagged", checkedNumbers, unverifiedClaims[] }`。深度遍历工具输出收集「可接受数字集合」=原始值 + 数组长度（覆盖"X 条 workout"派生计数）+ 字符串内嵌数字（覆盖日期/kg 串）+ ratio×100（覆盖 formatPercent）；从答案 summary/bullets/conclusion/recommendation 抽取数字 token 带容差比对（相对 1% + 绝对 0.5，吃掉四舍五入/toFixed/千分位逗号）；文本里的 UUID 引用若不在 evidence/sources 也计入。阈值全命名常量。`shouldStrictlyVerify()`/`enforceFaithfulnessInDev()`：默认只标注，仅 `FAITHFULNESS_STRICT=1` 且非 production 时对 flagged 抛错。
+- `answer-faithfulness.test.ts`（新，9 例）：全数字有出处→verified、编造 999kg→flagged 且列出 999、toLocaleString/percent 不误报、数组长度计数不误报、第N步序号忽略、UUID 不在 evidence→flagged / 在 evidence→verified、enforce 默认不抛。
+- `assistant-orchestrator-service.ts`：`MockAssistantTurnResponseData` 加 response 级 optional `faithfulness`；常规工具路径用作用域内 tool result（覆盖 mixed_tool_rag/plateau）；`next_week_plan` agent 路径在注入的 `runTool` 外包一层捕获聚合工具结果集——**不需改动 agent 与 react-planner-types**。两路径算完都 `enforceFaithfulnessInDev`，随 structured_output 持久化。
+
+Verification:
+- `pnpm --filter @fitmind/server type-check` / `lint` / `test:unit`（200）：通过。
+
+文档：`ai-decisions.md` D21、`api-contract.md`（structured_output.faithfulness 字段）、`roadmap.md §8` Slice 1 标 ✅、本条。
+
+Notes:
+- 可接受集合刻意宽松（宁可漏标也不误标真实数据）；少数硬编码文案常量（如"最近 30 天"窗口）可能被标 flagged，属记录性元数据、不影响答案/测试。
+- 护栏先于真实模型就位：mock 不编造、真实模型会编造，Slice 7 接真实大模型后这道护栏 + Slice 2 的 faithfulness 通过率指标正是兜住编造的关键。
+- 前端"✓ 数据已核对"徽章留给后续 Slice；本片不碰 client（optional 字段向前兼容）。
+- 下一片：§8 Slice 2（Eval 套件 + 回归门禁，复用本片校验器做 faithfulness 打分）。

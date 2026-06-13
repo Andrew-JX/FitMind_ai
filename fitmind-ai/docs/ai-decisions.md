@@ -547,3 +547,28 @@ Decision：
 
 Out of scope（本次不做）：
 - 让 LLM 自由决定下一步工具（真正的开放式 ReAct）；多 intent 共用 agent；agent 步数上限自适应；trace 落独立表（现仅存在消息 structuredOutput 里）。
+
+## [D21] 运行时 faithfulness 校验（answer-faithfulness，Slice 1）
+
+- **Date**: 2026-06-14
+- **Status**: Accepted（校验器 + 单测 + orchestrator 两路径接线已落地）
+
+背景：
+- 项目核心论点是「证据绑定、确定性、不是套壳 ChatGPT」。但"答案里的数字都来自真实工具输出"此前只是设计口号，没有被任何机制强制校验。要把它变成**被强制校验的不变量**，需要一道运行时护栏。
+
+Decision：
+- 新增 `server/src/services/assistant/answer-faithfulness.ts`，导出确定性（无 LLM）的 `verifyAnswerFaithfulness(answer, toolOutputs)` → `{ status: "verified" | "flagged"; checkedNumbers; unverifiedClaims[] }`。
+- 思路：深度遍历本轮所有工具输出收集「可接受数字集合」——原始数值 + **数组长度**（覆盖"X 条 workout"这类派生计数）+ **字符串内嵌数字**（覆盖日期 `2026-06-01`、`toLocaleString` 的 kg 串）+ **ratio×100**（覆盖 `formatPercent` 的 `0.4 → 40.0%`）；再从答案 summary/bullets/conclusion/recommendation 抽取数字 token，带容差逐个比对（相对 1% + 绝对 0.5，覆盖四舍五入 / toFixed / 千分位逗号）。匹配不上 → `unverifiedClaims`。文本中出现的 UUID 引用若不在 evidence/sources → 也计入。
+- 阈值（`NUMERIC_RELATIVE_TOLERANCE`、`NUMERIC_ABSOLUTE_TOLERANCE`、`RATIO_PERCENT_MULTIPLIER`、`ORDINAL_STRIP_PATTERN`）全部命名常量，写在文件顶部（遵守 AGENTS §5）。
+- **为何确定性而非 LLM 评判**：与项目 mock-first、可离线、可单测、零成本定位一致；校验"数字有没有出处"本就是确定性问题，不需要模型。
+- **为何标注不拦截（默认）**：护栏的目标是把编造**暴露出来**而不是改写答案文案。`status=flagged` + 列表是元数据，挂在 `structured_output.faithfulness` 上随消息持久化，不改既有答案逻辑。dev 自查可选抛错：`shouldStrictlyVerify()` 仅在 `FAITHFULNESS_STRICT=1` 且非 production 时开启，`enforceFaithfulnessInDev` 据此对 flagged 抛错；默认关闭，生产 / 测试安全。
+- **接线**：`MockAssistantTurnResponseData` 加 response 级 optional `faithfulness` 字段（与 `agent_trace` 同款）。常规工具路径用作用域内那一次 tool result（覆盖 mixed_tool_rag / plateau）；`next_week_plan` agent 路径在注入的 `runTool` 外包一层捕获工具结果，跑完后对聚合结果集校验——因此**不需改动 agent 与 react-planner-types**。knowledge/unsupported/message 路径无工具数据，字段留空。
+
+与未来真实模型的关系（为何护栏先于模型就位）：
+- 当前 mock provider 是确定性的、不会编造，所以校验现在几乎总是 verified。但 Slice 7 接真实大模型后，模型**会**编造数字与引用——届时这道护栏（以及 Slice 2 的 faithfulness 通过率指标）正是兜住编造的关键。先于模型把不变量和校验机制建好，比模型上线后再补更稳。
+
+诚实标注的取舍：
+- 可接受集合刻意宽松（宁可漏标也不误标真实数据），配合"标注不拦截"。代价是少数硬编码文案常量（如 recommendation 路径的"最近 30 天"窗口描述）可能被标 flagged——这是记录性元数据，不影响答案或测试。未来"✓ 数据已核对"前端徽章（后续 Slice）可据 `status` 决定展示。
+
+Out of scope（本次不做）：
+- 前端"✓ 数据已核对"徽章展示；校验非数字的语义声明（如"训练量上升"这类定性判断）；把 faithfulness 落独立表。
