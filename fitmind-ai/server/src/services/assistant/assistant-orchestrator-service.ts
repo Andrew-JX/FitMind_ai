@@ -16,7 +16,9 @@ import { runNextWeekPlanAgent } from "../agent/next-week-plan-agent.js";
 import type {
   AgentTrace,
   NextWeekPlanDraft,
+  PlanProfileContext,
 } from "../agent/react-planner-types.js";
+import { getAthleteProfile } from "../athlete-profile-service.js";
 import {
   enforceFaithfulnessInDev,
   verifyAnswerFaithfulness,
@@ -1354,6 +1356,8 @@ async function runNextWeekPlanAgentTurn(args: {
   let agentOutput: Awaited<ReturnType<typeof runNextWeekPlanAgent>>;
   // 聚合 agent 跨步实际执行过的工具结果集，供 faithfulness 校验使用。
   const capturedToolOutputs: unknown[] = [];
+  // 运动员档案注入计划生成（个性化 + 安全）；加载失败不影响规划。
+  const profile = await loadPlanProfile(userId);
 
   try {
     agentOutput = await runNextWeekPlanAgent(
@@ -1362,6 +1366,7 @@ async function runNextWeekPlanAgentTurn(args: {
         startDate: input.start_date,
         endDate: input.end_date,
         exerciseId: input.exercise_id ?? null,
+        profile,
       },
       {
         runTool: async (toolName, toolArgs) => {
@@ -1468,6 +1473,25 @@ async function runNextWeekPlanAgentTurn(args: {
   });
 
   return response;
+}
+
+async function loadPlanProfile(
+  userId: string,
+): Promise<PlanProfileContext | null> {
+  try {
+    const dto = await getAthleteProfile(userId);
+
+    return dto === null
+      ? null
+      : {
+          goal: dto.goal,
+          weeklyDays: dto.weeklyDays,
+          injuryConstraints: dto.injuryConstraints,
+        };
+  } catch {
+    // Personalization is best-effort; a profile load failure must not break planning.
+    return null;
+  }
 }
 
 function inferDominantFocusArea(

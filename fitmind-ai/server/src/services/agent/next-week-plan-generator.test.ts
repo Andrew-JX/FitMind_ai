@@ -90,6 +90,53 @@ describe("generateNextWeekPlan", () => {
     expect(plan.exercises.length).toBeLessThanOrEqual(4);
   });
 
+  it("switches to the strength rep/intensity scheme from the profile goal", () => {
+    const plan = generateNextWeekPlan({
+      ...baseInput,
+      focusExercise: {
+        exerciseName: "Barbell Bench Press",
+        estimated1RmKg: 100,
+        maxWeightKg: 90,
+      },
+      profile: { goal: "strength", weeklyDays: 4, injuryConstraints: [] },
+    });
+
+    const focus = plan.exercises[0];
+    // strength: 3-6 reps @ 85% → 100 * 0.85 = 85.
+    expect(focus?.rep_min).toBe(3);
+    expect(focus?.rep_max).toBe(6);
+    expect(focus?.target_weight_kg).toBe(85);
+  });
+
+  it("keeps the hypertrophy default when no profile is provided", () => {
+    const plan = generateNextWeekPlan({
+      ...baseInput,
+      focusExercise: {
+        exerciseName: "Barbell Bench Press",
+        estimated1RmKg: 100,
+        maxWeightKg: 90,
+      },
+    });
+
+    expect(plan.exercises[0]?.rep_max).toBe(10);
+    expect(plan.exercises[0]?.target_weight_kg).toBe(72.5);
+  });
+
+  it("injects injury and weekly-day notes from the profile", () => {
+    const plan = generateNextWeekPlan({
+      ...baseInput,
+      profile: {
+        goal: "hypertrophy",
+        weeklyDays: 3,
+        injuryConstraints: ["knee", "shoulder"],
+      },
+    });
+
+    expect(plan.notes.some((note) => note.includes("knee"))).toBe(true);
+    expect(plan.notes.some((note) => note.includes("shoulder"))).toBe(true);
+    expect(plan.notes.some((note) => note.includes("每周 3 天"))).toBe(true);
+  });
+
   it("uses more working sets when adding frequency, and surfaces the weak area", () => {
     const consolidate = generateNextWeekPlan({
       ...baseInput,

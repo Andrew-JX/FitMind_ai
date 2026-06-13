@@ -41,6 +41,20 @@ export interface AgentToolCallSummary {
 /** How next week leans relative to the recent baseline (drives sets + guidance). */
 export type ProgressionMode = "consolidate" | "add_frequency" | "maintain";
 
+/** Training goal that selects the rep / intensity scheme in the plan generator. */
+export type PlanGoal =
+  | "strength"
+  | "hypertrophy"
+  | "endurance"
+  | "general_fitness";
+
+/** Thin athlete-profile slice injected into the planner for personalization + safety. */
+export interface PlanProfileContext {
+  goal: PlanGoal;
+  weeklyDays: number;
+  injuryConstraints: string[];
+}
+
 /** One prescribed exercise in the executable draft. `target_weight_kg` is null when no weight baseline exists (never fabricated). */
 export interface PlannedExercise {
   exercise_name: string;
@@ -94,6 +108,7 @@ export interface NextWeekPlanAgentInput {
   startDate: string;
   endDate: string;
   exerciseId?: string | null | undefined;
+  profile?: PlanProfileContext | null | undefined;
 }
 
 export interface NextWeekPlanAgentDeps {

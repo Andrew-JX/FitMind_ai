@@ -617,3 +617,24 @@ Decision：
 
 Out of scope（本次不做）：
 - 前端结构化渲染草案卡片；落库为 planned workout；按器械 / 伤病约束筛动作；多动作各自的 1RM 基线（weekly top_exercises 不带单动作重量，故非 focus 动作目标重量保持 null）。
+
+## [D24] 运动员档案（薄）+ 注入计划生成器（athlete profile，Slice 4）
+
+- **Date**: 2026-06-14
+- **Status**: Accepted（持久化 + CRUD + 注入 agent 已落地，分 3 批）
+
+背景：
+- Slice 3 的计划生成器对所有人用同一套增肌方案。要做"个性化 + 安全"，需要一份薄档案（目标 / 每周天数 / 器械 / 伤病约束）持久化并注入 agent，喂给生成器更准、更安全。
+
+Decision：
+- **数据模型（Batch 1）**：`athlete_profiles` 表，`user_id` 主键（一人一档，CRUD 走 upsert），`goal`（受控枚举 strength/hypertrophy/endurance/general_fitness）、`weekly_days`（1–7）、`available_equipment text[]`（受控词表）、`injury_constraints text[]`（自由标签）。repository（get/upsert）+ service（zod 校验、标签归一化小写去重 ≤10 个、DI 可注入 fake repo 单测）。只存训练偏好，不存身高体重真实姓名（AGENTS §7.4）。
+- **HTTP CRUD（Batch 2）**：`GET/PUT /api/athlete-profile`，鉴权必填，PUT 用 `.strict()` zod 拒绝额外字段（含 `user_id`），thin controller + 路由挂载，controller 单测 mock service。
+- **注入 agent（Batch 3）**：orchestrator 在 `next_week_plan` 路径用 `getAthleteProfile(userId)` 加载档案（**best-effort：加载失败回退 null，不破坏规划**），映射成 `PlanProfileContext`（goal/weeklyDays/injuryConstraints）经 `NextWeekPlanAgentInput` → 生成器。生成器据 `goal` 选次数/强度方案（`GOAL_SCHEMES`：strength 3~6@85%、hypertrophy 6~10@72%、endurance 12~15@60%、general_fitness 8~12@68%；**无档案退回 hypertrophy，保持档案上线前行为**），伤病约束 / 每周天数注入安全与分配提示 notes。
+- **为何确定性映射而非让模型解释档案**：与项目定位一致；目标→方案、伤病→提示都是确定性规则，可单测、可解释、零成本。
+- **为何 best-effort 加载**：个性化是增强项，不应让档案查询故障阻断核心规划能力（降级到默认方案）。
+
+与未来的关系：
+- Slice 5 把生成的草案接成 app 里「计划训练」并记录依从度；伤病约束未来可升级为按动作→部位的硬过滤（当前是安全 notes）；前端档案编辑表单 + 把 DTO 提升到 `shared/` 待前端 CRUD 片。
+
+Out of scope（本次不做）：
+- 前端档案编辑 UI；按器械/伤病硬过滤动作；把档案喂给非 next_week_plan 的其它 intent；档案历史版本。

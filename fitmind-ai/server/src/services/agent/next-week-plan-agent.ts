@@ -132,7 +132,13 @@ export async function runNextWeekPlanAgent(
 
   // Structured executable draft (动作 × 组 × 次 × 目标重量); rides on structured_output.
   const plan = generateNextWeekPlan(
-    buildGeneratorInput({ weeklyResult, weakArea, progressionMode, progressResult }),
+    buildGeneratorInput({
+      weeklyResult,
+      weakArea,
+      progressionMode,
+      progressResult,
+      profile: input.profile ?? null,
+    }),
   );
 
   return {
@@ -148,6 +154,7 @@ function buildGeneratorInput(context: {
   weakArea: string | null;
   progressionMode: ProgressionMode;
   progressResult: unknown;
+  profile: NextWeekPlanGeneratorInput["profile"];
 }): NextWeekPlanGeneratorInput {
   const weekly = asRecord(context.weeklyResult);
   const topExercises = asArray(weekly?.top_exercises)
@@ -181,6 +188,7 @@ function buildGeneratorInput(context: {
             estimated1RmKg: readNumber(totals?.estimated_1rm_kg),
             maxWeightKg: readNumber(totals?.max_weight_kg),
           },
+    profile: context.profile,
   };
 }
 

@@ -142,9 +142,11 @@ saved-insight 分享链接、知识管理后台、离线编辑 / 同步。优先
   - 价值：产品↑↑ / PM 面试↑｜成本：中｜依赖：6.0 agent 已有。
   - 后续：前端结构化渲染草案卡片；档案注入（Slice 4）；落库 + 依从度（Slice 5）。
 
-- **Slice 4 — 运动员档案（薄）+ 注入 agent　🟡**
+- **Slice 4 — 运动员档案（薄）+ 注入 agent　✅ 2026-06-14 完成（3 批）**
   - 目标 / 每周天数 / 器械 / 伤病约束，持久化 + CRUD + 注入 agent 上下文。
+  - 落地：Batch 1 数据层（`athlete_profiles` 表 + repository + service + 单测）；Batch 2 HTTP CRUD（`GET/PUT /api/athlete-profile` + controller 单测）；Batch 3 注入（orchestrator best-effort 加载档案 → `PlanProfileContext` → 生成器按 goal 选 `GOAL_SCHEMES` 次数/强度方案、伤病/每周天数进 notes，无档案退回 hypertrophy 默认）。决策见 `ai-decisions.md` D24。
   - 价值：产品↑↑、个性化 + 安全｜成本：低-中｜依赖：喂给 Slice 3 更准。
+  - 后续：前端档案编辑表单 + DTO 提升到 `shared/`；伤病→动作硬过滤；落库依从度（Slice 5）。
 
 - **Slice 5 — 接受计划 → planned workout 模型 + 依从度　🟡**
   - 一键把生成的计划接成 app 里的「计划训练」，记录 planned vs performed，给依从度反馈。真正合上 记录→分析→计划→再记录。

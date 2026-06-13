@@ -4300,3 +4300,34 @@ Notes:
 - 先不落库（不引入 planned-workout 模型 / 不接"接受计划"）——那是 Slice 5；档案注入是 Slice 4，生成器纯函数签名已预留扩展位。
 - 前端结构化渲染草案卡片留作后续 Slice（本片不碰 client）。
 - 下一片：§8 Slice 4（运动员档案薄模型 + 注入 agent）。
+
+## 2026-06-14 §8 Slice 4 - 运动员档案（薄）+ 注入计划生成器（3 批）
+
+个性化 + 安全：薄档案（目标/每周天数/器械/伤病约束）持久化 + CRUD + best-effort 注入 next-week-plan agent。详见 `ai-decisions.md` D24、`db-schema.md §10`、`api-contract.md` Slice 4 Addition。
+
+Batch 1（数据层）：
+- `migrations/20260614100000_create_athlete_profiles.js`（user_id 主键一人一档、goal/weekly_days/equipment[]/injury[]、check 约束）。
+- `db/athlete-profile-repository.ts`：`getAthleteProfileByUserId` + `upsertAthleteProfile`（ON CONFLICT user_id）。
+- `services/athlete-profile-service.ts`：DTO + `athleteProfileInputSchema`（zod .strict）+ get/save，标签归一化小写去重（≤10 个、≤40 字）、DI 可注入 repo。
+- `athlete-profile-service.test.ts`（5 例，注入 fake repo，无 DB）。
+
+Batch 2（HTTP CRUD）：
+- `controllers/athlete-profile-controller.ts`：`GET`（返回 profile 或 null）+ `PUT`（zod 校验后 upsert）。
+- `routes/athlete-profile.ts`（authMiddleware）+ `app.ts` 挂载 `/api`。
+- `athlete-profile-controller.test.ts`（4 例，mock service，拒绝非法 goal / 额外字段）。
+
+Batch 3（注入 agent）：
+- `react-planner-types.ts`：新增 `PlanGoal` / `PlanProfileContext`，`NextWeekPlanAgentInput` 加 `profile?`。
+- `next-week-plan-generator.ts`：`GOAL_SCHEMES`（strength 3~6@85% / hypertrophy 6~10@72% / endurance 12~15@60% / general_fitness 8~12@68%），无档案退回 hypertrophy（保持历史行为）；伤病/每周天数注入 notes。+3 例单测。
+- `next-week-plan-agent.ts`：`buildGeneratorInput` 透传 `input.profile`。
+- `assistant-orchestrator-service.ts`：`loadPlanProfile(userId)` best-effort（失败回退 null 不破坏规划）→ 传入 agent input。
+
+Verification:
+- `pnpm type-check`、`pnpm --filter @fitmind/server lint`、`pnpm test:unit`（227）：通过。
+- `pnpm eval`：13/13 + 12/12 + 3/3 Overall PASS（无回归）。
+- DB 链路（迁移/repo SQL）本地无 DATABASE_URL 未实跑，按惯例靠 smoke / 线上验证；逻辑层已单测。
+
+Notes:
+- 档案加载 best-effort：故障降级到默认增肌方案，核心规划不受影响。
+- 前端档案编辑 UI + DTO 提升到 shared/ 留作前端片；伤病→动作硬过滤、落库依从度是 Slice 5。
+- 下一片：§8 Slice 5（接受计划 → planned workout 模型 + 依从度）或 Slice 6（可观测 + 配额）。
