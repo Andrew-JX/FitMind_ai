@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import type { DictionaryExercise } from "./dictionary-api";
+import type { DraftExercise } from "./training-session-draft";
 import type { WorkoutIntakeDraft } from "./workout-intake-api";
-import { mapWorkoutIntakeDraftToSessionInitialDraft } from "./workout-intake-to-session-draft";
+import {
+  appendIntakeExercisesToDraft,
+  mapWorkoutIntakeDraftToSessionInitialDraft,
+} from "./workout-intake-to-session-draft";
 
 const benchExerciseId = "11111111-1111-4111-8111-111111111111";
 const pullUpExerciseId = "77777777-7777-4777-8777-777777777777";
@@ -227,5 +231,109 @@ describe("mapWorkoutIntakeDraftToSessionInitialDraft", () => {
       inputName: "unknown",
       matchStatus: "unresolved",
     });
+  });
+});
+
+function createDraftExercise(
+  overrides: Partial<DraftExercise> = {},
+): DraftExercise {
+  return {
+    candidateExercises: [],
+    categoryLabel: "胸",
+    exercise: null,
+    exerciseId: benchExerciseId,
+    id: "exercise-existing",
+    inputName: null,
+    isExpanded: false,
+    loadType: "weighted",
+    matchStatus: "matched",
+    name: "杠铃卧推",
+    sets: [
+      {
+        completed: true,
+        effort: "normal",
+        id: "set-existing-1",
+        reps: "8",
+        restSeconds: null,
+        weightKg: "60",
+      },
+    ],
+    ...overrides,
+  };
+}
+
+describe("appendIntakeExercisesToDraft", () => {
+  it("merges incoming sets into an existing matched exercise", () => {
+    const current = [createDraftExercise()];
+    const incoming = [
+      createDraftExercise({
+        id: "intake-exercise-0",
+        sets: [
+          {
+            completed: true,
+            effort: "normal",
+            id: "intake-set-0",
+            reps: "10",
+            restSeconds: null,
+            weightKg: "70",
+          },
+        ],
+      }),
+    ];
+
+    const result = appendIntakeExercisesToDraft(current, incoming);
+
+    expect(result.addedCount).toBe(0);
+    expect(result.mergedCount).toBe(1);
+    expect(result.next).toHaveLength(1);
+    expect(result.next[0]?.sets).toHaveLength(2);
+    expect(result.next[0]?.sets[1]).toMatchObject({ reps: "10", weightKg: "70" });
+    expect(result.next[0]?.isExpanded).toBe(true);
+  });
+
+  it("appends a different matched exercise as a new card", () => {
+    const current = [createDraftExercise()];
+    const incoming = [
+      createDraftExercise({
+        exerciseId: pullUpExerciseId,
+        id: "intake-exercise-0",
+        name: "引体向上",
+      }),
+    ];
+
+    const result = appendIntakeExercisesToDraft(current, incoming);
+
+    expect(result.addedCount).toBe(1);
+    expect(result.mergedCount).toBe(0);
+    expect(result.next).toHaveLength(2);
+    expect(result.next[1]?.exerciseId).toBe(pullUpExerciseId);
+  });
+
+  it("regenerates exercise and set ids so appended entries stay unique", () => {
+    const current = [createDraftExercise()];
+    const incoming = [
+      createDraftExercise({
+        exerciseId: pullUpExerciseId,
+        id: "exercise-existing",
+        sets: [
+          {
+            completed: true,
+            effort: "normal",
+            id: "set-existing-1",
+            reps: "10",
+            restSeconds: null,
+            weightKg: "0",
+          },
+        ],
+      }),
+    ];
+
+    const result = appendIntakeExercisesToDraft(current, incoming);
+    const ids = result.next.flatMap((exercise) => [
+      exercise.id,
+      ...exercise.sets.map((set) => set.id),
+    ]);
+
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });

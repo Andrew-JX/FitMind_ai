@@ -32,6 +32,77 @@ export function mapWorkoutIntakeDraftToSessionInitialDraft(
   };
 }
 
+/**
+ * Append intake-parsed exercises into an existing composer draft.
+ *
+ * @param current - The draft exercises already in the composer
+ * @param incoming - Newly parsed exercises (already confirmed/matched) to add
+ * @returns The merged draft plus counts of newly added and merged exercises
+ *
+ * @remarks
+ * A matched exercise whose `exerciseId` already exists in the draft has its sets
+ * merged into that existing card; everything else is pushed as a new card. All
+ * appended exercise and set ids are regenerated so they stay unique within the
+ * draft even across repeated voice appends.
+ */
+export function appendIntakeExercisesToDraft(
+  current: DraftExercise[],
+  incoming: DraftExercise[],
+): { addedCount: number; mergedCount: number; next: DraftExercise[] } {
+  const next = [...current];
+  const nextId = createAppendIdFactory();
+  let addedCount = 0;
+  let mergedCount = 0;
+
+  incoming.forEach((incomingExercise) => {
+    const remappedSets = incomingExercise.sets.map((set) => ({
+      ...set,
+      id: nextId("set"),
+    }));
+
+    const targetIndex =
+      incomingExercise.matchStatus === "matched" && incomingExercise.exerciseId
+        ? next.findIndex(
+            (item) =>
+              item.matchStatus === "matched" &&
+              item.exerciseId === incomingExercise.exerciseId,
+          )
+        : -1;
+
+    const existing = targetIndex >= 0 ? next[targetIndex] : undefined;
+
+    if (existing) {
+      next[targetIndex] = {
+        ...existing,
+        isExpanded: true,
+        sets: [...existing.sets, ...remappedSets],
+      };
+      mergedCount += 1;
+      return;
+    }
+
+    next.push({
+      ...incomingExercise,
+      id: nextId("exercise"),
+      isExpanded: true,
+      sets: remappedSets,
+    });
+    addedCount += 1;
+  });
+
+  return { addedCount, mergedCount, next };
+}
+
+function createAppendIdFactory(): (kind: "exercise" | "set") => string {
+  const base = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  let counter = 0;
+
+  return (kind) => {
+    counter += 1;
+    return `append-${kind}-${base}-${counter}`;
+  };
+}
+
 function mapWorkoutIntakeExerciseToDraftExercise(
   exercise: WorkoutIntakeDraftExercise,
   exerciseDictionary: DictionaryExercise[],

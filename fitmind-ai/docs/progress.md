@@ -4133,3 +4133,23 @@ Verification:
 Notes:
 - 未匹配（无候选）目前只提供"移除"，暂不支持在该页直接搜动作库替换——后续可加。
 - 仍需用户在 Vercel 配 `WORKOUT_INTAKE_LLM_PROVIDER=groq` + `GROQ_API_KEY` 才能让自由口语走 LLM；规则解析 + 本次确认流对结构化语音已可用。
+
+## 2026-06-13 记录页内语音 - 手势 FAB + 语音追加到当前 draft（roadmap §1.6 任务 B）
+
+之前语音录入只能从训练页入口新建一条训练；进入 composer（记录页内）后无法再语音补动作。本批次让 composer 右下的 FAB 支持手势，并把语音解析结果**追加**到当前 draft（不新建、不替换）。
+
+改动：
+- `use-fab-gesture.ts`（新）：FAB 指针手势 hook。点按/键盘 = 原行为（开动作库）；长按触发震动 + 视觉提示浮层；上滑 = 语音追加、右滑 = 动作库。`navigator.vibrate` 兜底（不支持则静默），`setPointerCapture` 让滑动越界仍可识别，`touchAction:none` 防页面滚动抢手势。
+- `workout-intake-to-session-draft.ts`：新增纯函数 `appendIntakeExercisesToDraft(current, incoming)` —— 已匹配且 `exerciseId` 已在 draft 的，把组并进现有卡片（`mergedCount`）；其余追加为新卡片（`addedCount`）；所有追加的 exercise/set id 重新生成防跨次冲突。
+- `workout-intake-to-session-draft.test.ts`：补 3 例（合并/新增/id 唯一）。
+- `TrainingSessionComposer.tsx`：FAB 接 `useFabGesture` + 方向提示浮层；上滑打开"语音追加动作" ActionSheet，内嵌复用 `WorkoutIntakePanel`（解析时已走完候选确认，`onDraftParsed` 吐出的全是已匹配动作）；`handleAppendIntakeDraft` 映射 + 追加 + 顶部提示"已追加 N 个动作"。
+
+UX 取舍：上滑打开的弹窗里仍是点麦克风开始（直接复用现成组件、零回归），未做"上滑即自动录音"；如需可后续给 `WorkoutIntakePanel` 加 `autoStart`。
+
+Verification:
+- `pnpm type-check`、`pnpm lint`（改动文件）、`pnpm test:unit`（187）：通过。
+- E2E（`pnpm test:e2e`）覆盖鉴权流程，未覆盖 composer 手势；手势/震动需真机手测。
+
+Notes:
+- roadmap §1.6 任务 B 完成；任务 A（配 Groq）用户已在 Vercel 配好。
+- 任务 C（未匹配动作在确认页搜词典替换）仍未做。

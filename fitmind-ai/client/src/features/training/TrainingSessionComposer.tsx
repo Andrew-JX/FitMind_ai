@@ -38,6 +38,13 @@ import {
   getExerciseCategoryLabel as getDisplayExerciseCategoryLabel,
   getExerciseDisplayName,
 } from "./exercise-display";
+import { useFabGesture, type FabGestureDirection } from "./use-fab-gesture";
+import { WorkoutIntakePanel } from "./WorkoutIntakePanel";
+import type { WorkoutIntakeDraft } from "./workout-intake-api";
+import {
+  appendIntakeExercisesToDraft,
+  mapWorkoutIntakeDraftToSessionInitialDraft,
+} from "./workout-intake-to-session-draft";
 import { buildWorkoutEditPlan } from "./workout-to-session-draft";
 
 export interface TrainingSessionComposerProps {
@@ -73,8 +80,14 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
     null,
   );
   const [restTimer, setRestTimer] = useState<RestTimerState | null>(null);
+  const [isVoiceSheetOpen, setIsVoiceSheetOpen] = useState(false);
+  const [appendNotice, setAppendNotice] = useState<string | null>(null);
   const mode = props.mode ?? "create_active";
   const isActiveSession = mode === "create_active";
+  const fabGesture = useFabGesture({
+    onSwipe: handleFabSwipe,
+    onTap: () => void handleOpenLibrary(),
+  });
 
   useEffect(() => {
     if (!props.isOpen || !isActiveSession || !isRunning) {
@@ -226,6 +239,10 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
             />
           ) : null}
 
+          {appendNotice ? (
+            <StateNotice description={appendNotice} title="已追加动作" />
+          ) : null}
+
           {draftExercises.length === 0 ? (
             <TrainingSessionEmptyState />
           ) : (
@@ -269,15 +286,39 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
         </main>
 
         <div style={fabWrapStyle}>
+          {fabGesture.isActive ? (
+            <div aria-hidden="true" style={fabHintStackStyle}>
+              <div style={fabHintStyle(theme, fabGesture.direction === "up")}>
+                <Icon name="mic" size={15} />
+                <span>上滑 · 语音追加</span>
+              </div>
+              <div style={fabHintStyle(theme, fabGesture.direction === "right")}>
+                <Icon name="chevron-right" size={15} />
+                <span>右滑 · 动作库</span>
+              </div>
+            </div>
+          ) : null}
           <button
-            aria-label="添加动作"
-            onClick={() => void handleOpenLibrary()}
-            style={fabStyle(theme)}
+            aria-label="添加动作（长按可上滑语音追加、右滑打开动作库）"
+            style={fabStyle(theme, fabGesture.isActive)}
             type="button"
+            {...fabGesture.handlers}
           >
-            <Icon name="plus" size={24} />
+            <Icon name={fabGesture.isActive ? "mic" : "plus"} size={24} />
           </button>
         </div>
+
+        <ActionSheet
+          description="说出动作、重量、次数和组数，确认后会追加到本次训练，不会覆盖已记录的动作。"
+          onClose={() => setIsVoiceSheetOpen(false)}
+          open={isVoiceSheetOpen}
+          title="语音追加动作"
+        >
+          <WorkoutIntakePanel
+            onDraftParsed={handleAppendIntakeDraft}
+            token={props.token}
+          />
+        </ActionSheet>
 
         {restTimer ? (
           <TrainingSessionRestTimer
@@ -389,8 +430,38 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
   async function handleOpenLibrary(): Promise<void> {
     setDuplicateNotice(null);
     setErrorMessage(null);
+    setAppendNotice(null);
     setReplacingDraftExerciseId(null);
     setIsLibraryOpen(true);
+  }
+
+  function handleFabSwipe(direction: FabGestureDirection): void {
+    if (direction === "up") {
+      setDuplicateNotice(null);
+      setErrorMessage(null);
+      setAppendNotice(null);
+      setIsVoiceSheetOpen(true);
+      return;
+    }
+
+    void handleOpenLibrary();
+  }
+
+  function handleAppendIntakeDraft(draft: WorkoutIntakeDraft): void {
+    const mapped = mapWorkoutIntakeDraftToSessionInitialDraft(
+      draft,
+      props.exerciseLibraryProps.exercises,
+    );
+    const result = appendIntakeExercisesToDraft(draftExercises, mapped.exercises);
+    const appendedCount = result.addedCount + result.mergedCount;
+
+    setDraftExercises(result.next);
+    setAppendNotice(
+      appendedCount > 0
+        ? `已通过语音追加 ${appendedCount} 个动作到本次训练。`
+        : "没有识别到可追加的动作。",
+    );
+    setIsVoiceSheetOpen(false);
   }
 
   function handleSelectExercise(exercise: DictionaryExercise): void {
@@ -898,6 +969,8 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
 
   function resetComposerState(): void {
     setDraftExercises([]);
+    setAppendNotice(null);
+    setIsVoiceSheetOpen(false);
     setDuplicateNotice(null);
     setDraftDurationMin(null);
     setDraftEndedAt(null);
@@ -1338,7 +1411,10 @@ const fabWrapStyle: React.CSSProperties = {
   zIndex: 210,
 };
 
-function fabStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function fabStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+  isActive = false,
+): React.CSSProperties {
   return {
     alignItems: "center",
     backgroundColor: theme.colors.ac,
@@ -1350,7 +1426,40 @@ function fabStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPropert
     display: "inline-flex",
     height: 56,
     justifyContent: "center",
+    touchAction: "none",
+    transform: isActive ? "scale(1.08)" : "scale(1)",
+    transition: "transform 120ms ease",
     width: 56,
+  };
+}
+
+const fabHintStackStyle: React.CSSProperties = {
+  bottom: "calc(100% + 12px)",
+  display: "grid",
+  gap: 8,
+  justifyItems: "end",
+  position: "absolute",
+  right: 0,
+};
+
+function fabHintStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+  isActive: boolean,
+): React.CSSProperties {
+  return {
+    alignItems: "center",
+    backgroundColor: isActive ? theme.colors.ac : theme.colors.surf,
+    border: `1px solid ${isActive ? theme.colors.ac : theme.colors.bdr2}`,
+    borderRadius: theme.radius.pill,
+    boxShadow: theme.shadows.card,
+    color: isActive ? theme.colors.acText : theme.colors.tx2,
+    display: "inline-flex",
+    fontSize: 12,
+    fontWeight: 700,
+    gap: 6,
+    padding: "8px 12px",
+    transition: "background-color 120ms ease, color 120ms ease",
+    whiteSpace: "nowrap",
   };
 }
 

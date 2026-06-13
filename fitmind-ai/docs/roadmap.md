@@ -22,7 +22,7 @@
 - 扩展 B（MCP Server）——刻意推迟，未做。
 - 扩展 C（多步 ReAct 训练计划）——只做了单轮版本，缺多步循环 + trace 可视化。
 - 打磨阶段——`§11` 性能精确数字未回填（主观达标）。
-- 语音录入"记录页内"入口 + 手势 FAB（见下方待办 B）。
+- ~~语音录入"记录页内"入口 + 手势 FAB~~ ✅ 2026-06-13 完成（待办 B，见 §1.5 / `progress.md`）。
 
 ---
 
@@ -35,6 +35,7 @@
 - **语音多动作解析**：逗号/`和`·`还有`·`以及`连接词分隔、`磅`→kg、"先报清单再分述"按动作合并去重、词典外的第二个动作不再被吞、`isSetOnlyFragment` 只回填纯组数碎片。
 - **录入 LLM 兜底**：新增 `gemini` 与 `groq` provider（OpenAI 兼容），schema 改宽容、失败原因回传 `fallback_warnings`、429 重试 + 模型可配（`GEMINI_MODEL`/`GROQ_MODEL`）。
 - **候选确认移到语音页**：未匹配/多候选动作在语音页先确认（选候选或移除），只有已匹配的才进 composer；词典外垃圾进不了训练。
+- **记录页内语音（手势 FAB）**：composer 右下 FAB 长按震动 + 视觉提示，上滑=语音追加、右滑=动作库；语音结果**追加**到当前 draft（合并同动作组 / 新动作追加 / id 重排），复用 `WorkoutIntakePanel` 候选确认流。
 
 ---
 
@@ -42,12 +43,13 @@
 
 > 新窗口先读 `AGENTS.md`（含当前状态 + 文档同步规则），再按需读领域文档。部署 = push 到 `main`，Vercel 自动部署。线上验证可用 curl 注册取 token 再打 `/api/training/workout-intake/parse`，看返回的 `evidence.source`。
 
-- **A. 配置 Groq 让自由口语 LLM 解析生效（仅需用户操作，代码已就绪）** 🔴
-  - Vercel 设 `WORKOUT_INTAKE_LLM_PROVIDER=groq` + `GROQ_API_KEY`（console.groq.com 免费 key）→ Redeploy。
-  - 之前 Gemini 免费层对该账号持续 429，故改用 Groq。配好后线上探测应见 `source: llm_structured_fallback`。
-- **B. Batch C：记录页手势 FAB（让"记录页内"也能语音）** 🟠 较大前端
-  - composer 右下"+"：长按有反馈（震动/视觉）→ 上滑=语音输入、右滑=进动作库。
-  - 语音解析结果**追加到当前 draft**（而非新建/替换），并复用 1.6 的语音页候选确认流。
+- **A. 配置 Groq 让自由口语 LLM 解析生效** ✅ 2026-06-13 用户已在 Vercel 配好
+  - 已设 `WORKOUT_INTAKE_LLM_PROVIDER=groq` + `GROQ_API_KEY`（console.groq.com 免费 key）并 Redeploy。
+  - 之前 Gemini 免费层对该账号持续 429，故改用 Groq。线上探测自由口语应见 `source: llm_structured_fallback`（仍建议 curl 复测一次确认）。
+- **B. Batch C：记录页手势 FAB（让"记录页内"也能语音）** ✅ 2026-06-13 完成
+  - composer 右下"+"：长按震动 + 视觉提示 → 上滑=语音追加、右滑=动作库；点按/键盘保留开动作库。
+  - 语音解析结果**追加到当前 draft**（合并同动作组 / 新动作追加 / id 重排），复用 `WorkoutIntakePanel` 候选确认流。
+  - 余项（可选后续）：上滑即自动录音（给 `WorkoutIntakePanel` 加 `autoStart`）。
 - **C. 录入确认页：未匹配动作支持"搜动作库替换"** 🟡
   - 现在未匹配（无候选）只能"移除"；加一个在确认页直接搜词典选动作的入口。
 - **D. 性能精确数字回填** 🟢
