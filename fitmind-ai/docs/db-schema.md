@@ -411,3 +411,24 @@ Safety:
 
 - Saved snapshots keep aggregate Evidence counts, tool names, Source titles/categories, limitations, and a structured output subset.
 - Copy text must not include raw workout/set payload dumps or secrets.
+
+## 10. Athlete Profiles
+
+roadmap §8 Slice 4 adds `athlete_profiles` — one thin profile per user, injected into the next-week-plan agent for personalization + safety.
+
+Columns:
+
+- `user_id uuid primary key references users(id) on delete cascade`（一人一档，user_id 即主键，CRUD 走 upsert）
+- `goal text not null`（check：`strength` / `hypertrophy` / `endurance` / `general_fitness`）
+- `weekly_days smallint not null`（check：1–7）
+- `available_equipment text[] not null default '{}'`（受控词表：barbell/dumbbell/machine/cable/bodyweight/kettlebell）
+- `injury_constraints text[] not null default '{}'`（自由标签，service 层归一化小写 + 去重，≤10 个、每个 ≤40 字）
+- `created_at timestamptz not null default now()`
+- `updated_at timestamptz not null default now()`（upsert 时 `now()` 刷新）
+
+Migration: `20260614100000_create_athlete_profiles.js`。
+
+Safety:
+
+- 档案只存训练目标 / 频率 / 器械 / 伤病约束标签，不存身高体重真实姓名（遵守 AGENTS §7.4 脱敏）。
+- 伤病约束用于在计划草案里加保守安全提示，不作医疗判断。
