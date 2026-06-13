@@ -74,7 +74,7 @@
 
 ---
 
-## 3. Phase 6.0 — Agent / 多步 ReAct 训练计划　🔵 进行中
+## 3. Phase 6.0 — Agent / 多步 ReAct 训练计划　✅ 2026-06-14 完成
 
 原计划"扩展 C"。把单轮 next-week-plan 升级为多步 ReAct 循环（查容量 → 找弱项 → 查进展 → 检索知识 → 生成计划），并提供 trace 可视化。是项目从 "Tool Calling" 跨到 "Agent" 的关键一跃。
 
@@ -82,7 +82,7 @@
 
 - **Batch 6.0-1 — 后端 agent 核心　✅ 2026-06-14**：新增 `server/src/services/agent/`：`react-planner-types.ts`（trace / step / 事件类型）+ `next-week-plan-agent.ts`（确定性 ReAct 策略，注入 `runTool`/`retrieve`/`onStep`/`now`，可单测）+ 4 例单测。策略基于观察分支：空数据第一步即停（`no_data`）；无指定动作则跳过单动作进展；按周频率给"巩固/加量/维持"建议；证据跨步聚合。尚未接入 orchestrator。
 - **Batch 6.0-2 — 接线 + SSE 契约　✅ 2026-06-14**：`assistant-stream-types.ts` 加 `planning` 状态 + `agent_step_started/finished` 事件；`assistant-orchestrator-service.ts` 把 `next_week_plan` 改走 agent（早返回分支，注入 `executeAiTool`/`retrieveKnowledgeChunks`+log/`onStep→SSE`），trace 进 `structured_output` 并持久化，删掉旧单轮 `buildNextWeekPlanAnswer`；客户端 `assistant-types.ts`/`use-assistant-chat.ts` 接事件累积 trace + 未知事件忽略（向前兼容），`AssistantStatusRail` 加 planning 文案；`api-contract.md` + `ai-decisions.md`（D20）已更。
-- **Batch 6.0-3 — 前端 trace 可视化**：新增 `AssistantAgentTrace.tsx` 时间线组件，在消息气泡里挂载渲染 `message.agentTrace`（thought→action→observation + 状态）。
+- **Batch 6.0-3 — 前端 trace 可视化　✅ 2026-06-14**：新增 `AssistantAgentTrace.tsx` 垂直时间线（节点 + 连接线 + kind 图标 + 状态色 chip + thought/工具/耗时/观察），`AssistantMessageBubble` 在答案上方渲染 `message.agentTrace`（默认展开），状态色复用 `getToneColors`。
 
 ---
 

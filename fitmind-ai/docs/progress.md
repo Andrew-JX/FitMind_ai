@@ -4219,3 +4219,19 @@ Verification:
 Notes:
 - 客户端与服务端同批改，保证部署任一时刻不破（旧客户端遇新事件已能忽略）。
 - Batch 3：`AssistantAgentTrace.tsx` 时间线 + 挂载渲染。
+
+## 2026-06-14 Phase 6.0 Batch 3 - 多步 Agent trace 时间线可视化（Phase 6.0 完成）
+
+给多步 ReAct 规划补上前端可视化，Phase 6.0 收尾。
+
+改动：
+- `AssistantAgentTrace.tsx`（新）：垂直时间线。每步 = 左侧节点(kind 图标：tool→tool / retrieval→search / synthesis→zap)+连接线，右侧 标题 + 状态 chip(running/success/error/skipped，色用 getToneColors) + thought + kind 徽章 + 工具名(code) + 耗时 + "观察"行。默认 `<details open>`，标题"多步推理 · N 步 + goal"。
+- `AssistantMessageBubble.tsx`：assistant 消息且有 `agentTrace` 时，在答案文本下、Evidence 之上渲染 trace。
+
+Verification:
+- `pnpm type-check`、`pnpm lint`、`pnpm test:unit`（191）：通过。
+- 真机：问"帮我规划下周训练"→ 流式时间线逐步点亮（planning 状态 + agent_step 事件累积），done 后 structured_output 的 agent_trace 重渲染权威版；历史消息也能展示（trace 已持久化）。
+
+Notes:
+- Phase 6.0（多步 ReAct 训练计划 + trace 可视化）三批全部完成；roadmap §3 标 ✅。
+- 后续可选：让 LLM 真正驱动选工具（开放式 ReAct）、6.1 MCP、性能数字回填（任务 D）、Prettier 欠债（任务 E）。

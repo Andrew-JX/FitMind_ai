@@ -2,6 +2,7 @@ import { Badge } from "../../components/Badge";
 import { Icon } from "../../components/Icon";
 import { IconButton } from "../../components/IconButton";
 import { useTheme } from "../../theme/ThemeContext";
+import { AssistantAgentTrace } from "./AssistantAgentTrace";
 import { isAssistantMessageSaveEligible } from "./assistant-saved-insights";
 import type { AssistantChatMessage } from "./assistant-types";
 
@@ -32,6 +33,9 @@ export function AssistantMessageBubble(props: AssistantMessageBubbleProps) {
         </div>
         <div style={bubbleStyle(theme, isAssistant)}>
           <p style={messageTextStyle}>{message.text || "..."}</p>
+          {isAssistant && message.agentTrace ? (
+            <AssistantAgentTrace trace={message.agentTrace} />
+          ) : null}
           {isAssistant ? (
             <AssistantMessageEvidenceSummary
               message={message}

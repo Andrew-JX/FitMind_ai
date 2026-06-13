@@ -298,7 +298,7 @@ export async function getFatigueScore(
 - **线上地址**：`https://fitmind-ai-psi.vercel.app/`
 - **部署**：Vercel 托管 app/API 合并运行时；PostgreSQL 存用户、训练、消息、知识 chunk、saved insights、feedback。客户端走相对 `/api`，Vercel 上 `VITE_API_BASE_URL` 可留空。
 - **已落地的主流程**：训练日志 CRUD + 自然语言录入、确定性训练分析（summary / progress / muscle-load / recommendation-context / weekly-report）、SSE 助手（intent 路由 + 确定性工具 + RAG + 周报/平台期诊断）、saved insights、产品反馈、可安装 PWA 壳。
-- **多步 Agent（Phase 6.0）**：`next_week_plan` intent 走 `server/src/services/agent/` 的确定性 ReAct 规划器（查容量→找弱项→查进展→检索知识→生成草案），发 `agent_step_*` SSE 事件 + `state:"planning"`，`agent_trace` 进 `structured_output` 持久化。前端 trace 时间线可视化为 Batch 6.0-3。
+- **多步 Agent（Phase 6.0 ✅）**：`next_week_plan` intent 走 `server/src/services/agent/` 的确定性 ReAct 规划器（查容量→找弱项→查进展→检索知识→生成草案），发 `agent_step_*` SSE 事件 + `state:"planning"`，`agent_trace` 进 `structured_output` 持久化；前端 `AssistantAgentTrace.tsx` 在消息气泡里渲染 thought→action→observation 时间线。
 - **RAG**：DB 存知识 chunk，Voyage `voyage-4-lite` + pgvector `vector(1024)`，有 embedding 时用 `0.7*向量 + 0.3*关键词` 混合打分，否则关键词兜底。
 - **鉴权**：HttpOnly + SameSite=Lax 会话 cookie（`fitmind_token`，7 天），刷新不掉线；中间件优先读 cookie、回退 Bearer（保留给 smoke 脚本）。详见 `ai-decisions.md`。
 - **语音/文本录入**：规则解析器（多动作 / 连接词 / 磅→kg / 先报后述合并）+ 可选 LLM 兜底（`WORKOUT_INTAKE_LLM_PROVIDER`= `mock`/`off`/`gemini`/`groq`/`anthropic`）；未匹配/多候选动作在语音页先确认（可"搜动作库替换"选词典动作，或移除），已匹配才进 composer。**记录页内**也可语音：composer 右下 FAB 长按"细胞分裂"成放射菜单（中=收起、上=语音、左=动作库），可滑动松手或点卫星选择；静止时脉冲光环 + "长按"提示，快速轻点仍开动作库。语音解析结果合并/追加进当前 draft，不覆盖（`use-fab-gesture.ts` 速拨手势 + `appendIntakeExercisesToDraft`）。
