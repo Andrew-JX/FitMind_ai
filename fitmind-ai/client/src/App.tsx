@@ -13,6 +13,7 @@ import {
   useAuth,
 } from "./features/auth/use-auth";
 import { FeedbackButton } from "./features/feedback/FeedbackButton";
+import { AthleteProfileButton } from "./features/profile/AthleteProfileButton";
 import { AnalysisView } from "./features/training/AnalysisView";
 import { TrainingView } from "./features/training/TrainingView";
 import { useExerciseSearch } from "./features/training/use-exercise-search";
@@ -113,10 +114,13 @@ export function App() {
       onClearAuth={auth.logout}
       onSelectTab={setActiveTab}
       secondaryAction={
-        <FeedbackButton
-          sourceRoute={getSourceRoute(activeTab)}
-          token={auth.token ?? ""}
-        />
+        <>
+          <AthleteProfileButton token={auth.token} />
+          <FeedbackButton
+            sourceRoute={getSourceRoute(activeTab)}
+            token={auth.token ?? ""}
+          />
+        </>
       }
       subtitle="基于真实训练日志的可追溯 AI 训练分析助手"
       userLabel={auth.user.display_name ?? auth.user.email}

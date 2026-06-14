@@ -857,3 +857,18 @@ client/src/
 - [ ] 半透明背景是否区分了深色/浅色模式的 alpha？
 - [ ] 是否遵守了第 8 节的逻辑约束？
 - [ ] 新增的交互是否需要在 `frontend-current-state.md` 中补充文档？
+## 11. 训练档案表单（AthleteProfileSheet，roadmap §8 FE-3）
+
+Header 右侧操作区加「训练档案」user IconButton（在「反馈」左侧），点开 ActionSheet 表单（Slice 4 运动员档案）：
+
+```
+描述: "档案会注入下周计划：目标决定次数/强度，伤病/每周天数加保守提示。"
+字段（label 12px/500/--fm-tx2）:
+  - 训练目标: select（力量/增肌/耐力/综合健身）
+  - 每周训练天数: select（1~7 天）
+  - 可用器械: chip 多选（杠铃/哑铃/器械/绳索/自重/壶铃），选中=半透明 --fm-ac 底 + --fm-ac 边/字
+  - 伤病约束（可选）: Input，placeholder "用逗号分隔，如：膝盖, 肩"
+footer: 取消（次级）+ 保存档案（主按钮 flex:2）
+```
+
+行为：开表单 `GET /api/athlete-profile` 预填（无则默认增肌/3 天/空）；保存 `PUT`，伤病文本经 `parseInjuryTags`（逗号/空格分隔、去重、小写、≤10 个/≤40 字）。保存成功关闭表单 + Header 显示"训练档案已保存"。

@@ -521,3 +521,10 @@ assistant 的 exercise progress quick prompt 复用逻辑。
 - 接受按钮：`AssistantPlanCard` 底部「设为本周计划」，handler 在 `AssistantChatPanel`（accepting/accepted by message.id），drill 路径同 `onSaveInsight`（panel→list→bubble→plan card）；接受成功后 hook.accept 内部 refresh 顶部卡片。
 
 约束补充：accept 的周期窗口固定为接受当天起 7 天；目标重量为 null 的动作不编造数字。
+
+## 训练档案编辑（2026-06-14，roadmap §8 FE-3）
+
+- `features/profile/athlete-profile-api.ts`：`getAthleteProfile`(GET) / `saveAthleteProfile`(PUT) + 纯 `parseInjuryTags`（逗号/空格分隔、trim、小写、去重、≤10 个/≤40 字）。
+- `AthleteProfileSheet.tsx`：ActionSheet 表单（目标 select / 每周天数 select / 器械 chip 多选 / 伤病逗号输入），开表单 GET 预填、保存 PUT。
+- `AthleteProfileButton.tsx`：Header user IconButton + 开关 sheet + 保存状态文案。挂在 `App.tsx` 的 `secondaryAction`（档案 + 反馈并排）。
+- `services/http-client.ts`：`HttpRequestOptions.method` 联合补 `PUT`（athlete-profile 用 PUT）。

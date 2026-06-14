@@ -4,7 +4,7 @@ import type { ApiError } from "../../../shared/src/errors";
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "";
 
 export interface HttpRequestOptions<TBody> {
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: TBody;
   token?: string | null | undefined;
   signal?: AbortSignal;
