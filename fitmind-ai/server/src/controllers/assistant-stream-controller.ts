@@ -1,13 +1,29 @@
 import type { Request, Response } from "express";
 
 import { runMockAssistantTurn } from "../services/assistant/assistant-orchestrator-service.js";
+import type { MockAssistantTurnResponseData } from "../services/assistant/assistant-orchestrator-service.js";
 import type { AssistantStreamEvent } from "../services/assistant/assistant-stream-types.js";
+import { logAssistantTurnEvent } from "../services/assistant/assistant-turn-observability.js";
 import { createSuccessResponse } from "../utils/api-response.js";
 import { isHttpError } from "../utils/http-error.js";
 
 type AuthLocals = {
   userId: string;
 };
+
+function logTurnTelemetry(
+  result: MockAssistantTurnResponseData,
+  durationMs: number,
+): void {
+  logAssistantTurnEvent({
+    intent: result.intent,
+    durationMs,
+    toolCalls: result.tool_calls,
+    agentStepCount: result.agent_trace?.steps.length ?? null,
+    faithfulness: result.faithfulness ?? null,
+    hasPlan: result.plan !== undefined,
+  });
+}
 
 function writeSseEvent(
   res: Response<unknown, AuthLocals>,
@@ -53,7 +69,9 @@ export async function postMockAssistantTurnController(
   req: Request,
   res: Response<unknown, AuthLocals>,
 ) {
+  const startedAt = Date.now();
   const result = await runMockAssistantTurn(res.locals.userId, req.body);
+  logTurnTelemetry(result, Date.now() - startedAt);
 
   return res.status(200).json(createSuccessResponse(result));
 }
@@ -76,9 +94,10 @@ export async function postAssistantStreamTurnController(
   res.flushHeaders();
 
   let errorEventSent = false;
+  const startedAt = Date.now();
 
   try {
-    await runMockAssistantTurn(res.locals.userId, req.body, {
+    const result = await runMockAssistantTurn(res.locals.userId, req.body, {
       onEvent: async (event) => {
         if (event.type === "error") {
           errorEventSent = true;
@@ -87,6 +106,7 @@ export async function postAssistantStreamTurnController(
         writeSseEvent(res, event);
       },
     });
+    logTurnTelemetry(result, Date.now() - startedAt);
 
     if (!res.writableEnded && !res.destroyed) {
       res.end();
