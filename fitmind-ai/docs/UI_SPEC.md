@@ -872,3 +872,9 @@ footer: 取消（次级）+ 保存档案（主按钮 flex:2）
 ```
 
 行为：开表单 `GET /api/athlete-profile` 预填（无则默认增肌/3 天/空）；保存 `PUT`，伤病文本经 `parseInjuryTags`（逗号/空格分隔、去重、小写、≤10 个/≤40 字）。保存成功关闭表单 + Header 显示"训练档案已保存"。
+
+## 12. faithfulness 徽章 + 限流提示（roadmap §8 FE-4）
+
+**faithfulness 徽章（Slice 1）**：助手消息头部（角色名旁、非流式时）渲染 Badge——verified→`✓ 数据已核对`（success 绿）/ flagged→`⚠ N 处待核`（warning 橙，N=未核对数字个数）。来源 `structured_output.faithfulness`；unchecked/未知状态不渲染。
+
+**限流友好提示（Slice 6）**：助手 turn 触发 429 时，`use-assistant-chat` 把错误码映射成中文——`RATE_LIMITED`→"AI 请求太频繁了，请约 N 秒后再试。"（N 取 `error.details.retry_after_seconds`，无则"稍等片刻"）；`AI_QUOTA_EXCEEDED`→"今天的 AI 使用次数已用完，明天再来吧。"。`AssistantChatPanel` 的错误 StateNotice 改为展示真实 errorMessage（标题"助手暂时无法回应"）。

@@ -486,6 +486,18 @@ function normalizeAgentStepStatus(
 
 function getReadableErrorMessage(error: unknown): string {
   if (error instanceof HttpClientError) {
+    if (error.code === "RATE_LIMITED") {
+      const retryAfter = readRetryAfterSeconds(error.details);
+
+      return retryAfter
+        ? `AI 请求太频繁了，请约 ${retryAfter} 秒后再试。`
+        : "AI 请求太频繁了，请稍等片刻再试。";
+    }
+
+    if (error.code === "AI_QUOTA_EXCEEDED") {
+      return "今天的 AI 使用次数已用完，明天再来吧。";
+    }
+
     return error.message;
   }
 
@@ -494,4 +506,12 @@ function getReadableErrorMessage(error: unknown): string {
   }
 
   return "Assistant chat is unavailable right now.";
+}
+
+function readRetryAfterSeconds(
+  details: Record<string, unknown> | undefined,
+): number | null {
+  const value = details?.["retry_after_seconds"];
+
+  return typeof value === "number" && value > 0 ? value : null;
 }

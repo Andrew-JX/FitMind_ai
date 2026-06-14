@@ -528,3 +528,10 @@ assistant 的 exercise progress quick prompt 复用逻辑。
 - `AthleteProfileSheet.tsx`：ActionSheet 表单（目标 select / 每周天数 select / 器械 chip 多选 / 伤病逗号输入），开表单 GET 预填、保存 PUT。
 - `AthleteProfileButton.tsx`：Header user IconButton + 开关 sheet + 保存状态文案。挂在 `App.tsx` 的 `secondaryAction`（档案 + 反馈并排）。
 - `services/http-client.ts`：`HttpRequestOptions.method` 联合补 `PUT`（athlete-profile 用 PUT）。
+
+## faithfulness 徽章 + 限流提示（2026-06-14，roadmap §8 FE-4）
+
+- `assistant-types` / `assistant-structured-output`：`structured_output.faithfulness` 归一化到 `message.faithfulness`（`normalizeFaithfulness`，只认 verified/flagged）。
+- `AssistantMessageBubble`：消息头渲染 faithfulness Badge（verified=✓ 数据已核对 / flagged=⚠ N 处待核），非流式才显示。
+- `use-assistant-chat`：`getReadableErrorMessage` 把 `RATE_LIMITED`/`AI_QUOTA_EXCEEDED` 映射成中文友好提示（带 retry_after_seconds）。
+- `AssistantChatPanel`：错误 StateNotice 改为展示真实 `chat.errorMessage`（之前是固定文案）。

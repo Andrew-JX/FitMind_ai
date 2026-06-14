@@ -256,8 +256,8 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
 
       {chat.errorMessage ? (
         <StateNotice
-          description="可以重试这次追问，或先确认最新训练记录已经保存。"
-          title="助手响应失败"
+          description={chat.errorMessage}
+          title="助手暂时无法回应"
           tone="error"
         />
       ) : null}

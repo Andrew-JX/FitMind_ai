@@ -4426,3 +4426,22 @@ Verification:
 已知局限（与用户共识，写进 roadmap）：非点名动作无重量目标（需周报回传单动作最高重量的后端小增强）；计划扁平、未按训练日拆分（day-split 是更大后端改动，暂不做）。
 
 下一步可选：FE-3 档案编辑（Slice 4）、FE-4 faithfulness 徽章+限流提示（Slice 1+6）；或回后端做"周报带单动作最高重量"让目标重量更实。
+
+## 2026-06-14 §8 前端集中片 FE-3 / FE-4 - 档案编辑 + faithfulness 徽章 + 限流提示
+
+点亮 Slice 4（档案）/ Slice 1（faithfulness）/ Slice 6（限流）。前端集中片（FE-1..4）全部完成。详见 `UI_SPEC §11/§12`、`roadmap §8`。
+
+FE-3（档案编辑，6 文件含 1 行 http-client 类型补丁）：
+- `features/profile/athlete-profile-api.ts`（GET/PUT + 纯 `parseInjuryTags` + 单测）、`AthleteProfileSheet.tsx`（ActionSheet 表单：目标/每周天数/器械 chip/伤病逗号输入，开表单 GET 预填、保存 PUT）、`AthleteProfileButton.tsx`（Header user IconButton）、`App.tsx`（secondaryAction 加档案按钮）、`services/http-client.ts`（method 联合补 PUT）。
+
+FE-4a（faithfulness 徽章，4 文件）：
+- `assistant-types`/`assistant-structured-output`（`normalizeFaithfulness`）/`AssistantMessageBubble`（消息头 Badge：✓ 数据已核对 / ⚠ N 处待核）+ 单测 2 例。
+
+FE-4b（限流友好提示，2 文件）：
+- `use-assistant-chat`：RATE_LIMITED/AI_QUOTA_EXCEEDED → 中文提示（带 retry_after_seconds）；`AssistantChatPanel`：错误提示展示真实 errorMessage。
+
+Verification:
+- `pnpm type-check`（client+server+shared）/ `pnpm lint` / `pnpm test:unit`（264）：通过。
+- 本机未起 dev 实测视觉；纯展示/类型安全/风格对齐既有组件。
+
+至此前端集中片 FE-1（计划草案卡片）/FE-2（接受+依从度）/FE-3（档案）/FE-4（徽章+限流）全部点亮；后端 §8 Slice 1-6 + 前端均已落地。剩 Slice 7（provider seam 文档）+ 8-10（按需）+ 可选"周报带单动作最高重量"增强。

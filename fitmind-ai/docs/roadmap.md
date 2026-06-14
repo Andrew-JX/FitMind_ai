@@ -154,12 +154,12 @@ saved-insight 分享链接、知识管理后台、离线编辑 / 同步。优先
   - 价值：产品↑↑↑｜成本：中-高（新数据模型）｜依赖：Slice 3 + 4。
   - 后续：前端「接受计划」按钮 + 依从度卡片；依从度可纳入 agent 上下文（下次规划参考上次依从）。
 
-- **前端集中片（点亮 Slice 3/4/5/1/6）　🟠 进行中**
+- **前端集中片（点亮 Slice 3/4/5/1/6）　✅ 2026-06-14 完成**
   - 目标：把后端已落地、UI 仍"隐形"的能力点亮。按用户选择分批：
   - **FE-1 — 计划草案卡片（Slice 3）　✅ 2026-06-14**：助手消息带结构化 `plan` 时渲染 `AssistantPlanCard`（策略 chip + 动作×组×次×目标重量 + basis + notes，目标重量 null 显示"沿用上次重量"不编造）。`assistant-types`/`assistant-structured-output`（`normalizePlan`）/ bubble 接线 + 单测。
   - **FE-2 — 接受计划 + 依从度卡片（Slice 5）　✅ 2026-06-14**：心智模型=本周「目标动作集」（接受一次设为本周目标，常驻卡片哪天打开都在，真实训练按周自动匹配依从度，不强排到具体某天）。FE-2a：`planned-workout-api`（accept/current/abandon + 纯 denormalize/forward-week helper + 单测）+ `use-current-plan` hook + 常驻 `AssistantCurrentPlanCard`（助手页顶部，计划 + 逐动作 done/partial/missed + 依从比例 / 空态）。FE-2b：草案卡片「设为本周计划」按钮，drill 过 panel→list→bubble→plan card 接到 hook.accept，成功后顶部卡片刷新。
   - **FE-3 — 运动员档案编辑（Slice 4）　✅ 2026-06-14**：Header 加「训练档案」user IconButton（`AthleteProfileButton`）→ `AthleteProfileSheet`（ActionSheet 表单：目标 select / 每周天数 select / 器械 chip 多选 / 伤病约束逗号输入），开表单时 `GET /athlete-profile` 预填、保存 `PUT`。新增 `athlete-profile-api`（含纯 `parseInjuryTags` + 单测）；`http-client` method 联合补 `PUT`。
-  - 待办：FE-4 faithfulness 徽章 + 限流提示（Slice 1+6）。
+  - **FE-4 — faithfulness 徽章 + 限流友好提示（Slice 1+6）　✅ 2026-06-14**：FE-4a 助手消息头渲染 faithfulness 徽章（`structured_output.faithfulness` → message.faithfulness，verified="✓ 数据已核对"/flagged="⚠ N 处待核"）。FE-4b 限流友好文案：`use-assistant-chat` 把 `RATE_LIMITED`/`AI_QUOTA_EXCEEDED` 映射成中文提示（带 retry_after_seconds），`AssistantChatPanel` 错误提示改为展示真实 errorMessage。
   - 已知局限（与用户共识）：非点名动作无重量目标（"沿用上次重量"，需周报回传单动作最高重量的后端小增强）；计划是扁平周目标、未按训练日拆分（day-split 是更大的后端改动，暂不做）。
 
 - **Slice 6 — 可观测 + 配额落实　✅ 2026-06-14 完成（2 批）**
