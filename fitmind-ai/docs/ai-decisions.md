@@ -658,3 +658,26 @@ Decision：
 
 Out of scope（本次不做）：
 - 全局 60/IP/分钟与登录限流；分布式计数；telemetry 落库/接 APM；错误轮（失败 turn）的 telemetry。
+
+## [D26] 接受计划 → planned workout 模型 + 依从度（Slice 5）
+
+- **Date**: 2026-06-14
+- **Status**: Accepted（依从度计算器 + 持久化 + HTTP 已落地，分 3 批；合上闭环）
+
+背景：
+- 此前助手能生成下周草案（Slice 3）但用户无法"接受"它，也没有 planned vs performed 反馈。要真正合上 记录→分析→计划→再记录 的产品闭环，需要把草案接成 app 里的计划训练并给依从度。
+
+Decision：
+- **依从度计算器（Batch 1）**：`services/training/plan-adherence.ts` 纯函数 `computePlanAdherence({ plannedExercises, performedExercises })`，动作名 trim+lowercase 匹配，逐动作 done/partial/missed + 动作级/组级依从比例，完成度用 min(performed, planned) 封顶 100%，除零安全。无 LLM、无 DB、6 例单测。比例小数位用命名常量。
+- **持久化（Batch 2）**：`planned_workouts` 表把 `NextWeekPlanDraft` 存为 jsonb 快照 + 周期 + status（active/completed/abandoned）+ 可选 source_message_id。repository（create/getActive/updateStatus）+ service（`acceptPlan` 校验后持久化、`getCurrentPlanWithAdherence`、`setPlanStatus`）。
+- **依从度在读取时计算，不新增 performed 数据**：`getCurrentPlanWithAdherence` 取 active 计划后，用既有 `getTrainingSummary` 拉该周期内已记录训练的 by-exercise，喂给计算器。好处：单一事实来源（performed 永远来自真实训练日志）、计划是快照不漂移、零冗余存储。
+- **计划存快照而非引用动作字典**：jsonb 存草案全文，未来动作字典变化不影响历史计划/依从度回看。
+- **date 列读取转 text**：`start_date::text`，避免 pg 把 date 解析成 JS Date，干净喂给 `getTrainingSummary` 的 `$::date`。
+- **读取时用 zod 解析 jsonb plan**：`planDraftSchema.parse(row.plan)` 既校验又给类型，避免 `as` 类型逃逸（遵守 AGENTS §4）。
+- **HTTP（Batch 3）**：`POST /api/planned-workouts`（接受，201）、`GET /api/planned-workouts/current`（带依从度或 null）、`PATCH /api/planned-workouts/:id`（completed/abandoned）。thin controller + zod `.strict()` 校验 + controller 单测。
+
+与未来的关系：
+- 前端「接受计划」按钮 + 依从度卡片（让闭环在 UI 可见）；依从度可反过来注入 agent 上下文（下次规划参考上次依从，如依从低则更保守）；可加完成单个动作的勾选/手动 override。
+
+Out of scope（本次不做）：
+- 前端 UI；按 set/rep/重量的细粒度依从（当前以动作×组数为粒度）；自动判定计划完成/过期；把依从度喂回 agent。

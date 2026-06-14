@@ -4355,3 +4355,28 @@ Notes:
 - 限流为单进程内存计数，多实例/Serverless 各自计数；分布式需 Redis/DB（接口 seam 不变），已在 D25 / roadmap / api-contract 诚实标注。
 - 全局 60/IP/分钟与登录限流仍未实现（out of scope）。
 - 至此 §8 已完成 Slice 1/2/3/4/6；剩 Slice 5（接受计划→依从度，最重）、7（provider seam 文档）、8-10。前端（档案编辑 + plan 卡片 + 限流提示）仍待集中做。
+
+## 2026-06-14 §8 Slice 5 - 接受计划 → planned workout 模型 + 依从度（3 批）
+
+合上 记录→分析→计划→再记录 闭环：助手草案可「接受」成计划训练，并按 planned vs performed 给依从度。详见 `ai-decisions.md` D26、`db-schema.md §11`、`api-contract.md` Slice 5 Addition。
+
+Batch 1（依从度计算器，纯函数无 DB）：
+- `services/training/plan-adherence.ts`（新）：`computePlanAdherence`，动作名大小写/空格不敏感匹配 → 逐动作 done/partial/missed + 动作级/组级依从比例（min 封顶 100%、除零安全）。+6 例单测。
+
+Batch 2（持久化）：
+- `migrations/20260614110000_create_planned_workouts.js`：jsonb plan 快照 + 周期 + status + 可选 source_message_id + (user_id,status,created_at) 索引。
+- `db/planned-workout-repository.ts`：create / getActive / updateStatus（date 列 ::text 读取）。
+- `services/planned-workout-service.ts`：`acceptPlan`（zod `.strict()` 校验 NextWeekPlanDraft + 持久化）、`getCurrentPlanWithAdherence`（读取时用 `getTrainingSummary` 算依从度，单一事实来源）、`setPlanStatus`；读取 jsonb 用 zod parse 避免 `as`。+4 例注入 fake 单测。
+
+Batch 3（HTTP）：
+- `controllers/planned-workout-controller.ts` + `routes/planned-workouts.ts` + `app.ts` 挂载：`POST /api/planned-workouts`（201）、`GET /api/planned-workouts/current`（带依从度/null）、`PATCH /api/planned-workouts/:id`（completed/abandoned）。+5 例 controller 单测。
+
+Verification:
+- `pnpm type-check` / `pnpm --filter @fitmind/server lint` / `pnpm test:unit`（253）：通过。
+- `pnpm eval`：13/13 + 12/12 + 3/3 Overall PASS（无回归）。
+- DB 链路（迁移/repo SQL）本地无 DATABASE_URL 未实跑，逻辑层已单测；需有 DB 环境跑迁移 + smoke 验证。
+
+Notes:
+- 依从度读取时算、不存冗余：performed 永远来自真实训练日志（单一事实来源），计划 jsonb 快照不随动作字典漂移。
+- 前端「接受计划」按钮 + 依从度卡片留作前端集中片；依从度注入 agent 上下文是后续增强。
+- §8 进度：Slice 1/2/3/4/5/6 全部完成；剩 Slice 7（provider seam 文档，极便宜）+ 8-10 + 前端集中片。

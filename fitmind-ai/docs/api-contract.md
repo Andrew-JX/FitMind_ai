@@ -963,3 +963,63 @@ Validates (zod, `.strict()`) and upserts the profile. Body:
 - `weeklyDays` 1–7；`goal` 受控枚举；`availableEquipment` 受控词表；`injuryConstraints` 自由标签（service 归一化小写 + 去重，≤10 个 / 每个 ≤40 字）。
 - 不接受请求体里的 `user_id` 等额外字段（`.strict()` 拒绝）。
 - Response 200 返回与 GET 相同的 `{ profile }` 结构。
+
+## Slice 5 Addition - Planned Workouts (accept plan + adherence)
+
+把助手生成的下周草案接受成 app 里的计划训练，并按 planned vs performed 给依从度。鉴权必填。
+
+### POST /api/planned-workouts
+
+接受一份计划草案（通常来自助手 `structured_output.plan`），持久化为 active 计划。Body（zod `.strict()`）：
+
+```json
+{
+  "startDate": "2026-06-15",
+  "endDate": "2026-06-21",
+  "plan": {
+    "strategy": "maintain",
+    "exercises": [
+      { "exercise_name": "Barbell Bench Press", "sets": 3, "rep_min": 6, "rep_max": 10, "target_weight_kg": 72.5, "basis": "..." }
+    ],
+    "notes": ["..."]
+  },
+  "sourceMessageId": "uuid (可选)"
+}
+```
+
+- `endDate` 必须 ≥ `startDate`；plan 结构按 `NextWeekPlanDraft` 校验。
+- Response 201：`{ "ok": true, "data": { "plannedWorkout": { id, status, startDate, endDate, plan, sourceMessageId, createdAt, updatedAt } } }`。
+
+### GET /api/planned-workouts/current
+
+返回当前 active 计划 + **读取时计算**的依从度，无则 `plannedWorkout: null`。
+
+Response 200：
+
+```json
+{
+  "ok": true,
+  "data": {
+    "plannedWorkout": {
+      "id": "uuid", "status": "active", "startDate": "...", "endDate": "...",
+      "plan": { "...": "NextWeekPlanDraft" },
+      "adherence": {
+        "planned_exercise_count": 2,
+        "trained_exercise_count": 2,
+        "extra_exercise_count": 0,
+        "exercise_adherence_ratio": 1,
+        "set_adherence_ratio": 0.7143,
+        "exercises": [
+          { "exercise_name": "Barbell Bench Press", "planned_sets": 3, "performed_sets": 3, "status": "done", "set_completion_ratio": 1 }
+        ]
+      }
+    }
+  }
+}
+```
+
+- 依从度按计划周期内已记录训练的 by-exercise（动作名匹配，大小写/空格不敏感）确定性计算；状态 `done` / `partial` / `missed`；比例封顶 100%。
+
+### PATCH /api/planned-workouts/:id
+
+更新计划状态。Body：`{ "status": "completed" | "abandoned" }`（`.strict()`）。计划不存在 → 404 `NOT_FOUND`；Response 200 返回更新后的 `{ plannedWorkout }`。

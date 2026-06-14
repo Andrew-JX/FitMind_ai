@@ -148,9 +148,11 @@ saved-insight 分享链接、知识管理后台、离线编辑 / 同步。优先
   - 价值：产品↑↑、个性化 + 安全｜成本：低-中｜依赖：喂给 Slice 3 更准。
   - 后续：前端档案编辑表单 + DTO 提升到 `shared/`；伤病→动作硬过滤；落库依从度（Slice 5）。
 
-- **Slice 5 — 接受计划 → planned workout 模型 + 依从度　🟡**
+- **Slice 5 — 接受计划 → planned workout 模型 + 依从度　✅ 2026-06-14 完成（3 批）**
   - 一键把生成的计划接成 app 里的「计划训练」，记录 planned vs performed，给依从度反馈。真正合上 记录→分析→计划→再记录。
+  - 落地：Batch 1 依从度计算器（`plan-adherence.ts` 纯函数：planned vs performed 动作名匹配 → done/partial/missed + 动作级/组级比例，封顶 100%、除零安全，6 例单测）；Batch 2 持久化（`planned_workouts` 表 jsonb 快照 + repository + service：`acceptPlan` / `getCurrentPlanWithAdherence`（读取时用 `getTrainingSummary` 算依从度）/ `setPlanStatus`，注入 fake 单测）；Batch 3 HTTP（`POST /api/planned-workouts` 接受、`GET /api/planned-workouts/current` 带依从度、`PATCH /api/planned-workouts/:id` 改状态 + controller 单测）。决策见 `ai-decisions.md` D26。
   - 价值：产品↑↑↑｜成本：中-高（新数据模型）｜依赖：Slice 3 + 4。
+  - 后续：前端「接受计划」按钮 + 依从度卡片；依从度可纳入 agent 上下文（下次规划参考上次依从）。
 
 - **Slice 6 — 可观测 + 配额落实　✅ 2026-06-14 完成（2 批）**
   - 每轮延迟 / 步骤耗时 / 调用计数；落实 AGENTS §7.3 承诺的 50 次/天 + 每分钟限流；token 成本待接真实模型。
