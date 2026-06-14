@@ -8,6 +8,9 @@ import type {
 
 export interface AssistantPlanCardProps {
   plan: AssistantPlanDraft;
+  onAccept?: (() => void) | undefined;
+  isAccepting?: boolean | undefined;
+  isAccepted?: boolean | undefined;
 }
 
 const STRATEGY_LABEL: Record<AssistantPlanStrategy, string> = {
@@ -51,6 +54,21 @@ export function AssistantPlanCard(props: AssistantPlanCardProps) {
             <li key={index}>{note}</li>
           ))}
         </ul>
+      ) : null}
+
+      {props.onAccept ? (
+        <button
+          disabled={props.isAccepting || props.isAccepted}
+          onClick={props.onAccept}
+          style={acceptButtonStyle(theme, props.isAccepted ?? false)}
+          type="button"
+        >
+          {props.isAccepted
+            ? "已设为本周计划"
+            : props.isAccepting
+              ? "接受中…"
+              : "设为本周计划"}
+        </button>
       ) : null}
     </details>
   );
@@ -219,5 +237,23 @@ function notesStyle(
     lineHeight: 1.5,
     margin: "10px 0 0",
     paddingLeft: 16,
+  };
+}
+
+function acceptButtonStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+  isAccepted: boolean,
+): React.CSSProperties {
+  return {
+    backgroundColor: isAccepted ? theme.colors.surf3 : theme.colors.ac,
+    border: "none",
+    borderRadius: theme.radius.control,
+    color: isAccepted ? theme.colors.tx2 : theme.colors.acText,
+    cursor: isAccepted ? "default" : "pointer",
+    fontSize: 13,
+    fontWeight: 700,
+    marginTop: 12,
+    padding: "10px 14px",
+    width: "100%",
   };
 }

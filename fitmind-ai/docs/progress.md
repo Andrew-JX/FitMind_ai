@@ -4399,3 +4399,30 @@ Verification:
 Notes:
 - 目标重量 null 显示"沿用上次重量"，不编造（与后端 D23 一致）；卡片不内联进答案文本，不影响 faithfulness。
 - 本轮只点亮 Slice 3；FE-2 接受计划+依从度（Slice 5）、FE-3 档案编辑（Slice 4）、FE-4 faithfulness 徽章+限流提示（Slice 1+6）待后续按需做。
+
+## 2026-06-14 §8 前端集中片 FE-2 - 接受计划 + 本周计划/依从度卡片（Slice 5 闭环可见）
+
+与用户共定心智模型=本周「目标动作集」（接受一次=设为本周目标，常驻卡片哪天打开都在，真实训练按周自动匹配依从度，不强排到具体某天，匹配现有后端、纯前端）。分 2 批。详见 `UI_SPEC §4.3.3`、`frontend-current-state`、`roadmap §8`。
+
+FE-2a（视图侧，5 文件）：
+- `planned-workout-api.ts`：accept/current/abandon + 纯 helper `denormalizePlanDraft`（camel→snake）/`createForwardWeekRange`（今天起 7 天）。
+- `planned-workout-api.test.ts`：+3 例（denormalize / 日期窗口 / 补零）。
+- `use-current-plan.ts`：hook（token 变化拉 current，accept/abandon/refresh，status/isMutating/actionError）。
+- `AssistantCurrentPlanCard.tsx`：常驻助手页顶部，计划 + 逐动作 done/partial/missed chip（success/warning/neutral 色）+ 依从进度条 + 放弃按钮 + 空/加载/错误态。
+- `AssistantWorkspace.tsx`：挂 hook + 在 IntroCard 之下渲染卡片。
+
+FE-2b（接受按钮 drill，5 文件）：
+- `AssistantPlanCard.tsx`：底部「设为本周计划」全宽主按钮（接受中/已设为本周计划 态）。
+- `AssistantMessageBubble.tsx` / `AssistantMessageList.tsx`：透传 onAcceptPlan / isPlanAccepting / isPlanAccepted（drill 路径同 onSaveInsight）。
+- `AssistantChatPanel.tsx`：handleAcceptPlan（按 message.id 跟踪 accepting/accepted）+ 状态文案，调 props.onAcceptPlan。
+- `AssistantWorkspace.tsx`：把 `currentPlan.accept` 传给 panel，接受成功 hook 内部 refresh 顶部卡片。
+
+Verification:
+- `pnpm type-check`（client+server+shared）/ `pnpm lint` / `pnpm test:unit`（258）：通过。
+- 本机未起 dev 实测视觉；纯展示 + 类型安全 + 风格对齐既有卡片。
+
+解决了用户疑问：第二天打开计划还在（常驻 GET /current 卡片，不用去已保存洞察翻）；"一键接受整周"改为"设为本周目标"（接受一次、真实训练按周填依从度）。
+
+已知局限（与用户共识，写进 roadmap）：非点名动作无重量目标（需周报回传单动作最高重量的后端小增强）；计划扁平、未按训练日拆分（day-split 是更大后端改动，暂不做）。
+
+下一步可选：FE-3 档案编辑（Slice 4）、FE-4 faithfulness 徽章+限流提示（Slice 1+6）；或回后端做"周报带单动作最高重量"让目标重量更实。

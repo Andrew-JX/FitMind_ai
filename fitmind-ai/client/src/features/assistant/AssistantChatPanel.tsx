@@ -16,12 +16,19 @@ import { saveAssistantInsight } from "./assistant-saved-insights-api";
 import type {
   AssistantChatMessage,
   AssistantChatRequestPayload,
+  AssistantPlanDraft,
   AssistantPromptSuggestion,
 } from "./assistant-types";
 import type { UseAssistantChatResult } from "./use-assistant-chat";
 
 export interface AssistantChatPanelProps {
   chat: UseAssistantChatResult;
+  onAcceptPlan?:
+    | ((
+        draft: AssistantPlanDraft,
+        sourceMessageId?: string | undefined,
+      ) => Promise<boolean>)
+    | undefined;
   onPromptSuggestionChange: (prompt: AssistantPromptSuggestion) => void;
   promptSuggestion?: AssistantPromptSuggestion | null | undefined;
   selectedExerciseId?: string | null | undefined;
@@ -41,6 +48,12 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
   const [savedInsightsRefreshKey, setSavedInsightsRefreshKey] = useState(0);
   const [insightStatusText, setInsightStatusText] = useState<string | null>(
     null,
+  );
+  const [acceptingPlanIds, setAcceptingPlanIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [acceptedPlanIds, setAcceptedPlanIds] = useState<Set<string>>(
+    () => new Set(),
   );
   const message = props.promptSuggestion?.message ?? "";
   const mode = props.promptSuggestion?.mode ?? "auto";
@@ -115,6 +128,42 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
     }
   }
 
+  async function handleAcceptPlan(
+    assistantMessage: AssistantChatMessage,
+  ): Promise<void> {
+    if (!assistantMessage.plan || !props.onAcceptPlan) {
+      return;
+    }
+
+    const planKey = assistantMessage.id;
+    setAcceptingPlanIds((currentValues) =>
+      new Set(currentValues).add(planKey),
+    );
+    setInsightStatusText(null);
+
+    try {
+      const accepted = await props.onAcceptPlan(
+        assistantMessage.plan,
+        assistantMessage.messageId,
+      );
+
+      if (accepted) {
+        setAcceptedPlanIds((currentValues) =>
+          new Set(currentValues).add(planKey),
+        );
+        setInsightStatusText("已设为本周计划，可在页面顶部查看完成进度。");
+      } else {
+        setInsightStatusText("接受计划失败，请稍后再试。");
+      }
+    } finally {
+      setAcceptingPlanIds((currentValues) => {
+        const nextValues = new Set(currentValues);
+        nextValues.delete(planKey);
+        return nextValues;
+      });
+    }
+  }
+
   async function handleCopyInsight(
     assistantMessage: AssistantChatMessage,
   ): Promise<void> {
@@ -159,7 +208,18 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
               typeof assistantMessage.messageId === "string" &&
               savingMessageIds.has(assistantMessage.messageId)
             }
+            isPlanAccepted={(assistantMessage) =>
+              acceptedPlanIds.has(assistantMessage.id)
+            }
+            isPlanAccepting={(assistantMessage) =>
+              acceptingPlanIds.has(assistantMessage.id)
+            }
             messages={chat.messages}
+            onAcceptPlan={
+              props.onAcceptPlan
+                ? (assistantMessage) => void handleAcceptPlan(assistantMessage)
+                : undefined
+            }
             onCopyInsight={(assistantMessage) =>
               void handleCopyInsight(assistantMessage)
             }

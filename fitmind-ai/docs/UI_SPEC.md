@@ -667,6 +667,22 @@ border-radius: 10px
 
 约束：目标重量为 null 时显示"沿用上次重量"，**不编造数字**（与后端 D23 一致）。卡片纯展示，不内联进答案文本，不参与 faithfulness 数字扫描。
 
+卡片底部「设为本周计划」按钮（roadmap §8 FE-2）：全宽主按钮（--fm-ac / --fm-ac-txt）。接受中→"接受中…"禁用；接受成功→"已设为本周计划"（--fm-surf3 灰底 + --fm-tx2，禁用）。点击 POST `/api/planned-workouts`（周期=今天起 7 天），成功后页面顶部「本周计划」卡片刷新。
+
+**本周计划卡片（AssistantCurrentPlanCard，roadmap §8 FE-2）**：常驻在 AI 助手页顶部（IntroCard 之下），`GET /api/planned-workouts/current`，**哪天打开都在**。
+
+```
+Card（--fm-surf）。头部: zap 图标 + "本周计划"（15px/700）+「放弃计划」次级按钮
+空态: "还没有本周计划。让助手生成下周训练草案后，点草案上的「设为本周计划」…"
+有计划:
+  - 周期行: "起 ~ 止 · 动作 trained/planned 已练 · 组数依从 XX%"（12px/--fm-tx2）
+  - 进度条（动作依从比例，--fm-ac 填充）
+  - 逐动作行（--fm-surf2, 圆角 soft）: 动作名 + 状态 chip（已完成=success / 部分=warning / 未练=neutral）+ "performed/planned 组"
+  - 计划外动作数提示 + 错误提示（如有）
+```
+
+模型：本周「目标动作集」——接受一次设为本周目标，真实训练按周自动匹配出依从度（不强排到具体某天）。详见 `ai-decisions.md` D26 / 闭环设计。
+
 #### 4.3.4 Context Note
 
 仅当未选中动作时显示：

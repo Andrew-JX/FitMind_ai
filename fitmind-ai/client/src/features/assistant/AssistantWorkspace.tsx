@@ -42,6 +42,7 @@ export function AssistantWorkspace(props: AssistantWorkspaceProps) {
       />
       <AssistantChatPanel
         chat={chat}
+        onAcceptPlan={currentPlan.accept}
         onPromptSuggestionChange={setPromptSuggestion}
         promptSuggestion={promptSuggestion}
         selectedExerciseId={props.selectedExerciseId}

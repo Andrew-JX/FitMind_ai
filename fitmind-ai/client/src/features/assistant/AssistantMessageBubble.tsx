@@ -10,7 +10,10 @@ import type { AssistantChatMessage } from "./assistant-types";
 export interface AssistantMessageBubbleProps {
   isSaved?: boolean | undefined;
   isSaving?: boolean | undefined;
+  isPlanAccepting?: boolean | undefined;
+  isPlanAccepted?: boolean | undefined;
   message: AssistantChatMessage;
+  onAcceptPlan?: ((message: AssistantChatMessage) => void) | undefined;
   onCopyInsight?: ((message: AssistantChatMessage) => void) | undefined;
   onSaveInsight?: ((message: AssistantChatMessage) => void) | undefined;
 }
@@ -38,7 +41,16 @@ export function AssistantMessageBubble(props: AssistantMessageBubbleProps) {
             <AssistantAgentTrace trace={message.agentTrace} />
           ) : null}
           {isAssistant && message.plan ? (
-            <AssistantPlanCard plan={message.plan} />
+            <AssistantPlanCard
+              isAccepted={props.isPlanAccepted}
+              isAccepting={props.isPlanAccepting}
+              onAccept={
+                props.onAcceptPlan
+                  ? () => props.onAcceptPlan?.(message)
+                  : undefined
+              }
+              plan={message.plan}
+            />
           ) : null}
           {isAssistant ? (
             <AssistantMessageEvidenceSummary

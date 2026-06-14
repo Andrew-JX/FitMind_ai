@@ -5,7 +5,10 @@ import { AssistantMessageBubble } from "./AssistantMessageBubble";
 export interface AssistantMessageListProps {
   isMessageSaved?: ((message: AssistantChatMessage) => boolean) | undefined;
   isMessageSaving?: ((message: AssistantChatMessage) => boolean) | undefined;
+  isPlanAccepting?: ((message: AssistantChatMessage) => boolean) | undefined;
+  isPlanAccepted?: ((message: AssistantChatMessage) => boolean) | undefined;
   messages: AssistantChatMessage[];
+  onAcceptPlan?: ((message: AssistantChatMessage) => void) | undefined;
   onCopyInsight?: ((message: AssistantChatMessage) => void) | undefined;
   onSaveInsight?: ((message: AssistantChatMessage) => void) | undefined;
 }
@@ -25,10 +28,13 @@ export function AssistantMessageList(props: AssistantMessageListProps) {
     <div style={listStyle}>
       {props.messages.map((message) => (
         <AssistantMessageBubble
+          isPlanAccepted={props.isPlanAccepted?.(message)}
+          isPlanAccepting={props.isPlanAccepting?.(message)}
           isSaved={props.isMessageSaved?.(message)}
           isSaving={props.isMessageSaving?.(message)}
           key={message.id}
           message={message}
+          onAcceptPlan={props.onAcceptPlan}
           onCopyInsight={props.onCopyInsight}
           onSaveInsight={props.onSaveInsight}
         />
