@@ -154,6 +154,11 @@ saved-insight 分享链接、知识管理后台、离线编辑 / 同步。优先
   - 价值：产品↑↑↑｜成本：中-高（新数据模型）｜依赖：Slice 3 + 4。
   - 后续：前端「接受计划」按钮 + 依从度卡片；依从度可纳入 agent 上下文（下次规划参考上次依从）。
 
+- **前端集中片（点亮 Slice 3/4/5/1/6）　🟠 进行中**
+  - 目标：把后端已落地、UI 仍"隐形"的能力点亮。按用户选择分批：
+  - **FE-1 — 计划草案卡片（Slice 3）　✅ 2026-06-14**：助手消息带结构化 `plan` 时渲染 `AssistantPlanCard`（策略 chip + 动作×组×次×目标重量 + basis + notes，目标重量 null 显示"沿用上次重量"不编造）。`assistant-types`/`assistant-structured-output`（`normalizePlan`）/ bubble 接线 + 单测。
+  - 待办：FE-2 接受计划 + 依从度卡片（Slice 5）；FE-3 运动员档案编辑（Slice 4）；FE-4 faithfulness 徽章 + 限流提示（Slice 1+6）。
+
 - **Slice 6 — 可观测 + 配额落实　✅ 2026-06-14 完成（2 批）**
   - 每轮延迟 / 步骤耗时 / 调用计数；落实 AGENTS §7.3 承诺的 50 次/天 + 每分钟限流；token 成本待接真实模型。
   - 落地：Batch A 每轮可观测（`assistant-turn-observability.ts`：intent/总延迟/工具数+耗时/faithfulness 状态/agent 步数/有无 plan，单行结构化 JSON，两个 turn controller 各一处接入）；Batch B AI 限流（`ai-rate-limiter.ts` 纯固定窗口 20/分→`RATE_LIMITED`、50/天→`AI_QUOTA_EXCEEDED`，注入 store+clock 可单测；`ai-rate-limit-middleware.ts` 挂在 mock-turn / stream-turn 两个 AI 端点）。token 成本待 Slice 7 接真实模型。决策见 `ai-decisions.md` D25。

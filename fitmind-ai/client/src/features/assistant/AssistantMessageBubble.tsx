@@ -3,6 +3,7 @@ import { Icon } from "../../components/Icon";
 import { IconButton } from "../../components/IconButton";
 import { useTheme } from "../../theme/ThemeContext";
 import { AssistantAgentTrace } from "./AssistantAgentTrace";
+import { AssistantPlanCard } from "./AssistantPlanCard";
 import { isAssistantMessageSaveEligible } from "./assistant-saved-insights";
 import type { AssistantChatMessage } from "./assistant-types";
 
@@ -35,6 +36,9 @@ export function AssistantMessageBubble(props: AssistantMessageBubbleProps) {
           <p style={messageTextStyle}>{message.text || "..."}</p>
           {isAssistant && message.agentTrace ? (
             <AssistantAgentTrace trace={message.agentTrace} />
+          ) : null}
+          {isAssistant && message.plan ? (
+            <AssistantPlanCard plan={message.plan} />
           ) : null}
           {isAssistant ? (
             <AssistantMessageEvidenceSummary

@@ -103,6 +103,26 @@ export interface AssistantAgentTrace {
   stopReason?: string | undefined;
 }
 
+export type AssistantPlanStrategy =
+  | "consolidate"
+  | "add_frequency"
+  | "maintain";
+
+export interface AssistantPlannedExercise {
+  exerciseName: string;
+  sets: number;
+  repMin: number;
+  repMax: number;
+  targetWeightKg: number | null;
+  basis: string;
+}
+
+export interface AssistantPlanDraft {
+  strategy: AssistantPlanStrategy;
+  exercises: AssistantPlannedExercise[];
+  notes: string[];
+}
+
 export type AssistantMessageRole = "user" | "assistant";
 
 export interface AssistantChatMessage {
@@ -116,6 +136,7 @@ export interface AssistantChatMessage {
   limitations?: string[] | undefined;
   sources?: AssistantMessageSource[] | undefined;
   agentTrace?: AssistantAgentTrace | undefined;
+  plan?: AssistantPlanDraft | undefined;
 }
 
 export interface AssistantActiveToolCall {
@@ -184,6 +205,22 @@ export interface AssistantStructuredOutput {
               title?: string | undefined;
             }>
           | undefined;
+      }
+    | undefined;
+  plan?:
+    | {
+        strategy?: string | undefined;
+        exercises?:
+          | Array<{
+              exercise_name?: string | undefined;
+              sets?: number | undefined;
+              rep_min?: number | undefined;
+              rep_max?: number | undefined;
+              target_weight_kg?: number | null | undefined;
+              basis?: string | undefined;
+            }>
+          | undefined;
+        notes?: string[] | undefined;
       }
     | undefined;
 }

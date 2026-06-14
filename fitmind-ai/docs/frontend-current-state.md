@@ -506,3 +506,7 @@ assistant 的 exercise progress quick prompt 复用逻辑。
 
 - 你要求重点阅读的 `client/src/features/training/SetEditor.tsx`，当前仓库中并不存在。
 - 当前 set 编辑能力已被内联进 `WorkoutForm.tsx` 与 `use-workout-form.ts`。
+
+## 计划草案卡片（AssistantPlanCard，2026-06-14，roadmap §8 FE-1）
+
+助手消息带结构化 `plan`（`next_week_plan` 草案）时，在消息气泡里（agent trace 之下、Evidence 之上）渲染 `AssistantPlanCard`：策略 chip + 动作行（名称 / 目标重量 / "N 组 × a~b 次" / basis）+ notes。`plan` 由 `mergeStructuredOutputIntoMessage` 的 `normalizePlan` 从 `structured_output.plan` 归一化到 `message.plan`。目标重量为 null 时显示"沿用上次重量"（不编造）。详见 `UI_SPEC.md §4.3.3`。

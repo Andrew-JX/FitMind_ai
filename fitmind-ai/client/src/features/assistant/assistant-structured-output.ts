@@ -2,8 +2,44 @@ import type {
   AssistantChatMessage,
   AssistantMessageEvidence,
   AssistantMessageSource,
+  AssistantPlanDraft,
+  AssistantPlanStrategy,
   AssistantStructuredOutput,
 } from "./assistant-types";
+
+const PLAN_STRATEGIES: readonly AssistantPlanStrategy[] = [
+  "consolidate",
+  "add_frequency",
+  "maintain",
+];
+
+function normalizePlanStrategy(value: string | undefined): AssistantPlanStrategy {
+  return PLAN_STRATEGIES.find((strategy) => strategy === value) ?? "maintain";
+}
+
+function normalizePlan(
+  output: AssistantStructuredOutput,
+): AssistantPlanDraft | undefined {
+  const plan = output.plan;
+  const exercises = plan?.exercises ?? [];
+
+  if (!plan || exercises.length === 0) {
+    return undefined;
+  }
+
+  return {
+    strategy: normalizePlanStrategy(plan.strategy),
+    exercises: exercises.map((exercise) => ({
+      exerciseName: exercise.exercise_name ?? "未命名动作",
+      sets: exercise.sets ?? 0,
+      repMin: exercise.rep_min ?? 0,
+      repMax: exercise.rep_max ?? 0,
+      targetWeightKg: exercise.target_weight_kg ?? null,
+      basis: exercise.basis ?? "",
+    })),
+    notes: plan.notes ?? [],
+  };
+}
 
 function normalizeEvidence(
   output: AssistantStructuredOutput,
@@ -48,6 +84,7 @@ export function mergeStructuredOutputIntoMessage(
           intent: output.intent,
           limitations: output.answer?.limitations ?? [],
           messageId: output.message_id ?? message.messageId,
+          plan: normalizePlan(output),
           sources: normalizeSources(output),
         }
       : message,

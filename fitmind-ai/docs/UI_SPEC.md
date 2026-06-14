@@ -653,6 +653,20 @@ border-radius: 10px
 
 **思考中动画**：3 个 5×5px 圆点，`--fm-tx3` 色，`dotBounce` 动画，每个延迟 120ms。
 
+**计划草案卡片（AssistantPlanCard，roadmap §8 Slice 3）**：当助手消息带结构化 `plan`（`next_week_plan`）时，在 agent trace 之下、Evidence 之上渲染。
+
+```
+背景: --fm-surf2, 边框 1px --fm-bdr, 圆角 control（同 agent trace 容器）
+<details open> 头部: zap 图标 + "下周训练草案 · N 个动作" + 策略 chip（巩固/控制疲劳 · 可小幅加量 · 维持基线）
+动作行（--fm-surf 卡片, 圆角 10px）:
+  - 第一行: 动作名（13px/700）+ 目标重量（右侧，有基线时 --fm-ac "目标 X kg"，无则 --fm-tx3 "沿用上次重量"）
+  - 第二行: "N 组 × a~b 次" pill（--fm-surf2）
+  - basis 说明（11px/--fm-tx3）
+底部 notes: 项目符号列表（11px/--fm-tx2）
+```
+
+约束：目标重量为 null 时显示"沿用上次重量"，**不编造数字**（与后端 D23 一致）。卡片纯展示，不内联进答案文本，不参与 faithfulness 数字扫描。
+
 #### 4.3.4 Context Note
 
 仅当未选中动作时显示：

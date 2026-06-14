@@ -4380,3 +4380,22 @@ Notes:
 - 依从度读取时算、不存冗余：performed 永远来自真实训练日志（单一事实来源），计划 jsonb 快照不随动作字典漂移。
 - 前端「接受计划」按钮 + 依从度卡片留作前端集中片；依从度注入 agent 上下文是后续增强。
 - §8 进度：Slice 1/2/3/4/5/6 全部完成；剩 Slice 7（provider seam 文档，极便宜）+ 8-10 + 前端集中片。
+
+## 2026-06-14 §8 前端集中片 FE-1 - 计划草案卡片（Slice 3 点亮）
+
+把后端已落地、UI 仍"隐形"的结构化下周草案点亮（用户本轮只选这一片）。详见 `UI_SPEC.md §4.3.3`、`roadmap §8 前端集中片`。
+
+改动（client，5 文件）：
+- `assistant-types.ts`：`AssistantStructuredOutput` 加 raw `plan?`；新增 `AssistantPlanDraft`/`AssistantPlannedExercise`/`AssistantPlanStrategy`；`AssistantChatMessage` 加 `plan?`。
+- `assistant-structured-output.ts`：`normalizePlan(output)`（策略归一化、目标重量 null 保留、无动作返回 undefined），并入 `mergeStructuredOutputIntoMessage`（与 evidence/sources 同处，无需动 use-assistant-chat）。
+- `AssistantPlanCard.tsx`（新）：`<details open>` + 策略 chip + 动作行（名称 / 目标重量 / "N 组 × a~b 次" / basis）+ notes，风格对齐 `AssistantAgentTrace`，用 theme token 不硬编码色值。
+- `AssistantMessageBubble.tsx`：agent trace 之下、Evidence 之上渲染 `AssistantPlanCard`。
+- `assistant-structured-output.test.ts`：+2 例（plan 归一化 / 无动作时 undefined）。
+
+Verification:
+- `pnpm type-check`（client+server+shared）/ `pnpm lint`（含 client）/ `pnpm test:unit`（255）：通过。
+- 视觉未在本机起 dev 实测；组件纯展示、类型安全、风格对齐既有 trace 卡片。
+
+Notes:
+- 目标重量 null 显示"沿用上次重量"，不编造（与后端 D23 一致）；卡片不内联进答案文本，不影响 faithfulness。
+- 本轮只点亮 Slice 3；FE-2 接受计划+依从度（Slice 5）、FE-3 档案编辑（Slice 4）、FE-4 faithfulness 徽章+限流提示（Slice 1+6）待后续按需做。
