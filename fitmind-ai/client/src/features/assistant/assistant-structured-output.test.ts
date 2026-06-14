@@ -93,4 +93,35 @@ describe("mergeStructuredOutputIntoMessage", () => {
 
     expect(result[0]?.plan).toBeUndefined();
   });
+
+  it("normalizes a flagged faithfulness result with the claim count", () => {
+    const messages: AssistantChatMessage[] = [
+      { id: "assistant-1", role: "assistant", text: "回答" },
+    ];
+
+    const result = mergeStructuredOutputIntoMessage(messages, "assistant-1", {
+      intent: "weekly_report",
+      faithfulness: {
+        status: "flagged",
+        checkedNumbers: 5,
+        unverifiedClaims: ["999", "42"],
+      },
+    });
+
+    expect(result[0]?.faithfulness?.status).toBe("flagged");
+    expect(result[0]?.faithfulness?.unverifiedClaimCount).toBe(2);
+    expect(result[0]?.faithfulness?.checkedNumbers).toBe(5);
+  });
+
+  it("ignores an unchecked / unknown faithfulness status", () => {
+    const messages: AssistantChatMessage[] = [
+      { id: "assistant-1", role: "assistant", text: "回答" },
+    ];
+
+    const result = mergeStructuredOutputIntoMessage(messages, "assistant-1", {
+      intent: "knowledge",
+    });
+
+    expect(result[0]?.faithfulness).toBeUndefined();
+  });
 });

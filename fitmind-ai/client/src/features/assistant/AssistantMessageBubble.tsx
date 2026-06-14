@@ -34,6 +34,19 @@ export function AssistantMessageBubble(props: AssistantMessageBubbleProps) {
         <div style={metaRowStyle}>
           <span style={nameStyle(theme)}>{isAssistant ? "训练助手" : "你"}</span>
           {message.isStreaming ? <Badge tone="info">生成中</Badge> : null}
+          {isAssistant && !message.isStreaming && message.faithfulness ? (
+            <Badge
+              tone={
+                message.faithfulness.status === "verified"
+                  ? "success"
+                  : "warning"
+              }
+            >
+              {message.faithfulness.status === "verified"
+                ? "✓ 数据已核对"
+                : `⚠ ${message.faithfulness.unverifiedClaimCount} 处待核`}
+            </Badge>
+          ) : null}
         </div>
         <div style={bubbleStyle(theme, isAssistant)}>
           <p style={messageTextStyle}>{message.text || "..."}</p>

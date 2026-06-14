@@ -1,11 +1,31 @@
 import type {
   AssistantChatMessage,
   AssistantMessageEvidence,
+  AssistantMessageFaithfulness,
   AssistantMessageSource,
   AssistantPlanDraft,
   AssistantPlanStrategy,
   AssistantStructuredOutput,
 } from "./assistant-types";
+
+function normalizeFaithfulness(
+  output: AssistantStructuredOutput,
+): AssistantMessageFaithfulness | undefined {
+  const faithfulness = output.faithfulness;
+
+  if (
+    !faithfulness ||
+    (faithfulness.status !== "verified" && faithfulness.status !== "flagged")
+  ) {
+    return undefined;
+  }
+
+  return {
+    status: faithfulness.status,
+    checkedNumbers: faithfulness.checkedNumbers ?? 0,
+    unverifiedClaimCount: faithfulness.unverifiedClaims?.length ?? 0,
+  };
+}
 
 const PLAN_STRATEGIES: readonly AssistantPlanStrategy[] = [
   "consolidate",
@@ -81,6 +101,7 @@ export function mergeStructuredOutputIntoMessage(
       ? {
           ...message,
           evidence: normalizeEvidence(output),
+          faithfulness: normalizeFaithfulness(output),
           intent: output.intent,
           limitations: output.answer?.limitations ?? [],
           messageId: output.message_id ?? message.messageId,

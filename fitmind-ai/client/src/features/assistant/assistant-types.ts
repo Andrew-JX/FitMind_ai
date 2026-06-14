@@ -123,6 +123,12 @@ export interface AssistantPlanDraft {
   notes: string[];
 }
 
+export interface AssistantMessageFaithfulness {
+  status: "verified" | "flagged";
+  checkedNumbers: number;
+  unverifiedClaimCount: number;
+}
+
 export type AssistantMessageRole = "user" | "assistant";
 
 export interface AssistantChatMessage {
@@ -137,6 +143,7 @@ export interface AssistantChatMessage {
   sources?: AssistantMessageSource[] | undefined;
   agentTrace?: AssistantAgentTrace | undefined;
   plan?: AssistantPlanDraft | undefined;
+  faithfulness?: AssistantMessageFaithfulness | undefined;
 }
 
 export interface AssistantActiveToolCall {
@@ -221,6 +228,13 @@ export interface AssistantStructuredOutput {
             }>
           | undefined;
         notes?: string[] | undefined;
+      }
+    | undefined;
+  faithfulness?:
+    | {
+        status?: string | undefined;
+        checkedNumbers?: number | undefined;
+        unverifiedClaims?: string[] | undefined;
       }
     | undefined;
 }
