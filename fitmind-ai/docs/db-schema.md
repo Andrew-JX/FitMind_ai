@@ -432,3 +432,27 @@ Safety:
 
 - 档案只存训练目标 / 频率 / 器械 / 伤病约束标签，不存身高体重真实姓名（遵守 AGENTS §7.4 脱敏）。
 - 伤病约束用于在计划草案里加保守安全提示，不作医疗判断。
+
+## 11. Planned Workouts
+
+roadmap §8 Slice 5 adds `planned_workouts` — 把助手生成的下周草案「接受」成 app 里的计划训练，合上 记录→分析→计划→再记录 闭环。
+
+Columns:
+
+- `id uuid primary key default uuid_generate_v4()`
+- `user_id uuid not null references users(id) on delete cascade`
+- `status text not null default 'active'`（check：`active` / `completed` / `abandoned`）
+- `start_date date not null` / `end_date date not null`（计划周期；读取时转 text 喂给依从度计算）
+- `plan jsonb not null`（`NextWeekPlanDraft` 快照：strategy / exercises[动作×组×次×目标重量] / notes，接受时 zod 校验）
+- `source_message_id uuid references messages(id) on delete set null`（可选：来源助手消息，便于溯源）
+- `created_at` / `updated_at timestamptz not null default now()`
+
+Constraints and indexes:
+
+- `(user_id, status, created_at)` 支持"取当前 active 计划"。
+- 一个用户可有多条历史计划，"当前"取最近 active 一条。
+
+依从度（adherence）：
+
+- **不新增 performed 数据**：依从度在**读取时**确定性计算（`plan-adherence.ts`），把 `plan.exercises` 与该周期内已记录训练的 by-exercise（来自 `getTrainingSummary`）按动作名匹配，得出逐动作 done/partial/missed + 动作级/组级依从比例。
+- 计划是快照，不随后续动作字典变化漂移。
