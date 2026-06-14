@@ -4331,3 +4331,27 @@ Notes:
 - 档案加载 best-effort：故障降级到默认增肌方案，核心规划不受影响。
 - 前端档案编辑 UI + DTO 提升到 shared/ 留作前端片；伤病→动作硬过滤、落库依从度是 Slice 5。
 - 下一片：§8 Slice 5（接受计划 → planned workout 模型 + 依从度）或 Slice 6（可观测 + 配额）。
+
+## 2026-06-14 §8 Slice 6 - 可观测 + AI 配额限流（2 批，Track 1）
+
+回摆 Track 1（AI 工程）平衡 Slice 3/4 的 Track 2：每轮 telemetry + 兑现 AGENTS §7.3 的 AI 限流。详见 `ai-decisions.md` D25、`api-contract.md §9`。
+
+Batch A（每轮可观测）：
+- `services/assistant/assistant-turn-observability.ts`（新）：`buildAssistantTurnLogEvent` + `logAssistantTurnEvent`，记录 intent/总延迟/工具数+错误数+总工具耗时/agent 步数/faithfulness 状态/有无 plan，单行结构化 JSON。
+- `assistant-turn-observability.test.ts`（4 例）。
+- `controllers/assistant-stream-controller.ts`：mock-turn + stream-turn 各测量总延迟并 `logTurnTelemetry`（接 controller 层避免 orchestrator 循环依赖）。token 成本待 Slice 7。
+
+Batch B（AI 限流）：
+- `services/assistant/ai-rate-limiter.ts`（新）：纯固定窗口 `createAiRateLimiter({perMinute,perDay,now})`，20/分→RATE_LIMITED、50/天→AI_QUOTA_EXCEEDED（命名常量），注入 store+clock，仅放行时消费计数，retryAfterSeconds 到窗口末。
+- `ai-rate-limiter.test.ts`（5 例：到顶拦截 / 分钟窗复位 / 日配额 / 拦截不消费日计数 / 用户隔离）。
+- `middleware/ai-rate-limit-middleware.ts`（新）：`createAiRateLimitMiddleware(limiter)` 工厂 + 内存单例默认，超限抛 429 HttpError（带 retry_after_seconds）。+ 2 例中间件测。
+- `routes/assistant.ts`：mock-turn / stream-turn 两端点挂 `aiRateLimitMiddleware`（authMiddleware 之后）。
+
+Verification:
+- `pnpm type-check` / `pnpm --filter @fitmind/server lint` / `pnpm test:unit`（238）：通过。
+- `pnpm eval`：13/13 + 12/12 + 3/3 Overall PASS（无回归）。
+
+Notes:
+- 限流为单进程内存计数，多实例/Serverless 各自计数；分布式需 Redis/DB（接口 seam 不变），已在 D25 / roadmap / api-contract 诚实标注。
+- 全局 60/IP/分钟与登录限流仍未实现（out of scope）。
+- 至此 §8 已完成 Slice 1/2/3/4/6；剩 Slice 5（接受计划→依从度，最重）、7（provider seam 文档）、8-10。前端（档案编辑 + plan 卡片 + 限流提示）仍待集中做。

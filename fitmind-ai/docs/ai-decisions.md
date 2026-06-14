@@ -638,3 +638,23 @@ Decision：
 
 Out of scope（本次不做）：
 - 前端档案编辑 UI；按器械/伤病硬过滤动作；把档案喂给非 next_week_plan 的其它 intent；档案历史版本。
+
+## [D25] 可观测 + AI 配额限流（observability + rate limit，Slice 6）
+
+- **Date**: 2026-06-14
+- **Status**: Accepted（每轮 telemetry + 限流中间件已落地，分 2 批；Track 1 AI 工程，回摆平衡 Slice 3/4 的 Track 2）
+
+背景：
+- AGENTS §7.3 承诺的 AI 限流（20/分、50/天）此前只是文档承诺、未实现；助手每轮也没有延迟/调用计数等运维 telemetry。要兑现承诺并具备"每轮可观测"。
+
+Decision：
+- **每轮可观测（Batch A）**：`assistant-turn-observability.ts` 纯 builder `buildAssistantTurnLogEvent` + `logAssistantTurnEvent`，记录 intent / 总延迟 / 工具调用数 + 错误数 + 总工具耗时 / agent 步数 / faithfulness 状态（verified/flagged/unchecked）/ 有无 plan，单行结构化 JSON。**接入点选在两个 turn controller**（mock-turn / stream-turn）各一处，而非 orchestrator——避免 observability ↔ orchestrator 循环依赖，且 controller 能拿到完整 response（tool_calls/agent_trace/faithfulness/plan 都在里面）+ 测量总延迟。**token 成本故意不记**，等 Slice 7 接真实计费 provider 再加。
+- **AI 限流（Batch B）**：`ai-rate-limiter.ts` 纯固定窗口限流器 `createAiRateLimiter({ perMinute, perDay, now })`，注入 store（内存 Map）+ clock，可确定性单测；每用户每分钟 20 次超限 → `RATE_LIMITED`，每天 50 次 → `AI_QUOTA_EXCEEDED`（命名常量来自 §7.3），仅在完全放行时才消费计数器，retryAfterSeconds 给到窗口末尾。`ai-rate-limit-middleware.ts` 用 `createAiRateLimitMiddleware(limiter)` 工厂（可注入 limiter 便于测）+ 默认内存单例，挂在 mock-turn / stream-turn 两个 AI 端点（authMiddleware 之后，拿到 res.locals.userId），超限抛 `HttpError(429, code, …, { retry_after_seconds })` 走统一错误处理。
+- **为何内存计数而非 DB/Redis**：与项目 mock-first、零依赖、可单测定位一致；先把承诺落地 + 接口 seam 建好。**诚实标注限制**：单进程内存计数，多实例/Serverless 各自计数，分布式需 Redis/DB 计数器（`AiRateLimiter` 接口不变，换实现即可）。
+- **为何错误码这样映射**：每分钟超限是瞬时退避 → `RATE_LIMITED`；每天 50 次是硬上限 → `AI_QUOTA_EXCEEDED`，两者都是文档里已有的 429 码，前端/调用方可区分"稍后重试"vs"今日用尽"。
+
+与未来的关系：
+- Slice 7 接真实模型后：observability 加 token/成本字段、限流可叠加成本预算；分布式部署换 Redis/DB 计数。
+
+Out of scope（本次不做）：
+- 全局 60/IP/分钟与登录限流；分布式计数；telemetry 落库/接 APM；错误轮（失败 turn）的 telemetry。

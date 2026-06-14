@@ -10,6 +10,7 @@ import {
   postAssistantStreamTurnController,
   postMockAssistantTurnController,
 } from "../controllers/assistant-stream-controller.js";
+import { aiRateLimitMiddleware } from "../middleware/ai-rate-limit-middleware.js";
 import { authMiddleware } from "../middleware/auth-middleware.js";
 
 export const assistantRouter = Router();
@@ -23,5 +24,13 @@ assistantRouter.delete(
   "/assistant/insights/:id",
   deleteAssistantSavedInsightController,
 );
-assistantRouter.post("/assistant/mock-turn", postMockAssistantTurnController);
-assistantRouter.post("/assistant/stream-turn", postAssistantStreamTurnController);
+assistantRouter.post(
+  "/assistant/mock-turn",
+  aiRateLimitMiddleware,
+  postMockAssistantTurnController,
+);
+assistantRouter.post(
+  "/assistant/stream-turn",
+  aiRateLimitMiddleware,
+  postAssistantStreamTurnController,
+);

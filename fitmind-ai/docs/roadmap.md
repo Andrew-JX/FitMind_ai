@@ -152,9 +152,11 @@ saved-insight 分享链接、知识管理后台、离线编辑 / 同步。优先
   - 一键把生成的计划接成 app 里的「计划训练」，记录 planned vs performed，给依从度反馈。真正合上 记录→分析→计划→再记录。
   - 价值：产品↑↑↑｜成本：中-高（新数据模型）｜依赖：Slice 3 + 4。
 
-- **Slice 6 — 可观测 + 配额落实　🟢**
+- **Slice 6 — 可观测 + 配额落实　✅ 2026-06-14 完成（2 批）**
   - 每轮延迟 / 步骤耗时 / 调用计数；落实 AGENTS §7.3 承诺的 50 次/天 + 每分钟限流；token 成本待接真实模型。
+  - 落地：Batch A 每轮可观测（`assistant-turn-observability.ts`：intent/总延迟/工具数+耗时/faithfulness 状态/agent 步数/有无 plan，单行结构化 JSON，两个 turn controller 各一处接入）；Batch B AI 限流（`ai-rate-limiter.ts` 纯固定窗口 20/分→`RATE_LIMITED`、50/天→`AI_QUOTA_EXCEEDED`，注入 store+clock 可单测；`ai-rate-limit-middleware.ts` 挂在 mock-turn / stream-turn 两个 AI 端点）。token 成本待 Slice 7 接真实模型。决策见 `ai-decisions.md` D25。
   - 价值：运维 / AI 面试↑｜成本：低｜依赖：token 成本部分待 Slice 7。
+  - 已知限制：限流为单进程内存计数，多实例/Serverless 各自计数；分布式需 Redis/DB 计数（接口 seam 不变）。
 
 - **Slice 7 — provider seam 审计 + 决策文档　🟢（极便宜，可随 Slice 1/2 叙述穿插）**
   - 核对 provider 抽象足够干净（换模型只动一层）；在 `ai-decisions.md` 记："为何因成本暂用 Groq 免费、接真实大模型会变什么"——流式 token 计费、prompt caching 经济学、faithfulness 校验/eval 变得更必要（真实模型会编造，mock 不会）、延迟/成本遥测、降级链。

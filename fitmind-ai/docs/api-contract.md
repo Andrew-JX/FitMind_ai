@@ -612,6 +612,8 @@ export const TOOL_DEFINITIONS = [
 
 超限返回 `429` + `Retry-After` header。
 
+**已实现（roadmap §8 Slice 6）**：AI turn 端点 `POST /api/assistant/mock-turn` 与 `POST /api/assistant/stream-turn` 已挂 per-user 限流中间件——每用户 20 次/分钟超限返回 `RATE_LIMITED`、50 次/天超限返回 `AI_QUOTA_EXCEEDED`，均为 `429`，`error.details.retry_after_seconds` 给出重试秒数。当前为单进程内存计数（多实例/Serverless 各自计数；分布式需 Redis/DB，接口 seam 不变）。全局 60/IP/分钟与登录限流尚未实现。
+
 ------
 
 ## 10. 版本演进
