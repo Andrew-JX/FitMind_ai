@@ -1,5 +1,5 @@
 {
-  "name": "fitmind-ai",
+  "name": "fitmindai",
   "main": "cloudflare-worker/index.js",
   "compatibility_date": "2026-06-15",
   "assets": {
