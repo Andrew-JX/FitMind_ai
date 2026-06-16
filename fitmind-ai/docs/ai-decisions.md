@@ -703,3 +703,38 @@ DTO 边界：
 
 局限 / 未来：
 - 估算 1RM 用单组 Epley 的组内最大值，高次低重的耐力组可能高估，仅作起始重量参考；前端把非 focus 动作的具体目标重量渲染出来仍待前端片；依从度尚未按目标重量细粒度比对（仍以动作×组数为粒度，见 D26）。
+- **2026-06-17 修订**：`buildPlannedExercise` 的 basis 文案此前直接拼接原始浮点 1RM（实地走查时杠铃深蹲显示「估算 1RM 110.83333333333333 kg」）。修复为用 `formatOneRmForDisplay`（取整到 1 位小数）仅做**展示**取整；目标重量仍用未取整 1RM × 强度比例再 `roundToPlate`，避免复合误差。+1 例防回归单测。
+
+## [D28] Provider seam 审计 + 真实模型上线决策（roadmap §8 Slice 7）
+
+- **Date**: 2026-06-17
+- **Status**: Accepted（审计 + 文档；本片不改代码，发现的接缝气味记为后续片）
+
+背景：
+- 共识是「暂只用免费 / mock provider 控成本，但保留干净的 provider seam，等接真实大模型时只动一层」。本片做两件事：(1) 审计现有 provider 抽象是否真的「换模型只动一层」；(2) 把「为何暂缓接真实大模型、真接时哪些维度会变」写成可讲的决策记录（PM + AI 工程两边都要能答）。
+- 定位锚点：本产品的差异化是「证据绑定、确定性、不是套壳 ChatGPT」。provider 只负责**选意图 / 选工具 / 措辞**，所有**数字与结论都来自确定性计算层**——这条决定了换模型的风险面很小（模型不产出数据，只产出路由与自然语言）。
+
+审计结论 —— 三处独立 LLM/embedding 接缝：
+1. **助手轮 provider**（主 tool-calling / 措辞路径）：`AssistantProvider` 接口（`provider-types.ts`）+ `provider-adapter.ts`（按 `ASSISTANT_PROVIDER` 选）+ `provider-config.ts` + `anthropic-provider.ts` / `mock-provider.ts`。**换模型只动一层成立**：加 provider = 1 个新实现文件 + 扩 `ASSISTANT_PROVIDER` enum + adapter switch 一个分支。adapter 还做了 `ensureAllowedTool`（拒绝模型编造的工具名）和统一错误归一化，是干净的防御边界。
+2. **训练录入解析**（`workout-intake-llm-parser.ts`）：`WorkoutIntakeLlmRawParser` 工厂按 `WORKOUT_INTAKE_LLM_PROVIDER`（`off`/`mock`/`anthropic`/`gemini`/`groq`）选；返回裸字符串 → 宽松 zod 兜底（`llmWorkoutIntakeOutputSchema`），解析失败回退规则解析器。已有免费 provider（groq/gemini）。
+3. **RAG embedding**（`voyage-embedding-client.ts`）：Voyage `voyage-4-lite` / 1024 维，常量固定，独立一层。
+
+发现的接缝气味（不阻塞，记为后续可改进，**本片不改**）：
+- **A. 助手轮缺免费 provider**：`ASSISTANT_PROVIDER` 只有 `mock`/`anthropic`，没有 Groq。「暂只用 Groq 免费」其实只覆盖录入解析这一缝；助手轮要真零成本上线需补一个 Groq 实现（OpenAI 兼容 `chat/completions`，工具调用走 `tools`/`tool_choice`）。
+- **B. 模型 id + api version 硬编码且重复**：`claude-sonnet-4-20250514` 与 `2023-06-01` 在 `provider-config.ts` 和 `workout-intake-llm-parser.ts` 各写一份。换模型/升级版本要动两个文件，「只动一层」不完全成立。建议收进 env（如 `ANTHROPIC_MODEL`）或共享常量。
+- **C.「流式」名不符实**：SSE 推的是**确定性 agent 步骤**（`agent_step_*`、`provider_selected`），`runAssistantProvider` 本身是单次**非流式** fetch。真正的 token 级流式输出 + 流式计费需要 provider 层支持 streaming（`stream: true` + 增量解析）。
+
+Decision（为何暂缓接真实大模型）：
+- **成本**：真实模型按 token 计费，开发/eval/demo 高频调用会持续烧钱；mock provider 让全链路、eval、E2E 零成本可复现。
+- **确定性 / 可复现**：mock 输出确定，单测与 `pnpm eval` 能断言 intent 路由 / 拒答 / faithfulness；真实模型有随机性，不适合做回归断言的**基线**。
+- **风险面已被架构压到最小**：模型不产出用户可见数字（数字来自计算层 + faithfulness 校验），所以「先用 mock 把护栏/闭环做扎实，再换模型」是低风险顺序。
+
+真接真实大模型时，会变的维度（这条是面试可讲的核心）：
+- **流式 token 计费**：provider 层加 streaming；observability（D25）补 input/output token 数与成本字段；限流（D25）从「次数」叠加「token / 成本预算」。
+- **Prompt caching 经济学**：system prompt + 工具定义是稳定前缀，可用 provider 的 prompt caching 显著降本；意味着 prompt 要稳定、把易变上下文后置。
+- **faithfulness / eval 从「锦上添花」变「刚需」**：mock 不会编造，真实模型会——D21 的运行时 faithfulness 校验和 D22 的 eval 门禁此时才真正发挥拦截价值（编造数字会被标注 / 回归会非零退出）。这正是先做 Slice 1/2 的理由。
+- **延迟 / 成本遥测**：D25 的每轮 telemetry 补真实延迟分布与每轮成本，用于预算告警。
+- **降级链**：真实 provider 故障 / 超预算 → 回退到更便宜模型或 mock / 确定性兜底，保证核心「记录→分析」不依赖外部模型可用性。
+
+与未来的关系 / Out of scope：
+- 本片纯文档，不补 Groq 助手 provider（气味 A）、不收编模型常量（气味 B）、不做流式（气味 C）——这些是接真实模型那一片（或独立的小 seam 清理片）的工作。届时按上面的「会变维度」清单逐项落地。

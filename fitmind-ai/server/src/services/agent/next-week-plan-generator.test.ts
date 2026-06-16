@@ -124,6 +124,25 @@ describe("generateNextWeekPlan", () => {
     expect(plan.exercises[0]?.basis).toContain("沿用上次");
   });
 
+  it("rounds the estimated 1RM shown in basis copy to one decimal (no float tail)", () => {
+    const plan = generateNextWeekPlan({
+      ...baseInput,
+      focusExercise: null,
+      topExercises: [
+        {
+          exerciseName: "Barbell Squat",
+          setCount: 6,
+          estimated1RmKg: 110.83333333333333,
+          maxWeightKg: 100,
+        },
+      ],
+    });
+
+    const basis = plan.exercises[0]?.basis ?? "";
+    expect(basis).toContain("110.8 kg");
+    expect(basis).not.toMatch(/\d\.\d{2,}/);
+  });
+
   it("deduplicates the focus exercise out of the top-exercise list", () => {
     const plan = generateNextWeekPlan({
       ...baseInput,

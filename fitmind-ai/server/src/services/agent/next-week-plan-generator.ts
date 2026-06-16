@@ -135,10 +135,11 @@ function buildPlannedExercise(
   if (baseline.estimated1RmKg !== null && baseline.estimated1RmKg > 0) {
     return {
       ...base,
+      // 目标重量用未取整的 1RM 算，避免复合误差；只在 basis 文案里把 1RM 显示取整。
       target_weight_kg: roundToPlate(
         baseline.estimated1RmKg * scheme.intensityPctOf1Rm,
       ),
-      basis: `基于估算 1RM ${baseline.estimated1RmKg} kg 的 ${Math.round(
+      basis: `基于估算 1RM ${formatOneRmForDisplay(baseline.estimated1RmKg)} kg 的 ${Math.round(
         scheme.intensityPctOf1Rm * 100,
       )}%（${scheme.repMin}~${scheme.repMax} 次区间起始重量）。`,
     };
@@ -210,4 +211,14 @@ function describeGoal(goal: PlanGoal): string {
 
 function roundToPlate(value: number): number {
   return Math.round(value / WEIGHT_ROUNDING_KG) * WEIGHT_ROUNDING_KG;
+}
+
+/**
+ * 把估算 1RM 取整到 1 位小数用于 basis 文案展示（去掉浮点尾巴，如 110.8333… → 110.8）。
+ *
+ * @param value - 原始估算 1RM（kg）
+ * @returns 适合展示的数值（整数则不带小数点）
+ */
+function formatOneRmForDisplay(value: number): number {
+  return Math.round(value * 10) / 10;
 }

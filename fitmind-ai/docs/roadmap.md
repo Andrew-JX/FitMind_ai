@@ -174,9 +174,11 @@ saved-insight 分享链接、知识管理后台、离线编辑 / 同步。优先
   - 价值：运维 / AI 面试↑｜成本：低｜依赖：token 成本部分待 Slice 7。
   - 已知限制：限流为单进程内存计数，多实例/Serverless 各自计数；分布式需 Redis/DB 计数（接口 seam 不变）。
 
-- **Slice 7 — provider seam 审计 + 决策文档　🟢（极便宜，可随 Slice 1/2 叙述穿插）**
+- **Slice 7 — provider seam 审计 + 决策文档　✅ 2026-06-17 完成（纯文档）**
   - 核对 provider 抽象足够干净（换模型只动一层）；在 `ai-decisions.md` 记："为何因成本暂用 Groq 免费、接真实大模型会变什么"——流式 token 计费、prompt caching 经济学、faithfulness 校验/eval 变得更必要（真实模型会编造，mock 不会）、延迟/成本遥测、降级链。
+  - 落地：审计三处接缝（助手轮 `AssistantProvider`/adapter、录入解析 `WorkoutIntakeLlmRawParser` 工厂、RAG `voyage-embedding-client`），结论是三处都「换模型只动一层」成立；记录 3 个接缝气味为后续片（A 助手轮缺 Groq 免费 provider、B 模型 id+api version 硬编码且两处重复、C「流式」实为 SSE 推确定性步骤而非 token 级流式）。决策见 `ai-decisions.md` D28。纯文档，零代码改动。
   - 价值：AI 面试↑｜成本：极低（文档为主）｜依赖：无。
+  - 后续：接真实模型那一片按 D28「会变维度」清单逐项落地，并可顺手清掉气味 A/B/C。
 
 - **Slice 8 — 主动周报推送**（定时任务 + PWA 通知）：留存 / agent 主动性。🟢
 - **Slice 9 — MCP Server（原 6.1）**：确定性工具暴露给 Claude Desktop。面试话题强、产品价值低（诚实标注为面试彩蛋）。⚪

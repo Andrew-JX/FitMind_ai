@@ -1,5 +1,9 @@
 # FitMind AI 前端现状盘点
 
+> ⚠️ **正文（§1–12）已严重过时（2026-05-07 快照），描述的是重构前形态，请勿据此判断现状。** 该快照写的是「英文毛坯单页、token 仅内存保存、刷新丢失」；**现状完全不同**：前端已按 `docs/UI_SPEC.md` 完整落地——深色优先、移动端居中（`AppShell`，max-width 430）、底部三 tab（训练 / 分析 / AI 助手）、全中文、完整 design tokens + 组件库；鉴权是 **HttpOnly cookie 会话**（刷新保持登录，见 `ai-decisions.md` D19）。三个 tab 均产品级，AI 助手含主动洞察看板、多步 agent trace、计划草案卡、faithfulness 徽章。
+>
+> 要看真实现状：读 `client/src/` 实际代码，或本地跑（`pnpm dev:server` + `pnpm dev:client`，demo 账号 `assistant-demo@fitmind.local` / `Passw0rd!`，先 `pnpm seed:assistant-demo`）。文末「计划草案卡片」起的增量段是新的；§1–12 待后续单独大修重写。
+
 本文基于 2026-05-07 当前仓库中的前端实现整理，供后续 Claude Design 做中文 UI 设计输入，也供后续 Codex 做等价前端重构时校验逻辑边界。
 
 ## 1. 当前前端整体结构

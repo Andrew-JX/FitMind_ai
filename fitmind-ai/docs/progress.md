@@ -4471,3 +4471,39 @@ Verification:
 - 未起 dev 实测；纯确定性后端 + 类型安全 + 单测覆盖。
 
 已知局限：前端把非 focus 动作的具体目标重量渲染出来仍待前端片（卡片已支持 null/数值两态，数据现已带上）；估算 1RM 用组内 Epley 最大值，仅作起始重量参考。
+
+## 2026-06-17 §8 Slice 7 - provider seam 审计 + 决策文档（纯文档）
+
+核对 provider 抽象是否「换模型只动一层」，并把「为何暂用 mock/免费、接真实大模型会变什么」写成可讲的决策记录。本片**零代码改动**，纯文档。决策见 `ai-decisions.md` D28，进度见 `roadmap §8 Slice 7`。
+
+审计结论 —— 三处独立 LLM/embedding 接缝，均「换模型只动一层」成立：
+- 助手轮 `AssistantProvider` 接口 + `provider-adapter`（按 `ASSISTANT_PROVIDER` 选）+ `anthropic`/`mock` 实现；adapter 还做 `ensureAllowedTool` + 错误归一化。
+- 录入解析 `WorkoutIntakeLlmRawParser` 工厂（按 `WORKOUT_INTAKE_LLM_PROVIDER`：off/mock/anthropic/gemini/groq）+ 宽松 zod 兜底。
+- RAG `voyage-embedding-client`（Voyage voyage-4-lite / 1024 维）。
+
+记录 3 个接缝气味为后续片（本片不改）：
+- A：助手轮只有 mock/anthropic，无 Groq 免费 provider（「暂用 Groq 免费」其实只覆盖录入解析）。
+- B：anthropic 模型 id + api version 硬编码且在 `provider-config.ts` 与 `workout-intake-llm-parser.ts` 两处重复，「只动一层」不完全成立 → 建议收进 env/常量。
+- C：「流式」是 SSE 推确定性 agent 步骤，`runAssistantProvider` 是单次非流式 fetch；真 token 级流式/计费需 provider 支持 streaming。
+
+D28 还记了接真实大模型会变的维度（面试核心）：流式 token 计费、prompt caching 经济学、faithfulness/eval 从锦上添花变刚需（mock 不编造、真实模型会）、延迟/成本遥测、降级链。
+
+Verification:
+- 纯文档改动（`ai-decisions.md` D28、`roadmap.md` §8 Slice 7、`progress.md` 本条），无代码改动，故不跑 type-check/lint/test/eval。
+- 用户拍板范围＝纯文档；审计发现的气味 A/B/C 记为已知 follow-up，留给接真实模型片或独立 seam 清理片。
+
+## 2026-06-17 可用性打磨批次（实地走查后修复）
+
+把 App 跑起来（demo 账号 `assistant-demo@fitmind.local`）实地走查三个 tab + 一轮 next_week_plan agent 后，修掉走查当场发现的问题。
+
+修复 #1（真 bug · server）：`next-week-plan-generator.ts` 的 `buildPlannedExercise` basis 文案直接拼接原始浮点估算 1RM，导致下周草案里杠铃深蹲显示「估算 1RM 110.83333333333333 kg」。新增 `formatOneRmForDisplay`（取整 1 位小数）只对展示取整，目标重量仍用未取整 1RM 算再 `roundToPlate`（不引入复合误差）。+1 例防回归单测。这是 D27/Slice 3.1 让更多动作走该路径后放大的。决策见 `ai-decisions.md` D27（2026-06-17 修订）。
+
+修复 #2（文案 · client）：`TrainingStatsStrip.tsx` 训练 tab 顶部统计写「本月训练 / 同步本月训练数据」，但数据实为近 30 天范围（`useTrainingSummary` 默认 today-29..today，分析 tab 已正确写「30 天总览」）。改为「近 30 天训练 / 近 30 天训练总结的快速统计」。
+
+修复 #3（文档隐患）：`frontend-current-state.md` 正文（§1–12，2026-05-07 快照）描述的是重构前英文毛坯单页 + token 内存保存，与现状（已按 UI_SPEC 落地的深色移动端 tabbed App + HttpOnly cookie 鉴权）严重矛盾，照它规划会跑偏。顶部加醒目过时横幅指向真实现状 + 本地复跑方式；§1–12 全量重写属大修，留作后续单独片。
+
+Verification:
+- `pnpm type-check`（client+server+shared）/ `pnpm test:unit`（269，+1）/ `pnpm eval`（intent 13/13、refusal 12/12、faithfulness 3/3，PASS）：通过。改动文件 eslint EXIT 0。`format:check` 历史欠债不动。
+- 实地复跑：#2 训练 tab 显示「近 30 天训练」（「本月训练」消失）；#1 直接打 `/api/assistant/mock-turn`（mode=next_week_plan）确认杠铃深蹲 basis = 「估算 1RM 110.8 kg」（浮点尾巴消除），目标重量 75/55/80/57.5 不变。
+
+走查另记（未改，留作后续）：自由追问「给我一个下周训练草案」（mode=auto）被 intent 分类路由成 recommendation 而非 next_week_plan——文本分类对「草案」信号弱；非 bug，属分类器调优，按需再议。
