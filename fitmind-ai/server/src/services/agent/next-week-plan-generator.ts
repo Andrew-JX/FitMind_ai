@@ -33,16 +33,20 @@ const SETS_BY_MODE: Record<ProgressionMode, number> = {
   add_frequency: 4,
 };
 
+/** 单个动作的重量基线（来自周报 top_exercises 或单动作进展），都可能缺失。 */
+interface ExerciseWeightBaseline {
+  estimated1RmKg: number | null;
+  maxWeightKg: number | null;
+}
+
 /** 生成器输入：从 weekly report / exercise progress (+ 运动员档案) 提取后的干净结构。 */
 export interface NextWeekPlanGeneratorInput {
   progressionMode: ProgressionMode;
   weakArea: string | null;
-  topExercises: Array<{ exerciseName: string; setCount: number }>;
-  focusExercise: {
-    exerciseName: string;
-    estimated1RmKg: number | null;
-    maxWeightKg: number | null;
-  } | null;
+  topExercises: Array<
+    { exerciseName: string; setCount: number } & ExerciseWeightBaseline
+  >;
+  focusExercise: ({ exerciseName: string } & ExerciseWeightBaseline) | null;
   profile?: PlanProfileContext | null | undefined;
 }
 
@@ -69,7 +73,14 @@ export function generateNextWeekPlan(
   const seen = new Set<string>();
 
   if (input.focusExercise) {
-    exercises.push(buildFocusExercise(input.focusExercise, sets, scheme));
+    exercises.push(
+      buildPlannedExercise(
+        input.focusExercise.exerciseName,
+        input.focusExercise,
+        sets,
+        scheme,
+      ),
+    );
     seen.add(input.focusExercise.exerciseName);
   }
 
@@ -83,14 +94,14 @@ export function generateNextWeekPlan(
     }
 
     seen.add(topExercise.exerciseName);
-    exercises.push({
-      exercise_name: topExercise.exerciseName,
-      sets,
-      rep_min: scheme.repMin,
-      rep_max: scheme.repMax,
-      target_weight_kg: null,
-      basis: "无单独 1RM 基线，沿用上次训练重量并小幅保守渐进。",
-    });
+    exercises.push(
+      buildPlannedExercise(
+        topExercise.exerciseName,
+        topExercise,
+        sets,
+        scheme,
+      ),
+    );
   }
 
   return {
@@ -100,44 +111,49 @@ export function generateNextWeekPlan(
   };
 }
 
-function buildFocusExercise(
-  focus: NonNullable<NextWeekPlanGeneratorInput["focusExercise"]>,
+/**
+ * 由一个动作的重量基线（估算 1RM / 近期最高重量）确定性推导一条计划动作。
+ *
+ * focus 与非 focus 动作共用这一套规则：优先用估算 1RM × 目标强度比例算起始重量，
+ * 退化到近期最高训练重量，两者都没有（含纯自重动作的 0 基线）时保持
+ * target_weight_kg=null 并提示"沿用上次重量"，绝不编造数字。
+ *
+ * @param exerciseName - 动作名
+ * @param baseline - 该动作的估算 1RM 与近期最高重量（可缺失）
+ * @param sets - 工作组数（由进展策略决定）
+ * @param scheme - 训练目标对应的次数区间与目标强度
+ * @returns 一条结构化计划动作
+ */
+function buildPlannedExercise(
+  exerciseName: string,
+  baseline: ExerciseWeightBaseline,
   sets: number,
   scheme: GoalScheme,
 ): PlannedExercise {
-  if (focus.estimated1RmKg !== null) {
-    const targetWeight = roundToPlate(
-      focus.estimated1RmKg * scheme.intensityPctOf1Rm,
-    );
+  const base = { exercise_name: exerciseName, sets, rep_min: scheme.repMin, rep_max: scheme.repMax };
 
+  if (baseline.estimated1RmKg !== null && baseline.estimated1RmKg > 0) {
     return {
-      exercise_name: focus.exerciseName,
-      sets,
-      rep_min: scheme.repMin,
-      rep_max: scheme.repMax,
-      target_weight_kg: targetWeight,
-      basis: `基于估算 1RM ${focus.estimated1RmKg} kg 的 ${Math.round(
+      ...base,
+      target_weight_kg: roundToPlate(
+        baseline.estimated1RmKg * scheme.intensityPctOf1Rm,
+      ),
+      basis: `基于估算 1RM ${baseline.estimated1RmKg} kg 的 ${Math.round(
         scheme.intensityPctOf1Rm * 100,
       )}%（${scheme.repMin}~${scheme.repMax} 次区间起始重量）。`,
     };
   }
 
-  if (focus.maxWeightKg !== null) {
+  if (baseline.maxWeightKg !== null && baseline.maxWeightKg > 0) {
     return {
-      exercise_name: focus.exerciseName,
-      sets,
-      rep_min: scheme.repMin,
-      rep_max: scheme.repMax,
-      target_weight_kg: roundToPlate(focus.maxWeightKg),
+      ...base,
+      target_weight_kg: roundToPlate(baseline.maxWeightKg),
       basis: "无估算 1RM，以近期最高训练重量为基线，保持后再小幅渐进。",
     };
   }
 
   return {
-    exercise_name: focus.exerciseName,
-    sets,
-    rep_min: scheme.repMin,
-    rep_max: scheme.repMax,
+    ...base,
     target_weight_kg: null,
     basis: "暂无重量基线，沿用上次训练重量并小幅保守渐进。",
   };

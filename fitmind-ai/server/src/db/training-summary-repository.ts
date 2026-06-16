@@ -24,6 +24,8 @@ interface TrainingSummaryExerciseRow {
   set_count: number;
   total_reps: number;
   total_volume: string | number;
+  max_weight_kg: string | number | null;
+  estimated_1rm_kg: string | number | null;
 }
 
 export interface TrainingSummaryRepositoryResult {
@@ -119,7 +121,11 @@ export async function getTrainingSummary(
           COALESCE(
             SUM(COALESCE(s.weight_kg, 0) * COALESCE(s.reps, 0)),
             0
-          )::numeric AS total_volume
+          )::numeric AS total_volume,
+          MAX(COALESCE(s.weight_kg, 0))::numeric AS max_weight_kg,
+          MAX(
+            COALESCE(s.weight_kg, 0) * (1 + (COALESCE(s.reps, 0)::numeric / 30))
+          )::numeric AS estimated_1rm_kg
         FROM workouts w
         JOIN sets s ON s.workout_id = w.id
         JOIN exercises e ON e.id = s.exercise_id

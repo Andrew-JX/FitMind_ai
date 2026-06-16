@@ -9,8 +9,18 @@ const baseInput: NextWeekPlanGeneratorInput = {
   progressionMode: "maintain",
   weakArea: null,
   topExercises: [
-    { exerciseName: "Barbell Bench Press", setCount: 8 },
-    { exerciseName: "Barbell Squat", setCount: 6 },
+    {
+      exerciseName: "Barbell Bench Press",
+      setCount: 8,
+      estimated1RmKg: null,
+      maxWeightKg: null,
+    },
+    {
+      exerciseName: "Barbell Squat",
+      setCount: 6,
+      estimated1RmKg: null,
+      maxWeightKg: null,
+    },
   ],
   focusExercise: null,
 };
@@ -60,12 +70,76 @@ describe("generateNextWeekPlan", () => {
     expect(plan.exercises[0]?.basis).toContain("最高训练重量");
   });
 
+  it("derives a target weight for a non-focus top exercise from its estimated 1RM", () => {
+    const plan = generateNextWeekPlan({
+      ...baseInput,
+      focusExercise: null,
+      topExercises: [
+        {
+          exerciseName: "Barbell Squat",
+          setCount: 6,
+          estimated1RmKg: 150,
+          maxWeightKg: 130,
+        },
+      ],
+    });
+
+    const squat = plan.exercises[0];
+    // hypertrophy default: 150 * 0.72 = 108 → nearest 2.5kg plate.
+    expect(squat?.exercise_name).toBe("Barbell Squat");
+    expect(squat?.target_weight_kg).toBe(107.5);
+    expect(squat?.basis).toContain("1RM");
+  });
+
+  it("falls back to recent max weight for a non-focus top exercise without 1RM", () => {
+    const plan = generateNextWeekPlan({
+      ...baseInput,
+      focusExercise: null,
+      topExercises: [
+        {
+          exerciseName: "Barbell Row",
+          setCount: 5,
+          estimated1RmKg: null,
+          maxWeightKg: 71,
+        },
+      ],
+    });
+
+    expect(plan.exercises[0]?.target_weight_kg).toBe(70);
+    expect(plan.exercises[0]?.basis).toContain("最高训练重量");
+  });
+
+  it("keeps the target null for a bodyweight exercise whose only baseline is zero", () => {
+    const plan = generateNextWeekPlan({
+      ...baseInput,
+      focusExercise: {
+        exerciseName: "Pull Up",
+        estimated1RmKg: 0,
+        maxWeightKg: 0,
+      },
+    });
+
+    expect(plan.exercises[0]?.exercise_name).toBe("Pull Up");
+    expect(plan.exercises[0]?.target_weight_kg).toBeNull();
+    expect(plan.exercises[0]?.basis).toContain("沿用上次");
+  });
+
   it("deduplicates the focus exercise out of the top-exercise list", () => {
     const plan = generateNextWeekPlan({
       ...baseInput,
       topExercises: [
-        { exerciseName: "Barbell Bench Press", setCount: 8 },
-        { exerciseName: "Barbell Squat", setCount: 6 },
+        {
+          exerciseName: "Barbell Bench Press",
+          setCount: 8,
+          estimated1RmKg: null,
+          maxWeightKg: null,
+        },
+        {
+          exerciseName: "Barbell Squat",
+          setCount: 6,
+          estimated1RmKg: null,
+          maxWeightKg: null,
+        },
       ],
       focusExercise: {
         exerciseName: "Barbell Bench Press",
@@ -84,6 +158,8 @@ describe("generateNextWeekPlan", () => {
       topExercises: Array.from({ length: 8 }, (_, index) => ({
         exerciseName: `Exercise ${index}`,
         setCount: 5,
+        estimated1RmKg: null,
+        maxWeightKg: null,
       })),
     });
 

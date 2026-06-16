@@ -27,7 +27,13 @@ function createWeeklyResult(overrides: Record<string, unknown> = {}): unknown {
     },
     frequency: { range_days: 7, workouts_per_week: 4 },
     top_exercises: [
-      { exercise_name: "Barbell Bench Press", set_count: 8, total_volume: 4000 },
+      {
+        exercise_name: "Barbell Bench Press",
+        set_count: 8,
+        total_volume: 4000,
+        max_weight_kg: 80,
+        estimated_1rm_kg: 100,
+      },
     ],
     top_muscle_groups: [{ muscle_group_name: "胸", contribution_ratio: 0.4 }],
     low_volume_muscle_groups: [{ muscle_group_name: "腿", contribution_ratio: 0.05 }],
@@ -157,6 +163,19 @@ describe("runNextWeekPlanAgent", () => {
     const finished = events.filter((event) => event.phase === "finished");
     expect(started).toHaveLength(5);
     expect(finished).toHaveLength(5);
+  });
+
+  it("derives a target weight for a non-focus top exercise from its weekly max/1RM", async () => {
+    const { deps } = createDeps();
+
+    const output = await runNextWeekPlanAgent(baseInput, deps);
+
+    const planned = output.plan?.exercises.find(
+      (exercise) => exercise.exercise_name === "Barbell Bench Press",
+    );
+    // hypertrophy default: 100 * 0.72 = 72 → nearest 2.5kg plate.
+    expect(planned?.target_weight_kg).toBe(72.5);
+    expect(planned?.basis).toContain("1RM");
   });
 
   it("inspects exercise progress when an exercise id is provided", async () => {

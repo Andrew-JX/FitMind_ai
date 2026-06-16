@@ -160,7 +160,13 @@ saved-insight 分享链接、知识管理后台、离线编辑 / 同步。优先
   - **FE-2 — 接受计划 + 依从度卡片（Slice 5）　✅ 2026-06-14**：心智模型=本周「目标动作集」（接受一次设为本周目标，常驻卡片哪天打开都在，真实训练按周自动匹配依从度，不强排到具体某天）。FE-2a：`planned-workout-api`（accept/current/abandon + 纯 denormalize/forward-week helper + 单测）+ `use-current-plan` hook + 常驻 `AssistantCurrentPlanCard`（助手页顶部，计划 + 逐动作 done/partial/missed + 依从比例 / 空态）。FE-2b：草案卡片「设为本周计划」按钮，drill 过 panel→list→bubble→plan card 接到 hook.accept，成功后顶部卡片刷新。
   - **FE-3 — 运动员档案编辑（Slice 4）　✅ 2026-06-14**：Header 加「训练档案」user IconButton（`AthleteProfileButton`）→ `AthleteProfileSheet`（ActionSheet 表单：目标 select / 每周天数 select / 器械 chip 多选 / 伤病约束逗号输入），开表单时 `GET /athlete-profile` 预填、保存 `PUT`。新增 `athlete-profile-api`（含纯 `parseInjuryTags` + 单测）；`http-client` method 联合补 `PUT`。
   - **FE-4 — faithfulness 徽章 + 限流友好提示（Slice 1+6）　✅ 2026-06-14**：FE-4a 助手消息头渲染 faithfulness 徽章（`structured_output.faithfulness` → message.faithfulness，verified="✓ 数据已核对"/flagged="⚠ N 处待核"）。FE-4b 限流友好文案：`use-assistant-chat` 把 `RATE_LIMITED`/`AI_QUOTA_EXCEEDED` 映射成中文提示（带 retry_after_seconds），`AssistantChatPanel` 错误提示改为展示真实 errorMessage。
-  - 已知局限（与用户共识）：非点名动作无重量目标（"沿用上次重量"，需周报回传单动作最高重量的后端小增强）；计划是扁平周目标、未按训练日拆分（day-split 是更大的后端改动，暂不做）。
+  - 已知局限（与用户共识）：~~非点名动作无重量目标（"沿用上次重量"，需周报回传单动作最高重量的后端小增强）~~ **✅ 2026-06-17 由 Slice 3.1 修复**；计划是扁平周目标、未按训练日拆分（day-split 是更大的后端改动，暂不做）。
+
+- **Slice 3.1 — 周报回传单动作最高重量（补 Slice 3 局限）　✅ 2026-06-17 完成**
+  - 目标：让非 focus 的 top 动作也能给出具体目标重量，而不是恒为 null。
+  - 落地：`training-summary` 的 `by_exercise` 聚合 SQL 增 `max_weight_kg` + Epley `estimated_1rm_kg`（与单动作进展同款规则）→ 周报 `top_exercises` 透传 → agent `buildGeneratorInput` 读进每个 top 动作 → 生成器把 focus/非 focus 的重量推导统一成共享 `buildPlannedExercise`（有 1RM 用 1RM×强度%、退化到 max、再无则 null）。顺手修掉自重 0 基线会显示 `target 0kg` 的旧行为。计划重量仍只挂 `structured_output.plan`、不进答案文本（守 faithfulness）。决策见 `ai-decisions.md` D27。
+  - 价值：产品↑（闭环更实，非点名动作也有可执行目标重量）｜成本：低｜依赖：Slice 3。
+  - 已知局限：前端把非 focus 动作的具体目标重量渲染出来仍待前端片（卡片已支持 null/数值两态，数据现在带上了）；估算 1RM 用组内 Epley 最大值，仅作起始重量参考。
 
 - **Slice 6 — 可观测 + 配额落实　✅ 2026-06-14 完成（2 批）**
   - 每轮延迟 / 步骤耗时 / 调用计数；落实 AGENTS §7.3 承诺的 50 次/天 + 每分钟限流；token 成本待接真实模型。

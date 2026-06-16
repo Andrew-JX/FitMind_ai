@@ -30,6 +30,8 @@ export interface TrainingSummaryExerciseDto {
   set_count: number;
   total_reps: number;
   total_volume: number;
+  max_weight_kg: number | null;
+  estimated_1rm_kg: number | null;
 }
 
 export interface TrainingSummaryEvidenceDto {
@@ -58,6 +60,12 @@ const exerciseSchema = z.object({
   set_count: z.number().int().nonnegative(),
   total_reps: z.number().int().nonnegative(),
   total_volume: z.preprocess(normalizeNumericValue, z.number().nonnegative()),
+  max_weight_kg: z
+    .preprocess(normalizeNumericValue, z.number().nonnegative())
+    .nullable(),
+  estimated_1rm_kg: z
+    .preprocess(normalizeNumericValue, z.number().nonnegative())
+    .nullable(),
 });
 
 /**
@@ -97,6 +105,7 @@ export async function getUserTrainingSummary(
         "total_reps sums reps across all included sets, treating nullable values as zero if encountered.",
         "total_volume sums weight_kg multiplied by reps across all included sets, treating nullable values as zero if encountered.",
         "by_exercise groups included sets by exercise_id and exercise name, then calculates set_count, total_reps, and total_volume for each group.",
+        "by_exercise max_weight_kg returns the maximum weight_kg per exercise group, and estimated_1rm_kg uses the Epley formula weight_kg * (1 + reps / 30) taking the maximum per group, treating nullable weight_kg or reps as zero.",
       ],
     },
   };

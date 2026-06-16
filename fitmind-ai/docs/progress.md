@@ -4445,3 +4445,29 @@ Verification:
 - 本机未起 dev 实测视觉；纯展示/类型安全/风格对齐既有组件。
 
 至此前端集中片 FE-1（计划草案卡片）/FE-2（接受+依从度）/FE-3（档案）/FE-4（徽章+限流）全部点亮；后端 §8 Slice 1-6 + 前端均已落地。剩 Slice 7（provider seam 文档）+ 8-10（按需）+ 可选"周报带单动作最高重量"增强。
+
+## 2026-06-17 §8 Slice 3.1 - 周报回传单动作最高重量（补 Slice 3 局限）
+
+补上计划生成器的已知局限：非 focus 的 top 动作此前目标重量恒为 null（"沿用上次重量"），根因是周报 `top_exercises` 来自 `training-summary` 的 `by_exercise`、不带单动作重量基线。本片把单动作最高重量/估算 1RM 从聚合层一路接到生成器。决策见 `ai-decisions.md` D27，进度见 `roadmap §8 Slice 3.1`。
+
+后端（5 源文件）：
+- `db/training-summary-repository.ts`：`by_exercise` 分组 SQL 增 `MAX(COALESCE(s.weight_kg,0)) AS max_weight_kg` + Epley `MAX(COALESCE(s.weight_kg,0)*(1+COALESCE(s.reps,0)/30)) AS estimated_1rm_kg`（与 `exercise-progress-repository` 同款规则）；行接口加两字段。
+- `services/training/training-summary-service.ts`：`TrainingSummaryExerciseDto` + `exerciseSchema` 加 `max_weight_kg`/`estimated_1rm_kg`（nullable preprocess 数字）+ 一条 by_exercise 计算规则文案。
+- `services/training/weekly-training-report-service.ts`：`WeeklyTrainingReportExerciseDto` 加两字段（`top_exercises` 仍直接 slice 透传，运行时已带，补类型让 agent 类型安全）。
+- `services/agent/next-week-plan-generator.ts`：`NextWeekPlanGeneratorInput.topExercises` 元素加 `estimated1RmKg/maxWeightKg`；抽共享 `buildPlannedExercise`（focus 与 top 动作共用：有 1RM 用取整(1RM×强度%)、退化到 max、再无则 null+"沿用上次重量"）；顺手把 ≤0 基线（自重动作 max=0）判为 null，修掉旧 focus 自重显示 `target 0kg`。
+- `services/agent/next-week-plan-agent.ts`：`buildGeneratorInput` 的 topExercises map 读 `estimated_1rm_kg/max_weight_kg`。
+
+测试（4 文件）：
+- `next-week-plan-generator.test.ts`：fixtures 补两字段 + 新增「top 动作带 1RM 算出具体 target」「只有 max 退化」「自重 0 基线保持 null」3 例。
+- `next-week-plan-agent.test.ts`：`createWeeklyResult` top_exercises 补重量 + 新增「非 focus top 动作目标重量从周报 max/1RM 派生」断言（100×0.72=72→72.5）。
+- `weekly-training-report-service.test.ts`：by_exercise fixture 补两字段 + 断言 top_exercises 透传 max/1RM。
+- `planned-workout-service.test.ts`：`buildSummary` 的 byExercise fixture 补两字段（满足收紧后的 row 类型）。
+
+硬约束守住：计划重量仍只挂 `structured_output.plan`、不进答案文本（faithfulness 数字扫描看不到派生重量）；绝不编造（无基线仍 null）；DTO 是 server 本地类型，无前后端 shared 漂移。
+
+Verification:
+- `pnpm type-check`（client+server+shared）/ `pnpm test:unit`（268）/ `pnpm eval`（intent 13/13、refusal 12/12、faithfulness 3/3，PASS）：通过。
+- `pnpm lint`：本片 9 个改动文件 eslint EXIT 0；仓库唯一红的是 `cloudflare-worker/index.js` + `functions/api/[[path]].js`（commit b147415 Cloudflare 配置遗留的 no-undef，非本片，属历史欠债，同 format:check）。
+- 未起 dev 实测；纯确定性后端 + 类型安全 + 单测覆盖。
+
+已知局限：前端把非 focus 动作的具体目标重量渲染出来仍待前端片（卡片已支持 null/数值两态，数据现已带上）；估算 1RM 用组内 Epley 最大值，仅作起始重量参考。

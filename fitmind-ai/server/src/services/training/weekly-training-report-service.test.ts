@@ -133,6 +133,8 @@ describe("getUserWeeklyTrainingReport", () => {
           set_count: 9,
           total_reps: 45,
           total_volume: 6000,
+          max_weight_kg: 82.5,
+          estimated_1rm_kg: 96.25,
         },
       ],
       evidence: {
@@ -217,6 +219,8 @@ describe("getUserWeeklyTrainingReport", () => {
     });
     expect(report.totals.total_volume).toBe(14250);
     expect(report.top_exercises[0]?.exercise_name).toBe("Bench Press");
+    expect(report.top_exercises[0]?.max_weight_kg).toBe(82.5);
+    expect(report.top_exercises[0]?.estimated_1rm_kg).toBe(96.25);
     expect(report.top_muscle_groups[0]?.muscle_group_name).toBe("Chest");
     expect(report.low_volume_muscle_groups[0]?.muscle_group_name).toBe("Legs");
     expect(report.recovery_notes[0]).toContain("latest recorded workout");

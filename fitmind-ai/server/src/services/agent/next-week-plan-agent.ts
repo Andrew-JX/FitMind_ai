@@ -164,10 +164,15 @@ function buildGeneratorInput(context: {
 
       return exerciseName === null
         ? null
-        : { exerciseName, setCount: readNumber(record?.set_count) ?? 0 };
+        : {
+            exerciseName,
+            setCount: readNumber(record?.set_count) ?? 0,
+            estimated1RmKg: readNumber(record?.estimated_1rm_kg),
+            maxWeightKg: readNumber(record?.max_weight_kg),
+          };
     })
     .filter(
-      (item): item is { exerciseName: string; setCount: number } =>
+      (item): item is NextWeekPlanGeneratorInput["topExercises"][number] =>
         item !== null,
     );
 

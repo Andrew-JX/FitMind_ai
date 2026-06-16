@@ -34,6 +34,8 @@ export interface WeeklyTrainingReportExerciseDto {
   set_count: number;
   total_reps: number;
   total_volume: number;
+  max_weight_kg: number | null;
+  estimated_1rm_kg: number | null;
 }
 
 export interface WeeklyTrainingReportMuscleGroupDto {

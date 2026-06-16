@@ -681,3 +681,25 @@ Decision：
 
 Out of scope（本次不做）：
 - 前端 UI；按 set/rep/重量的细粒度依从（当前以动作×组数为粒度）；自动判定计划完成/过期；把依从度喂回 agent。
+
+## [D27] 周报回传单动作最高重量 → 非 focus 动作目标重量（补 D23 局限）
+
+- **Date**: 2026-06-17
+- **Status**: Accepted（聚合 + 接线 + 单测已落地）
+
+背景：
+- D23 的计划生成器只有 focus 动作（即用户指定、走 `get_exercise_progress` 的动作）有重量基线，能算出具体 `target_weight_kg`；其余 top 动作目标重量恒为 `null`，前端只能显示"沿用上次重量"。根因写在 D23 的 Out of scope：周报 `top_exercises` 来自 `training-summary` 的 `by_exercise`，只带 `exercise_name + set_count + total_*`，不带单动作重量，所以非 focus 动作没有重量基线。
+
+Decision：
+- **在聚合层加重量基线，而不是在周报里 enrich**：`training-summary-repository.ts` 的 `by_exercise` 分组 SQL 增 `MAX(COALESCE(s.weight_kg,0)) AS max_weight_kg` 和 `MAX(COALESCE(s.weight_kg,0) * (1 + COALESCE(s.reps,0)/30)) AS estimated_1rm_kg`（Epley，与 `exercise-progress-repository` 同款规则）。`training-summary-service` 的 `TrainingSummaryExerciseDto` + zod schema、`weekly-training-report-service` 的 `WeeklyTrainingReportExerciseDto` 各加这两个 nullable 字段；周报 `top_exercises` 本就直接 slice 透传，运行时自然带上。
+  - **为何聚合而非 enrich**：enrich 要对每个 top 动作再发一次 `getExerciseProgress` 查询（N 次往返）；而 `by_exercise` 聚合本就扫同一批 sets，加两个 `MAX` 几乎零成本，且和单动作进展共用同一条计算规则，单一真相源、不漂移。
+- **生成器统一重量推导**：`next-week-plan-generator.ts` 把原 `buildFocusExercise` 的重量逻辑抽成共享 `buildPlannedExercise(name, baseline, sets, scheme)`，focus 与非 focus top 动作共用：有估算 1RM → 取整(1RM × 目标强度比例)；退化到近期最高重量；两者都无则 `target_weight_kg=null` + "沿用上次重量"。`buildGeneratorInput` 把每个 top 动作的 `estimated_1rm_kg/max_weight_kg` 读进 `NextWeekPlanGeneratorInput.topExercises`。沿用 D23 既有常量（`WEIGHT_ROUNDING_KG` 等），不新增。
+- **顺手修掉自重 0 基线**：共享 helper 把 `≤0` 的基线（纯自重动作 `MAX(COALESCE(weight,0))=0`）判为"无基线 → null"，修掉旧 focus 路径在自重动作上会显示 `target 0kg` 的行为。更保守、不编造。
+- **守住 D23/D21 的关系**：计划重量仍只挂在 `structured_output.plan`（`NextWeekPlanDraft`），不写进 answer 文本，Slice 1 faithfulness 数字扫描看不到这些派生重量，不会误标。
+- **绝不编造重量**：真没有任何重量基线的动作仍保持 `null` + 文案，未变。
+
+DTO 边界：
+- weekly report / training summary 的 DTO 是 server 本地类型（不在 `shared/`），客户端读周报走松散解析，agent 读 `top_exercises` 走 `unknown` + `readNumber`，故无前后端 shared 漂移风险。`assistant-orchestrator-service` 里的本地结构视图是只读子集，运行时多出字段不影响类型。
+
+局限 / 未来：
+- 估算 1RM 用单组 Epley 的组内最大值，高次低重的耐力组可能高估，仅作起始重量参考；前端把非 focus 动作的具体目标重量渲染出来仍待前端片；依从度尚未按目标重量细粒度比对（仍以动作×组数为粒度，见 D26）。

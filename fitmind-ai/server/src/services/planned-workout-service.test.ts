@@ -63,6 +63,8 @@ function buildSummary(): TrainingSummaryRepositoryResult {
         set_count: 3,
         total_reps: 24,
         total_volume: 600,
+        max_weight_kg: 90,
+        estimated_1rm_kg: 105,
       },
       {
         exercise_id: "e2",
@@ -70,6 +72,8 @@ function buildSummary(): TrainingSummaryRepositoryResult {
         set_count: 2,
         total_reps: 16,
         total_volume: 400,
+        max_weight_kg: 120,
+        estimated_1rm_kg: 140,
       },
     ],
   };
