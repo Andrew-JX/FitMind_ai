@@ -26,6 +26,14 @@ interface ParseHybridOptions {
 const FALLBACK_FAILURE_WARNING =
   "\u667a\u80fd\u89e3\u6790\u7ed3\u679c\u672a\u901a\u8fc7\u6821\u9a8c\uff0c\u5df2\u8fd4\u56de\u4fdd\u5b88\u89c4\u5219\u89e3\u6790\u8349\u7a3f\u3002";
 
+/** \u6587\u672c\u91cc\u51fa\u73b0\u81f3\u5c11\u8fd9\u4e48\u591a\u4e2a\u4e92\u4e0d\u76f8\u540c\u7684\u91cd\u91cf\uff0c\u624d\u68c0\u67e5"\u662f\u5426\u88ab\u89c4\u5219\u89e3\u6790\u538b\u6241\u6210\u66f4\u5c11\u7ec4"\u3002 */
+const MIN_DISTINCT_WEIGHTS_FOR_VARIED_SET_CHECK = 2;
+
+/** \u5e26\u5355\u4f4d\u7684\u91cd\u91cf\u63d0\u53ca\uff0c\u5982 60\u516c\u65a4 / 27.5kg / 135\u78c5\u3002 */
+const WEIGHT_MENTION_PATTERN = /(\d+(?:\.\d+)?)\s*(?:kg|\u516c\u65a4|\u5343\u514b|\u78c5|lbs?)/giu;
+/** "\u91cd\u91cf x \u6b21\u6570"\u6210\u5bf9\u5199\u6cd5\u91cc\u5de6\u4fa7\u7684\u91cd\u91cf\uff0c\u5982 60x10 / 65\u00d78\u3002 */
+const WEIGHT_BEFORE_REPS_PAIR_PATTERN = /(\d+(?:\.\d+)?)\s*[x\u00d7*]\s*\d/giu;
+
 export async function parseHybridWorkoutIntakeDraft(
   input: WorkoutIntakeParseRequest,
   exerciseDictionary: WorkoutIntakeExerciseDictionaryItem[],
@@ -37,7 +45,7 @@ export async function parseHybridWorkoutIntakeDraft(
     options.now,
   );
 
-  if (!shouldUseLlmFallback(ruleResult)) {
+  if (!shouldUseLlmFallback(ruleResult, input.text)) {
     return ruleResult;
   }
 
@@ -73,7 +81,10 @@ export async function parseHybridWorkoutIntakeDraft(
   }
 }
 
-function shouldUseLlmFallback(result: WorkoutIntakeParseResponse): boolean {
+function shouldUseLlmFallback(
+  result: WorkoutIntakeParseResponse,
+  text: string,
+): boolean {
   const validSetCount = result.draft.exercises.reduce(
     (total, exercise) => total + exercise.sets.length,
     0,
@@ -98,8 +109,67 @@ function shouldUseLlmFallback(result: WorkoutIntakeParseResponse): boolean {
     hasIncompleteSets ||
     hasAnyExerciseWithoutValidSets ||
     hasNoCandidateItems ||
-    hasMissingSetWarning
+    hasMissingSetWarning ||
+    likelyFlattenedVariedSets(result, text)
   );
+}
+
+/**
+ * \u542f\u53d1\u5f0f\uff1a\u7528\u6237\u6587\u672c\u91cc\u63d0\u5230\u4e86\u591a\u4e2a\u4e92\u4e0d\u76f8\u540c\u7684\u91cd\u91cf\uff08\u5982"\u7b2c\u4e00\u7ec460\u516c\u65a4\u2026\u7b2c\u4e8c\u7ec470\u516c\u65a4\u2026"\uff09\uff0c
+ * \u4f46\u89c4\u5219\u89e3\u6790\u6355\u83b7\u5230\u7684\u4e0d\u540c\u91cd\u91cf\u66f4\u5c11\u2014\u2014\u5f80\u5f80\u662f\u53e3\u8bed filler\uff08"\u505a\u4e86 / \u52a0\u5230 / \u4e86"\uff09\u8ba9\u6210\u5bf9\u5199\u6cd5
+ * \u6f0f\u5339\u914d\u3001\u628a"\u6bcf\u7ec4\u4e0d\u540c\u91cd\u91cf"\u538b\u6241\u6210\u66f4\u5c11\u751a\u81f3\u5355\u7ec4\u3002\u6b64\u65f6\u5347\u7ea7\u5230 LLM \u515c\u5e95\u91cd\u89e3\u3002
+ *
+ * \u6bd4\u8f83\u7684\u662f"\u4e0d\u540c\u91cd\u91cf\u7684\u4e2a\u6570"\u800c\u975e\u5177\u4f53\u6570\u503c\uff0c\u56e0\u6b64\u5bf9\u78c5\u2194\u516c\u65a4\u6362\u7b97\uff08\u89c4\u5219\u89e3\u6790\u4f1a\u6362\u7b97\u3001\u539f\u6587\u4e0d\u4f1a\uff09\u5b89\u5168\u3002
+ *
+ * @param result - \u89c4\u5219\u89e3\u6790\u7ed3\u679c
+ * @param text - \u7528\u6237\u539f\u59cb\u8f93\u5165\u6587\u672c
+ * @returns \u662f\u5426\u7591\u4f3c\u628a\u53d8\u7ec4\u538b\u6241\u3001\u9700\u8981 LLM \u515c\u5e95
+ */
+function likelyFlattenedVariedSets(
+  result: WorkoutIntakeParseResponse,
+  text: string,
+): boolean {
+  const mentionedDistinctWeights = countDistinctMentionedWeights(text);
+  const parsedDistinctWeights = countDistinctParsedWeights(result);
+
+  return (
+    mentionedDistinctWeights >= MIN_DISTINCT_WEIGHTS_FOR_VARIED_SET_CHECK &&
+    mentionedDistinctWeights > parsedDistinctWeights
+  );
+}
+
+function countDistinctMentionedWeights(text: string): number {
+  const weights = new Set<string>();
+
+  for (const match of text.matchAll(WEIGHT_MENTION_PATTERN)) {
+    if (match[1] !== undefined) {
+      weights.add(match[1]);
+    }
+  }
+
+  for (const match of text.matchAll(WEIGHT_BEFORE_REPS_PAIR_PATTERN)) {
+    if (match[1] !== undefined) {
+      weights.add(match[1]);
+    }
+  }
+
+  return weights.size;
+}
+
+function countDistinctParsedWeights(
+  result: WorkoutIntakeParseResponse,
+): number {
+  const weights = new Set<number>();
+
+  for (const exercise of result.draft.exercises) {
+    for (const set of exercise.sets) {
+      if (set.weight_kg > 0) {
+        weights.add(set.weight_kg);
+      }
+    }
+  }
+
+  return weights.size;
 }
 
 function buildResponseFromLlmOutput(

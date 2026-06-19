@@ -4507,3 +4507,40 @@ Verification:
 - 实地复跑：#2 训练 tab 显示「近 30 天训练」（「本月训练」消失）；#1 直接打 `/api/assistant/mock-turn`（mode=next_week_plan）确认杠铃深蹲 basis = 「估算 1RM 110.8 kg」（浮点尾巴消除），目标重量 75/55/80/57.5 不变。
 
 走查另记（未改，留作后续）：自由追问「给我一个下周训练草案」（mode=auto）被 intent 分类路由成 recommendation 而非 next_week_plan——文本分类对「草案」信号弱；非 bug，属分类器调优，按需再议。
+
+## 2026-06-17 路线图：理解层升级（real-LLM seam）方向共定（规划，未动代码）
+
+与用户讨论"后续路径 / 两个长期体验痛点（对话死板、录入变组识别不了）如何优化"，实地走查 + 代码核对（`assistant-intent-router.ts` 意图分类是死正则、`workout-intake-parser.ts` + hybrid 兜底触发条件）后，定下下一档主线并写进 `roadmap.md §8.1`：
+
+诊断（同根）：链路是「理解层 → 确定性工具/计算 → faithfulness → 回答」，后三段扎实，痛点全在理解层是写死正则、无真实模型。换 provider 也不解决（路由在 provider 之前）。接缝已就绪（D28）。
+
+新增 roadmap 条目：
+- §8.1 主题块（诊断 + 与 D28/Phase 7.0/Slice 1·2 的关系）。
+- Slice 11 — Groq 真实模型接入意图路由 + 工具选择（理解层核心，治对话死板；中风险，靠 ensureAllowedTool + faithfulness + eval 兜底）。
+- Slice 12 — 录入鲁棒性：放宽 hybrid LLM 兜底触发 + 确保 Groq 本地配 + 确认 UI 逐组可编辑（治变组识别不了；低风险）。
+- Slice 11a — 对话"不死"的纯确定性止血（unsupported 走 RAG + 澄清，极低成本，仅缓解非根治）。
+- 建议顺序：Slice 12 → 11a → 11。§7 优先级建议同步加了指向 §8.1 的更新注。
+
+未动任何代码；docs-only。`format:check` 历史欠债不动。
+
+## 2026-06-17 路线图：D29（LangChain/LangSmith 选择性增强）+ §8.2 优化总 Slice（规划，未动代码）
+
+- `ai-decisions.md` 加 **D29**：LangChain/LangSmith 选择性增强决策——立场是"先用原语自研、再在框架真能加杠杆处选择性采纳"；逐方向 verdict（retriever 中 / RAG pipeline 低-中 / structured output 低=退步 / tracing 真实模型后值 / agent harness 最不该换 / LangSmith eval 真实模型后增强）；时机=Slice 11 之后；坚决保留自研 agent harness + structured output + 核心 eval。
+- `roadmap.md` 加 **§8.2 优化总 Slice（执行总路线）**：把全部后续工作排成 A→E 五阶段一张表（A 鲁棒性打底=Slice 12+11a / B 理解层质变=Slice 11 / C 真实模型后增强=tracing+LangSmith eval+retriever rerank+Slice 10 / D 叙事彩蛋=Slice 9+8 / E 收尾=文档重写+UI 打磨）。常设规则：UI 最后，但致命 UI 问题立即提前改；一次一片、先计划后写、≤5 文件。
+- docs-only，未动代码。`format:check` 历史欠债不动。
+
+## 2026-06-17 §8.2 Phase A / Slice 12 - 录入鲁棒性：变组 LLM 兜底升级
+
+治用户痛点"一个动作每组重量/次数不一样识别不了"。实地核对后定位：规则解析对干净成对写法能出多组，真正断在口语 filler（做了/加到/了）让成对匹配漏掉、把变组压扁，而 hybrid 兜底此时不触发→静默给错值。确认 UI 已逐组可编辑（`workout-intake-to-session-draft.ts`），非瓶颈。
+
+改动（1 代码 + 1 测试）：
+- `workout-intake-hybrid-parser.ts`：`shouldUseLlmFallback` 加 `likelyFlattenedVariedSets`——原文 ≥2 个互不相同重量（带单位或 60x10 左值）但规则解析捕获的不同重量更少 → 升级 LLM 重解。比"个数"不比数值（对磅↔kg 换算安全）。常量 `MIN_DISTINCT_WEIGHTS_FOR_VARIED_SET_CHECK=2`。不动规则核心、不动 UI。决策见 `ai-decisions.md` D30。
+- `workout-intake-hybrid-parser.test.ts`：+2 例（filler 压扁→升级 LLM 还原 3 个不同组；规则已捕获全部不同重量→不过度触发）。
+
+Verification:
+- `pnpm type-check`（client+server+shared）/ `pnpm test:unit`（271，+2）/ `pnpm eval`（intent 13/13、refusal 12/12、faithfulness 3/3，PASS）：通过。改动文件 eslint EXIT 0。`format:check` 历史欠债不动。
+- 未跑浏览器验证：变组解析靠真实 LLM（生产 Vercel 配 `WORKOUT_INTAKE_LLM_PROVIDER=groq`），本地默认 mock 不产变组——用户在手机（生产）实测。
+
+依赖/局限：本地真测需 `GROQ_API_KEY`；只覆盖"重量不同"压扁，"重量同但次数不同"未捕获（确认 UI 可手改）。
+
+另记 D31（Python/FastAPI）：现在不加（无 Python 才擅长的负载，避免拆双运行时）；最佳切入=Phase C 单一 ML 微服务（reranker / 安全分类器 / 离线 eval），Node 经 HTTP 调，不早于 Slice 11。

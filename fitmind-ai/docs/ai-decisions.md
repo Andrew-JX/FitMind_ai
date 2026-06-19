@@ -738,3 +738,64 @@ Decision（为何暂缓接真实大模型）：
 
 与未来的关系 / Out of scope：
 - 本片纯文档，不补 Groq 助手 provider（气味 A）、不收编模型常量（气味 B）、不做流式（气味 C）——这些是接真实模型那一片（或独立的小 seam 清理片）的工作。届时按上面的「会变维度」清单逐项落地。
+
+## [D29] LangChain / LangSmith：选择性增强决策（逐方向 verdict + 时机）
+
+- **Date**: 2026-06-17
+- **Status**: Accepted（决策记录；现在不动手，时机=Slice 11 接真实模型之后）
+
+背景 / 立场：
+- 用户提出的框架定位是「**不是从无到有靠 LangChain 加能力，而是先用原语自己造一遍（RAG / agent / eval / faithfulness），再在框架真能加杠杆处选择性采纳**」。这把 AGENTS §11「刻意不引入 LangChain/LangGraph/MCP」从"排斥"升级为"有判断力的选择性采纳"——对 AI PM / 应用开发岗是更强的叙事（懂原语 + 会判断何时上框架）。
+- LangSmith 可独立 SDK / OpenTelemetry 使用，不强依赖 LangChain；故技术上可接。
+
+逐方向 verdict（对照已自研的部分）：
+| 方向 | 现有自研 | verdict |
+| --- | --- | --- |
+| retriever 抽象 | hybrid 0.7 向量 + 0.3 关键词（Voyage + pgvector，`knowledge-retriever.ts`） | 🟡 中——要的是接口可换性，非现成实现（套 LangChain PGVector 仍需重写 hybrid 权重） |
+| RAG pipeline | 检索→注入确定性答案（简单） | 🟡 低-中——LCEL 适合复杂多步，本链不复杂；真正能加的是 reranking（Phase 7.0 已记待办） |
+| structured output | 自研 JSON schema 校验 + faithfulness（D21） | 🔴 低——LangChain `withStructuredOutput` 只是 provider 原生 tool-use/JSON mode 的薄包装，自研已更强，接了是退步 |
+| tracing | 自研每轮 telemetry（D25） | 🟢 接真实模型后值——LangSmith trace UI 加速调 prompt（mock 期无可 trace） |
+| agent harness | 自研**确定性** ReAct（D20，刻意不用 LangGraph） | 🔴 最不该换——确定性 / 可审计是产品护城河，换 LangGraph 等于让出差异化 |
+| LangSmith eval | 自研 eval 套件 + 门禁（D22） | 🟢 接真实模型后当增强——数据集 + LLM-as-judge UI；核心 eval 仍自研当承重护栏 |
+
+Decision：
+- **现在不接**：mock-first 无真实模型调用可 trace/评估；且与"自研护栏"差异化重叠；agent harness / structured output 接了反而退步。
+- **接真实模型（Slice 11）之后**，选择性采纳「值」的两类：**tracing + LangSmith eval**（可观测/评估托管 UI）、**retriever 接口 + reranking**（可换性 + 检索质量）；**坚决保留自研**：agent harness（不上 LangGraph）、structured output（provider 原生 + faithfulness）、核心 eval（`assistant-eval.ts` 当承重护栏，LangSmith 只做增强 UI）。
+- 接 LangSmith 前确认 trace **不带 PII**（落实 §7.4 脱敏；LangSmith 是云端 SaaS）。
+- 每一处采纳都要在本文件补一条"为何引入 / 为何不违背不用 LangChain 初衷"，保持可讲。
+
+与未来的关系：归入 §8.2 总路线的 Phase C（真实模型之后的增强），不早于 Slice 11。
+
+## [D30] 录入鲁棒性：变组 LLM 兜底升级启发式（§8.2 Phase A / Slice 12）
+
+- **Date**: 2026-06-17
+- **Status**: Accepted（已落地 + 单测）
+
+背景：
+- 用户反馈"一个动作做几组、每组重量/次数不一样时识别不了"。实地核对：规则解析器对**干净**的成对写法（`60x10 65x8 70x6`）能正确出多组；真正断的是口语 filler（"做了 / 加到 / 了"）让 `SET_PAIR_PATTERN` 漏匹配，把"每组不同重量"压扁成更少甚至单组。而 hybrid 的 `shouldUseLlmFallback` 原条件（无有效组 / incomplete / warning / no_candidates）此时**全为假**——结果是"自信但残缺"，LLM 兜底不触发，用户静默拿到错值。
+- 确认 UI 不是瓶颈：`workout-intake-to-session-draft.ts` 已把每个解析 set 映射成独立可编辑行，解析器产出 N 组 UI 就显示 N 个可编辑行。
+
+Decision：
+- 在 `workout-intake-hybrid-parser.ts` 给 `shouldUseLlmFallback` 加一条触发：`likelyFlattenedVariedSets`——**原文出现 ≥2 个互不相同的重量（带单位 60公斤/27.5kg/135磅，或成对 60x10 的左值），但规则解析捕获到的不同重量更少 → 判定可能被压扁 → 升级 LLM 兜底重解**。
+- **比较"不同重量的个数"而非具体数值**：规则解析会把磅换算成 kg、原文不会，比数值会误判；比个数对换算安全。
+- 不动规则解析核心（避免回归）、不动 UI（已满足逐组可编辑）。常量 `MIN_DISTINCT_WEIGHTS_FOR_VARIED_SET_CHECK=2`。
+- +2 单测：① filler 压扁场景升级 LLM 并还原 3 个不同组；② 规则已捕获全部不同重量时**不**过度触发（仍 `rule_parser`）。
+
+局限 / 依赖：
+- 真正解析变组靠 LLM——生产 Vercel 配了 `WORKOUT_INTAKE_LLM_PROVIDER=groq` 故手机端生效；**本地默认 `mock`**（`env.ts`），mock LLM 只产均匀组，本地要真测需配 `GROQ_API_KEY`。
+- 只覆盖"重量不同"的压扁；"重量相同但每组次数不同"未被此启发式捕获（确认 UI 可手动改；后续可再加 reps 维度信号）。
+
+## [D31] 是否引入 Python / FastAPI（考虑，暂缓）
+
+- **Date**: 2026-06-17
+- **Status**: Considered / Deferred（不现在做；最佳切入点=Phase C 的单一 ML 微服务）
+
+背景：
+- 用户问"考虑 Python + FastAPI 的加入"。当前栈是 Node/Express/TS 单仓（client/server/shared），无任何需要 Python 的计算。
+
+判断：
+- **现在不加**：FitMind 现有计算是确定性 TS + provider 走 fetch，没有 Python 才擅长的负载；只为"简历有 Python"而引入会把干净单仓拆成两套运行时/部署/CI，是 resume-driven、得不偿失。
+- **真正值得切入的位置（都在 Phase C / 真实模型之后）**：把**单一 ML 重活**拆成一个 FastAPI 微服务，Node 端通过 HTTP 调用（干净接缝，呼应 provider seam 哲学）。最佳候选：① RAG **reranker**（cross-encoder，Python 生态成熟）；② **安全分类器**（Slice 10，若用 HF transformer / 微调模型）；③ 离线 **eval / 实验台**（pandas / ragas 等）。
+- 若决定做：保持核心单仓 TS 不变，只新增**一个**职责单一的 Python 服务，并在本文件记"为何这块用 Python、边界在哪"。这本身是"按合适工具选型 + 服务化"的好面试叙事，强于到处塞 Python。
+
+与未来的关系：归入 §8.2 Phase C，作为 C2（reranker）或 C3（安全分类器）的可选实现方式，不早于 Slice 11。

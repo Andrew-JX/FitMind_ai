@@ -275,6 +275,69 @@ describe("parseHybridWorkoutIntakeDraft", () => {
     );
   });
 
+  it("escalates to LLM fallback when varied per-set weights look flattened by the rule parser", async () => {
+    let fallbackCalls = 0;
+    const result = await parseHybridWorkoutIntakeDraft(
+      createInput(
+        "杠铃卧推 第一组60公斤做了10个 第二组加到70公斤做8个 第三组80公斤做6个",
+      ),
+      dictionary,
+      {
+        llmParser: async () => {
+          fallbackCalls += 1;
+
+          return JSON.stringify({
+            exercises: [
+              {
+                spoken_name: "杠铃卧推",
+                sets: [
+                  { reps: 10, weight_kg: 60 },
+                  { reps: 8, weight_kg: 70 },
+                  { reps: 6, weight_kg: 80 },
+                ],
+                incomplete_sets: [],
+              },
+            ],
+            warnings: [],
+          });
+        },
+        provider: "mock",
+      },
+    );
+
+    expect(fallbackCalls).toBe(1);
+    expect(result.evidence.source).toBe("llm_structured_fallback");
+    expect(result.draft.exercises[0]?.sets).toEqual([
+      { intensity_label: null, reps: 10, rpe: null, weight_kg: 60 },
+      { intensity_label: null, reps: 8, rpe: null, weight_kg: 70 },
+      { intensity_label: null, reps: 6, rpe: null, weight_kg: 80 },
+    ]);
+    expectNoFakeZeroSets(result);
+  });
+
+  it("does not escalate when the rule parser already captured every distinct weight", async () => {
+    let fallbackCalls = 0;
+    const result = await parseHybridWorkoutIntakeDraft(
+      createInput("杠铃卧推 60公斤10次 80公斤8次"),
+      dictionary,
+      {
+        llmParser: async () => {
+          fallbackCalls += 1;
+
+          return JSON.stringify({ exercises: [], warnings: [] });
+        },
+        provider: "mock",
+      },
+    );
+
+    expect(fallbackCalls).toBe(0);
+    expect(result.evidence.source).toBe("rule_parser");
+    expect(result.draft.exercises[0]?.sets).toEqual([
+      { intensity_label: null, reps: 10, rpe: null, weight_kg: 60 },
+      { intensity_label: null, reps: 8, rpe: null, weight_kg: 80 },
+    ]);
+  });
+
   it("ignores an LLM-provided exercise id and re-matches against the dictionary", async () => {
     const result = await parseHybridWorkoutIntakeDraft(
       createInput(
