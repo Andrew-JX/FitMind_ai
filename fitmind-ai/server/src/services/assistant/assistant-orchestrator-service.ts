@@ -35,9 +35,13 @@ import {
 } from "./assistant-answer-composer.js";
 import {
   classifyAssistantIntent,
+  isOutOfScopeMessage,
   type AssistantRoutedIntent,
 } from "./assistant-intent-router.js";
-import { retrieveKnowledgeChunks } from "../rag/knowledge-retriever.js";
+import {
+  retrieveKnowledgeChunks,
+  tokenizeKnowledgeQuery,
+} from "../rag/knowledge-retriever.js";
 import { logRetrievalEvent } from "../rag/retrieval-observability.js";
 import type {
   AssistantStreamEvent,
@@ -1055,7 +1059,33 @@ export async function runMockAssistantTurn(
   const executionMode = resolveExecutionModeForIntent(input, intent);
 
   if (intent === "unsupported") {
-    const answer = composeUnsupportedAnswer(input.message);
+    // Slice 11a：没听懂的提问不要直接死给。明显越界（黑名单/空）保持澄清式拒答；
+    // 否则用 tokenizeKnowledgeQuery 当相关性闸门（纯无关查询返回空 token，避免向量乱答），
+    // 有训练知识锚点就检索——命中知识用知识答（更有用、带 Sources + 免责），否则退回澄清。
+    const canTryKnowledgeFallback =
+      !isOutOfScopeMessage(input.message) &&
+      tokenizeKnowledgeQuery(input.message).length > 0;
+    let answer = composeUnsupportedAnswer(input.message);
+
+    if (canTryKnowledgeFallback) {
+      await emitEvent(options, {
+        type: "state",
+        state: "retrieving",
+      });
+
+      const sources = await retrieveKnowledgeChunks(input.message);
+
+      logRetrievalEvent({
+        intent: "knowledge",
+        retrievalMode: sources[0]?.retrieval_mode ?? "fallback",
+        sources,
+        fallbackReason: sources.length === 0 ? "no_sources" : undefined,
+      });
+
+      if (sources.length > 0) {
+        answer = composeKnowledgeAnswer({ message: input.message, sources });
+      }
+    }
 
     await emitAnswerEvents(answer, options);
 
@@ -1063,7 +1093,8 @@ export async function runMockAssistantTurn(
       session_id: resolvedSession.sessionId,
       mode: input.mode,
       assistant_type: "deterministic_mock",
-      intent,
+      // 知识兜底命中时按实际行为记 knowledge，让观测/持久化更诚实；否则仍是 unsupported。
+      intent: answer.intent,
       tool_calls: [],
       answer,
     };

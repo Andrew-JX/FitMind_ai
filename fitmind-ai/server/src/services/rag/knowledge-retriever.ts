@@ -61,6 +61,10 @@ export function tokenizeKnowledgeQuery(input: string): string[] {
     "引体向上",
     "疲劳",
     "恢复",
+    "热身",
+    "拉伸",
+    "组间休息",
+    "睡眠",
   ]) {
     if (normalizedInput.includes(phrase.toLowerCase())) {
       tokens.add(phrase);

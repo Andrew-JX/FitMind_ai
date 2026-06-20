@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { classifyAssistantIntent } from "./assistant-intent-router.js";
+import {
+  classifyAssistantIntent,
+  isOutOfScopeMessage,
+} from "./assistant-intent-router.js";
 
 describe("classifyAssistantIntent", () => {
   it("routes natural training questions to deterministic tool intents", () => {
@@ -57,5 +60,24 @@ describe("classifyAssistantIntent", () => {
       "unsupported",
     );
     expect(classifyAssistantIntent("讲个笑话").intent).toBe("unsupported");
+  });
+
+  it("routes broadened knowledge / recommendation phrasings (Slice 11a synonyms)", () => {
+    expect(classifyAssistantIntent("训练前怎么热身？").intent).toBe("knowledge");
+    expect(classifyAssistantIntent("组间休息多久比较好").intent).toBe(
+      "knowledge",
+    );
+    expect(classifyAssistantIntent("睡眠对训练重要吗").intent).toBe("knowledge");
+    expect(classifyAssistantIntent("我该练哪个部位").intent).toBe(
+      "recommendation",
+    );
+  });
+
+  it("flags only genuinely out-of-scope or empty messages (Slice 11a fallback gate)", () => {
+    expect(isOutOfScopeMessage("明天天气怎么样？")).toBe(true);
+    expect(isOutOfScopeMessage("讲个笑话")).toBe(true);
+    expect(isOutOfScopeMessage("   ")).toBe(true);
+    expect(isOutOfScopeMessage("训练前怎么热身？")).toBe(false);
+    expect(isOutOfScopeMessage("我最近有点疲劳还能练吗")).toBe(false);
   });
 });

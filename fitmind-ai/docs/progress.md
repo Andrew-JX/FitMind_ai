@@ -4544,3 +4544,23 @@ Verification:
 依赖/局限：本地真测需 `GROQ_API_KEY`；只覆盖"重量不同"压扁，"重量同但次数不同"未捕获（确认 UI 可手改）。
 
 另记 D31（Python/FastAPI）：现在不加（无 Python 才擅长的负载，避免拆双运行时）；最佳切入=Phase C 单一 ML 微服务（reranker / 安全分类器 / 离线 eval），Node 经 HTTP 调，不早于 Slice 11。
+
+## 2026-06-17 §8.2 Phase A / Slice 11a - 对话"不死"的纯确定性止血
+
+治"稍微不按规矩问就没了"。根因：意图路由是关键词正则，没听懂就落 unsupported 罐头拒答。本片把 unsupported 分流，并保守扩同义词。决策见 `ai-decisions.md` D32。
+
+改动（4 文件）：
+- `assistant-intent-router.ts`：导出 `isOutOfScopeMessage`（黑名单/空）；`KNOWLEDGE_PATTERN` 加 热身/拉伸/组间休息/睡眠、`RECOMMENDATION_PATTERN` 加 练哪。
+- `knowledge-retriever.ts`：`tokenizeKnowledgeQuery` 词表加 热身/拉伸/组间休息/睡眠。
+- `assistant-orchestrator-service.ts`：`unsupported` 分支分流——越界保持澄清拒答；否则用 `tokenizeKnowledgeQuery` 当相关性闸门（纯无关查询不检索，避免向量乱答），带锚点走 RAG，命中知识用 `composeKnowledgeAnswer`、否则退回澄清；兜底命中时 response.intent 记 knowledge。
+- `assistant-intent-router.test.ts`：+2 例（新同义词路由；isOutOfScopeMessage 闸门）。
+
+关键约束：**不改分类器返回的 intent**，故 eval `intent_routing 13/13` + `refusal_regression 12/12` 不动（eval 只看 classify().intent，不跑 orchestrator）。
+
+Verification:
+- `pnpm type-check` / `pnpm test:unit`（273，+2）/ `pnpm eval`（13/13·12/12·3/3 PASS）：通过。改动文件 eslint EXIT 0。`format:check` 历史欠债不动。
+- 真链路（node UTF-8 探针，避开 curl 在 Windows 传中文编码问题）：带锚点"怎么缓解训练后的疲劳"/"训练后怎么加快恢复"→ 分类 unsupported 但 RAG 兜底→ knowledge sources=3；无锚点"我女朋友生气了"→ 澄清不乱答；越界"天气"→ 拒答保留。
+
+排查记录：验证初期"全 unsupported"是 curl 在 Windows 下传中文 body 被编码搞坏所致（"RPE是什么"因 ASCII 残留仍命中），非代码问题；改 node 原生 UTF-8 后全部正确。dev server 为常驻进程，验证后已停、临时探针文件已删。
+
+局限：闸门词表有限、覆盖窄（stopgap 本质），泛化靠 Slice 11 真实 LLM 路由；疼痛/医疗硬路由是 Slice 10 职责。

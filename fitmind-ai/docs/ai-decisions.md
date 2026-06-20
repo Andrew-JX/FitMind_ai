@@ -799,3 +799,28 @@ Decision：
 - 若决定做：保持核心单仓 TS 不变，只新增**一个**职责单一的 Python 服务，并在本文件记"为何这块用 Python、边界在哪"。这本身是"按合适工具选型 + 服务化"的好面试叙事，强于到处塞 Python。
 
 与未来的关系：归入 §8.2 Phase C，作为 C2（reranker）或 C3（安全分类器）的可选实现方式，不早于 Slice 11。
+
+## [D32] 对话"不死"的纯确定性止血（§8.2 Phase A / Slice 11a）
+
+- **Date**: 2026-06-17
+- **Status**: Accepted（已落地 + 单测 + 真链路验证）
+
+背景：
+- 用户反馈"稍微不按规矩问就没了"。根因：意图路由 `classifyAssistantIntent` 是关键词正则，匹配不上即落 `unsupported`。但 `unsupported` 其实混了两类：① 真越界（天气/股票黑名单或空消息）；② 没听懂但可能训练相关。原本两类都给同一条罐头拒答（已是澄清式，但二类被白白浪费）。
+- 这是 stopgap（仅缓解）；根治是 Slice 11（真实 LLM 路由）。
+
+Decision：
+- **不改分类器返回的 intent**（保证 eval `intent_routing 13/13` + `refusal_regression 12/12` 不动——eval 只看 `classifyAssistantIntent().intent`，不跑 orchestrator）。改在 orchestrator 的 `unsupported` 分支分流：
+  - 导出 `isOutOfScopeMessage`（黑名单/空）→ 命中保持原澄清拒答。
+  - 否则用 `tokenizeKnowledgeQuery(message).length > 0` 当**相关性闸门**：纯无关查询（"我女朋友生气了"）tokenize 返回空 → 不检索、直接澄清（避免向量模式拿无关 chunk 乱答）；有训练锚点（疲劳/恢复…）→ RAG 检索，命中知识用 `composeKnowledgeAnswer`（带 Sources + 免责），无命中退回澄清。
+  - 兜底命中知识时 response.intent 记 `knowledge`（observability/持久化更诚实）。
+- **保守扩同义词**（直接修路由，减少落 unsupported）：`KNOWLEDGE_PATTERN` 加 热身/拉伸/组间休息/睡眠；`RECOMMENDATION_PATTERN` 加 练哪；`tokenizeKnowledgeQuery` 词表同步加 热身/拉伸/组间休息/睡眠。改完 eval + 路由测试双绿才留。
+- **为何 tokenize 当闸门而非分数阈值**：关键词排序对无锚点查询天然返回空，是个干净的相关性下限；而向量分数语义跨模式不一（归一化 vs 原始 cosine），单一阈值不可靠。这把"不乱答"做成确定性的，符合定位。
+
+验证：
+- 门禁全绿（type-check / lint / test:unit 273 / eval 13/13·12/12·3/3）。
+- 真链路（node UTF-8 探针，避开 curl 在 Windows 传中文的编码问题）："怎么缓解训练后的疲劳"/"训练后怎么加快恢复"→ unsupported 分类但走 RAG 兜底 → knowledge + sources=3；"我女朋友生气了怎么办"→ 无锚点 → 澄清不乱答；"今天悉尼天气"→ 拒答保留。
+
+局限 / 依赖：
+- 闸门词表有限（curated vocab），覆盖窄——这是 stopgap 的本质，泛化靠 Slice 11 的真实 LLM 路由。
+- 疼痛/医疗边界查询若带锚点会走知识答（有免责），但**安全硬路由是 Slice 10 的职责**（§8.2 排在真实模型之后）。
