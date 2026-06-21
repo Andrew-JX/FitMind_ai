@@ -741,7 +741,7 @@ Decision（为何暂缓接真实大模型）：
 
 ## [D29] LangChain / LangSmith：选择性增强决策（逐方向 verdict + 时机）
 
-- **Date**: 2026-06-17
+- **Date**: 2026-06-20
 - **Status**: Accepted（决策记录；现在不动手，时机=Slice 11 接真实模型之后）
 
 背景 / 立场：
@@ -768,7 +768,7 @@ Decision：
 
 ## [D30] 录入鲁棒性：变组 LLM 兜底升级启发式（§8.2 Phase A / Slice 12）
 
-- **Date**: 2026-06-17
+- **Date**: 2026-06-20
 - **Status**: Accepted（已落地 + 单测）
 
 背景：
@@ -787,7 +787,7 @@ Decision：
 
 ## [D31] 是否引入 Python / FastAPI（考虑，暂缓）
 
-- **Date**: 2026-06-17
+- **Date**: 2026-06-20
 - **Status**: Considered / Deferred（不现在做；最佳切入点=Phase C 的单一 ML 微服务）
 
 背景：
@@ -802,7 +802,7 @@ Decision：
 
 ## [D32] 对话"不死"的纯确定性止血（§8.2 Phase A / Slice 11a）
 
-- **Date**: 2026-06-17
+- **Date**: 2026-06-21
 - **Status**: Accepted（已落地 + 单测 + 真链路验证）
 
 背景：
@@ -825,11 +825,11 @@ Decision：
 - 闸门词表有限（curated vocab），覆盖窄——这是 stopgap 的本质，泛化靠 Slice 11 的真实 LLM 路由。
 - 疼痛/医疗边界查询若带锚点会走知识答（有免责），但**安全硬路由是 Slice 10 的职责**（§8.2 排在真实模型之后）。
 
-- **2026-06-17 修订（前端粘 mode bug，致命 UX，提前修）**：上线后用户在 prod 自由提问仍被误路由（"训练后怎么加快恢复"→ recommendation），排查发现是前端 bug 掩盖了本片：`AssistantChatPanel` 把 `mode` 存在共享 `promptSuggestion` 里且**会粘住**——点过一次快捷问题/洞察卡片（如 `next_training_focus`）后，之后**手输的自由提问继承旧 mode**、发的不是 `auto`，绕过服务端 `classifyAssistantIntent`（本片改的路径）。修复：用户手动改写文本（`onChangeMessage`）与提交后都把 `mode` 重置为 `auto`（`AssistantChatPanel.tsx`）。实地验证：点"本周训练报告"后再输"训练后怎么加快恢复"，请求 `mode=auto` → 后端 `intent=knowledge` + RAG 3 源。**教训**：服务端 classify / eval 全绿 ≠ 用户真用得上——客户端发的 `mode` 决定是否触达该路径。`mode` 双轨（客户端显式 mode vs 服务端 auto classify）应在 Slice 11 收敛。
+- **2026-06-21 修订（前端粘 mode bug，致命 UX，提前修）**：上线后用户在 prod 自由提问仍被误路由（"训练后怎么加快恢复"→ recommendation），排查发现是前端 bug 掩盖了本片：`AssistantChatPanel` 把 `mode` 存在共享 `promptSuggestion` 里且**会粘住**——点过一次快捷问题/洞察卡片（如 `next_training_focus`）后，之后**手输的自由提问继承旧 mode**、发的不是 `auto`，绕过服务端 `classifyAssistantIntent`（本片改的路径）。修复：用户手动改写文本（`onChangeMessage`）与提交后都把 `mode` 重置为 `auto`（`AssistantChatPanel.tsx`）。实地验证：点"本周训练报告"后再输"训练后怎么加快恢复"，请求 `mode=auto` → 后端 `intent=knowledge` + RAG 3 源。**教训**：服务端 classify / eval 全绿 ≠ 用户真用得上——客户端发的 `mode` 决定是否触达该路径。`mode` 双轨（客户端显式 mode vs 服务端 auto classify）应在 Slice 11 收敛。
 
 ## [D33] 助手"自信错答"止血：回退过宽词表 + 知识检索相关性下限（A+B，先稳定）
 
-- **Date**: 2026-06-17
+- **Date**: 2026-06-21
 - **Status**: Accepted（已落地 + 单测 + 真链路验证；只减不增、更诚实）
 
 背景（稳定性体检发现）：
@@ -852,7 +852,7 @@ Decision：
 
 ## [D34] Groq 助手 provider 接缝（Slice 11.1，建接缝、零行为变更）
 
-- **Date**: 2026-06-17
+- **Date**: 2026-06-21
 - **Status**: Accepted（已落地 + 单测；默认仍 mock，env 可切换/回退）
 
 背景：D28 气味 A——助手轮 provider 只有 `mock`/`anthropic`，没有免费 Groq。Slice 11（真实模型路由）的第一步：先把 Groq provider 接缝建好，**不改任何默认行为**，把风险隔离在"加一个可选 provider"上。

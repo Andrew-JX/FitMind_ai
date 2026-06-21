@@ -4508,7 +4508,7 @@ Verification:
 
 走查另记（未改，留作后续）：自由追问「给我一个下周训练草案」（mode=auto）被 intent 分类路由成 recommendation 而非 next_week_plan——文本分类对「草案」信号弱；非 bug，属分类器调优，按需再议。
 
-## 2026-06-17 路线图：理解层升级（real-LLM seam）方向共定（规划，未动代码）
+## 2026-06-20 路线图：理解层升级（real-LLM seam）方向共定（规划，未动代码）
 
 与用户讨论"后续路径 / 两个长期体验痛点（对话死板、录入变组识别不了）如何优化"，实地走查 + 代码核对（`assistant-intent-router.ts` 意图分类是死正则、`workout-intake-parser.ts` + hybrid 兜底触发条件）后，定下下一档主线并写进 `roadmap.md §8.1`：
 
@@ -4523,13 +4523,13 @@ Verification:
 
 未动任何代码；docs-only。`format:check` 历史欠债不动。
 
-## 2026-06-17 路线图：D29（LangChain/LangSmith 选择性增强）+ §8.2 优化总 Slice（规划，未动代码）
+## 2026-06-20 路线图：D29（LangChain/LangSmith 选择性增强）+ §8.2 优化总 Slice（规划，未动代码）
 
 - `ai-decisions.md` 加 **D29**：LangChain/LangSmith 选择性增强决策——立场是"先用原语自研、再在框架真能加杠杆处选择性采纳"；逐方向 verdict（retriever 中 / RAG pipeline 低-中 / structured output 低=退步 / tracing 真实模型后值 / agent harness 最不该换 / LangSmith eval 真实模型后增强）；时机=Slice 11 之后；坚决保留自研 agent harness + structured output + 核心 eval。
 - `roadmap.md` 加 **§8.2 优化总 Slice（执行总路线）**：把全部后续工作排成 A→E 五阶段一张表（A 鲁棒性打底=Slice 12+11a / B 理解层质变=Slice 11 / C 真实模型后增强=tracing+LangSmith eval+retriever rerank+Slice 10 / D 叙事彩蛋=Slice 9+8 / E 收尾=文档重写+UI 打磨）。常设规则：UI 最后，但致命 UI 问题立即提前改；一次一片、先计划后写、≤5 文件。
 - docs-only，未动代码。`format:check` 历史欠债不动。
 
-## 2026-06-17 §8.2 Phase A / Slice 12 - 录入鲁棒性：变组 LLM 兜底升级
+## 2026-06-20 §8.2 Phase A / Slice 12 - 录入鲁棒性：变组 LLM 兜底升级
 
 治用户痛点"一个动作每组重量/次数不一样识别不了"。实地核对后定位：规则解析对干净成对写法能出多组，真正断在口语 filler（做了/加到/了）让成对匹配漏掉、把变组压扁，而 hybrid 兜底此时不触发→静默给错值。确认 UI 已逐组可编辑（`workout-intake-to-session-draft.ts`），非瓶颈。
 
@@ -4545,7 +4545,7 @@ Verification:
 
 另记 D31（Python/FastAPI）：现在不加（无 Python 才擅长的负载，避免拆双运行时）；最佳切入=Phase C 单一 ML 微服务（reranker / 安全分类器 / 离线 eval），Node 经 HTTP 调，不早于 Slice 11。
 
-## 2026-06-17 §8.2 Phase A / Slice 11a - 对话"不死"的纯确定性止血
+## 2026-06-21 §8.2 Phase A / Slice 11a - 对话"不死"的纯确定性止血
 
 治"稍微不按规矩问就没了"。根因：意图路由是关键词正则，没听懂就落 unsupported 罐头拒答。本片把 unsupported 分流，并保守扩同义词。决策见 `ai-decisions.md` D32。
 
@@ -4565,7 +4565,7 @@ Verification:
 
 局限：闸门词表有限、覆盖窄（stopgap 本质），泛化靠 Slice 11 真实 LLM 路由；疼痛/医疗硬路由是 Slice 10 职责。
 
-## 2026-06-17 修复：前端"粘 mode"致命 UX bug（自由提问被误路由）
+## 2026-06-21 修复：前端"粘 mode"致命 UX bug（自由提问被误路由）
 
 用户在 prod(Vercel)自由提问"训练后怎么加快恢复"仍被路由成 recommendation，而我直连后端 mode=auto 探针是 knowledge。排查链：后端确认最新(Evidence 含 Slice 3.1 规则) → 同后端不同结果只能是客户端发的 mode 不是 auto → 读 `AssistantChatPanel.tsx` 发现 `mode` 存在共享 `promptSuggestion` 且会粘住：点过快捷问题/洞察卡片(如 next_training_focus)后，手输自由提问继承旧 mode、不发 auto，绕过服务端 classify（Slice 11a 改的路径）。
 
@@ -4582,7 +4582,7 @@ Verification:
 
 教训记入 `ai-decisions.md` D32 修订：服务端 classify/eval 全绿 ≠ 用户触达该路径；客户端 mode 是否 auto 才决定是否走服务端分类。mode 双轨（客户端显式 vs 服务端 auto）应在 Slice 11 收敛为一处。
 
-## 2026-06-17 助手"自信错答"止血：A 回退过宽词表 + B 知识检索相关性下限
+## 2026-06-21 助手"自信错答"止血：A 回退过宽词表 + B 知识检索相关性下限
 
 稳定性体检(把助手按各类提问跑一遍)发现 3 类问题：①"今天适合练什么"路由对但 provider 不接→兜底文案(路由双轨);②"睡眠/热身"等知识库没覆盖的话题被自信错答(向量召回返回语义最近的恢复 chunk);③ RAG 排序逐次抖动。其中 ② 是我 Slice 11a 扩词放大的。用户要求"先稳定",本批只做 ② 的止血(A+B)。决策见 `ai-decisions.md` D33。
 
@@ -4598,7 +4598,7 @@ Verification:
 
 遗留(Slice 11 处理)：① 路由双轨(classify vs mock-provider)、③ 向量召回底层非确定。本批是"先稳定"，不引入新行为、只让它更诚实。
 
-## 2026-06-17 文档补记（api-contract 同步）+ Slice 11 实现计划草案
+## 2026-06-21 文档补记（api-contract 同步）+ Slice 11 实现计划草案
 
 用户指出"相关文档还没记录"——核对发现 `api-contract.md` 助手章节漏更（一直只写 ai-decisions/progress/roadmap，漏了契约文档，违反 AGENTS 文档同步表"助手 intent/路由 → api-contract"）。本次补：
 - `api-contract.md`：助手「Intent routing & honesty boundaries」段（Slice 11a unsupported 分流：越界→拒答无 Sources、带锚点→RAG 兜底可返知识答；D33 知识相关性下限：没覆盖话题诚实"没资料"不返最近错 chunk；路由双轨已知局限留 Slice 11）；录入 fallback 段补 Slice 12 变组升级（D30）+ 修正 `WORKOUT_INTAKE_LLM_PROVIDER` 取值（补 gemini/groq，prod=groq）。
@@ -4606,7 +4606,7 @@ Verification:
 
 docs-only。Slice 11 代码未动。
 
-## 2026-06-17 §8.2 B1 / Slice 11.1 - Groq 助手 provider 接缝（零行为变更）
+## 2026-06-21 §8.2 B1 / Slice 11.1 - Groq 助手 provider 接缝（零行为变更）
 
 Slice 11 第一步：建 Groq 助手 provider 接缝(D28 气味 A),默认仍 mock、零用户可见变更、env 可回退,风险隔离在"加一个可选 provider"上。决策见 `ai-decisions.md` D34,计划见 `roadmap §8.3`。
 
@@ -4623,3 +4623,13 @@ Verification:
 - 默认 mock,零行为变更,无需浏览器验证。
 
 遗留(11.2/11.3)：让 LLM 真正参与路由(带校验 + 确定性回退 + 扩"自由表达"eval);收敛路由双轨;客户端 `provider_selected` 接受 groq 的类型放宽;旧 anthropic 硬编码模型 id 收编。文档同步：`api-contract`/`local-run-guide`/roadmap §8.2/§8.3 + D34 已更。
+
+## 2026-06-22 文档日期更正
+
+用户发现本轮所有文档条目都被错标成 2026-06-17（实际今天 06-22，且本 session 跨多天）。按 git 提交时间戳更正：
+- 06-17（保留，本就正确）：Slice 3.1、Slice 7、可用性打磨批次（含浮点 1RM 修复）= D27/D28。
+- 06-20（原误标 17，已改）：§8.1 理解层升级 + §7 更新、D29/D30/D31、§8.2 优化总 Slice、Slice 12。
+- 06-21（原误标 17，已改）：Slice 11a + D32、前端粘 mode 修复、A+B 止血 + D33、api-contract 文档同步 + §8.3、Slice 11.1 + D34。
+- roadmap 顶部 `Last updated` 6-13 → 6-22。
+
+教训：应使用系统提供的当前日期写文档条目，而不是沿用 session 起始日。涉及 `progress.md` / `ai-decisions.md`(D29–D34) / `roadmap.md`(§7/§8.1/§8.2/§8.3 + 表内 ✅ 戳)。无代码改动。
