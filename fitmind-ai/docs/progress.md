@@ -4633,3 +4633,23 @@ Verification:
 - roadmap 顶部 `Last updated` 6-13 → 6-22。
 
 教训：应使用系统提供的当前日期写文档条目，而不是沿用 session 起始日。涉及 `progress.md` / `ai-decisions.md`(D29–D34) / `roadmap.md`(§7/§8.1/§8.2/§8.3 + 表内 ✅ 戳)。无代码改动。
+
+## 2026-06-22 §8.3 Slice 11.2a - provider 路径"数据意图必出工具"安全网（治①，确定性）
+
+治体检问题①："今天适合练什么"等数据 intent 路由对了,但 provider 路径里 mock-provider 选不出工具、返回泛泛 prose("我目前更适合回答…"),用户拿到非答案。决策见 `ai-decisions.md` D35。
+
+核查：provider 路径的 intent 全是"要数据"的,`getAllowedToolDefinitions` 给多个工具可选;mock 选不准。
+
+改动（4 文件）：
+- 新增 `assistant-provider-fallback.ts`：纯函数 `coerceMessageToEvidenceToolCall(response, tool, args)`——provider 返回 message（没调工具）就兜底合成对该 mode 默认工具的 tool_call,复用既有执行+组装路径;仅参数齐备才兜底（exercise_id 缺失的动作工具保留"先选动作"提示）。
+- `assistant-provider-fallback.test.ts`：4 例（date-only 兜底 / 带 exercise_id / 缺参不兜底 / tool_call 透传）。
+- `assistant-orchestrator-service.ts`：`runAssistantProvider` 结果过错误闸 → `coerceMessageToEvidenceToolCall` → 既有分支（rawProviderResponse→providerResponse）。
+- `assistant-mock-turn-smoke.ts`：更正一条过时断言（mode=unsupported 早返回 `composeUnsupportedAnswer`,断言改"这个问题我还没识别清楚";该断言自 Slice 11a 起就与行为不符,smoke 不在门禁故未发现）。
+
+确定性、provider 无关：mock 下①即被治好,groq 下作兜底网,让"启用 groq"安全。
+
+Verification:
+- `pnpm type-check` / `pnpm test:unit`(285,+4) / `pnpm eval`(13/13·12/12·3/3 PASS)：通过。改动文件 eslint EXIT 0。
+- ① 已在 mock 上修好（部署后当前 prod 即可验证"今天适合练什么"出真答案,无需切 groq）。
+
+下一步：11.2b（LLM 自由表达路由,治"明天练啥")才是切 groq 的真正增量;切 prod groq 建议留到 11.2b 一起,避免只为小增益加每轮 Groq 调用延迟。

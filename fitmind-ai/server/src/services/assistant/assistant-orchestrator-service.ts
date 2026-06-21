@@ -25,6 +25,7 @@ import {
   type AnswerFaithfulnessResult,
 } from "./answer-faithfulness.js";
 import { runAssistantProvider } from "./provider-adapter.js";
+import { coerceMessageToEvidenceToolCall } from "./assistant-provider-fallback.js";
 import { getConfiguredAssistantProvider } from "./provider-config.js";
 import {
   composeKnowledgeAnswer,
@@ -1194,15 +1195,15 @@ export async function runMockAssistantTurn(
     provider: getConfiguredAssistantProvider(),
   });
 
-  const providerResponse = await runAssistantProvider(providerRequest);
+  const rawProviderResponse = await runAssistantProvider(providerRequest);
 
-  if (providerResponse.kind === "error") {
+  if (rawProviderResponse.kind === "error") {
     const error = new HttpError(
       502,
       "AI_PROVIDER_ERROR",
-      providerResponse.message,
+      rawProviderResponse.message,
       {
-        provider_error_code: providerResponse.error_code,
+        provider_error_code: rawProviderResponse.error_code,
       },
     );
 
@@ -1214,6 +1215,19 @@ export async function runMockAssistantTurn(
 
     throw error;
   }
+
+  // Slice 11.2a safety net: provider-path intents are all data questions, so if
+  // the provider answered in prose (no tool), run the mode's default tool instead
+  // of degrading to a generic non-answer (fixes routing issue ①, provider-agnostic).
+  const providerResponse = coerceMessageToEvidenceToolCall(
+    rawProviderResponse,
+    getToolDefinitionForMode(executionMode),
+    {
+      start_date: input.start_date,
+      end_date: input.end_date,
+      exercise_id: input.exercise_id,
+    },
+  );
 
   const toolCalls: MockAssistantTurnResponseData["tool_calls"] = [];
   const toolOutputs: unknown[] = [];

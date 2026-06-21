@@ -864,3 +864,20 @@ Decision：
 - 系统/用户 prompt 在 groq provider 内自带一份（与 anthropic 对齐）；跨 provider 的 prompt 共享留到 11.3 措辞阶段再抽，避免本片扩面。
 
 与未来的关系：11.2 才让 LLM 真正参与路由（带校验 + 确定性回退 + 扩 eval）；客户端 `provider_selected` 接受 `groq` 的类型放宽留到 11.2（届时才会真的发 groq）。回退：`ASSISTANT_PROVIDER=mock` 一键回到确定性。
+
+## [D35] provider 路径"数据意图必出工具"安全网（Slice 11.2a，确定性、治①）
+
+- **Date**: 2026-06-22
+- **Status**: Accepted（已落地 + 单测；provider 无关，默认 mock 也生效）
+
+背景：体检问题①——"今天适合练什么"等数据类提问路由对了（recommendation），但 provider 路径里 mock-provider 选不出工具、返回一句 prose（"我目前更适合回答…"），用户拿到泛泛非答案。核查发现：provider 路径的 intent **全是"要数据"的**，`getAllowedToolDefinitions` 给 provider 多个工具可选；mock 选不准、groq 一般能选准但偶尔也会用 prose 作答。
+
+Decision：
+- 新增纯函数 `assistant-provider-fallback.ts` `coerceMessageToEvidenceToolCall(response, tool, args)`：provider 路径若返回 `message`（没调任何工具），就**兜底合成对该 mode 默认工具（`getToolDefinitionForMode`）的 tool_call**，复用既有 tool_call 执行 + 组装路径出确定性答案。仅当所需参数齐备才兜底（exercise_id 缺失的动作类工具保留其"先选动作"提示）。
+- **确定性、provider 无关**：不依赖 groq 是否听话——mock 下①也被治好；groq 下作为兜底网（groq 没调工具也不退化）。这让"启用 groq"这一步变安全。
+- orchestrator 接线：`runAssistantProvider` 结果过错误闸后,经本函数再进既有 message/tool_call 分支（`rawProviderResponse` → 错误闸 → `coerce` → `providerResponse`）。
+- 顺带更正一条过时 smoke 断言（`assistant-mock-turn-smoke.ts`：mode=unsupported 早返回的是 `composeUnsupportedAnswer` 文案，断言改为"这个问题我还没识别清楚"；该断言自 Slice 11a 起就已与行为不符，smoke 不在门禁故未被发现）。
+
+边界 / 未来：
+- 仅作用于 provider 路径（数据 intent）；早返回的 unsupported/knowledge/next_week_plan 不受影响。
+- 11.2a 让 ① 在 mock 上即被治好；**启用 groq（prod 切 `ASSISTANT_PROVIDER=groq`）的真正增量价值在"自由表达路由"（11.2b）**——groq 在 provider 路径的多工具里挑得更准只是小增益。客户端 `provider_selected` 接受 groq 的类型放宽仍随 prod 切 groq 时一并做。

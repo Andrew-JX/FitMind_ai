@@ -695,7 +695,7 @@ async function main(): Promise<void> {
       "Unsupported prompt should not execute any tool.",
     );
     assert(
-      unsupportedTurn.answer.summary.includes("我目前更适合回答这些训练问题"),
+      unsupportedTurn.answer.summary.includes("这个问题我还没识别清楚"),
       "Unsupported prompt should explain supported question types.",
     );
 
