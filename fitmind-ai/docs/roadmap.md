@@ -223,7 +223,7 @@ saved-insight 分享链接、知识管理后台、离线编辑 / 同步。优先
 | **A 鲁棒性打底**（真实模型前先把高频入口/对话稳住，低风险） | A1 = **Slice 12** | 录入鲁棒性：放宽 hybrid LLM 兜底触发（变组被压扁→升级 LLM，D30）。确认 UI 已逐组可编辑、无需改 | 无 | ✅ 2026-06-17（变组兜底 + 2 单测；变组解析靠生产 Groq，本地 mock 不产变组） |
 | | A2 = **Slice 11a** | 对话"不死"纯确定性止血：`unsupported` 分流——越界保持拒答；带训练锚点（tokenize 闸门）走 RAG 兜底→知识答，否则澄清。决策见 D32 | 无 | ✅ 2026-06-17（兜底 + 4 单测；前端粘 mode bug 已修；**A+B 修订 D33：回退过宽词表 + 知识相关性下限，消除"自信错答"**） |
 | | A3 = 稳定性体检 + A/B 止血 | 体检发现 3 类问题（路由双轨 / 无相关性下限 / RAG 抖动）；本批先做 B 类止血（回退扩词 + `filterRelevantKnowledgeChunks` 词法重叠下限），把"自信错答"→"诚实没资料"。①路由双轨 ③向量召回非确定 留 Slice 11。决策见 D33 | 无 | ✅ 2026-06-17 |
-| **B 理解层质变**（核心一跳） | B1 = **Slice 11** | 接 Groq 真实模型做意图路由 + 工具选择 + 措辞；正则分类器降级为快路径/eval 基线；faithfulness(D21)+eval(D22) 当承重护栏；顺手收编模型 id（D28 气味 B） | D28 接缝、Slice 1/2 护栏、Groq key | 🟠 待做（中风险） |
+| **B 理解层质变**（核心一跳，计划见 §8.3） | B1 = **Slice 11** | 接 Groq 真实模型做意图路由 + 工具选择 + 措辞；正则分类器降级为快路径/eval 基线；faithfulness(D21)+eval(D22) 当承重护栏 | D28 接缝、Slice 1/2 护栏、Groq key | 🟠 进行中：**11.1 provider 接缝 ✅ 2026-06-17（D34，默认 mock 零变更）**；11.2 LLM 路由 / 11.3 收敛措辞 待做 |
 | **C 真实模型后的增强**（全部依赖 B1） | C1 | tracing + LangSmith eval（选择性，独立 SDK 不引 LangChain；trace 去 PII） | B1 | ⚪ 见 `ai-decisions.md` D29 |
 | | C2 | retriever 接口可换性 + RAG reranking（原 Phase 7.0 + D29）；reranker 可作为 Python/FastAPI 微服务的最佳切入点（D31） | B1 | ⚪ |
 | | C3 = **Slice 10** | 安全分类器（疼痛/医疗边界→安全路由）；真实模型能自由表达后，安全路由的必要性才真正抬升 | B1、Slice 4 伤病字段 | ⚪ |
@@ -248,9 +248,10 @@ saved-insight 分享链接、知识管理后台、离线编辑 / 同步。优先
 
 **分阶段（每阶段 ≤5 代码文件、各自可回退、各自过门禁）**
 
-- **11.1 Groq 助手 provider（建接缝，零行为变更）**
-  - 新增 `groq-assistant-provider.ts`（OpenAI 兼容 `chat/completions` + `tools`/`tool_choice`，复用录入那套 Groq 调用经验）；`ASSISTANT_PROVIDER` enum + `provider-config`/`provider-adapter` 加 `groq` 分支；模型 id 收编进 env（D28 气味 B）。
-  - 默认仍 `mock`，**不改任何用户可见行为**；mock-fetch 单测。纯接缝，风险最低。
+- **11.1 Groq 助手 provider（建接缝，零行为变更）　✅ 2026-06-17 完成（D34）**
+  - 新增 `groq-assistant-provider.ts`（OpenAI 兼容 `chat/completions` + `tools`/`tool_choice`，zod 校验，异常→`GROQ_PROVIDER_ERROR`）；`provider-config` 加 `getGroqAssistantProviderConfig`（模型 `GROQ_MODEL` 默认 `llama-3.3-70b-versatile`，env 可配）；`provider-adapter` switch 加 groq；`env.ts` enum/类型 + `assistant-stream-types` 事件类型加 groq。
+  - 默认仍 `mock`，**零用户可见行为变更**；5 例 mock-fetch 单测。门禁全绿（type-check / test:unit 281 / eval）。
+  - 顺带：新 provider 模型 id 从一开始 env 可配（不重蹈 D28 气味 B）；旧 anthropic 硬编码 id 未收编（留后续）；客户端 `provider_selected` 接受 `groq` 的类型放宽留 11.2（默认 mock 暂不会发 groq）。
 - **11.2 LLM 路由（带校验 + 确定性回退，env 灰度）**
   - 路由决策从"只用 classify"改为"provider=groq 时用 LLM 选 intent/工具，校验落在已知集合，非法/超时→回退 classify"。`unsupported`/`knowledge`/`next_week_plan` 早返回分支也纳入同一路由出口（消除双轨）。
   - 扩 `assistant-eval.ts` 加"自由表达"golden（同义改写"今天适合练什么/帮我看看这周/卧推是不是卡住了"等），度量路由准确率提升；保留原 13 条不回归。

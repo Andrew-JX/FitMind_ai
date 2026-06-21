@@ -33,8 +33,9 @@ ANTHROPIC_API_KEY=optional_only_for_anthropic
 ```
 
 说明：
-- `ASSISTANT_PROVIDER` 当前支持 `mock` 和 `anthropic`，默认值是 `mock`。
-- 只在使用 `anthropic` provider 时需要提供 `ANTHROPIC_API_KEY`。
+- `ASSISTANT_PROVIDER` 当前支持 `mock`、`anthropic` 和 `groq`，默认值是 `mock`（见 `ai-decisions.md` D34）。
+- 使用 `anthropic` 时需提供 `ANTHROPIC_API_KEY`；使用 `groq` 时需提供 `GROQ_API_KEY`（可选 `GROQ_MODEL`，默认 `llama-3.3-70b-versatile`）。
+- 注意：Slice 11.1 只建好了 Groq provider 接缝，**路由仍走确定性分类器**；让 LLM 真正参与路由是 11.2。
 
 客户端示例：
 

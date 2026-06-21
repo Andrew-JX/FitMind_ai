@@ -26,7 +26,10 @@ const serverEnvSchema = z.object({
   JWT_SECRET: optionalSecret,
   // `.catch("mock")` keeps an unknown/typo provider value from throwing and
   // taking down every request that loads env (e.g. auth); it degrades to mock.
-  ASSISTANT_PROVIDER: z.enum(["mock", "anthropic"]).default("mock").catch("mock"),
+  ASSISTANT_PROVIDER: z
+    .enum(["mock", "anthropic", "groq"])
+    .default("mock")
+    .catch("mock"),
   WORKOUT_INTAKE_LLM_PROVIDER: z
     .enum(["off", "mock", "anthropic", "gemini", "groq"])
     .default("mock")
@@ -44,7 +47,7 @@ export interface ServerEnv {
   port: number;
   databaseUrl?: string | undefined;
   jwtSecret?: string | undefined;
-  assistantProvider: "mock" | "anthropic";
+  assistantProvider: "mock" | "anthropic" | "groq";
   workoutIntakeLlmProvider: "off" | "mock" | "anthropic" | "gemini" | "groq";
   anthropicApiKey?: string | undefined;
   geminiApiKey?: string | undefined;

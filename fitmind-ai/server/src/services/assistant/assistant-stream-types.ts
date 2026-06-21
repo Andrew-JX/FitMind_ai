@@ -9,7 +9,7 @@ export type AssistantStreamEvent =
         | "answering";
     }
   | { type: "session"; session_id: string }
-  | { type: "provider_selected"; provider: "mock" | "anthropic" }
+  | { type: "provider_selected"; provider: "mock" | "anthropic" | "groq" }
   | { type: "tool_call_started"; tool_name: string }
   | {
       type: "tool_call_finished";

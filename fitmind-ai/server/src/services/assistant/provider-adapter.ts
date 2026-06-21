@@ -1,5 +1,6 @@
 import { anthropicAssistantProvider } from "./anthropic-provider.js";
 import { getConfiguredAssistantProvider } from "./provider-config.js";
+import { groqAssistantProvider } from "./groq-assistant-provider.js";
 import { mockAssistantProvider } from "./mock-provider.js";
 import type {
   AssistantProvider,
@@ -8,9 +9,14 @@ import type {
 } from "./provider-types.js";
 
 function getAssistantProvider(): AssistantProvider {
-  return getConfiguredAssistantProvider() === "anthropic"
-    ? anthropicAssistantProvider
-    : mockAssistantProvider;
+  switch (getConfiguredAssistantProvider()) {
+    case "anthropic":
+      return anthropicAssistantProvider;
+    case "groq":
+      return groqAssistantProvider;
+    default:
+      return mockAssistantProvider;
+  }
 }
 
 function normalizeAdapterError(error: unknown): AssistantProviderResponse {

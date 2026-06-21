@@ -849,3 +849,18 @@ Decision：
 遗留（不在本片，Slice 11 处理）：
 - ① 路由双轨（classify vs mock-provider）："今天适合练什么"等仍可能 provider 不接 → 收敛路由。
 - ③ RAG 排序逐次抖动的根（向量召回非确定）——本片已消除其在知识答上的**可见**抖动（词法过滤后确定性），但底层向量召回顺序仍非确定。
+
+## [D34] Groq 助手 provider 接缝（Slice 11.1，建接缝、零行为变更）
+
+- **Date**: 2026-06-17
+- **Status**: Accepted（已落地 + 单测；默认仍 mock，env 可切换/回退）
+
+背景：D28 气味 A——助手轮 provider 只有 `mock`/`anthropic`，没有免费 Groq。Slice 11（真实模型路由）的第一步：先把 Groq provider 接缝建好，**不改任何默认行为**，把风险隔离在"加一个可选 provider"上。
+
+Decision：
+- 新增 `groq-assistant-provider.ts`：实现既有 `AssistantProvider` 接口，走 Groq 的 OpenAI 兼容 `chat/completions` + `tools`/`tool_choice`；返回 zod 校验，异常/异形响应 → 干净的 `GROQ_PROVIDER_ERROR`（不抛进 orchestrator）。tool_call → `{kind:"tool_call"}`，content → `{kind:"message"}`，否则 error。
+- `provider-config.ts` 加 `getGroqAssistantProviderConfig`（key 必填、模型来自 `GROQ_MODEL` 默认 `llama-3.3-70b-versatile`——**新 provider 模型 id 从一开始就 env 可配**，不重蹈 D28 气味 B；旧 anthropic 硬编码 id 暂未收编，留作后续）；`provider-adapter.ts` switch 加 `groq` 分支；`env.ts` `ASSISTANT_PROVIDER` enum + 类型加 `groq`；`assistant-stream-types.ts` 的 `provider_selected` 事件类型同步加 `groq`（类型传播）。
+- **默认仍 `mock`**：不接路由、不改答案，纯接缝；5 例 mock-fetch 单测（tool_call / message / HTTP 错误 / 空响应 / 缺 key 抛错）。
+- 系统/用户 prompt 在 groq provider 内自带一份（与 anthropic 对齐）；跨 provider 的 prompt 共享留到 11.3 措辞阶段再抽，避免本片扩面。
+
+与未来的关系：11.2 才让 LLM 真正参与路由（带校验 + 确定性回退 + 扩 eval）；客户端 `provider_selected` 接受 `groq` 的类型放宽留到 11.2（届时才会真的发 groq）。回退：`ASSISTANT_PROVIDER=mock` 一键回到确定性。

@@ -1,0 +1,117 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { runGroqAssistantProvider } from "./groq-assistant-provider.js";
+import type { AssistantProviderRequest } from "./provider-types.js";
+
+const request: AssistantProviderRequest = {
+  conversation: { user_message: "帮我做本周训练报告" },
+  assistant_context: {
+    mode: "auto",
+    start_date: "2026-05-19",
+    end_date: "2026-06-17",
+    exercise_id: null,
+  },
+  allowed_tools: [
+    {
+      name: "get_weekly_training_report",
+      description: "Weekly training report.",
+      input_fields: ["start_date", "end_date"],
+    },
+  ],
+  simulation: { scenario: "default", normalized_message: "帮我做本周训练报告" },
+};
+
+function mockFetchOnce(status: number, body: unknown): void {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => ({
+      ok: status >= 200 && status < 300,
+      status,
+      json: async () => body,
+    })),
+  );
+}
+
+describe("runGroqAssistantProvider", () => {
+  const originalKey = process.env.GROQ_API_KEY;
+
+  beforeEach(() => {
+    process.env.GROQ_API_KEY = "test-groq-key";
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    if (originalKey === undefined) {
+      delete process.env.GROQ_API_KEY;
+    } else {
+      process.env.GROQ_API_KEY = originalKey;
+    }
+  });
+
+  it("maps an OpenAI-style tool call to a provider tool_call with parsed args", async () => {
+    mockFetchOnce(200, {
+      choices: [
+        {
+          message: {
+            content: null,
+            tool_calls: [
+              {
+                function: {
+                  name: "get_weekly_training_report",
+                  arguments:
+                    '{"start_date":"2026-05-19","end_date":"2026-06-17"}',
+                },
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    const result = await runGroqAssistantProvider(request);
+
+    expect(result).toEqual({
+      kind: "tool_call",
+      tool_name: "get_weekly_training_report",
+      tool_args: { start_date: "2026-05-19", end_date: "2026-06-17" },
+    });
+  });
+
+  it("maps a plain text completion to a message", async () => {
+    mockFetchOnce(200, {
+      choices: [{ message: { content: "  渐进超负荷指逐步加量。  " } }],
+    });
+
+    const result = await runGroqAssistantProvider(request);
+
+    expect(result).toEqual({ kind: "message", message: "渐进超负荷指逐步加量。" });
+  });
+
+  it("normalizes an HTTP error into a provider error", async () => {
+    mockFetchOnce(429, { error: { message: "rate limited", type: "rate_limit" } });
+
+    const result = await runGroqAssistantProvider(request);
+
+    expect(result.kind).toBe("error");
+    if (result.kind === "error") {
+      expect(result.error_code).toBe("GROQ_PROVIDER_ERROR");
+      expect(result.message).toContain("rate limited");
+    }
+  });
+
+  it("errors when the response has neither text nor a tool call", async () => {
+    mockFetchOnce(200, { choices: [{ message: { content: "" } }] });
+
+    const result = await runGroqAssistantProvider(request);
+
+    expect(result.kind).toBe("error");
+  });
+
+  it("throws when GROQ_API_KEY is missing", async () => {
+    delete process.env.GROQ_API_KEY;
+
+    await expect(runGroqAssistantProvider(request)).rejects.toThrow(
+      /GROQ_API_KEY/u,
+    );
+  });
+});

@@ -4605,3 +4605,21 @@ Verification:
 - `roadmap.md §8.3`：Slice 11 实现计划草案（分 11.1 Groq provider 接缝 / 11.2 LLM 路由带校验+确定性回退+eval / 11.3 收敛双轨+措辞；安全边界：模型不产数字、路由必落已知集合+回退、env 可回退、eval 门禁先行；前置=Groq key 在助手轮可用 + 模型选型 + 限流）。**待用户确认后再写代码**。
 
 docs-only。Slice 11 代码未动。
+
+## 2026-06-17 §8.2 B1 / Slice 11.1 - Groq 助手 provider 接缝（零行为变更）
+
+Slice 11 第一步：建 Groq 助手 provider 接缝(D28 气味 A),默认仍 mock、零用户可见变更、env 可回退,风险隔离在"加一个可选 provider"上。决策见 `ai-decisions.md` D34,计划见 `roadmap §8.3`。
+
+改动（6 文件，第 6 个为 1 行类型传播）：
+- 新增 `groq-assistant-provider.ts`：实现 `AssistantProvider`,走 Groq OpenAI 兼容 `chat/completions` + `tools`/`tool_choice`,zod 校验,异常→`GROQ_PROVIDER_ERROR`。
+- `provider-config.ts`：`getGroqAssistantProviderConfig`(key 必填、`GROQ_MODEL` 默认 `llama-3.3-70b-versatile`,env 可配——不重蹈 D28 气味 B)。
+- `provider-adapter.ts`：switch 加 groq 分支。
+- `env.ts`：`ASSISTANT_PROVIDER` enum + 类型加 groq。
+- `assistant-stream-types.ts`：`provider_selected` 事件类型加 groq(类型传播)。
+- `groq-assistant-provider.test.ts`：5 例 mock-fetch(tool_call / message / HTTP 错误 / 空响应 / 缺 key 抛错)。
+
+Verification:
+- `pnpm type-check`(client+server+shared) / `pnpm test:unit`(281,+5) / `pnpm eval`(13/13·12/12·3/3 PASS)：通过。改动文件 eslint EXIT 0。
+- 默认 mock,零行为变更,无需浏览器验证。
+
+遗留(11.2/11.3)：让 LLM 真正参与路由(带校验 + 确定性回退 + 扩"自由表达"eval);收敛路由双轨;客户端 `provider_selected` 接受 groq 的类型放宽;旧 anthropic 硬编码模型 id 收编。文档同步：`api-contract`/`local-run-guide`/roadmap §8.2/§8.3 + D34 已更。
