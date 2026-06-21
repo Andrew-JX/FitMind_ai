@@ -4564,3 +4564,20 @@ Verification:
 排查记录：验证初期"全 unsupported"是 curl 在 Windows 下传中文 body 被编码搞坏所致（"RPE是什么"因 ASCII 残留仍命中），非代码问题；改 node 原生 UTF-8 后全部正确。dev server 为常驻进程，验证后已停、临时探针文件已删。
 
 局限：闸门词表有限、覆盖窄（stopgap 本质），泛化靠 Slice 11 真实 LLM 路由；疼痛/医疗硬路由是 Slice 10 职责。
+
+## 2026-06-17 修复：前端"粘 mode"致命 UX bug（自由提问被误路由）
+
+用户在 prod(Vercel)自由提问"训练后怎么加快恢复"仍被路由成 recommendation，而我直连后端 mode=auto 探针是 knowledge。排查链：后端确认最新(Evidence 含 Slice 3.1 规则) → 同后端不同结果只能是客户端发的 mode 不是 auto → 读 `AssistantChatPanel.tsx` 发现 `mode` 存在共享 `promptSuggestion` 且会粘住：点过快捷问题/洞察卡片(如 next_training_focus)后，手输自由提问继承旧 mode、不发 auto，绕过服务端 classify（Slice 11a 改的路径）。
+
+这是致命 UX（按用户共识规则提前修，UI 虽排最后）：
+
+修复（`AssistantChatPanel.tsx`，2 处）：
+- `onChangeMessage`：用户手动改写文本即视为自由提问，`mode` 重置为 `auto`。
+- 提交后重置：`{message:"", mode:"auto"}`（原保留旧 mode）。
+
+Verification:
+- client `type-check` / 改动文件 eslint：通过。
+- 实地复现（preview + 本地后端 + fetch 抓包）：点"本周训练报告"(设 mode=weekly_report)后手输"训练后怎么加快恢复"提交 → 实际请求 **mode=auto**（修复前会是 weekly_report）→ 后端 `intent=knowledge` + RAG 命中 3 源(训练疲劳和恢复判断/渐进超负荷/Deload)。
+- dev server / preview 验证后均已停。
+
+教训记入 `ai-decisions.md` D32 修订：服务端 classify/eval 全绿 ≠ 用户触达该路径；客户端 mode 是否 auto 才决定是否走服务端分类。mode 双轨（客户端显式 vs 服务端 auto）应在 Slice 11 收敛为一处。

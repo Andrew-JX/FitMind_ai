@@ -824,3 +824,5 @@ Decision：
 局限 / 依赖：
 - 闸门词表有限（curated vocab），覆盖窄——这是 stopgap 的本质，泛化靠 Slice 11 的真实 LLM 路由。
 - 疼痛/医疗边界查询若带锚点会走知识答（有免责），但**安全硬路由是 Slice 10 的职责**（§8.2 排在真实模型之后）。
+
+- **2026-06-17 修订（前端粘 mode bug，致命 UX，提前修）**：上线后用户在 prod 自由提问仍被误路由（"训练后怎么加快恢复"→ recommendation），排查发现是前端 bug 掩盖了本片：`AssistantChatPanel` 把 `mode` 存在共享 `promptSuggestion` 里且**会粘住**——点过一次快捷问题/洞察卡片（如 `next_training_focus`）后，之后**手输的自由提问继承旧 mode**、发的不是 `auto`，绕过服务端 `classifyAssistantIntent`（本片改的路径）。修复：用户手动改写文本（`onChangeMessage`）与提交后都把 `mode` 重置为 `auto`（`AssistantChatPanel.tsx`）。实地验证：点"本周训练报告"后再输"训练后怎么加快恢复"，请求 `mode=auto` → 后端 `intent=knowledge` + RAG 3 源。**教训**：服务端 classify / eval 全绿 ≠ 用户真用得上——客户端发的 `mode` 决定是否触达该路径。`mode` 双轨（客户端显式 mode vs 服务端 auto classify）应在 Slice 11 收敛。

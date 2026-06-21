@@ -84,7 +84,7 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
 
     props.onPromptSuggestionChange({
       message: "",
-      mode,
+      mode: "auto",
     });
 
     await chat.sendMessage(payload);
@@ -244,8 +244,10 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
         message={message}
         onChangeMessage={(nextMessage) =>
           props.onPromptSuggestionChange({
+            // 用户手动改写文本即视为自由提问，重置回 auto 让服务端分类，
+            // 避免上一次快捷问题 / 洞察卡片的 mode 粘住、把自由提问误路由。
             message: nextMessage,
-            mode,
+            mode: "auto",
           })
         }
         onClear={chat.clearConversation}
