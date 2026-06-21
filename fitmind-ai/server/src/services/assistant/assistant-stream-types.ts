@@ -1,3 +1,5 @@
+import type { LlmIntentRouter } from "./llm-intent-router.js";
+
 export type AssistantStreamEvent =
   | {
       type: "state";
@@ -43,4 +45,6 @@ export type AssistantStreamEvent =
 
 export interface AssistantStreamOptions {
   onEvent?: ((event: AssistantStreamEvent) => void | Promise<void>) | undefined;
+  /** Injectable LLM intent router (Slice 11.2b). Default resolves from provider config; tests inject a fake. */
+  intentRouter?: LlmIntentRouter | null | undefined;
 }

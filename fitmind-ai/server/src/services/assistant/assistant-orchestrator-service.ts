@@ -26,6 +26,10 @@ import {
 } from "./answer-faithfulness.js";
 import { runAssistantProvider } from "./provider-adapter.js";
 import { coerceMessageToEvidenceToolCall } from "./assistant-provider-fallback.js";
+import {
+  createGroqIntentRouter,
+  type LlmIntentRouter,
+} from "./llm-intent-router.js";
 import { getConfiguredAssistantProvider } from "./provider-config.js";
 import {
   composeKnowledgeAnswer,
@@ -756,11 +760,30 @@ function getToolDefinitionForMode(
   }
 }
 
-function resolveRoutedIntent(
+export async function resolveRoutedIntent(
   input: MockAssistantTurnInput,
-): AssistantRoutedIntent {
+  router: LlmIntentRouter | null,
+): Promise<AssistantRoutedIntent> {
   if (input.mode === "auto") {
-    return classifyAssistantIntent(input.message).intent;
+    const keywordIntent = classifyAssistantIntent(input.message).intent;
+
+    // Fast path: a confident keyword match wins (deterministic, eval-stable, no LLM call).
+    if (keywordIntent !== "unsupported") {
+      return keywordIntent;
+    }
+
+    // Slice 11.2b: keyword fell through. Genuinely out-of-scope (blocklist/empty)
+    // stays a refusal; otherwise let the LLM rescue-route into the known intent
+    // set (validated upstream; null → unsupported). No LLM → keep deterministic.
+    if (isOutOfScopeMessage(input.message)) {
+      return "unsupported";
+    }
+
+    if (router === null) {
+      return "unsupported";
+    }
+
+    return (await router.classify(input.message)) ?? "unsupported";
   }
 
   switch (input.mode) {
@@ -1057,7 +1080,13 @@ export async function runMockAssistantTurn(
     type: "session",
     session_id: resolvedSession.sessionId,
   });
-  const intent = resolveRoutedIntent(input);
+  const intentRouter =
+    options?.intentRouter !== undefined
+      ? options.intentRouter
+      : getConfiguredAssistantProvider() === "groq"
+        ? createGroqIntentRouter()
+        : null;
+  const intent = await resolveRoutedIntent(input, intentRouter);
   const executionMode = resolveExecutionModeForIntent(input, intent);
 
   if (intent === "unsupported") {

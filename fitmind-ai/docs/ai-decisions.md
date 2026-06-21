@@ -881,3 +881,28 @@ Decision：
 边界 / 未来：
 - 仅作用于 provider 路径（数据 intent）；早返回的 unsupported/knowledge/next_week_plan 不受影响。
 - 11.2a 让 ① 在 mock 上即被治好；**启用 groq（prod 切 `ASSISTANT_PROVIDER=groq`）的真正增量价值在"自由表达路由"（11.2b）**——groq 在 provider 路径的多工具里挑得更准只是小增益。客户端 `provider_selected` 接受 groq 的类型放宽仍随 prod 切 groq 时一并做。
+
+## [D36] LLM 意图路由：关键词优先 + 落空时 Groq 救场（Slice 11.2b）
+
+- **Date**: 2026-06-22
+- **Status**: Accepted（已落地 + 单测；prod 切 `ASSISTANT_PROVIDER=groq` 后生效）
+
+背景：关键词路由对"明天练啥/帮我看看这周咋样"等**自由表达**会落空 → unsupported → 死板。要让 LLM 真正参与路由,但**不能牺牲稳定性/eval 基线**。
+
+Decision（架构：关键词优先 + 落空才调 LLM）：
+- `resolveRoutedIntent` 改 async：mode=auto 时先跑确定性 `classifyAssistantIntent`,**确信命中（非 unsupported）直接用**——13 条 eval 不动、无额外延迟、无回归;关键词**只在落空**时才进救场。
+- 落空后：**越界（黑名单/空）仍拒答**;否则若有 LLM router → 调 Groq 做**受限分类**（在 12 个已知 intent 里选一,含 unsupported）。
+- **校验 + 确定性回退**：新增 `llm-intent-router.ts` `createGroqIntentRouter`,任何失败（缺 key / HTTP 错 / 异形 / 非法 label / 异常）→ `null` → 上层回退 `unsupported`。模型**永不崩、永不强出已知集合外的 intent**。
+- **provider 无关的稳态**：router 仅当 `ASSISTANT_PROVIDER=groq` 时默认创建;mock 下 router=null → 落空仍按现确定性澄清（行为不变）。router 可经 `AssistantStreamOptions.intentRouter` 注入（测试注 fake）。
+- 路由收敛到**一个决策点**（`resolveRoutedIntent`）：救场得到的 intent 走正常处理流（配合 D35 安全网,recommendation 等自然出工具答案）。
+- 客户端 `provider_selected` 类型 + `formatProvider` 放宽到 `groq`（显示"智能回答"），为 prod 切 groq 做好。
+
+验证：
+- 门禁全绿（type-check / lint / test:unit 296 / eval 13/13·12/12·3/3）。
+- 单测：`llm-intent-router.test.ts`（合法 label / 含标点空白 / 非法→null / HTTP 错→null / 缺 key→null）;`resolve-routed-intent.test.ts`（关键词命中不调 LLM / 落空经 fake router 救场 / router 返 null→unsupported / 越界不调 LLM / 无 router→unsupported / 非 auto mode 直映射）。
+- **真实自由表达路由质量靠 prod 验证**（切 groq 后实测"明天练啥"→recommendation）;确定性 fake-router 测试覆盖救场逻辑。
+
+边界 / 未来（11.3）：
+- 关键词"自信误判"的罕见情况 LLM 管不到（keyword-first 设计）——留 11.3 LLM 主路由。
+- 自由表达的**真实 LLM** 路由 eval 是非确定,留作 opt-in（默认不进门禁,类似 NarrativeJudge）。
+- 切 prod groq 后,每个落空轮多一次 Groq 分类调用 + provider 路径一次 → 落空轮 2 次 Groq（落空是少数）;非落空轮仅 provider 路径一次。

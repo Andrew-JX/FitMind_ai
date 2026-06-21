@@ -33,7 +33,7 @@ export function AssistantStatusRail(props: AssistantStatusRailProps) {
 }
 
 function formatProvider(provider: AssistantProvider | null): string {
-  if (provider === "anthropic") {
+  if (provider === "anthropic" || provider === "groq") {
     return "智能回答";
   }
 

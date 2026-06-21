@@ -4653,3 +4653,26 @@ Verification:
 - ① 已在 mock 上修好（部署后当前 prod 即可验证"今天适合练什么"出真答案,无需切 groq）。
 
 下一步：11.2b（LLM 自由表达路由,治"明天练啥")才是切 groq 的真正增量;切 prod groq 建议留到 11.2b 一起,避免只为小增益加每轮 Groq 调用延迟。
+
+## 2026-06-22 §8.3 Slice 11.2b - LLM 意图路由（关键词优先 + 落空 Groq 救场）
+
+让 LLM 真正参与路由,治"明天练啥/帮我看看这周咋样"等自由表达落空死板,且不牺牲 eval 基线。决策见 `ai-decisions.md` D36。
+
+架构：关键词优先 + 落空才调 LLM：
+- `resolveRoutedIntent` 改 async：关键词确信命中直接用(13 条 eval 不动、无延迟、无回归);只在落空时进救场。
+- 落空：越界仍拒答;否则有 router 就调 Groq 受限分类(12 个已知 intent 选一,含 unsupported)+ 校验 + 失败回退 unsupported。
+
+改动（server 3 + client 2 + 2 测试）：
+- 新增 `llm-intent-router.ts`：`createGroqIntentRouter`,Groq 受限分类,任何失败(缺 key/HTTP 错/异形/非法 label/异常)→ null,上层回退。
+- `assistant-orchestrator-service.ts`：`resolveRoutedIntent` async + 关键词优先 + 救场 + 可注入 router(默认仅 provider=groq 时创建,mock 下 null 行为不变);导出供测试。
+- `assistant-stream-types.ts`：`AssistantStreamOptions.intentRouter` 注入位。
+- client `assistant-types.ts` + `AssistantStatusRail.tsx`：`provider_selected`/`AssistantProvider`/`formatProvider` 放宽到 groq(显示"智能回答"),为 prod 切 groq 做好。
+- `llm-intent-router.test.ts`(5) + `resolve-routed-intent.test.ts`(6,fake router)。
+
+Verification:
+- `pnpm type-check`(client+server+shared) / `pnpm test:unit`(296,+11) / `pnpm eval`(13/13·12/12·3/3 PASS)：通过。改动文件 eslint EXIT 0。
+- 救场逻辑由 fake-router 确定性单测覆盖;真实自由表达路由质量靠 prod 验证(切 groq 后)。
+
+⚠️ 待生效：需把 Vercel `ASSISTANT_PROVIDER` 改为 `groq`——届时"明天练啥"被 LLM 救场到 recommendation,且 D35 工具选择 + groq 一起上线。回退:改回 `mock` 一键回确定性。
+
+遗留(11.3)：关键词自信误判 LLM 管不到(留 LLM 主路由);自由表达真实 LLM eval 非确定,留 opt-in。
