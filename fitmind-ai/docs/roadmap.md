@@ -221,7 +221,8 @@ saved-insight 分享链接、知识管理后台、离线编辑 / 同步。优先
 | 阶段 | Slice | 内容 | 依赖 | 状态 |
 | --- | --- | --- | --- | --- |
 | **A 鲁棒性打底**（真实模型前先把高频入口/对话稳住，低风险） | A1 = **Slice 12** | 录入鲁棒性：放宽 hybrid LLM 兜底触发（变组被压扁→升级 LLM，D30）。确认 UI 已逐组可编辑、无需改 | 无 | ✅ 2026-06-17（变组兜底 + 2 单测；变组解析靠生产 Groq，本地 mock 不产变组） |
-| | A2 = **Slice 11a** | 对话"不死"纯确定性止血：`unsupported` 分流——越界保持拒答；带训练锚点（tokenize 闸门）走 RAG 兜底→知识答，否则澄清；保守扩同义词。决策见 D32 | 无 | ✅ 2026-06-17（兜底 + 同义词 + 4 单测；仅缓解，根治在 Slice 11） |
+| | A2 = **Slice 11a** | 对话"不死"纯确定性止血：`unsupported` 分流——越界保持拒答；带训练锚点（tokenize 闸门）走 RAG 兜底→知识答，否则澄清。决策见 D32 | 无 | ✅ 2026-06-17（兜底 + 4 单测；前端粘 mode bug 已修；**A+B 修订 D33：回退过宽词表 + 知识相关性下限，消除"自信错答"**） |
+| | A3 = 稳定性体检 + A/B 止血 | 体检发现 3 类问题（路由双轨 / 无相关性下限 / RAG 抖动）；本批先做 B 类止血（回退扩词 + `filterRelevantKnowledgeChunks` 词法重叠下限），把"自信错答"→"诚实没资料"。①路由双轨 ③向量召回非确定 留 Slice 11。决策见 D33 | 无 | ✅ 2026-06-17 |
 | **B 理解层质变**（核心一跳） | B1 = **Slice 11** | 接 Groq 真实模型做意图路由 + 工具选择 + 措辞；正则分类器降级为快路径/eval 基线；faithfulness(D21)+eval(D22) 当承重护栏；顺手收编模型 id（D28 气味 B） | D28 接缝、Slice 1/2 护栏、Groq key | 🟠 待做（中风险） |
 | **C 真实模型后的增强**（全部依赖 B1） | C1 | tracing + LangSmith eval（选择性，独立 SDK 不引 LangChain；trace 去 PII） | B1 | ⚪ 见 `ai-decisions.md` D29 |
 | | C2 | retriever 接口可换性 + RAG reranking（原 Phase 7.0 + D29）；reranker 可作为 Python/FastAPI 微服务的最佳切入点（D31） | B1 | ⚪ |

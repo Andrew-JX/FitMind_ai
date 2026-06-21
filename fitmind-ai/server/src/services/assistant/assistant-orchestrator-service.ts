@@ -39,6 +39,7 @@ import {
   type AssistantRoutedIntent,
 } from "./assistant-intent-router.js";
 import {
+  filterRelevantKnowledgeChunks,
   retrieveKnowledgeChunks,
   tokenizeKnowledgeQuery,
 } from "../rag/knowledge-retriever.js";
@@ -1073,13 +1074,16 @@ export async function runMockAssistantTurn(
         state: "retrieving",
       });
 
-      const sources = await retrieveKnowledgeChunks(input.message);
+      const retrieved = await retrieveKnowledgeChunks(input.message);
+      // Slice 11a 修订（B 相关性下限）：只用与查询有词法重叠的来源，
+      // 召回不够相关就退回澄清，不拿"语义最近的错 chunk"自信错答。
+      const sources = filterRelevantKnowledgeChunks(retrieved, input.message);
 
       logRetrievalEvent({
         intent: "knowledge",
-        retrievalMode: sources[0]?.retrieval_mode ?? "fallback",
+        retrievalMode: retrieved[0]?.retrieval_mode ?? "fallback",
         sources,
-        fallbackReason: sources.length === 0 ? "no_sources" : undefined,
+        fallbackReason: sources.length === 0 ? "no_relevant_sources" : undefined,
       });
 
       if (sources.length > 0) {
@@ -1125,13 +1129,16 @@ export async function runMockAssistantTurn(
       state: "retrieving",
     });
 
-    const sources = await retrieveKnowledgeChunks(input.message);
+    const retrieved = await retrieveKnowledgeChunks(input.message);
+    // B 相关性下限：知识库很小，向量召回会返回"语义最近"的无关 chunk → 自信错答。
+    // 只保留与查询有词法重叠的来源；无相关来源时 composeKnowledgeAnswer 会诚实回退到"没找到可靠资料"。
+    const sources = filterRelevantKnowledgeChunks(retrieved, input.message);
 
     logRetrievalEvent({
       intent,
-      retrievalMode: sources[0]?.retrieval_mode ?? "fallback",
+      retrievalMode: retrieved[0]?.retrieval_mode ?? "fallback",
       sources,
-      fallbackReason: sources.length === 0 ? "no_sources" : undefined,
+      fallbackReason: sources.length === 0 ? "no_relevant_sources" : undefined,
     });
 
     const answer = composeKnowledgeAnswer({

@@ -62,14 +62,13 @@ describe("classifyAssistantIntent", () => {
     expect(classifyAssistantIntent("讲个笑话").intent).toBe("unsupported");
   });
 
-  it("routes broadened knowledge / recommendation phrasings (Slice 11a synonyms)", () => {
-    expect(classifyAssistantIntent("训练前怎么热身？").intent).toBe("knowledge");
-    expect(classifyAssistantIntent("组间休息多久比较好").intent).toBe(
-      "knowledge",
+  it("routes knowledge-base topics without coverage out of the curated vocab (no confident wrong answers)", () => {
+    // 这些词不在精选词表/知识库 → 不路由 knowledge，交给澄清，避免向量召回"最近的错 chunk"。
+    expect(classifyAssistantIntent("训练前怎么热身？").intent).toBe(
+      "unsupported",
     );
-    expect(classifyAssistantIntent("睡眠对训练重要吗").intent).toBe("knowledge");
-    expect(classifyAssistantIntent("我该练哪个部位").intent).toBe(
-      "recommendation",
+    expect(classifyAssistantIntent("睡眠对训练重要吗").intent).toBe(
+      "unsupported",
     );
   });
 

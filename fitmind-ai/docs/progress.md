@@ -4581,3 +4581,19 @@ Verification:
 - dev server / preview 验证后均已停。
 
 教训记入 `ai-decisions.md` D32 修订：服务端 classify/eval 全绿 ≠ 用户触达该路径；客户端 mode 是否 auto 才决定是否走服务端分类。mode 双轨（客户端显式 vs 服务端 auto）应在 Slice 11 收敛为一处。
+
+## 2026-06-17 助手"自信错答"止血：A 回退过宽词表 + B 知识检索相关性下限
+
+稳定性体检(把助手按各类提问跑一遍)发现 3 类问题：①"今天适合练什么"路由对但 provider 不接→兜底文案(路由双轨);②"睡眠/热身"等知识库没覆盖的话题被自信错答(向量召回返回语义最近的恢复 chunk);③ RAG 排序逐次抖动。其中 ② 是我 Slice 11a 扩词放大的。用户要求"先稳定",本批只做 ② 的止血(A+B)。决策见 `ai-decisions.md` D33。
+
+改动（3 源 + 2 测试）：
+- A 回退（`assistant-intent-router.ts` + `knowledge-retriever.ts`）：撤掉 11a 加的 KNOWLEDGE_PATTERN 词(热身/拉伸/组间休息/睡眠)、RECOMMENDATION 的"练哪"、tokenize 词表对应项。保留 11a 安全部分(isOutOfScopeMessage + 疲劳/恢复 有内容的兜底)。
+- B 相关性下限（`knowledge-retriever.ts` 新纯函数 `filterRelevantKnowledgeChunks` + `assistant-orchestrator-service.ts` 知识分支/兜底分支应用）：只保留与查询精选 token 有**词法重叠**的召回,无重叠→诚实回退。用词法重叠而非向量分数阈值——小知识库下确定性、可单测、顺带消除 ③ 在知识答上的可见抖动;不动检索核心打分、不动 agent RAG。
+- 测试：路由测试改为断言 热身/睡眠→unsupported(诚实);`knowledge-retriever.test.ts` +3 例(词法重叠保留/语义最近无重叠丢弃/无术语返回空)。
+
+Verification:
+- `pnpm type-check` / `pnpm test:unit`(276,+3) / `pnpm eval`(13/13·12/12·3/3 PASS)：通过。改动文件 eslint EXIT 0。
+- 真链路(本地后端=同 Neon+Voyage≈prod)：睡眠/热身→诚实澄清 sources=0(原自信错答);渐进超负荷/deload→精准 1 源;恢复/疲劳→命中"训练疲劳和恢复判断";女朋友/天气→澄清/拒答。"自信错答"消除。
+- dev server 验证后已停;临时探针文件已删。
+
+遗留(Slice 11 处理)：① 路由双轨(classify vs mock-provider)、③ 向量召回底层非确定。本批是"先稳定"，不引入新行为、只让它更诚实。

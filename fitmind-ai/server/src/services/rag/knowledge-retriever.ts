@@ -61,10 +61,6 @@ export function tokenizeKnowledgeQuery(input: string): string[] {
     "引体向上",
     "疲劳",
     "恢复",
-    "热身",
-    "拉伸",
-    "组间休息",
-    "睡眠",
   ]) {
     if (normalizedInput.includes(phrase.toLowerCase())) {
       tokens.add(phrase);
@@ -72,6 +68,37 @@ export function tokenizeKnowledgeQuery(input: string): string[] {
   }
 
   return [...tokens];
+}
+
+/**
+ * 相关性下限：只保留与查询有**词法重叠**（精选词表 token 出现在 chunk 文本里）的召回结果。
+ *
+ * 为什么用词法重叠而非向量分数阈值：知识库很小，纯向量召回总会返回"语义最近"的一条，
+ * 哪怕主题不相关（如"睡眠"召回"恢复"），导致**自信错答**；而向量分数跨模式语义不一、
+ * 还会逐次抖动，阈值不可靠。词法重叠是**确定性**的——chunk 必须真的提到查询里的训练术语，
+ * 才算"有据可答"，否则上层应诚实回退到"没找到可靠资料"。
+ *
+ * @param chunks - 已召回的知识 chunk（任意检索模式）
+ * @param query - 用户原始查询
+ * @returns 与查询有词法重叠的 chunk 子集（无重叠则为空数组）
+ */
+export function filterRelevantKnowledgeChunks(
+  chunks: RetrievedKnowledgeChunk[],
+  query: string,
+): RetrievedKnowledgeChunk[] {
+  const queryTokens = tokenizeKnowledgeQuery(query);
+
+  if (queryTokens.length === 0) {
+    return [];
+  }
+
+  return chunks.filter((chunk) => {
+    const haystack = [chunk.title, chunk.category, chunk.chunk_text, ...chunk.tags]
+      .join(" ")
+      .toLowerCase();
+
+    return queryTokens.some((token) => haystack.includes(token));
+  });
 }
 
 function scoreChunk(

@@ -1,11 +1,65 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  filterRelevantKnowledgeChunks,
   rankKnowledgeChunks,
   rankHybridKnowledgeChunks,
   retrieveKnowledgeChunks,
   tokenizeKnowledgeQuery,
+  type RetrievedKnowledgeChunk,
 } from "./knowledge-retriever.js";
+
+const retrievedRecovery: RetrievedKnowledgeChunk = {
+  id: "c-recovery",
+  title: "训练疲劳和恢复判断",
+  category: "recovery",
+  chunk_text:
+    "恢复判断不能只看训练日志，还应结合睡眠、酸痛、主观疲劳和疼痛信号。",
+  source_type: "seed",
+  tags: ["恢复", "疲劳"],
+  score: 0.8,
+  retrieval_mode: "vector",
+};
+const retrievedOverload: RetrievedKnowledgeChunk = {
+  id: "c-overload",
+  title: "渐进超负荷",
+  category: "training_principle",
+  chunk_text: "渐进超负荷通过重量、次数、组数或动作质量逐步提升。",
+  source_type: "seed",
+  tags: ["渐进超负荷"],
+  score: 0.7,
+  retrieval_mode: "vector",
+};
+
+describe("filterRelevantKnowledgeChunks", () => {
+  it("keeps chunks that lexically overlap the query's curated tokens", () => {
+    const result = filterRelevantKnowledgeChunks(
+      [retrievedRecovery, retrievedOverload],
+      "怎么缓解疲劳",
+    );
+
+    expect(result.map((chunk) => chunk.id)).toEqual(["c-recovery"]);
+  });
+
+  it("drops semantically-near but lexically-unrelated chunks (no confident wrong answer)", () => {
+    // "恢复"查询命中含"恢复"的 chunk，但不含该词的"渐进超负荷"被丢弃。
+    const result = filterRelevantKnowledgeChunks(
+      [retrievedOverload],
+      "训练后怎么加快恢复",
+    );
+
+    expect(result).toEqual([]);
+  });
+
+  it("returns empty when the query has no curated training token", () => {
+    const result = filterRelevantKnowledgeChunks(
+      [retrievedRecovery, retrievedOverload],
+      "我女朋友生气了怎么办",
+    );
+
+    expect(result).toEqual([]);
+  });
+});
 
 const dbRows = [
   {

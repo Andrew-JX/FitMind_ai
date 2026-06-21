@@ -826,3 +826,26 @@ Decision：
 - 疼痛/医疗边界查询若带锚点会走知识答（有免责），但**安全硬路由是 Slice 10 的职责**（§8.2 排在真实模型之后）。
 
 - **2026-06-17 修订（前端粘 mode bug，致命 UX，提前修）**：上线后用户在 prod 自由提问仍被误路由（"训练后怎么加快恢复"→ recommendation），排查发现是前端 bug 掩盖了本片：`AssistantChatPanel` 把 `mode` 存在共享 `promptSuggestion` 里且**会粘住**——点过一次快捷问题/洞察卡片（如 `next_training_focus`）后，之后**手输的自由提问继承旧 mode**、发的不是 `auto`，绕过服务端 `classifyAssistantIntent`（本片改的路径）。修复：用户手动改写文本（`onChangeMessage`）与提交后都把 `mode` 重置为 `auto`（`AssistantChatPanel.tsx`）。实地验证：点"本周训练报告"后再输"训练后怎么加快恢复"，请求 `mode=auto` → 后端 `intent=knowledge` + RAG 3 源。**教训**：服务端 classify / eval 全绿 ≠ 用户真用得上——客户端发的 `mode` 决定是否触达该路径。`mode` 双轨（客户端显式 mode vs 服务端 auto classify）应在 Slice 11 收敛。
+
+## [D33] 助手"自信错答"止血：回退过宽词表 + 知识检索相关性下限（A+B，先稳定）
+
+- **Date**: 2026-06-17
+- **Status**: Accepted（已落地 + 单测 + 真链路验证；只减不增、更诚实）
+
+背景（稳定性体检发现）：
+- 把助手按各类提问跑了一遍发现：① "今天适合练什么" 路由对但 provider 不接 → 兜底文案（路由双轨）；② "睡眠/热身"等**知识库没覆盖**的话题被**自信错答**（向量召回返回"语义最近"的恢复 chunk）；③ RAG 排序逐次抖动（同问时对时错）。其中 ② 是我 Slice 11a 扩词（把 热身/拉伸/组间休息/睡眠 加进知识路由）**放大**的——把原本诚实的"没识别清楚"改成了自信错答，比原来更糟。
+- 用户要求"先稳定再拓展"。本片只做最伤信任的 ②，把"自信错答"摁成"诚实没资料"。①③ 的结构性根因（路由双轨/向量打分）留给 Slice 11 真实模型路由收敛。
+
+Decision：
+- **A（回退过宽词表）**：撤掉 Slice 11a 加的 `KNOWLEDGE_PATTERN` 词（热身/拉伸/组间休息/睡眠）、`RECOMMENDATION_PATTERN` 的"练哪"、`tokenizeKnowledgeQuery` 词表对应项。效果：这些无知识库内容的词回到 unsupported → 澄清，不再硬路由 knowledge 后被向量乱答。保留 11a 安全部分（`isOutOfScopeMessage` 分流 + 疲劳/恢复 这类**有内容**的兜底）。
+- **B（相关性下限 = 词法重叠，而非分数阈值）**：新增纯函数 `filterRelevantKnowledgeChunks(chunks, query)`——只保留**与查询精选 token 有词法重叠**（token 出现在 chunk title/category/text/tags）的召回；无重叠则空。orchestrator 的 knowledge 分支与 11a 兜底分支都先过这层，空了就走诚实回退（`composeKnowledgeAnswer` 空 sources 文案 / 澄清）。
+- **为何词法重叠而非向量分数阈值**：知识库很小，纯向量"语义最近"恰恰是错答来源；向量分数跨模式（keyword 计数 / hybrid 归一化 / 纯向量原始 cosine）语义不一、且逐次抖动，阈值既难定又会让边界问题忽对忽错。词法重叠**确定性**、可单测、顺带消除 ③ 在知识路径上的抖动表现。代价：纯语义、无术语重叠的合法问题也会被判"没资料"——对本产品**宁可诚实说不知道，不要自信错答**，可接受；泛化靠 Slice 11。
+- 不动检索核心打分（hybrid 0.7/0.3 不变）、不动 agent 的 RAG（只在 orchestrator 答案分支加过滤，规划器 sources 不受影响）。
+
+验证：
+- 门禁全绿（type-check / lint / test:unit 276 / eval 13/13·12/12·3/3）；+3 单测（词法重叠保留 / 语义最近无重叠丢弃 / 无术语返回空）。
+- 真链路（本地后端=同 Neon+Voyage≈prod）：睡眠/热身 → 诚实澄清 sources=0；渐进超负荷/deload → 精准 1 源；恢复/疲劳 → 命中"训练疲劳和恢复判断"；女朋友/天气 → 澄清/拒答。"自信错答"消除。
+
+遗留（不在本片，Slice 11 处理）：
+- ① 路由双轨（classify vs mock-provider）："今天适合练什么"等仍可能 provider 不接 → 收敛路由。
+- ③ RAG 排序逐次抖动的根（向量召回非确定）——本片已消除其在知识答上的**可见**抖动（词法过滤后确定性），但底层向量召回顺序仍非确定。
