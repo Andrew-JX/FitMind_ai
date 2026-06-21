@@ -234,4 +234,36 @@ saved-insight 分享链接、知识管理后台、离线编辑 / 同步。优先
 
 > **坚决保留自研、不让框架替换**（D29）：agent harness（不上 LangGraph）、structured output（provider 原生 + faithfulness）、核心 eval（`assistant-eval.ts` 当承重护栏，LangSmith 只做增强 UI）。这是"证据绑定、确定性"差异化的护城河。
 
+---
+
+### 8.3 Slice 11 实现计划（草案，2026-06-17，待用户确认后再写代码）
+
+> 目标：把"理解层"从死正则换成真实（免费 Groq）LLM 做**意图路由 + 工具选择 + 措辞**，并**收敛路由双轨**（体检问题 ①：classify vs mock-provider 各判各的，"今天适合练什么"路由对却不被接住）。**数字与结论仍只来自确定性工具 + faithfulness 校验**——模型只负责"听懂 + 选工具 + 说话"，不产出数据。这是把 Slice 1/2 护栏从闲置变承重的一跳。
+
+**设计原则（安全边界）**
+- 模型**不产出用户可见数字**：所有数值/结论来自确定性工具输出，faithfulness（D21）运行时校验，编造即标注。
+- 模型路由/选工具**必须落在已知集合**：返回非法 intent / 不在 `allowed_tools` 的工具 → `ensureAllowedTool` 拒绝 + **回退确定性 classify**。永不因模型故障而崩或乱答。
+- **全程可回退**：用 env 开关（`ASSISTANT_PROVIDER` + 路由开关）一键切回 mock/确定性。
+- **eval 门禁先行**：扩 golden 覆盖"自由表达"（同义改写），mock 与 Groq 双跑对比，回归非零退出。
+
+**分阶段（每阶段 ≤5 代码文件、各自可回退、各自过门禁）**
+
+- **11.1 Groq 助手 provider（建接缝，零行为变更）**
+  - 新增 `groq-assistant-provider.ts`（OpenAI 兼容 `chat/completions` + `tools`/`tool_choice`，复用录入那套 Groq 调用经验）；`ASSISTANT_PROVIDER` enum + `provider-config`/`provider-adapter` 加 `groq` 分支；模型 id 收编进 env（D28 气味 B）。
+  - 默认仍 `mock`，**不改任何用户可见行为**；mock-fetch 单测。纯接缝，风险最低。
+- **11.2 LLM 路由（带校验 + 确定性回退，env 灰度）**
+  - 路由决策从"只用 classify"改为"provider=groq 时用 LLM 选 intent/工具，校验落在已知集合，非法/超时→回退 classify"。`unsupported`/`knowledge`/`next_week_plan` 早返回分支也纳入同一路由出口（消除双轨）。
+  - 扩 `assistant-eval.ts` 加"自由表达"golden（同义改写"今天适合练什么/帮我看看这周/卧推是不是卡住了"等），度量路由准确率提升；保留原 13 条不回归。
+- **11.3 收敛 + 措辞（可选，验证稳后再做）**
+  - mock 路径也走同一路由出口，彻底消除 classify↔mock-provider 双轨；可让模型基于工具输出**措辞**（faithfulness 兜底）。token/成本字段加进 observability（D25 扩展）。
+
+**前置条件（需你确认）**
+- **Groq key 在助手轮的 Vercel 后端可读**：你之前配的 `GROQ_API_KEY` 是给"录入解析"那条 seam 的，助手轮要确认同一 key 可用（同一环境变量即可）。
+- **模型选型**：默认拟用与录入一致的 `llama-3.3-70b-versatile`（支持 tool calling、免费），可换。
+- **成本/限流**：Groq 免费层有每分钟限流；沿用 D25 的 AI 限流 + 失败回退确定性。
+
+**遗留/顺带**：体检问题 ① 在 11.2 收敛路由时一并解决；③ 向量召回非确定属 RAG 层，本片不动（已被 D33 词法过滤遮住可见抖动）。
+
+**验收**：每阶段 type-check/lint/test:unit/eval 全绿；11.2 起新增"自由表达"eval 集；mock vs groq 双跑对比；env 可一键回退；真链路验证（自由提问不再死板、"今天适合练什么"被正确接住）。
+
 > 接手提示：每片开工先读 `AGENTS.md`，再读该片涉及的领域文档（Slice 1/2 主要是 `ai-decisions.md` + `assistant-*`/`agent` 代码；Slice 3-5 涉及 `db-schema.md` / `api-contract.md` / `UI_SPEC.md`）。每片完成更新 `progress.md` 并把本节对应 Slice 标进度。

@@ -780,8 +780,9 @@ Fallback boundaries:
 - LLM output can contain `spoken_name`, complete `sets`, incomplete set facts, and warnings.
 - LLM output must not contain `exercise_id`; database exercise matching still uses the deterministic exercise matching service.
 - LLM fallback never creates `workouts` or `sets`; user confirmation and the existing create workout API remain the only persistence path.
-- `WORKOUT_INTAKE_LLM_PROVIDER` supports `off`, `mock`, and `anthropic`, defaulting to `mock` for local tests and smoke.
+- `WORKOUT_INTAKE_LLM_PROVIDER` supports `off`, `mock`, `anthropic`, `gemini`, and `groq`, defaulting to `mock` for local tests and smoke (prod uses `groq`).
 - Phase 4.4 Batch 6B treats a matched exercise with no valid sets as low quality and attempts fallback, so oral phrases like `我今天训练了背部做了高位下拉做了3组每组做的是70公斤然后每组做了10次` can return a saveable draft instead of a matched empty row.
+- **roadmap §8.2 Slice 12 (varied-set escalation, `ai-decisions.md` D30)**: when the text mentions ≥2 distinct weights but the rule parser captured fewer distinct weights (oral filler like 做了/加到 dropping `weight×reps` pairs and flattening per-set weights), the hybrid parser escalates to the LLM fallback even though the rule draft looked "complete". Compares distinct-weight counts (not values), so it is safe across lb→kg conversion.
 - User-facing parse warnings are Chinese product copy; provider/debug failures remain in `evidence.fallback_warnings`.
 - Phase 4.4 Batch 6C resolves date hints like `昨天`, `前天`, `5月29号`, `五月二十九号`, `2026年5月29日`, `5/29`, and `2026-05-29` into `draft.performed_at`. Explicit text dates take priority over request `performed_at`; if text has no date, the request value is used; otherwise server time is used.
 - Phase 4.4 Batch 6D expands the system dictionary and alias map for common Chinese gym movements such as `哑铃推肩`, `坐姿哑铃推肩`, `引体向上`, `侧平举`, `杠铃划船`, `哑铃划船`, `腿屈伸`, `腿弯举`, and `臀推`.
@@ -827,7 +828,14 @@ Assistant integration:
 - `weekly_report` uses `get_weekly_training_report` and returns Evidence.
 - `plateau_diagnosis` uses exercise progress Evidence plus RAG Sources when an exercise is selected.
 - `next_week_plan` uses weekly report Evidence plus RAG Sources and must describe the output as a draft, not a prescription.
-- Unsupported prompts continue to return no Evidence and no Sources.
+
+Intent routing & honesty boundaries (roadmap §8 Slice 11a + §8.2 A/B; `ai-decisions.md` D32/D33):
+
+- Free-text messages are sent with `mode: "auto"` and routed by the deterministic keyword classifier (`classifyAssistantIntent`). Quick prompts / insight cards send an explicit `mode`. (Known limitation: the classifier and the mock-provider path are dual-track — convergence is deferred to Slice 11.)
+- An `unsupported` route now splits:
+  - **Out-of-scope** (weather/jokes/stocks blocklist, or empty) → polite clarification refusal, **no Evidence, no Sources**.
+  - **Unmatched but training-anchored** (the message contains a curated training term, e.g. 疲劳/恢复) → attempts knowledge retrieval; if relevant knowledge is found it returns a **`knowledge`** answer with Sources, otherwise the same clarification. So "unsupported prompts return no Sources" is **no longer absolute** — anchored ones can be recovered.
+- **Knowledge relevance floor (D33)**: `knowledge` answers (and the fallback above) only use retrieved chunks that **lexically overlap** the query's curated tokens (`filterRelevantKnowledgeChunks`). Topics the small KB does not cover (e.g. 睡眠/热身) return an honest "no reliable material" reply instead of the semantically-nearest (wrong) chunk. Lexical overlap is deterministic (no run-to-run flicker); chosen over a vector-score threshold.
 
 ------
 

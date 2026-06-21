@@ -4597,3 +4597,11 @@ Verification:
 - dev server 验证后已停;临时探针文件已删。
 
 遗留(Slice 11 处理)：① 路由双轨(classify vs mock-provider)、③ 向量召回底层非确定。本批是"先稳定"，不引入新行为、只让它更诚实。
+
+## 2026-06-17 文档补记（api-contract 同步）+ Slice 11 实现计划草案
+
+用户指出"相关文档还没记录"——核对发现 `api-contract.md` 助手章节漏更（一直只写 ai-decisions/progress/roadmap，漏了契约文档，违反 AGENTS 文档同步表"助手 intent/路由 → api-contract"）。本次补：
+- `api-contract.md`：助手「Intent routing & honesty boundaries」段（Slice 11a unsupported 分流：越界→拒答无 Sources、带锚点→RAG 兜底可返知识答；D33 知识相关性下限：没覆盖话题诚实"没资料"不返最近错 chunk；路由双轨已知局限留 Slice 11）；录入 fallback 段补 Slice 12 变组升级（D30）+ 修正 `WORKOUT_INTAKE_LLM_PROVIDER` 取值（补 gemini/groq，prod=groq）。
+- `roadmap.md §8.3`：Slice 11 实现计划草案（分 11.1 Groq provider 接缝 / 11.2 LLM 路由带校验+确定性回退+eval / 11.3 收敛双轨+措辞；安全边界：模型不产数字、路由必落已知集合+回退、env 可回退、eval 门禁先行；前置=Groq key 在助手轮可用 + 模型选型 + 限流）。**待用户确认后再写代码**。
+
+docs-only。Slice 11 代码未动。
