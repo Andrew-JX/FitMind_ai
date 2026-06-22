@@ -28,7 +28,7 @@ const HISTORY_PATTERN = /上次|什么时候|历史|记录/u;
 const EVIDENCE_PATTERN = /根据什么|依据|为什么|证据|判断/u;
 
 const WEEKLY_REPORT_PATTERN =
-  /本周训练报告|周训练报告|weekly\s*report|weekly\s*training\s*report|训练报告/u;
+  /本周训练报告|周训练报告|周报|weekly\s*report|weekly\s*training\s*report|训练报告/u;
 const PLATEAU_DIAGNOSIS_PATTERN =
   /平台期|停滞诊断|plateau\s*diagnosis|卧推平台|bench\s*plateau/u;
 const NEXT_WEEK_PLAN_PATTERN =

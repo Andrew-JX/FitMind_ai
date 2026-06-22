@@ -38,6 +38,8 @@ describe("classifyAssistantIntent", () => {
     expect(classifyAssistantIntent("帮我做一份本周训练报告").intent).toBe(
       "weekly_report",
     );
+    // 常见简写"周报"走关键词快路径（确定性、省一次 LLM 调用）。
+    expect(classifyAssistantIntent("周报").intent).toBe("weekly_report");
     expect(classifyAssistantIntent("卧推平台期怎么诊断").intent).toBe(
       "plateau_diagnosis",
     );

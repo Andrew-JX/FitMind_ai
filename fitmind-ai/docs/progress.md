@@ -4676,3 +4676,13 @@ Verification:
 ⚠️ 待生效：需把 Vercel `ASSISTANT_PROVIDER` 改为 `groq`——届时"明天练啥"被 LLM 救场到 recommendation,且 D35 工具选择 + groq 一起上线。回退:改回 `mock` 一键回确定性。
 
 遗留(11.3)：关键词自信误判 LLM 管不到(留 LLM 主路由);自由表达真实 LLM eval 非确定,留 opt-in。
+
+## 2026-06-22 Slice 11.2b 上线微调：常见简写"周报"进关键词快路径
+
+切 prod groq 后实测:LLM 路由质量很好（"明天练啥"→recommendation、"帮我看看这周练得咋样"→summary、"我最近有进步吗"→progress、"我练得均衡吗"→imbalance、"怎么判断的"→evidence,prod 探针 6 条中 5 条改写都对）。唯一漏的是 2 字简写**"周报"**——keyword 没收、LLM 也判成了 unsupported（可能当成工作周报）。
+
+修复：`WEEKLY_REPORT_PATTERN` 加 `周报`——常见词进关键词快路径,确定性、还省一次 LLM 调用。属正当 keyword 改进("周报"→weekly_report 正确且跑真工具,无自信错答风险),非脆弱过度打补丁。+1 路由单测。
+
+Verification: `pnpm type-check` / `pnpm test:unit`(+1) / `pnpm eval`(13/13·12/12·3/3 PASS) 通过;改动文件 eslint 干净。部署后"周报"即走 weekly_report（无需再调 LLM）。
+
+体会:这正是"关键词优先 + LLM 救场"设计该有的样子——常见词放 keyword（快、稳),长尾交 LLM(prod 实测改写覆盖良好)。
