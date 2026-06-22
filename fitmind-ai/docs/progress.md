@@ -4697,3 +4697,9 @@ Verification: `pnpm type-check` / `pnpm test:unit`(+1) / `pnpm eval`(13/13·12/1
 
 Verification: `pnpm type-check`(client+server+shared) / `pnpm test:unit`(298,+2) / `pnpm eval`(13/13·12/12·3/3 PASS) 通过；改动文件 eslint EXIT 0。
 文档：api-contract.md 早已正确写明周报 exercise_id 为 optional（line 675），是 input_fields 漂移而非文档——故 api-contract 不改。见 ai-decisions D37。
+
+## 2026-06-22 Slice 11.3a 收尾：周报 orchestrator 级端到端测试（补 Codex residual risk）
+
+Codex 本轮判过，建议补一个真正 orchestrator 级闭环测试。新增 `weekly-report-orchestrator.test.ts`：用 `vi.mock` 桩掉 DB（chat-repository）、tool 执行器（tool-executor）、provider（provider-adapter 返回纯 prose）、provider-config（=mock，走关键词路由），无数据库驱动整条链路。断言 message="周报" + 无 exercise_id + provider 只返回 prose 时：① 路由到 weekly_report；② 兜底把 prose 转成 `get_weekly_training_report` 工具调用，**exercise_id 完全不作为 key 传入**；③ tool_calls 记一条 success；④ 最终答案 evidence 绑定工具输出（tool_names / workout_ids / set_ids）；⑤ faithfulness=verified。这把 P1 的端到端闭环也纳入门禁（此前只有契约测试兜底）。
+
+Verification: `pnpm type-check` / `pnpm test:unit`(299,+1) / `pnpm eval`(13/13·12/12·3/3 PASS) 通过；新增文件 eslint EXIT 0。纯新增测试、无源码改动。
