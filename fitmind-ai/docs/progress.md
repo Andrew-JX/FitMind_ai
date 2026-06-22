@@ -4703,3 +4703,12 @@ Verification: `pnpm type-check`(client+server+shared) / `pnpm test:unit`(298,+2)
 Codex 本轮判过，建议补一个真正 orchestrator 级闭环测试。新增 `weekly-report-orchestrator.test.ts`：用 `vi.mock` 桩掉 DB（chat-repository）、tool 执行器（tool-executor）、provider（provider-adapter 返回纯 prose）、provider-config（=mock，走关键词路由），无数据库驱动整条链路。断言 message="周报" + 无 exercise_id + provider 只返回 prose 时：① 路由到 weekly_report；② 兜底把 prose 转成 `get_weekly_training_report` 工具调用，**exercise_id 完全不作为 key 传入**；③ tool_calls 记一条 success；④ 最终答案 evidence 绑定工具输出（tool_names / workout_ids / set_ids）；⑤ faithfulness=verified。这把 P1 的端到端闭环也纳入门禁（此前只有契约测试兜底）。
 
 Verification: `pnpm type-check` / `pnpm test:unit`(299,+1) / `pnpm eval`(13/13·12/12·3/3 PASS) 通过；新增文件 eslint EXIT 0。纯新增测试、无源码改动。
+
+## 2026-06-22 Slice 11.3a：收敛单轨路由（删除 mock provider 影子分类器）
+
+把路由双轨收敛成单轨。新增 `assistant-tool-routing.ts` 承载 `getToolDefinitionForMode`（从编排层搬出，单一 mode→工具映射源）；mock provider 改读 `assistant_context.mode`（`resolveRoutedIntent` 已解析的 mode）选工具，删除 `detectIntentFromMessage`/`resolveIntent` 这套独立正则分类器（轨 2）。此后全局唯一的消息→意图分类器就是 `resolveRoutedIntent`。编排层从新模块 import；`tool-contract.test.ts` import 路径跟随。
+
+- 行为：正确路由用例不变；过去轨 1↔轨 2 分歧的 bug 用例被纠正。eval 不受影响（intent 直接调 classify、refusal/faithfulness 离线 fixtures）。groq / mock 回退不受影响。
+- 测试：`mock-provider.test.ts` 重写为 mode 驱动 + "同一消息不同 mode → 不同工具（证明忽略消息文本）" + exercise 缺 id 守卫 + 模拟钩子保留。
+
+Verification: `pnpm type-check` / `pnpm test:unit`(303,+4) / `pnpm eval`(13/13·12/12·3/3 PASS) 通过；改动文件 eslint EXIT 0。决策见 ai-decisions D38。

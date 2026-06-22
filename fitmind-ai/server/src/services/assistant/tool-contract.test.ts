@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getToolDefinitionForMode } from "./assistant-orchestrator-service.js";
+import { getToolDefinitionForMode } from "./assistant-tool-routing.js";
 import { coerceMessageToEvidenceToolCall } from "./assistant-provider-fallback.js";
 import type { AssistantIntentMode } from "./provider-types.js";
 import { trainingAiTools } from "../ai/tools/training-tools.js";

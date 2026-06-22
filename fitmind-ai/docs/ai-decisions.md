@@ -922,3 +922,24 @@ Decision：
 边界 / 未影响：
 - `next_week_plan` agent 内部的 `retrieve` 回调（query 为 agent 生成、非用户原文）本次不动，Codex 也未圈。
 - api-contract.md 早已正确记载周报 `exercise_id` 为 optional —— 本次是 input_fields 与文档/schema 漂移，文档无需改。
+
+## [D38] 收敛单轨路由：mock provider 反映已解析 mode，删除影子分类器（Slice 11.3a）
+
+- **Date**: 2026-06-22
+- **Status**: Accepted（已落地 + 单测；门禁全绿）
+
+背景（体检问题①的根）：路由是双轨的——`resolveRoutedIntent`（关键词 + Groq 救场，**轨 1**）定出 `executionMode` 写进 `assistant_context.mode`；但 mock provider 用**另一套正则** `detectIntentFromMessage`（**轨 2**）重新从消息分类、自己挑工具，无视传入的 mode。编排层执行的是 provider 返回的工具（轨 2），可与轨 1 分歧（"路由对却执行别的工具"）。D35 coercion 只兜住"provider 返 prose"，没消除双轨本身。
+
+Decision：
+- 把 `getToolDefinitionForMode` 抽到新模块 `assistant-tool-routing.ts`（纯函数，只依赖 provider-types，无循环 import），作为**单一 mode→工具映射源**。
+- mock provider 的 `resolveDefaultIntent` 改读 `request.assistant_context.mode`，工具 = `getToolDefinitionForMode(mode).name`；保留两守卫（`get_exercise_progress` 缺 exercise_id → 提示选动作；`unsupported` → 提示文案）。**删除 `detectIntentFromMessage`/`resolveIntent`** —— 轨 2 消失。
+- 结果：**全局唯一的消息→意图分类器 = `resolveRoutedIntent`**。groq 在 `allowed_tools` 里选工具是期望行为（受 `ensureAllowedProviderTool` + faithfulness + coercion 约束），不是第二个分类器。
+
+边界 / 不变量：
+- 正确路由的用例**行为不变**（mock 现在产出的工具 = executionMode 的工具 = 轨 1 已决定的）；只有过去轨 1↔轨 2 分歧的 bug 用例被纠正。
+- **eval 不受影响**：`assistant-eval.ts` 的 intent 用例直接调 `classifyAssistantIntent`、refusal/faithfulness 是离线 fixtures，都不走 provider。
+- groq / `ASSISTANT_PROVIDER=mock` 一键回退均不受影响（且现在是单轨）。
+- 模拟钩子（`[mock:text]`/`[mock:error]`）保留。
+- 未做 11.3b（让模型基于工具输出措辞）——答案仍是确定性 composer 文案。
+
+验证：type-check / 改动文件 eslint / test:unit 303（mock-provider 测试扩为 mode 驱动 + "忽略消息文本"断言）/ eval 13·12·3 全绿。

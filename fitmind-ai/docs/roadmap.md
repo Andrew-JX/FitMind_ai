@@ -223,7 +223,7 @@ saved-insight 分享链接、知识管理后台、离线编辑 / 同步。优先
 | **A 鲁棒性打底**（真实模型前先把高频入口/对话稳住，低风险） | A1 = **Slice 12** | 录入鲁棒性：放宽 hybrid LLM 兜底触发（变组被压扁→升级 LLM，D30）。确认 UI 已逐组可编辑、无需改 | 无 | ✅ 2026-06-20（变组兜底 + 2 单测；变组解析靠生产 Groq，本地 mock 不产变组） |
 | | A2 = **Slice 11a** | 对话"不死"纯确定性止血：`unsupported` 分流——越界保持拒答；带训练锚点（tokenize 闸门）走 RAG 兜底→知识答，否则澄清。决策见 D32 | 无 | ✅ 2026-06-21（兜底 + 4 单测；前端粘 mode bug 已修；**A+B 修订 D33：回退过宽词表 + 知识相关性下限，消除"自信错答"**） |
 | | A3 = 稳定性体检 + A/B 止血 | 体检发现 3 类问题（路由双轨 / 无相关性下限 / RAG 抖动）；本批先做 B 类止血（回退扩词 + `filterRelevantKnowledgeChunks` 词法重叠下限），把"自信错答"→"诚实没资料"。①路由双轨 ③向量召回非确定 留 Slice 11。决策见 D33 | 无 | ✅ 2026-06-21 |
-| **B 理解层质变**（核心一跳，计划见 §8.3） | B1 = **Slice 11** | 接 Groq 真实模型做意图路由 + 工具选择 + 措辞；正则分类器降级为快路径/eval 基线；faithfulness(D21)+eval(D22) 当承重护栏 | D28 接缝、Slice 1/2 护栏、Groq key | 🟠 进行中：**11.1 接缝 ✅ 06-21（D34）**；**11.2a 数据意图必出工具 ✅ 06-22（D35，治①）**；**11.2b LLM 自由表达路由 ✅ 06-22（D36，关键词优先+Groq 救场，待切 prod groq 生效）**；11.3 收敛措辞 待做 |
+| **B 理解层质变**（核心一跳，计划见 §8.3） | B1 = **Slice 11** | 接 Groq 真实模型做意图路由 + 工具选择 + 措辞；正则分类器降级为快路径/eval 基线；faithfulness(D21)+eval(D22) 当承重护栏 | D28 接缝、Slice 1/2 护栏、Groq key | 🟠 进行中：**11.1 接缝 ✅ 06-21（D34）**；**11.2a 数据意图必出工具 ✅ 06-22（D35，治①）**；**11.2b LLM 自由表达路由 ✅ 06-22（D36，关键词优先+Groq 救场，待切 prod groq 生效）**；**11.3a 收敛单轨路由 ✅ 06-22（D38）**；11.3b 措辞 待做 |
 | **C 真实模型后的增强**（全部依赖 B1） | C1 | tracing + LangSmith eval（选择性，独立 SDK 不引 LangChain；trace 去 PII） | B1 | ⚪ 见 `ai-decisions.md` D29 |
 | | C2 | retriever 接口可换性 + RAG reranking（原 Phase 7.0 + D29）；reranker 可作为 Python/FastAPI 微服务的最佳切入点（D31） | B1 | ⚪ |
 | | C3 = **Slice 10** | 安全分类器（疼痛/医疗边界→安全路由）；真实模型能自由表达后，安全路由的必要性才真正抬升 | B1、Slice 4 伤病字段 | ⚪ |
@@ -260,8 +260,10 @@ saved-insight 分享链接、知识管理后台、离线编辑 / 同步。优先
   - +11 单测（router mock-fetch + resolve-routed-intent fake-router 逻辑）;门禁全绿（type-check / 296 单测 / eval）。真实自由表达路由质量靠 prod 验证。
   - **prod 切 `ASSISTANT_PROVIDER=groq` 后生效**（救场 + D35 工具选择一起上线）。eval 自由表达"golden"（真实 LLM）非确定,留 opt-in。
   - 遗留：关键词自信误判 LLM 管不到（留 11.3 LLM 主路由）。
-- **11.3 收敛 + 措辞（可选，验证稳后再做）**
-  - mock 路径也走同一路由出口，彻底消除 classify↔mock-provider 双轨；可让模型基于工具输出**措辞**（faithfulness 兜底）。token/成本字段加进 observability（D25 扩展）。
+- **11.3a 收敛单轨路由　✅ 2026-06-22 完成（D38）**
+  - mock 路径不再自分类：`getToolDefinitionForMode` 抽到 `assistant-tool-routing.ts` 作单一 mode→工具映射源，mock provider 改读 `assistant_context.mode`（即 `resolveRoutedIntent` 已解析的 mode），删除 `detectIntentFromMessage`/`resolveIntent` 影子分类器。**全局唯一消息→意图分类器 = `resolveRoutedIntent`**，彻底消除 classify↔mock-provider 双轨。eval 不受影响（直接调 classify / 离线 fixtures，不走 provider）；groq 不受影响；env 一键回退仍在。门禁全绿（type-check / 303 单测 / eval 13·12·3）。
+- **11.3b 措辞（可选，验证稳后再做）**
+  - 让模型基于工具输出**措辞**（现答案仍是确定性 composer 文案，faithfulness 兜底）。token/成本字段加进 observability（D25 扩展）。
 
 **前置条件（需你确认）**
 - **Groq key 在助手轮的 Vercel 后端可读**：你之前配的 `GROQ_API_KEY` 是给"录入解析"那条 seam 的，助手轮要确认同一 key 可用（同一环境变量即可）。
