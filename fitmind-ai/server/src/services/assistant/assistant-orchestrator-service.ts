@@ -716,7 +716,15 @@ function parseProviderSimulation(message: string): ProviderSimulationResult {
   };
 }
 
-function getToolDefinitionForMode(
+/**
+ * Map an assistant intent mode to its provider tool definition.
+ *
+ * @param mode - The resolved assistant intent mode.
+ * @returns The provider tool definition, whose `input_fields` lists only the
+ *   tool's REQUIRED args (optional args like the weekly report's `exercise_id`
+ *   are intentionally omitted so coercion and Groq treat them as optional).
+ */
+export function getToolDefinitionForMode(
   mode: MockAssistantTurnInput["mode"],
 ): AssistantProviderToolDefinition {
   switch (mode) {
@@ -734,10 +742,15 @@ function getToolDefinitionForMode(
       };
     case "weekly_report":
     case "next_week_plan":
+      // exercise_id is OPTIONAL in the real schema (weeklyTrainingReportArgsSchema),
+      // so it must not appear here: input_fields models REQUIRED args only. Listing
+      // it would (1) make coerceMessageToEvidenceToolCall bail when no exercise is
+      // selected (周报 prose leaks instead of running the tool) and (2) tell Groq the
+      // field is required, risking a "null" arg that fails uuid validation → 400/502.
       return {
         name: "get_weekly_training_report",
         description: "Return one deterministic weekly training coach report.",
-        input_fields: ["start_date", "end_date", "exercise_id"],
+        input_fields: ["start_date", "end_date"],
       };
     case "exercise_progress":
     case "plateau_diagnosis":
@@ -1328,13 +1341,17 @@ export async function runMockAssistantTurn(
         type: "state",
         state: "retrieving",
       });
-      const sources = await retrieveKnowledgeChunks(input.message);
+      const retrieved = await retrieveKnowledgeChunks(input.message);
+      // D33 相关性下限：混合诊断也只用与查询有词法重叠的来源，
+      // 召回不够相关就不附 Sources（composer 会显示"暂无训练知识来源"），
+      // 不拿"语义最近的错 chunk"自信错引用。
+      const sources = filterRelevantKnowledgeChunks(retrieved, input.message);
 
       logRetrievalEvent({
         intent,
-        retrievalMode: sources[0]?.retrieval_mode ?? "fallback",
+        retrievalMode: retrieved[0]?.retrieval_mode ?? "fallback",
         sources,
-        fallbackReason: sources.length === 0 ? "no_sources" : undefined,
+        fallbackReason: sources.length === 0 ? "no_relevant_sources" : undefined,
       });
 
       answer = composeMixedToolRagAnswer({
@@ -1347,13 +1364,16 @@ export async function runMockAssistantTurn(
         type: "state",
         state: "retrieving",
       });
-      const sources = await retrieveKnowledgeChunks(input.message);
+      const retrieved = await retrieveKnowledgeChunks(input.message);
+      // D33 相关性下限：平台期诊断同样只用词法相关的来源；无相关来源时
+      // 诊断仍基于确定性进展数据给出，但不附会误导的"最近 chunk"。
+      const sources = filterRelevantKnowledgeChunks(retrieved, input.message);
 
       logRetrievalEvent({
         intent,
-        retrievalMode: sources[0]?.retrieval_mode ?? "fallback",
+        retrievalMode: retrieved[0]?.retrieval_mode ?? "fallback",
         sources,
-        fallbackReason: sources.length === 0 ? "no_sources" : undefined,
+        fallbackReason: sources.length === 0 ? "no_relevant_sources" : undefined,
       });
 
       answer = buildPlateauDiagnosisAnswer({

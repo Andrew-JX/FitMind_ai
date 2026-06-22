@@ -4686,3 +4686,14 @@ Verification:
 Verification: `pnpm type-check` / `pnpm test:unit`(+1) / `pnpm eval`(13/13·12/12·3/3 PASS) 通过;改动文件 eslint 干净。部署后"周报"即走 weekly_report（无需再调 LLM）。
 
 体会:这正是"关键词优先 + LLM 救场"设计该有的样子——常见词放 keyword（快、稳),长尾交 LLM(prod 实测改写覆盖良好)。
+
+## 2026-06-22 Slice 11.3a Codex 审查止血：周报工具契约 + 混合/平台期相关性闸门
+
+接 Codex 审查（5b46108 之后）两条：
+
+- **P1 周报工具契约漂移（可致"周报"不跑工具 / 线上 400/502）**：`getToolDefinitionForMode` 把 `get_weekly_training_report` 的 `exercise_id` 列进 `input_fields`，但真实 schema（`weeklyTrainingReportArgsSchema`）里它是 **optional**。而 `input_fields` 被两个消费方都当"全必填"——`coerceMessageToEvidenceToolCall`（缺字段即放弃兜底）、`buildGroqTools`（`required: [...input_fields]`）。后果：没选动作的"周报"→ 兜底被卡 → 漏 prose；Groq 被告知 exercise_id 必填 → 可能传 `"null"` → uuid 校验失败。修复：该分支 `input_fields` 去掉 `exercise_id`（只留必填的 start/end_date）。代价：Groq 不再给周报传可选的单动作收窄——可忽略。
+- **P2 相关性闸门漏覆盖 mixed_tool_rag / plateau_diagnosis**：D33 的 `filterRelevantKnowledgeChunks` 原只用于纯 knowledge / unsupported 兜底；这两条最重要的诊断路径仍直接用 `retrieveKnowledgeChunks` 原始结果当 sources → 仍可能引"语义最近但无关"的 chunk。修复：两处都套上 `filterRelevantKnowledgeChunks`（与 knowledge 路径一致：日志记原始 `retrieved[0].retrieval_mode`、`fallbackReason: "no_relevant_sources"`）。两个 composer 已能优雅处理空 sources（"暂无训练知识来源"），过滤到空安全。
+- **回归测试（补 Codex 指出的 residual risk）**：导出 `getToolDefinitionForMode`；新增 `tool-contract.test.ts`——(a) 对所有 mode 断言每个 `input_fields` 在真实 zod schema 里确实必填（一次性抓本次及未来任何漂移）；(b) 周报无 exercise_id 时经 `coerceMessageToEvidenceToolCall` → 产出 tool_call 而非 prose。
+
+Verification: `pnpm type-check`(client+server+shared) / `pnpm test:unit`(298,+2) / `pnpm eval`(13/13·12/12·3/3 PASS) 通过；改动文件 eslint EXIT 0。
+文档：api-contract.md 早已正确写明周报 exercise_id 为 optional（line 675），是 input_fields 漂移而非文档——故 api-contract 不改。见 ai-decisions D37。

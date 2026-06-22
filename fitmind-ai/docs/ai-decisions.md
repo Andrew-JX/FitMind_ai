@@ -906,3 +906,19 @@ Decision（架构：关键词优先 + 落空才调 LLM）：
 - 关键词"自信误判"的罕见情况 LLM 管不到（keyword-first 设计）——留 11.3 LLM 主路由。
 - 自由表达的**真实 LLM** 路由 eval 是非确定,留作 opt-in（默认不进门禁,类似 NarrativeJudge）。
 - 切 prod groq 后,每个落空轮多一次 Groq 分类调用 + provider 路径一次 → 落空轮 2 次 Groq（落空是少数）;非落空轮仅 provider 路径一次。
+
+## [D37] 周报工具契约对齐 + 混合/平台期相关性闸门补全（Slice 11.3a，Codex 审查止血）
+
+- **Date**: 2026-06-22
+- **Status**: Accepted（已落地 + 回归单测；门禁全绿）
+
+背景：Codex 审查 5b46108 后报两条 —— P1 周报工具契约漂移、P2 D33 相关性闸门漏覆盖最重要的两条诊断路径。
+
+Decision：
+- **P1**：`input_fields` 的语义就是"工具的必填参数"（`buildGroqTools` 据此发 `required`，`coerceMessageToEvidenceToolCall` 据此判断是否能兜底）。`get_weekly_training_report` 的 `exercise_id` 在真实 `weeklyTrainingReportArgsSchema` 里是 optional，因此**不得**出现在 `input_fields`。修复后：没选动作的"周报"也能被兜底跑真工具；Groq 不再被强迫传 `exercise_id`（避免 `"null"` → uuid 校验失败 → 400/502）。可选的单动作收窄能力被牺牲——周报模式极少带选中动作，且不带也完整，可忽略。
+- **P2**：把 D33 的 `filterRelevantKnowledgeChunks`（词法重叠相关性下限）推广到 `mixed_tool_rag` 与 `plateau_diagnosis` —— 这两条带训练 evidence 的诊断路径才是"自信错引用最近 chunk"风险最高处。无相关来源时不附 Sources（composer 显示"暂无训练知识来源"），诊断仍基于确定性工具/进展数据给出。护栏（§3"知识答需词法相关"）现已覆盖全部展示 Sources 的路径。
+- **回归测试**：导出 `getToolDefinitionForMode` 并新增 `tool-contract.test.ts`，把"provider 工具定义的 input_fields ⊆ 真实 schema 必填字段"做成门禁断言——堵住 Codex 指出的"端到端测试缺口让 P1 没被门禁抓住"。
+
+边界 / 未影响：
+- `next_week_plan` agent 内部的 `retrieve` 回调（query 为 agent 生成、非用户原文）本次不动，Codex 也未圈。
+- api-contract.md 早已正确记载周报 `exercise_id` 为 optional —— 本次是 input_fields 与文档/schema 漂移，文档无需改。
