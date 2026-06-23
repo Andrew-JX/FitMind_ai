@@ -943,3 +943,26 @@ Decision：
 - 未做 11.3b（让模型基于工具输出措辞）——答案仍是确定性 composer 文案。
 
 验证：type-check / 改动文件 eslint / test:unit 303（mock-provider 测试扩为 mode 驱动 + "忽略消息文本"断言）/ eval 13·12·3 全绿。
+
+## [D39] LLM 措辞改写（summary），faithfulness 门控 + 确定性回退（Slice 11.3b）
+
+- **Date**: 2026-06-23
+- **Status**: Accepted（已落地 + 单测；env 默认 off，零默认行为变更）
+
+背景：答案文案此前全是确定性 composer 模板，略显死板。想让真实模型参与"措辞"，但**绝不能**动摇核心护城河——数字/结论确定性产生、evidence 绑定、faithfulness 校验。
+
+Decision（最小且安全）：
+- **只改写 `answer.summary`**：bullets（硬证据行）/conclusion/recommendation/evidence/sources 全保持确定性。blast radius 最小。
+- **双门控**：新增 `ASSISTANT_PHRASING`（布尔，默认 off）+ 仍需 `ASSISTANT_PROVIDER=groq`（`isAssistantAnswerPhrasingEnabled()`）。mock/anthropic 或开关关 → 零行为变更。回退：关 `ASSISTANT_PHRASING` 或切 `mock`。
+- **第二次 LLM 调用**（措辞必须在工具执行后，模型才见得到结果）：`runGroqAnswerPhrasing` system prompt 要求"自然中文改写、逐字保留所有数字/单位、不得新增或修改数字、不得加入草稿外事实"，temperature 0.3，max_tokens 256。**graceful**：缺 key / HTTP 错 / 异形 / 空 / 网络异常 → 返回原 draft，永不抛、永不破坏本轮。
+- **faithfulness 兜底**：`applyFaithfulPhrasing`（纯函数）把改写后的 summary 拼回 answer 跑 `verifyAnswerFaithfulness`；verified 才采用，否则回退确定性 draft。空白 / 与 draft 相同 → no-op 不调校验。**模型无法引入未验证数字而不被抓回。**
+- 接缝分层：`runGroqAnswerPhrasing`（groq provider）→ `runAssistantAnswerPhrasing`（provider-adapter 分发，非 groq/异常→draft）→ 编排层 provider 数据路径在 emit 前门控调用。
+
+落地分两小批（守 ≤5 文件）：Batch 1 = env/provider-config/groq/adapter + groq 单测（配置+接缝，不接线，零行为变更）；Batch 2 = `answer-phrasing.ts` 纯函数 + 单测 + 编排层接线。
+
+边界 / 未做：
+- conclusion/recommendation 改写、整段对话化——留后续。
+- **token/成本 observability**（D25 扩展）：`logAssistantTurnEvent` 尚未接进编排层，需先接线 + 从 groq 响应取 usage，单独片。
+- eval 不受影响（intent 直接调 classify、faithfulness/refusal 离线 fixtures，且默认 off 不走措辞）。
+
+验证：type-check / 改动文件 eslint / test:unit 311（groq 措辞 4 例 + answer-phrasing 4 例）/ eval 13·12·3 全绿。真链路（groq + 开关）质量靠 prod 验证。

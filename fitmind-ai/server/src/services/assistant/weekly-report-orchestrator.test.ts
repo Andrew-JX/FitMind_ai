@@ -40,12 +40,14 @@ vi.mock("./provider-adapter.js", () => ({
     kind: "message",
     message: "这是你的周报概述……",
   })),
+  runAssistantAnswerPhrasing: vi.fn(async (input: { draftSummary: string }) => input.draftSummary),
 }));
 
 // mock provider keeps the deterministic keyword router (no Groq), so "周报" routes
-// via the keyword fast path without any LLM call.
+// via the keyword fast path without any LLM call. Phrasing stays off.
 vi.mock("./provider-config.js", () => ({
   getConfiguredAssistantProvider: vi.fn(() => "mock"),
+  isAssistantAnswerPhrasingEnabled: vi.fn(() => false),
 }));
 
 // Stub the real tool executor: assert it is reached and feed a deterministic result.

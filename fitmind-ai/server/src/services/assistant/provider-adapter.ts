@@ -1,6 +1,10 @@
 import { anthropicAssistantProvider } from "./anthropic-provider.js";
 import { getConfiguredAssistantProvider } from "./provider-config.js";
-import { groqAssistantProvider } from "./groq-assistant-provider.js";
+import {
+  groqAssistantProvider,
+  runGroqAnswerPhrasing,
+  type AssistantPhrasingInput,
+} from "./groq-assistant-provider.js";
 import { mockAssistantProvider } from "./mock-provider.js";
 import type {
   AssistantProvider,
@@ -69,5 +73,29 @@ export async function runAssistantProvider(
     return ensureAllowedTool(request, response);
   } catch (error) {
     return normalizeAdapterError(error);
+  }
+}
+
+/**
+ * Re-phrase one answer summary through the configured provider (Slice 11.3b).
+ *
+ * Only `groq` performs a real re-phrasing call; every other provider (and any
+ * failure) returns the original draft summary unchanged, so this is a safe no-op
+ * outside the groq path. Faithfulness still validates the result upstream.
+ *
+ * @param input - The draft summary plus supporting fact lines.
+ * @returns The (possibly) re-phrased summary; the draft on any non-groq path or failure.
+ */
+export async function runAssistantAnswerPhrasing(
+  input: AssistantPhrasingInput,
+): Promise<string> {
+  try {
+    if (getConfiguredAssistantProvider() !== "groq") {
+      return input.draftSummary;
+    }
+
+    return await runGroqAnswerPhrasing(input);
+  } catch {
+    return input.draftSummary;
   }
 }

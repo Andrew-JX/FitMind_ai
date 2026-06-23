@@ -223,3 +223,90 @@ export async function runGroqAssistantProvider(
 export const groqAssistantProvider: AssistantProvider = {
   run: runGroqAssistantProvider,
 };
+
+const GROQ_PHRASING_MAX_TOKENS = 256;
+
+/** Input for one answer-summary re-phrasing call (Slice 11.3b). */
+export interface AssistantPhrasingInput {
+  /** The deterministic answer summary to re-word. */
+  draftSummary: string;
+  /** Evidence-bearing fact lines (answer bullets) the rewrite must stay consistent with. */
+  supportingFacts: string[];
+}
+
+/**
+ * System prompt for re-phrasing: re-word only, never touch the numbers.
+ *
+ * @returns System prompt text.
+ */
+function buildPhrasingSystemPrompt(): string {
+  return [
+    "You rewrite a fitness assistant's answer summary into natural, fluent Chinese.",
+    "Preserve every number, percentage, unit, and factual claim EXACTLY as given.",
+    "Never introduce, drop, or alter any number, and never add facts not present in the draft.",
+    "Return only the rewritten summary text — one or two sentences, no preamble, no explanation.",
+  ].join(" ");
+}
+
+function buildPhrasingUserPrompt(input: AssistantPhrasingInput): string {
+  const facts =
+    input.supportingFacts.length > 0
+      ? input.supportingFacts.map((fact) => `- ${fact}`).join("\n")
+      : "（无）";
+
+  return [`draft_summary=${input.draftSummary}`, `supporting_facts:\n${facts}`].join(
+    "\n",
+  );
+}
+
+/**
+ * Re-phrase one answer summary with Groq, preserving all numbers/facts.
+ *
+ * Graceful by contract: any failure (missing key, HTTP error, malformed/empty
+ * response, network throw) returns the original `draftSummary` so a phrasing
+ * attempt can never break or degrade the turn. Faithfulness still validates the
+ * returned text upstream before it is shown.
+ *
+ * @param input - The draft summary plus supporting fact lines.
+ * @returns The re-phrased summary, or the original draft on any failure.
+ */
+export async function runGroqAnswerPhrasing(
+  input: AssistantPhrasingInput,
+): Promise<string> {
+  try {
+    const config = getGroqAssistantProviderConfig();
+    const response = await fetch(GROQ_CHAT_COMPLETIONS_URL, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${config.apiKey}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: config.model,
+        max_tokens: GROQ_PHRASING_MAX_TOKENS,
+        temperature: 0.3,
+        messages: [
+          { role: "system", content: buildPhrasingSystemPrompt() },
+          { role: "user", content: buildPhrasingUserPrompt(input) },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      return input.draftSummary;
+    }
+
+    const payload = (await response.json()) as unknown;
+    const parsed = groqChatCompletionSchema.safeParse(payload);
+
+    if (!parsed.success) {
+      return input.draftSummary;
+    }
+
+    const text = parsed.data.choices[0]?.message.content?.trim() ?? "";
+
+    return text.length > 0 ? text : input.draftSummary;
+  } catch {
+    return input.draftSummary;
+  }
+}

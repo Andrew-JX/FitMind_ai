@@ -24,14 +24,21 @@ import {
   verifyAnswerFaithfulness,
   type AnswerFaithfulnessResult,
 } from "./answer-faithfulness.js";
-import { runAssistantProvider } from "./provider-adapter.js";
+import {
+  runAssistantAnswerPhrasing,
+  runAssistantProvider,
+} from "./provider-adapter.js";
 import { coerceMessageToEvidenceToolCall } from "./assistant-provider-fallback.js";
+import { applyFaithfulPhrasing } from "./answer-phrasing.js";
 import { getToolDefinitionForMode } from "./assistant-tool-routing.js";
 import {
   createGroqIntentRouter,
   type LlmIntentRouter,
 } from "./llm-intent-router.js";
-import { getConfiguredAssistantProvider } from "./provider-config.js";
+import {
+  getConfiguredAssistantProvider,
+  isAssistantAnswerPhrasingEnabled,
+} from "./provider-config.js";
 import {
   composeKnowledgeAnswer,
   composeMixedToolRagAnswer,
@@ -1338,6 +1345,21 @@ export async function runMockAssistantTurn(
         intent,
       );
     }
+
+    // Slice 11.3b: optional LLM re-phrasing of the summary, gated by env + provider
+    // and the runtime faithfulness check. The model only re-words `answer.summary`;
+    // a rewrite that introduces an unverified number is rejected and we keep the
+    // deterministic draft (numbers/conclusions stay deterministic + evidence-bound).
+    if (isAssistantAnswerPhrasingEnabled()) {
+      const phrasedSummary = await runAssistantAnswerPhrasing({
+        draftSummary: answer.summary,
+        supportingFacts: answer.bullets,
+      });
+      answer = applyFaithfulPhrasing(answer, phrasedSummary, (candidate) =>
+        verifyAnswerFaithfulness(candidate, toolOutputs),
+      ).answer;
+    }
+
     await emitAnswerEvents(answer, options);
   }
 

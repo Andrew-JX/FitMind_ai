@@ -26,6 +26,21 @@ export function getConfiguredAssistantProvider(): "mock" | "anthropic" | "groq" 
 }
 
 /**
+ * Whether LLM answer-summary re-phrasing (Slice 11.3b) is active.
+ *
+ * Requires both the opt-in `ASSISTANT_PHRASING` flag and a real model provider
+ * (`ASSISTANT_PROVIDER=groq`); under mock/anthropic it stays off so the default
+ * path is unchanged. Runtime faithfulness still gates the phrased text.
+ *
+ * @returns True when phrasing should be attempted this turn.
+ */
+export function isAssistantAnswerPhrasingEnabled(): boolean {
+  const env = loadServerEnv();
+
+  return env.assistantPhrasing && env.assistantProvider === "groq";
+}
+
+/**
  * Build the runtime config required for the Anthropic provider adapter.
  *
  * @returns Normalized Anthropic provider config.

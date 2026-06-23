@@ -17,6 +17,17 @@ const optionalSecret = z.preprocess(
   z.string().min(1).optional(),
 );
 
+/**
+ * Boolean feature flag: `"1"/"true"/"on"/"yes"` (case-insensitive) → `true`;
+ * anything else, blank, or unset → `false`. Keeps a typo/blank from throwing.
+ */
+const booleanFlag = z.preprocess(
+  (value) =>
+    typeof value === "string" &&
+    ["1", "true", "on", "yes"].includes(value.trim().toLowerCase()),
+  z.boolean().default(false),
+);
+
 const serverEnvSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
@@ -30,6 +41,9 @@ const serverEnvSchema = z.object({
     .enum(["mock", "anthropic", "groq"])
     .default("mock")
     .catch("mock"),
+  // Slice 11.3b: opt-in LLM re-phrasing of the answer summary (still gated by
+  // ASSISTANT_PROVIDER=groq + runtime faithfulness fallback). Default off.
+  ASSISTANT_PHRASING: booleanFlag,
   WORKOUT_INTAKE_LLM_PROVIDER: z
     .enum(["off", "mock", "anthropic", "gemini", "groq"])
     .default("mock")
@@ -48,6 +62,7 @@ export interface ServerEnv {
   databaseUrl?: string | undefined;
   jwtSecret?: string | undefined;
   assistantProvider: "mock" | "anthropic" | "groq";
+  assistantPhrasing: boolean;
   workoutIntakeLlmProvider: "off" | "mock" | "anthropic" | "gemini" | "groq";
   anthropicApiKey?: string | undefined;
   geminiApiKey?: string | undefined;
@@ -68,6 +83,7 @@ export function loadServerEnv(
     databaseUrl: parsed.DATABASE_URL,
     jwtSecret: parsed.JWT_SECRET,
     assistantProvider: parsed.ASSISTANT_PROVIDER,
+    assistantPhrasing: parsed.ASSISTANT_PHRASING,
     workoutIntakeLlmProvider: parsed.WORKOUT_INTAKE_LLM_PROVIDER,
     anthropicApiKey: parsed.ANTHROPIC_API_KEY,
     geminiApiKey: parsed.GEMINI_API_KEY,

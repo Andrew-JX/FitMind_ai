@@ -4712,3 +4712,12 @@ Verification: `pnpm type-check` / `pnpm test:unit`(299,+1) / `pnpm eval`(13/13·
 - 测试：`mock-provider.test.ts` 重写为 mode 驱动 + "同一消息不同 mode → 不同工具（证明忽略消息文本）" + exercise 缺 id 守卫 + 模拟钩子保留。
 
 Verification: `pnpm type-check` / `pnpm test:unit`(303,+4) / `pnpm eval`(13/13·12/12·3/3 PASS) 通过；改动文件 eslint EXIT 0。决策见 ai-decisions D38。
+
+## 2026-06-23 Slice 11.3b：LLM summary 措辞改写（faithfulness 门控 + 确定性回退，env 默认 off）
+
+让真实模型参与"措辞"但不动摇确定性护城河：**只改写 `answer.summary`**，其余字段全确定性。双门控 `ASSISTANT_PHRASING=on`（新增 env，默认 off）+ `ASSISTANT_PROVIDER=groq`；运行时 faithfulness 校验改写文本，未验证即回退 draft；第二次 LLM 调用任何失败 → 回退 draft。两小批（守 ≤5 文件）：
+
+- **Batch 1（配置+接缝，零行为变更）**：`env.ts` 加 `ASSISTANT_PHRASING` 布尔开关；`provider-config.ts` 加 `isAssistantAnswerPhrasingEnabled()`（开关 && groq）；`groq-assistant-provider.ts` 加 `runGroqAnswerPhrasing`（graceful，失败返 draft）；`provider-adapter.ts` 加 `runAssistantAnswerPhrasing` 分发；+4 groq 单测。
+- **Batch 2（决策+接线）**：新增 `answer-phrasing.ts` 纯函数 `applyFaithfulPhrasing`（verified 才采用改写，否则回退；空白/相同 no-op）+4 单测；编排层 provider 数据路径在 emit 前门控调用。`weekly-report-orchestrator.test.ts` 的 provider-config/adapter mock 补齐新导出。
+
+Verification: `pnpm type-check` / `pnpm test:unit`(311,+8) / `pnpm eval`(13/13·12/12·3/3 PASS) 通过；改动文件 eslint EXIT 0。默认 off 零行为变更，真链路质量靠 prod（开 `ASSISTANT_PHRASING` + groq）验证。决策见 ai-decisions D39。

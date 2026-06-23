@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { runGroqAssistantProvider } from "./groq-assistant-provider.js";
+import {
+  runGroqAnswerPhrasing,
+  runGroqAssistantProvider,
+} from "./groq-assistant-provider.js";
 import type { AssistantProviderRequest } from "./provider-types.js";
 
 const request: AssistantProviderRequest = {
@@ -113,5 +116,60 @@ describe("runGroqAssistantProvider", () => {
     await expect(runGroqAssistantProvider(request)).rejects.toThrow(
       /GROQ_API_KEY/u,
     );
+  });
+});
+
+describe("runGroqAnswerPhrasing (Slice 11.3b)", () => {
+  const originalKey = process.env.GROQ_API_KEY;
+  const phrasingInput = {
+    draftSummary: "本周共记录 4 次训练，20 组。",
+    supportingFacts: ["本周训练频率：4 次。"],
+  };
+
+  beforeEach(() => {
+    process.env.GROQ_API_KEY = "test-groq-key";
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    if (originalKey === undefined) {
+      delete process.env.GROQ_API_KEY;
+    } else {
+      process.env.GROQ_API_KEY = originalKey;
+    }
+  });
+
+  it("returns the re-phrased summary on success", async () => {
+    mockFetchOnce(200, {
+      choices: [{ message: { content: "  这周你练了 4 次，一共 20 组。  " } }],
+    });
+
+    const result = await runGroqAnswerPhrasing(phrasingInput);
+
+    expect(result).toBe("这周你练了 4 次，一共 20 组。");
+  });
+
+  it("falls back to the draft on an HTTP error", async () => {
+    mockFetchOnce(429, { error: { message: "rate limited" } });
+
+    const result = await runGroqAnswerPhrasing(phrasingInput);
+
+    expect(result).toBe(phrasingInput.draftSummary);
+  });
+
+  it("falls back to the draft on an empty completion", async () => {
+    mockFetchOnce(200, { choices: [{ message: { content: "   " } }] });
+
+    const result = await runGroqAnswerPhrasing(phrasingInput);
+
+    expect(result).toBe(phrasingInput.draftSummary);
+  });
+
+  it("falls back to the draft when GROQ_API_KEY is missing (never throws)", async () => {
+    delete process.env.GROQ_API_KEY;
+
+    const result = await runGroqAnswerPhrasing(phrasingInput);
+
+    expect(result).toBe(phrasingInput.draftSummary);
   });
 });
