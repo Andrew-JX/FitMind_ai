@@ -79,4 +79,16 @@ describe("applyFaithfulPhrasing", () => {
     expect(result.answer).toBe(draft);
     expect(verify).not.toHaveBeenCalled();
   });
+
+  it("rejects a rewrite that balloons past the length budget (bounds injected prose, never calls verify)", () => {
+    const verify = vi.fn(() => verified);
+    // Same numbers (would pass numeric faithfulness) but padded with extra prose.
+    const padded = `${draft.summary}恢复情况很好，训练安排已经很均衡，可以放心继续加量，无需担心疲劳累积的问题。`;
+
+    const result = applyFaithfulPhrasing(draft, padded, verify);
+
+    expect(result.phrasingApplied).toBe(false);
+    expect(result.answer).toBe(draft);
+    expect(verify).not.toHaveBeenCalled();
+  });
 });

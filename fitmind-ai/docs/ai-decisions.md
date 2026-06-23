@@ -955,7 +955,8 @@ Decision（最小且安全）：
 - **只改写 `answer.summary`**：bullets（硬证据行）/conclusion/recommendation/evidence/sources 全保持确定性。blast radius 最小。
 - **双门控**：新增 `ASSISTANT_PHRASING`（布尔，默认 off）+ 仍需 `ASSISTANT_PROVIDER=groq`（`isAssistantAnswerPhrasingEnabled()`）。mock/anthropic 或开关关 → 零行为变更。回退：关 `ASSISTANT_PHRASING` 或切 `mock`。
 - **第二次 LLM 调用**（措辞必须在工具执行后，模型才见得到结果）：`runGroqAnswerPhrasing` system prompt 要求"自然中文改写、逐字保留所有数字/单位、不得新增或修改数字、不得加入草稿外事实"，temperature 0.3，max_tokens 256。**graceful**：缺 key / HTTP 错 / 异形 / 空 / 网络异常 → 返回原 draft，永不抛、永不破坏本轮。
-- **faithfulness 兜底**：`applyFaithfulPhrasing`（纯函数）把改写后的 summary 拼回 answer 跑 `verifyAnswerFaithfulness`；verified 才采用，否则回退确定性 draft。空白 / 与 draft 相同 → no-op 不调校验。**模型无法引入未验证数字而不被抓回。**
+- **faithfulness 兜底 + 长度闸门**：`applyFaithfulPhrasing`（纯函数）把改写后的 summary 拼回 answer 跑 `verifyAnswerFaithfulness`；verified **且**长度不超 `draft.length*1.5+16` 才采用，否则回退确定性 draft。空白 / 与 draft 相同 / 超长 → no-op。
+- **诚实表述（程序性保证的边界，Codex P2）**：faithfulness 是**数字/引用级**校验（核对数字 + UUID），**不能**识别模型新增的**非数字事实**（如"恢复得很好""可以放心加量"）。所以程序性保证 = "无未验证数字/引用 + 长度受限"，**不等于**"不新增任何事实"。长度闸门只**收窄**（非杜绝）注水空间——故本特性**默认 off、开启需谨慎**。system prompt 里"不得加入草稿外事实"是给模型的指令，不是程序性保证。
 - 接缝分层：`runGroqAnswerPhrasing`（groq provider）→ `runAssistantAnswerPhrasing`（provider-adapter 分发，非 groq/异常→draft）→ 编排层 provider 数据路径在 emit 前门控调用。
 
 落地分两小批（守 ≤5 文件）：Batch 1 = env/provider-config/groq/adapter + groq 单测（配置+接缝，不接线，零行为变更）；Batch 2 = `answer-phrasing.ts` 纯函数 + 单测 + 编排层接线。

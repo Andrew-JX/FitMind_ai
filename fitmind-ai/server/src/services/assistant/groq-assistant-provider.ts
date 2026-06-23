@@ -292,11 +292,15 @@ export async function runGroqAnswerPhrasing(
       }),
     });
 
+    // Always drain the body (mirrors the main provider path): leaving an error
+    // response body unconsumed can break undici connection reuse, which compounds
+    // on repeated 429/5xx.
+    const payload = (await response.json()) as unknown;
+
     if (!response.ok) {
       return input.draftSummary;
     }
 
-    const payload = (await response.json()) as unknown;
     const parsed = groqChatCompletionSchema.safeParse(payload);
 
     if (!parsed.success) {

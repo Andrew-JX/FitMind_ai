@@ -4721,3 +4721,11 @@ Verification: `pnpm type-check` / `pnpm test:unit`(303,+4) / `pnpm eval`(13/13·
 - **Batch 2（决策+接线）**：新增 `answer-phrasing.ts` 纯函数 `applyFaithfulPhrasing`（verified 才采用改写，否则回退；空白/相同 no-op）+4 单测；编排层 provider 数据路径在 emit 前门控调用。`weekly-report-orchestrator.test.ts` 的 provider-config/adapter mock 补齐新导出。
 
 Verification: `pnpm type-check` / `pnpm test:unit`(311,+8) / `pnpm eval`(13/13·12/12·3/3 PASS) 通过；改动文件 eslint EXIT 0。默认 off 零行为变更，真链路质量靠 prod（开 `ASSISTANT_PHRASING` + groq）验证。决策见 ai-decisions D39。
+
+## 2026-06-23 Slice 11.3b 止血（Codex 审查 9c2591e 后）
+
+- **P2 安全保证对齐 + 保守闸门**：faithfulness 只拦数字/引用，拦不住模型新增的非数字事实（"恢复得很好"等）。`applyFaithfulPhrasing` 加**长度闸门**（改写 ≤ `draft.length*1.5+16`，超长回退）收窄注水空间；JSDoc/D39 改成诚实表述——程序性保证 = "无未验证数字/引用 + 长度受限"，**不等于**"不新增非数字事实"，故默认 off、开启需谨慎。+1 单测（注水超长被拒）。
+- **P3a 连接复用**：`runGroqAnswerPhrasing` 的 HTTP error 分支改为先 `await response.json()` 排空 body 再回退（对齐主 provider，避免 undici 未消费 body 影响连接复用，429/5xx 多了会变稳定性坑）。
+- **P3b 运维文档**：`.env.example` / `README.md` / `local-run-guide.md` 补 `ASSISTANT_PHRASING`（默认 off + 仅 groq 生效 + faithfulness 门控）；更正 README 过时的"无第二次 provider 调用"。
+
+Verification: `pnpm type-check` / `pnpm test:unit`(312,+1) / `pnpm eval`(13/13·12/12·3/3 PASS) 通过；改动文件 eslint EXIT 0。默认 off 仍零行为变更。

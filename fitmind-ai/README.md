@@ -97,7 +97,7 @@ AI layer:
 - No MCP.
 - No multi-tool agent loop.
 - No real Anthropic token streaming.
-- No second provider call after tool execution.
+- No second provider call after tool execution by default (an optional faithfulness-gated summary re-phrasing call runs only when `ASSISTANT_PHRASING=on` + `ASSISTANT_PROVIDER=groq`).
 - Recommendation context is deterministic preview, not medical advice.
 - Browser E2E test has not been completed.
 
@@ -113,6 +113,7 @@ Required:
 Optional:
 
 - `ANTHROPIC_API_KEY` - only required when `ASSISTANT_PROVIDER=anthropic` or `WORKOUT_INTAKE_LLM_PROVIDER=anthropic`.
+- `ASSISTANT_PHRASING` - `off` by default; set `on` to let the model re-phrase the answer summary. Only active when `ASSISTANT_PROVIDER=groq`; runtime faithfulness gates each rewrite (see `docs/ai-decisions.md` D39).
 - `VITE_API_BASE_URL` - leave empty for the current Vercel single-origin deployment.
 
 ## Verification
