@@ -114,11 +114,16 @@ describe("runGroqAssistantProvider", () => {
 
     const result = await runGroqAssistantProvider(request);
 
-    expect(result).toEqual({ kind: "message", message: "渐进超负荷指逐步加量。" });
+    expect(result).toEqual({
+      kind: "message",
+      message: "渐进超负荷指逐步加量。",
+    });
   });
 
   it("normalizes an HTTP error into a provider error", async () => {
-    mockFetchOnce(429, { error: { message: "rate limited", type: "rate_limit" } });
+    mockFetchOnce(429, {
+      error: { message: "rate limited", type: "rate_limit" },
+    });
 
     const result = await runGroqAssistantProvider(request);
 
@@ -137,12 +142,45 @@ describe("runGroqAssistantProvider", () => {
     expect(result.kind).toBe("error");
   });
 
-  it("throws when GROQ_API_KEY is missing", async () => {
+  it("keeps a valid tool_call even when the usage shape is invalid (P2b: usage never breaks business)", async () => {
+    mockFetchOnce(200, {
+      choices: [
+        {
+          message: {
+            tool_calls: [
+              {
+                function: {
+                  name: "get_weekly_training_report",
+                  arguments:
+                    '{"start_date":"2026-05-19","end_date":"2026-06-17"}',
+                },
+              },
+            ],
+          },
+        },
+      ],
+      usage: { prompt_tokens: "oops" },
+    });
+
+    const result = await runGroqAssistantProvider(request);
+
+    expect(result).toEqual({
+      kind: "tool_call",
+      tool_name: "get_weekly_training_report",
+      tool_args: { start_date: "2026-05-19", end_date: "2026-06-17" },
+      usage: undefined,
+    });
+  });
+
+  it("returns a provider error (not a throw) when GROQ_API_KEY is missing", async () => {
     delete process.env.GROQ_API_KEY;
 
-    await expect(runGroqAssistantProvider(request)).rejects.toThrow(
-      /GROQ_API_KEY/u,
-    );
+    const result = await runGroqAssistantProvider(request);
+
+    expect(result.kind).toBe("error");
+    if (result.kind === "error") {
+      expect(result.message).toMatch(/GROQ_API_KEY/u);
+    }
   });
 });
 

@@ -1,6 +1,7 @@
-import { z } from "zod";
-
-import { getGroqAssistantProviderConfig } from "./provider-config.js";
+import {
+  runGroqChatCompletion,
+  type GroqChatTool,
+} from "./groq-chat-client.js";
 import type {
   AssistantProvider,
   AssistantProviderRequest,
@@ -9,37 +10,7 @@ import type {
   AssistantProviderUsage,
 } from "./provider-types.js";
 
-const GROQ_CHAT_COMPLETIONS_URL =
-  "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MAX_TOKENS = 512;
-
-// OpenAI-compatible chat completion shape (Groq). Validated with Zod so a
-// malformed/unexpected response degrades to a clean provider error instead of
-// throwing deep in the orchestrator.
-const groqToolCallSchema = z.object({
-  function: z.object({
-    name: z.string(),
-    arguments: z.string(),
-  }),
-});
-
-const groqMessageSchema = z.object({
-  content: z.string().nullable().optional(),
-  tool_calls: z.array(groqToolCallSchema).optional(),
-});
-
-const groqUsageSchema = z.object({
-  prompt_tokens: z.number(),
-  completion_tokens: z.number(),
-  total_tokens: z.number(),
-});
-
-const groqChatCompletionSchema = z.object({
-  choices: z
-    .array(z.object({ message: groqMessageSchema }))
-    .min(1),
-  usage: groqUsageSchema.optional(),
-});
 
 /**
  * Build the provider-neutral system prompt for the assistant turn.
@@ -62,18 +33,7 @@ function buildSystemPrompt(): string {
 
 function buildGroqTools(
   allowedTools: AssistantProviderToolDefinition[],
-): Array<{
-  type: "function";
-  function: {
-    name: string;
-    description: string;
-    parameters: {
-      type: "object";
-      properties: Record<string, { type: "string" }>;
-      required: string[];
-    };
-  };
-}> {
+): GroqChatTool[] {
   return allowedTools.map((tool) => ({
     type: "function" as const,
     function: {
@@ -82,7 +42,10 @@ function buildGroqTools(
       parameters: {
         type: "object" as const,
         properties: Object.fromEntries(
-          tool.input_fields.map((field) => [field, { type: "string" as const }]),
+          tool.input_fields.map((field) => [
+            field,
+            { type: "string" as const },
+          ]),
         ),
         required: [...tool.input_fields],
       },
@@ -104,30 +67,6 @@ function buildUserPrompt(request: AssistantProviderRequest): string {
   }
 
   return baseLines.join("\n");
-}
-
-function extractProviderErrorMessage(payload: unknown, status: number): string {
-  const parsed = z
-    .object({
-      error: z
-        .object({
-          message: z.string().optional(),
-          type: z.string().optional(),
-        })
-        .optional(),
-      message: z.string().optional(),
-    })
-    .safeParse(payload);
-
-  if (parsed.success) {
-    const errorMessage = parsed.data.error?.message ?? parsed.data.message;
-
-    if (errorMessage !== undefined) {
-      return `Groq provider request failed (${status}): ${errorMessage}`;
-    }
-  }
-
-  return `Groq provider request failed with HTTP ${status}.`;
 }
 
 function normalizeToolArgs(rawArguments: string): Record<string, string> {
@@ -161,66 +100,41 @@ function normalizeToolArgs(rawArguments: string): Record<string, string> {
 export async function runGroqAssistantProvider(
   request: AssistantProviderRequest,
 ): Promise<AssistantProviderResponse> {
-  const config = getGroqAssistantProviderConfig();
-  const response = await fetch(GROQ_CHAT_COMPLETIONS_URL, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${config.apiKey}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: config.model,
-      max_tokens: GROQ_MAX_TOKENS,
-      temperature: 0,
-      tools: buildGroqTools(request.allowed_tools),
-      tool_choice: "auto",
-      messages: [
-        { role: "system", content: buildSystemPrompt() },
-        { role: "user", content: buildUserPrompt(request) },
-      ],
-    }),
+  const result = await runGroqChatCompletion({
+    messages: [
+      { role: "system", content: buildSystemPrompt() },
+      { role: "user", content: buildUserPrompt(request) },
+    ],
+    maxTokens: GROQ_MAX_TOKENS,
+    temperature: 0,
+    tools: buildGroqTools(request.allowed_tools),
+    toolChoice: "auto",
   });
 
-  const payload = (await response.json()) as unknown;
-
-  if (!response.ok) {
+  if (!result.ok) {
     return {
       kind: "error",
       error_code: "GROQ_PROVIDER_ERROR",
-      message: extractProviderErrorMessage(payload, response.status),
+      message: result.errorMessage ?? "Groq provider request failed.",
     };
   }
 
-  const parsedCompletion = groqChatCompletionSchema.safeParse(payload);
-
-  if (!parsedCompletion.success) {
-    return {
-      kind: "error",
-      error_code: "GROQ_PROVIDER_ERROR",
-      message: "Groq provider returned an unexpected response shape.",
-    };
-  }
-
-  const message = parsedCompletion.data.choices[0]?.message;
-  const toolCall = message?.tool_calls?.[0];
-  const usage = parsedCompletion.data.usage;
-
-  if (toolCall !== undefined) {
+  if (result.toolCall !== null) {
     return {
       kind: "tool_call",
-      tool_name: toolCall.function.name,
-      tool_args: normalizeToolArgs(toolCall.function.arguments),
-      usage,
+      tool_name: result.toolCall.name,
+      tool_args: normalizeToolArgs(result.toolCall.arguments),
+      usage: result.usage,
     };
   }
 
-  const text = message?.content?.trim() ?? "";
+  const text = result.content?.trim() ?? "";
 
   if (text.length > 0) {
     return {
       kind: "message",
       message: text,
-      usage,
+      usage: result.usage,
     };
   }
 
@@ -272,18 +186,19 @@ function buildPhrasingUserPrompt(input: AssistantPhrasingInput): string {
       ? input.supportingFacts.map((fact) => `- ${fact}`).join("\n")
       : "（无）";
 
-  return [`draft_summary=${input.draftSummary}`, `supporting_facts:\n${facts}`].join(
-    "\n",
-  );
+  return [
+    `draft_summary=${input.draftSummary}`,
+    `supporting_facts:\n${facts}`,
+  ].join("\n");
 }
 
 /**
  * Re-phrase one answer summary with Groq, preserving all numbers/facts.
  *
  * Graceful by contract: any failure (missing key, HTTP error, malformed/empty
- * response, network throw) returns the original `draftSummary` so a phrasing
- * attempt can never break or degrade the turn. Faithfulness still validates the
- * returned text upstream before it is shown.
+ * response) returns the original `draftSummary` so a phrasing attempt can never
+ * break or degrade the turn. Faithfulness still validates the returned text
+ * upstream before it is shown.
  *
  * @param input - The draft summary plus supporting fact lines.
  * @returns The re-phrased summary + token usage, or the original draft (no usage) on any failure.
@@ -291,46 +206,22 @@ function buildPhrasingUserPrompt(input: AssistantPhrasingInput): string {
 export async function runGroqAnswerPhrasing(
   input: AssistantPhrasingInput,
 ): Promise<AssistantPhrasingOutput> {
-  try {
-    const config = getGroqAssistantProviderConfig();
-    const response = await fetch(GROQ_CHAT_COMPLETIONS_URL, {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${config.apiKey}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: config.model,
-        max_tokens: GROQ_PHRASING_MAX_TOKENS,
-        temperature: 0.3,
-        messages: [
-          { role: "system", content: buildPhrasingSystemPrompt() },
-          { role: "user", content: buildPhrasingUserPrompt(input) },
-        ],
-      }),
-    });
+  const result = await runGroqChatCompletion({
+    messages: [
+      { role: "system", content: buildPhrasingSystemPrompt() },
+      { role: "user", content: buildPhrasingUserPrompt(input) },
+    ],
+    maxTokens: GROQ_PHRASING_MAX_TOKENS,
+    temperature: 0.3,
+  });
 
-    // Always drain the body (mirrors the main provider path): leaving an error
-    // response body unconsumed can break undici connection reuse, which compounds
-    // on repeated 429/5xx.
-    const payload = (await response.json()) as unknown;
-
-    if (!response.ok) {
-      return { summary: input.draftSummary };
-    }
-
-    const parsed = groqChatCompletionSchema.safeParse(payload);
-
-    if (!parsed.success) {
-      return { summary: input.draftSummary };
-    }
-
-    const text = parsed.data.choices[0]?.message.content?.trim() ?? "";
-
-    return text.length > 0
-      ? { summary: text, usage: parsed.data.usage }
-      : { summary: input.draftSummary };
-  } catch {
+  if (!result.ok) {
     return { summary: input.draftSummary };
   }
+
+  const text = result.content?.trim() ?? "";
+
+  return text.length > 0
+    ? { summary: text, usage: result.usage }
+    : { summary: input.draftSummary };
 }
