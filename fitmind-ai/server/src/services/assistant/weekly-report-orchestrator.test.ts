@@ -77,7 +77,7 @@ describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", ()
   });
 
   it('runs get_weekly_training_report for "周报" with no exercise_id when the provider only returns prose', async () => {
-    const response = await runMockAssistantTurn("user-1", {
+    const { response } = await runMockAssistantTurn("user-1", {
       mode: "auto",
       message: "周报",
       start_date: "2026-05-19",
@@ -121,36 +121,38 @@ describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", ()
     expect(response.faithfulness?.status).toBe("verified");
   });
 
-  it("aggregates the routing call's token usage into token_usage (C1)", async () => {
+  it("aggregates the routing call's token usage into telemetry (C1, not the public response)", async () => {
     mockedRunAssistantProvider.mockResolvedValueOnce({
       kind: "message",
       message: "这是你的周报概述……",
       usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 },
     });
 
-    const response = await runMockAssistantTurn("user-1", {
+    const { response, telemetry } = await runMockAssistantTurn("user-1", {
       mode: "auto",
       message: "周报",
       start_date: "2026-05-19",
       end_date: "2026-06-17",
     });
 
-    expect(response.token_usage).toEqual({
-      prompt_tokens: 100,
-      completion_tokens: 20,
-      total_tokens: 120,
-      llm_call_count: 1,
+    expect(telemetry.tokenUsage).toEqual({
+      promptTokens: 100,
+      completionTokens: 20,
+      totalTokens: 120,
+      llmCallCount: 1,
     });
+    // Token usage is server-only telemetry, never on the public response DTO.
+    expect(response).not.toHaveProperty("token_usage");
   });
 
-  it("leaves token_usage undefined when the provider reports no usage (mock path)", async () => {
-    const response = await runMockAssistantTurn("user-1", {
+  it("leaves telemetry token usage undefined when the provider reports no usage (mock path)", async () => {
+    const { telemetry } = await runMockAssistantTurn("user-1", {
       mode: "auto",
       message: "周报",
       start_date: "2026-05-19",
       end_date: "2026-06-17",
     });
 
-    expect(response.token_usage).toBeUndefined();
+    expect(telemetry.tokenUsage).toBeUndefined();
   });
 });

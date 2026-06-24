@@ -978,11 +978,11 @@ Decision（最小且安全）：
 Decision：
 - **接缝取 usage**：Groq 响应（OpenAI 兼容）带 `usage`。`provider-types` 给 message/tool_call 响应加可选 `usage`；`runGroqAssistantProvider`（路由）与 `runGroqAnswerPhrasing`（措辞，返回 `{summary, usage}`）各自解析上报；mock/anthropic 不带（usage 可选）。
 - **聚合**：编排层 `aggregateTurnTokenUsage([routingUsage, phrasingUsage])` 求和（忽略 undefined，记 `llm_call_count`）；仅当有调用上报 usage 时产出，否则 undefined（mock 路径）。
-- **两个出口**：① 可选 `token_usage` 进 `MockAssistantTurnResponseData`（structured_output，snake_case：`prompt_tokens/completion_tokens/total_tokens/llm_call_count`），additive 可选、向前兼容（见 api-contract）；② 控制器把它映射进 `logAssistantTurnEvent` 的 `assistant_turn` 单行 JSON，新增 `llm_call_count/prompt_tokens/completion_tokens/total_tokens/estimated_cost_usd`。
+- **服务端 telemetry 信封（不污染公开 DTO，审查改进）**：`runMockAssistantTurn` 返回内部 `AssistantTurnExecutionResult { response, telemetry }`；`telemetry.tokenUsage` 是服务端运维元数据，**不进** `MockAssistantTurnResponseData` / `structured_output`。控制器 `const { response, telemetry } = ...` → 记日志用 telemetry，响应只回 `response`。这样客户端不依赖 Groq/OpenAI 的 usage 结构；`telemetry` 后续可自然扩展 `trace_id`、模型、各调用耗时/成本。（初版曾把 `token_usage` 放进公开 DTO，Codex 标为 API 契约污染 P2，已改为信封。）
+- **日志出口**：控制器把 `telemetry.tokenUsage` 映射进 `logAssistantTurnEvent` 的 `assistant_turn` 单行 JSON，新增 `llm_call_count/prompt_tokens/completion_tokens/total_tokens/estimated_cost_usd`。
 - **成本估算**：`estimated_cost_usd` 按 llama-3.3-70b list price 常量（$0.59/1M prompt、$0.79/1M completion）算，**注明是估算**——Groq 免费层实际计费 $0；tokens 才是真信号。默认/mock 路径全 0。
-- 设计取舍：选 DTO 字段而非 options 回调——additive 可选、一批 ≤5 文件落地、还顺带给每条消息一份 token 成本痕迹（持久化在 structuredOutput）。
 
-落地两小批：Batch 1 = provider-types/groq/observability + 取 usage + schema（不接线，零行为变更）；Batch 2 = 措辞返回 usage（groq/adapter）+ 编排层聚合进 DTO + 控制器记日志 + 端到端单测。
+落地三步：Batch 1 = provider-types/groq/observability + 取 usage + schema（不接线，零行为变更）；Batch 2 = 措辞返回 usage（groq/adapter）+ 编排层聚合 + 控制器记日志 + 端到端单测；Batch 3（审查后）= 收敛到内部 telemetry 信封，把 token_usage 移出公开 DTO。
 
 边界 / 未做：
 - **LangSmith 外部 tracing**（C1 的另一半）：需新依赖 + key + PII 去除，单独片。

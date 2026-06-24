@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 
 import { runMockAssistantTurn } from "../services/assistant/assistant-orchestrator-service.js";
-import type { MockAssistantTurnResponseData } from "../services/assistant/assistant-orchestrator-service.js";
+import type { AssistantTurnExecutionResult } from "../services/assistant/assistant-orchestrator-service.js";
 import type { AssistantStreamEvent } from "../services/assistant/assistant-stream-types.js";
 import { logAssistantTurnEvent } from "../services/assistant/assistant-turn-observability.js";
 import { createSuccessResponse } from "../utils/api-response.js";
@@ -12,27 +12,19 @@ type AuthLocals = {
 };
 
 function logTurnTelemetry(
-  result: MockAssistantTurnResponseData,
+  result: AssistantTurnExecutionResult,
   durationMs: number,
 ): void {
-  const usage = result.token_usage;
+  const { response, telemetry } = result;
 
   logAssistantTurnEvent({
-    intent: result.intent,
+    intent: response.intent,
     durationMs,
-    toolCalls: result.tool_calls,
-    agentStepCount: result.agent_trace?.steps.length ?? null,
-    faithfulness: result.faithfulness ?? null,
-    hasPlan: result.plan !== undefined,
-    tokenUsage:
-      usage === undefined
-        ? null
-        : {
-            promptTokens: usage.prompt_tokens,
-            completionTokens: usage.completion_tokens,
-            totalTokens: usage.total_tokens,
-            llmCallCount: usage.llm_call_count,
-          },
+    toolCalls: response.tool_calls,
+    agentStepCount: response.agent_trace?.steps.length ?? null,
+    faithfulness: response.faithfulness ?? null,
+    hasPlan: response.plan !== undefined,
+    tokenUsage: telemetry.tokenUsage ?? null,
   });
 }
 
@@ -84,7 +76,7 @@ export async function postMockAssistantTurnController(
   const result = await runMockAssistantTurn(res.locals.userId, req.body);
   logTurnTelemetry(result, Date.now() - startedAt);
 
-  return res.status(200).json(createSuccessResponse(result));
+  return res.status(200).json(createSuccessResponse(result.response));
 }
 
 /**

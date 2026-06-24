@@ -31,6 +31,7 @@ import {
 import { coerceMessageToEvidenceToolCall } from "./assistant-provider-fallback.js";
 import { applyFaithfulPhrasing } from "./answer-phrasing.js";
 import { getToolDefinitionForMode } from "./assistant-tool-routing.js";
+import type { AssistantTokenUsage } from "./assistant-turn-observability.js";
 import {
   createGroqIntentRouter,
   type LlmIntentRouter,
@@ -256,20 +257,23 @@ export interface MockAssistantTurnResponseData {
   agent_trace?: AgentTrace | undefined;
   faithfulness?: AnswerFaithfulnessResult | undefined;
   plan?: NextWeekPlanDraft | undefined;
-  /**
-   * Aggregated LLM token usage for the turn (routing + optional phrasing calls).
-   * Present only when a real provider (Groq) reported usage; absent on the mock
-   * path. Surfaced for cost observability (Slice 11.3b / C1).
-   */
-  token_usage?: AssistantTurnTokenUsage | undefined;
 }
 
-/** Per-turn aggregated token usage (snake_case for the API/response DTO). */
-export interface AssistantTurnTokenUsage {
-  prompt_tokens: number;
-  completion_tokens: number;
-  total_tokens: number;
-  llm_call_count: number;
+/**
+ * Server-side operational metadata for one turn (NOT part of the public response
+ * DTO): token usage now, and a natural home for `trace_id`, model, and per-call
+ * latency/cost later. The controller logs this and strips it before responding,
+ * so clients never depend on Groq/OpenAI usage shapes (C1).
+ */
+export interface AssistantTurnTelemetry {
+  /** Aggregated LLM token usage (Groq); undefined on deterministic/mock paths. */
+  tokenUsage?: AssistantTokenUsage | undefined;
+}
+
+/** Internal envelope: the public response plus server-only telemetry. */
+export interface AssistantTurnExecutionResult {
+  response: MockAssistantTurnResponseData;
+  telemetry: AssistantTurnTelemetry;
 }
 
 interface PersistedTextBlock {
@@ -1049,7 +1053,7 @@ function buildToolAnswer(
  */
 function aggregateTurnTokenUsage(
   usages: ReadonlyArray<AssistantProviderUsage | undefined>,
-): AssistantTurnTokenUsage | undefined {
+): AssistantTokenUsage | undefined {
   const reported = usages.filter(
     (usage): usage is AssistantProviderUsage => usage !== undefined,
   );
@@ -1059,13 +1063,13 @@ function aggregateTurnTokenUsage(
   }
 
   return {
-    prompt_tokens: reported.reduce((sum, usage) => sum + usage.prompt_tokens, 0),
-    completion_tokens: reported.reduce(
+    promptTokens: reported.reduce((sum, usage) => sum + usage.prompt_tokens, 0),
+    completionTokens: reported.reduce(
       (sum, usage) => sum + usage.completion_tokens,
       0,
     ),
-    total_tokens: reported.reduce((sum, usage) => sum + usage.total_tokens, 0),
-    llm_call_count: reported.length,
+    totalTokens: reported.reduce((sum, usage) => sum + usage.total_tokens, 0),
+    llmCallCount: reported.length,
   };
 }
 
@@ -1073,7 +1077,7 @@ export async function runMockAssistantTurn(
   userId: string,
   rawInput: unknown,
   options?: AssistantStreamOptions,
-): Promise<MockAssistantTurnResponseData> {
+): Promise<AssistantTurnExecutionResult> {
   await emitEvent(options, {
     type: "state",
     state: "thinking",
@@ -1159,7 +1163,7 @@ export async function runMockAssistantTurn(
       session_id: resolvedSession.sessionId,
     });
 
-    return response;
+    return { response, telemetry: {} };
   }
 
   if (intent === "knowledge") {
@@ -1213,17 +1217,20 @@ export async function runMockAssistantTurn(
       session_id: resolvedSession.sessionId,
     });
 
-    return response;
+    return { response, telemetry: {} };
   }
 
   if (intent === "next_week_plan") {
-    return runNextWeekPlanAgentTurn({
+    // Deterministic ReAct agent path makes no billed provider call → empty telemetry.
+    const planResponse = await runNextWeekPlanAgentTurn({
       userId,
       input,
       intent,
       sessionId: resolvedSession.sessionId,
       options,
     });
+
+    return { response: planResponse, telemetry: {} };
   }
 
   const providerRequest = buildProviderRequest(input, executionMode);
@@ -1430,7 +1437,6 @@ export async function runMockAssistantTurn(
     tool_calls: toolCalls,
     answer,
     faithfulness,
-    token_usage: aggregateTurnTokenUsage([routingUsage, phrasingUsage]),
   };
 
   const messageId = await persistMockTurnMessages({
@@ -1451,7 +1457,12 @@ export async function runMockAssistantTurn(
     session_id: resolvedSession.sessionId,
   });
 
-  return response;
+  return {
+    response,
+    telemetry: {
+      tokenUsage: aggregateTurnTokenUsage([routingUsage, phrasingUsage]),
+    },
+  };
 }
 
 async function runNextWeekPlanAgentTurn(args: {

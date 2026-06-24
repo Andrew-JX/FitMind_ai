@@ -4740,3 +4740,14 @@ Verification: `pnpm type-check` / `pnpm test:unit`(312,+1) / `pnpm eval`(13/13·
 成本：`estimated_cost_usd` 按 llama-3.3-70b list price 估算（注明非实际计费，Groq 免费层 $0）；tokens 是真信号。
 
 Verification: `pnpm type-check` / `pnpm test:unit`(317,+6) / `pnpm eval`(13/13·12/12·3/3 PASS) 通过；改动文件 eslint EXIT 0。默认/mock 路径零行为变更。决策见 ai-decisions D40；DTO 字段见 api-contract。
+
+## 2026-06-23 C1 审查改进：token_usage 收敛到内部 telemetry 信封（不污染公开 DTO）
+
+Codex 审查 a8aa58e：把 `token_usage` 放进公开 `MockAssistantTurnResponseData` 属 API 契约污染（token/成本/trace 是服务端运维元数据，不该让客户端依赖 Groq/OpenAI usage 结构）。改为内部信封：
+
+- `runMockAssistantTurn` 返回 `AssistantTurnExecutionResult { response, telemetry }`；`telemetry.tokenUsage`（camelCase `AssistantTokenUsage`）服务端专属，**移出** `MockAssistantTurnResponseData` / `structured_output`。
+- 控制器 `const { response, telemetry } = await runMockAssistantTurn(...)`：`logTurnTelemetry` 从 telemetry 取 tokenUsage、从 response 取业务字段；响应只回 `response`。
+- `aggregateTurnTokenUsage` 返回 camelCase `AssistantTokenUsage`，去掉 snake_case 的 `AssistantTurnTokenUsage` DTO 类型。`telemetry` 后续可自然扩展 `trace_id`/模型/各调用耗时成本。
+- api-contract 改为"Token/成本是服务端 telemetry，不进响应"。
+
+Verification: `pnpm type-check` / `pnpm test:unit`(317) / `pnpm eval`(13/13·12/12·3/3 PASS) 通过；改动文件 eslint EXIT 0。涉及 3 代码文件（orchestrator / 控制器 / 端到端测试）+ docs。
