@@ -15,6 +15,8 @@ function logTurnTelemetry(
   result: MockAssistantTurnResponseData,
   durationMs: number,
 ): void {
+  const usage = result.token_usage;
+
   logAssistantTurnEvent({
     intent: result.intent,
     durationMs,
@@ -22,6 +24,15 @@ function logTurnTelemetry(
     agentStepCount: result.agent_trace?.steps.length ?? null,
     faithfulness: result.faithfulness ?? null,
     hasPlan: result.plan !== undefined,
+    tokenUsage:
+      usage === undefined
+        ? null
+        : {
+            promptTokens: usage.prompt_tokens,
+            completionTokens: usage.completion_tokens,
+            totalTokens: usage.total_tokens,
+            llmCallCount: usage.llm_call_count,
+          },
   });
 }
 

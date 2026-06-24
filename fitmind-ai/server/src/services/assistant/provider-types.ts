@@ -37,15 +37,26 @@ export interface AssistantProviderRequest {
   simulation: AssistantProviderSimulationHint;
 }
 
+/** Token usage for one provider (LLM) call; OpenAI-compatible shape. */
+export interface AssistantProviderUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+}
+
 export interface AssistantProviderMessageResponse {
   kind: "message";
   message: string;
+  /** Token usage for this call when the provider reports it (e.g. Groq); absent for mock. */
+  usage?: AssistantProviderUsage | undefined;
 }
 
 export interface AssistantProviderToolCallResponse {
   kind: "tool_call";
   tool_name: string;
   tool_args: Record<string, string>;
+  /** Token usage for this call when the provider reports it (e.g. Groq); absent for mock. */
+  usage?: AssistantProviderUsage | undefined;
 }
 
 export interface AssistantProviderErrorResponse {

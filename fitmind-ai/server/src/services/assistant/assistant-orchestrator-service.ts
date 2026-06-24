@@ -66,6 +66,7 @@ import type {
   AssistantProviderRequest,
   AssistantProviderResponse,
   AssistantProviderToolDefinition,
+  AssistantProviderUsage,
 } from "./provider-types.js";
 
 const assistantModeSchema = z.enum([
@@ -255,6 +256,20 @@ export interface MockAssistantTurnResponseData {
   agent_trace?: AgentTrace | undefined;
   faithfulness?: AnswerFaithfulnessResult | undefined;
   plan?: NextWeekPlanDraft | undefined;
+  /**
+   * Aggregated LLM token usage for the turn (routing + optional phrasing calls).
+   * Present only when a real provider (Groq) reported usage; absent on the mock
+   * path. Surfaced for cost observability (Slice 11.3b / C1).
+   */
+  token_usage?: AssistantTurnTokenUsage | undefined;
+}
+
+/** Per-turn aggregated token usage (snake_case for the API/response DTO). */
+export interface AssistantTurnTokenUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  llm_call_count: number;
 }
 
 interface PersistedTextBlock {
@@ -1024,6 +1039,36 @@ function buildToolAnswer(
   );
 }
 
+/**
+ * Aggregate per-call provider usages into one turn-level token total.
+ *
+ * @param usages - Usage from each LLM call this turn; `undefined` entries (mock /
+ *   draft-fallback) are ignored.
+ * @returns Aggregated usage with the reporting-call count, or `undefined` when no
+ *   call reported usage (the deterministic mock path).
+ */
+function aggregateTurnTokenUsage(
+  usages: ReadonlyArray<AssistantProviderUsage | undefined>,
+): AssistantTurnTokenUsage | undefined {
+  const reported = usages.filter(
+    (usage): usage is AssistantProviderUsage => usage !== undefined,
+  );
+
+  if (reported.length === 0) {
+    return undefined;
+  }
+
+  return {
+    prompt_tokens: reported.reduce((sum, usage) => sum + usage.prompt_tokens, 0),
+    completion_tokens: reported.reduce(
+      (sum, usage) => sum + usage.completion_tokens,
+      0,
+    ),
+    total_tokens: reported.reduce((sum, usage) => sum + usage.total_tokens, 0),
+    llm_call_count: reported.length,
+  };
+}
+
 export async function runMockAssistantTurn(
   userId: string,
   rawInput: unknown,
@@ -1222,6 +1267,11 @@ export async function runMockAssistantTurn(
     },
   );
 
+  // C1 token/cost observability: capture the routing call's usage (kept off the
+  // synthesized coercion result), and the phrasing call's usage if it runs.
+  const routingUsage = rawProviderResponse.usage;
+  let phrasingUsage: AssistantProviderUsage | undefined;
+
   const toolCalls: MockAssistantTurnResponseData["tool_calls"] = [];
   const toolOutputs: unknown[] = [];
   let answer: AssistantStructuredAnswer;
@@ -1351,11 +1401,12 @@ export async function runMockAssistantTurn(
     // a rewrite that introduces an unverified number is rejected and we keep the
     // deterministic draft (numbers/conclusions stay deterministic + evidence-bound).
     if (isAssistantAnswerPhrasingEnabled()) {
-      const phrasedSummary = await runAssistantAnswerPhrasing({
+      const phrasing = await runAssistantAnswerPhrasing({
         draftSummary: answer.summary,
         supportingFacts: answer.bullets,
       });
-      answer = applyFaithfulPhrasing(answer, phrasedSummary, (candidate) =>
+      phrasingUsage = phrasing.usage;
+      answer = applyFaithfulPhrasing(answer, phrasing.summary, (candidate) =>
         verifyAnswerFaithfulness(candidate, toolOutputs),
       ).answer;
     }
@@ -1379,6 +1430,7 @@ export async function runMockAssistantTurn(
     tool_calls: toolCalls,
     answer,
     faithfulness,
+    token_usage: aggregateTurnTokenUsage([routingUsage, phrasingUsage]),
   };
 
   const messageId = await persistMockTurnMessages({

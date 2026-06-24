@@ -3,6 +3,26 @@ import type { AssistantRoutedIntent } from "./assistant-intent-router.js";
 /** Faithfulness outcome bucket for telemetry (`unchecked` = no tool data this turn). */
 type FaithfulnessStatus = "verified" | "flagged" | "unchecked";
 
+/**
+ * Aggregated LLM token usage for one turn (sum across all provider calls, e.g.
+ * the routing/tool-selection call plus the optional 11.3b phrasing call).
+ */
+export interface AssistantTokenUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  /** Number of billed LLM calls this turn (0 for the deterministic mock path). */
+  llmCallCount: number;
+}
+
+/**
+ * Estimated USD list price per 1M tokens (Groq llama-3.3-70b reference rate).
+ * The actual Groq free tier bills $0; this is a cost *estimate* for visibility,
+ * not a billing figure. Update if the default GROQ_MODEL changes.
+ */
+const USD_PER_1M_PROMPT_TOKENS = 0.59;
+const USD_PER_1M_COMPLETION_TOKENS = 0.79;
+
 export interface AssistantTurnLogInput {
   intent: AssistantRoutedIntent;
   durationMs: number;
@@ -13,6 +33,7 @@ export interface AssistantTurnLogInput {
     | null
     | undefined;
   hasPlan?: boolean | undefined;
+  tokenUsage?: AssistantTokenUsage | null | undefined;
 }
 
 export interface AssistantTurnLogEvent {
@@ -26,6 +47,12 @@ export interface AssistantTurnLogEvent {
   faithfulness_status: FaithfulnessStatus;
   unverified_claim_count: number;
   has_plan: boolean;
+  llm_call_count: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  /** List-price cost estimate (USD); see rate constants. Groq free tier actual = 0. */
+  estimated_cost_usd: number;
 }
 
 /**
@@ -49,6 +76,10 @@ export function buildAssistantTurnLogEvent(
     0,
   );
 
+  const usage = input.tokenUsage ?? null;
+  const promptTokens = Math.max(0, usage?.promptTokens ?? 0);
+  const completionTokens = Math.max(0, usage?.completionTokens ?? 0);
+
   return {
     event: "assistant_turn",
     intent: input.intent,
@@ -60,7 +91,27 @@ export function buildAssistantTurnLogEvent(
     faithfulness_status: resolveFaithfulnessStatus(input.faithfulness),
     unverified_claim_count: input.faithfulness?.unverifiedClaims.length ?? 0,
     has_plan: input.hasPlan ?? false,
+    llm_call_count: Math.max(0, usage?.llmCallCount ?? 0),
+    prompt_tokens: promptTokens,
+    completion_tokens: completionTokens,
+    total_tokens: Math.max(0, usage?.totalTokens ?? 0),
+    estimated_cost_usd: estimateCostUsd(promptTokens, completionTokens),
   };
+}
+
+/**
+ * Estimate the list-price USD cost of one turn from its token counts.
+ *
+ * @param promptTokens - Prompt (input) tokens summed across the turn's LLM calls.
+ * @param completionTokens - Completion (output) tokens summed across the turn's LLM calls.
+ * @returns Estimated cost in USD, rounded to 6 decimals (0 when no tokens).
+ */
+function estimateCostUsd(promptTokens: number, completionTokens: number): number {
+  const cost =
+    (promptTokens / 1_000_000) * USD_PER_1M_PROMPT_TOKENS +
+    (completionTokens / 1_000_000) * USD_PER_1M_COMPLETION_TOKENS;
+
+  return Math.round(cost * 1_000_000) / 1_000_000;
 }
 
 /**

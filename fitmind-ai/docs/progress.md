@@ -4729,3 +4729,14 @@ Verification: `pnpm type-check` / `pnpm test:unit`(311,+8) / `pnpm eval`(13/13·
 - **P3b 运维文档**：`.env.example` / `README.md` / `local-run-guide.md` 补 `ASSISTANT_PHRASING`（默认 off + 仅 groq 生效 + faithfulness 门控）；更正 README 过时的"无第二次 provider 调用"。
 
 Verification: `pnpm type-check` / `pnpm test:unit`(312,+1) / `pnpm eval`(13/13·12/12·3/3 PASS) 通过；改动文件 eslint EXIT 0。默认 off 仍零行为变更。
+
+## 2026-06-23 C1：Token/成本 observability（聚合 Groq usage 进每轮日志 + 可选 token_usage DTO）
+
+11.3b 引入第二次计费调用后补成本可观测（小、稳、无行为风险）；LangSmith 外部 tracing 单独评估、本片不做。两小批：
+
+- **Batch 1（取 usage + schema，零行为变更）**：`provider-types.ts`（message/tool_call 响应加可选 `usage` + `AssistantProviderUsage`）；`groq-assistant-provider.ts`（路由调用解析 usage）；`assistant-turn-observability.ts`（event/input 加 `llm_call_count/prompt_tokens/completion_tokens/total_tokens/estimated_cost_usd`，list-price 估算）；+groq/observability 单测。无人消费 usage → 全绿零变更。
+- **Batch 2（接线）**：`runGroqAnswerPhrasing` 改返回 `{summary, usage}`（adapter 跟随）；编排层 `aggregateTurnTokenUsage` 聚合路由+措辞 usage → 可选 `token_usage` 进 `MockAssistantTurnResponseData`（structured_output，snake_case，additive 可选）；控制器映射进 `logAssistantTurnEvent`；+端到端单测（有 usage 聚合 / mock 路径 undefined）。
+
+成本：`estimated_cost_usd` 按 llama-3.3-70b list price 估算（注明非实际计费，Groq 免费层 $0）；tokens 是真信号。
+
+Verification: `pnpm type-check` / `pnpm test:unit`(317,+6) / `pnpm eval`(13/13·12/12·3/3 PASS) 通过；改动文件 eslint EXIT 0。默认/mock 路径零行为变更。决策见 ai-decisions D40；DTO 字段见 api-contract。

@@ -65,8 +65,10 @@ vi.mock("../../db/chat-repository.js", () => ({
 
 import { runMockAssistantTurn } from "./assistant-orchestrator-service.js";
 import { executeAiTool } from "../ai/tools/tool-executor.js";
+import { runAssistantProvider } from "./provider-adapter.js";
 
 const mockedExecuteAiTool = vi.mocked(executeAiTool);
+const mockedRunAssistantProvider = vi.mocked(runAssistantProvider);
 
 describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", () => {
   beforeEach(() => {
@@ -117,5 +119,38 @@ describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", ()
 
     // Numbers in the answer all trace back to the tool output.
     expect(response.faithfulness?.status).toBe("verified");
+  });
+
+  it("aggregates the routing call's token usage into token_usage (C1)", async () => {
+    mockedRunAssistantProvider.mockResolvedValueOnce({
+      kind: "message",
+      message: "这是你的周报概述……",
+      usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 },
+    });
+
+    const response = await runMockAssistantTurn("user-1", {
+      mode: "auto",
+      message: "周报",
+      start_date: "2026-05-19",
+      end_date: "2026-06-17",
+    });
+
+    expect(response.token_usage).toEqual({
+      prompt_tokens: 100,
+      completion_tokens: 20,
+      total_tokens: 120,
+      llm_call_count: 1,
+    });
+  });
+
+  it("leaves token_usage undefined when the provider reports no usage (mock path)", async () => {
+    const response = await runMockAssistantTurn("user-1", {
+      mode: "auto",
+      message: "周报",
+      start_date: "2026-05-19",
+      end_date: "2026-06-17",
+    });
+
+    expect(response.token_usage).toBeUndefined();
   });
 });

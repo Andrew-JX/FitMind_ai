@@ -967,3 +967,26 @@ Decision（最小且安全）：
 - eval 不受影响（intent 直接调 classify、faithfulness/refusal 离线 fixtures，且默认 off 不走措辞）。
 
 验证：type-check / 改动文件 eslint / test:unit 311（groq 措辞 4 例 + answer-phrasing 4 例）/ eval 13·12·3 全绿。真链路（groq + 开关）质量靠 prod 验证。
+
+## [D40] Token/成本 observability：聚合 Groq usage 进每轮日志 + 可选 token_usage DTO（C1）
+
+- **Date**: 2026-06-23
+- **Status**: Accepted（已落地 + 单测；LangSmith 外部 tracing 暂缓）
+
+背景：11.3b 上了第二次（计费）LLM 调用（措辞），加上路由选工具调用，一轮最多两次 Groq 调用。此前完全没记 token/成本，无法观测。C1 先做这块（小、稳、无行为风险）；LangSmith 外部 tracing 因需引新依赖 + API key + trace 去 PII，单独评估，本片不做。
+
+Decision：
+- **接缝取 usage**：Groq 响应（OpenAI 兼容）带 `usage`。`provider-types` 给 message/tool_call 响应加可选 `usage`；`runGroqAssistantProvider`（路由）与 `runGroqAnswerPhrasing`（措辞，返回 `{summary, usage}`）各自解析上报；mock/anthropic 不带（usage 可选）。
+- **聚合**：编排层 `aggregateTurnTokenUsage([routingUsage, phrasingUsage])` 求和（忽略 undefined，记 `llm_call_count`）；仅当有调用上报 usage 时产出，否则 undefined（mock 路径）。
+- **两个出口**：① 可选 `token_usage` 进 `MockAssistantTurnResponseData`（structured_output，snake_case：`prompt_tokens/completion_tokens/total_tokens/llm_call_count`），additive 可选、向前兼容（见 api-contract）；② 控制器把它映射进 `logAssistantTurnEvent` 的 `assistant_turn` 单行 JSON，新增 `llm_call_count/prompt_tokens/completion_tokens/total_tokens/estimated_cost_usd`。
+- **成本估算**：`estimated_cost_usd` 按 llama-3.3-70b list price 常量（$0.59/1M prompt、$0.79/1M completion）算，**注明是估算**——Groq 免费层实际计费 $0；tokens 才是真信号。默认/mock 路径全 0。
+- 设计取舍：选 DTO 字段而非 options 回调——additive 可选、一批 ≤5 文件落地、还顺带给每条消息一份 token 成本痕迹（持久化在 structuredOutput）。
+
+落地两小批：Batch 1 = provider-types/groq/observability + 取 usage + schema（不接线，零行为变更）；Batch 2 = 措辞返回 usage（groq/adapter）+ 编排层聚合进 DTO + 控制器记日志 + 端到端单测。
+
+边界 / 未做：
+- **LangSmith 外部 tracing**（C1 的另一半）：需新依赖 + key + PII 去除，单独片。
+- anthropic provider 未上报 usage（接口已留可选位，后续补）。
+- eval 不受影响（离线 + 不走 provider）。
+
+验证：type-check / 改动文件 eslint / test:unit 317（groq usage 2 例 + observability token 2 例 + orchestrator token_usage 2 例）/ eval 13·12·3 全绿。

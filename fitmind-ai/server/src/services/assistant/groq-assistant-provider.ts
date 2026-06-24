@@ -6,6 +6,7 @@ import type {
   AssistantProviderRequest,
   AssistantProviderResponse,
   AssistantProviderToolDefinition,
+  AssistantProviderUsage,
 } from "./provider-types.js";
 
 const GROQ_CHAT_COMPLETIONS_URL =
@@ -27,10 +28,17 @@ const groqMessageSchema = z.object({
   tool_calls: z.array(groqToolCallSchema).optional(),
 });
 
+const groqUsageSchema = z.object({
+  prompt_tokens: z.number(),
+  completion_tokens: z.number(),
+  total_tokens: z.number(),
+});
+
 const groqChatCompletionSchema = z.object({
   choices: z
     .array(z.object({ message: groqMessageSchema }))
     .min(1),
+  usage: groqUsageSchema.optional(),
 });
 
 /**
@@ -195,12 +203,14 @@ export async function runGroqAssistantProvider(
 
   const message = parsedCompletion.data.choices[0]?.message;
   const toolCall = message?.tool_calls?.[0];
+  const usage = parsedCompletion.data.usage;
 
   if (toolCall !== undefined) {
     return {
       kind: "tool_call",
       tool_name: toolCall.function.name,
       tool_args: normalizeToolArgs(toolCall.function.arguments),
+      usage,
     };
   }
 
@@ -210,6 +220,7 @@ export async function runGroqAssistantProvider(
     return {
       kind: "message",
       message: text,
+      usage,
     };
   }
 
@@ -232,6 +243,13 @@ export interface AssistantPhrasingInput {
   draftSummary: string;
   /** Evidence-bearing fact lines (answer bullets) the rewrite must stay consistent with. */
   supportingFacts: string[];
+}
+
+/** Output of one re-phrasing call: the (possibly rewritten) summary + optional usage. */
+export interface AssistantPhrasingOutput {
+  summary: string;
+  /** Token usage when the provider reports it (Groq); absent on the draft-fallback path. */
+  usage?: AssistantProviderUsage | undefined;
 }
 
 /**
@@ -268,11 +286,11 @@ function buildPhrasingUserPrompt(input: AssistantPhrasingInput): string {
  * returned text upstream before it is shown.
  *
  * @param input - The draft summary plus supporting fact lines.
- * @returns The re-phrased summary, or the original draft on any failure.
+ * @returns The re-phrased summary + token usage, or the original draft (no usage) on any failure.
  */
 export async function runGroqAnswerPhrasing(
   input: AssistantPhrasingInput,
-): Promise<string> {
+): Promise<AssistantPhrasingOutput> {
   try {
     const config = getGroqAssistantProviderConfig();
     const response = await fetch(GROQ_CHAT_COMPLETIONS_URL, {
@@ -298,19 +316,21 @@ export async function runGroqAnswerPhrasing(
     const payload = (await response.json()) as unknown;
 
     if (!response.ok) {
-      return input.draftSummary;
+      return { summary: input.draftSummary };
     }
 
     const parsed = groqChatCompletionSchema.safeParse(payload);
 
     if (!parsed.success) {
-      return input.draftSummary;
+      return { summary: input.draftSummary };
     }
 
     const text = parsed.data.choices[0]?.message.content?.trim() ?? "";
 
-    return text.length > 0 ? text : input.draftSummary;
+    return text.length > 0
+      ? { summary: text, usage: parsed.data.usage }
+      : { summary: input.draftSummary };
   } catch {
-    return input.draftSummary;
+    return { summary: input.draftSummary };
   }
 }

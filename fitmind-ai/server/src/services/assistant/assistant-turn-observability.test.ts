@@ -29,7 +29,45 @@ describe("buildAssistantTurnLogEvent", () => {
       faithfulness_status: "flagged",
       unverified_claim_count: 1,
       has_plan: false,
+      llm_call_count: 0,
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      total_tokens: 0,
+      estimated_cost_usd: 0,
     });
+  });
+
+  it("defaults token/cost fields to 0 on the deterministic (no-LLM) path", () => {
+    const event = buildAssistantTurnLogEvent({
+      intent: "summary",
+      durationMs: 10,
+      toolCalls: [],
+    });
+
+    expect(event.llm_call_count).toBe(0);
+    expect(event.total_tokens).toBe(0);
+    expect(event.estimated_cost_usd).toBe(0);
+  });
+
+  it("reports token usage and a list-price cost estimate", () => {
+    const event = buildAssistantTurnLogEvent({
+      intent: "weekly_report",
+      durationMs: 100,
+      toolCalls: [{ status: "success", duration_ms: 5 }],
+      tokenUsage: {
+        promptTokens: 1_000_000,
+        completionTokens: 1_000_000,
+        totalTokens: 2_000_000,
+        llmCallCount: 2,
+      },
+    });
+
+    expect(event.llm_call_count).toBe(2);
+    expect(event.prompt_tokens).toBe(1_000_000);
+    expect(event.completion_tokens).toBe(1_000_000);
+    expect(event.total_tokens).toBe(2_000_000);
+    // 1M prompt * 0.59 + 1M completion * 0.79 = 1.38 USD
+    expect(event.estimated_cost_usd).toBeCloseTo(1.38, 6);
   });
 
   it("marks faithfulness as unchecked when no tool data was verified", () => {

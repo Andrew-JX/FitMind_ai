@@ -4,6 +4,7 @@ import {
   groqAssistantProvider,
   runGroqAnswerPhrasing,
   type AssistantPhrasingInput,
+  type AssistantPhrasingOutput,
 } from "./groq-assistant-provider.js";
 import { mockAssistantProvider } from "./mock-provider.js";
 import type {
@@ -84,18 +85,18 @@ export async function runAssistantProvider(
  * outside the groq path. Faithfulness still validates the result upstream.
  *
  * @param input - The draft summary plus supporting fact lines.
- * @returns The (possibly) re-phrased summary; the draft on any non-groq path or failure.
+ * @returns The (possibly) re-phrased summary + usage; the draft (no usage) on any non-groq path or failure.
  */
 export async function runAssistantAnswerPhrasing(
   input: AssistantPhrasingInput,
-): Promise<string> {
+): Promise<AssistantPhrasingOutput> {
   try {
     if (getConfiguredAssistantProvider() !== "groq") {
-      return input.draftSummary;
+      return { summary: input.draftSummary };
     }
 
     return await runGroqAnswerPhrasing(input);
   } catch {
-    return input.draftSummary;
+    return { summary: input.draftSummary };
   }
 }
