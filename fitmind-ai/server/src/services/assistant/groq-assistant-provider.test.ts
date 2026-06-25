@@ -204,7 +204,7 @@ describe("runGroqAnswerPhrasing (Slice 11.3b)", () => {
     }
   });
 
-  it("returns the re-phrased summary and usage on success", async () => {
+  it("returns the re-phrased summary, usage, and call telemetry on success", async () => {
     mockFetchOnce(200, {
       choices: [{ message: { content: "  这周你练了 4 次，一共 20 组。  " } }],
       usage: { prompt_tokens: 80, completion_tokens: 20, total_tokens: 100 },
@@ -215,30 +215,38 @@ describe("runGroqAnswerPhrasing (Slice 11.3b)", () => {
     expect(result).toEqual({
       summary: "这周你练了 4 次，一共 20 组。",
       usage: { prompt_tokens: 80, completion_tokens: 20, total_tokens: 100 },
+      attempted: true,
+      errored: false,
     });
   });
 
-  it("falls back to the draft (no usage) on an HTTP error", async () => {
+  it("falls back to the draft and marks attempted+errored on an HTTP error", async () => {
     mockFetchOnce(429, { error: { message: "rate limited" } });
 
     const result = await runGroqAnswerPhrasing(phrasingInput);
 
-    expect(result).toEqual({ summary: phrasingInput.draftSummary });
+    expect(result.summary).toBe(phrasingInput.draftSummary);
+    expect(result.attempted).toBe(true);
+    expect(result.errored).toBe(true);
   });
 
-  it("falls back to the draft on an empty completion", async () => {
+  it("falls back to the draft (attempted, not errored) on an empty completion", async () => {
     mockFetchOnce(200, { choices: [{ message: { content: "   " } }] });
 
     const result = await runGroqAnswerPhrasing(phrasingInput);
 
     expect(result.summary).toBe(phrasingInput.draftSummary);
+    expect(result.attempted).toBe(true);
+    expect(result.errored).toBe(false);
   });
 
-  it("falls back to the draft when GROQ_API_KEY is missing (never throws)", async () => {
+  it("falls back to the draft (not attempted) when GROQ_API_KEY is missing", async () => {
     delete process.env.GROQ_API_KEY;
 
     const result = await runGroqAnswerPhrasing(phrasingInput);
 
     expect(result.summary).toBe(phrasingInput.draftSummary);
+    expect(result.attempted).toBe(false);
+    expect(result.errored).toBe(false);
   });
 });

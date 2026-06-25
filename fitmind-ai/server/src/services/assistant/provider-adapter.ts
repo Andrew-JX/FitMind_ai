@@ -92,11 +92,11 @@ export async function runAssistantAnswerPhrasing(
 ): Promise<AssistantPhrasingOutput> {
   try {
     if (getConfiguredAssistantProvider() !== "groq") {
-      return { summary: input.draftSummary };
+      return { summary: input.draftSummary, attempted: false, errored: false };
     }
 
     return await runGroqAnswerPhrasing(input);
   } catch {
-    return { summary: input.draftSummary };
+    return { summary: input.draftSummary, attempted: false, errored: false };
   }
 }

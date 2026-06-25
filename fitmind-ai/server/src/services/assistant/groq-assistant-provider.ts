@@ -159,11 +159,15 @@ export interface AssistantPhrasingInput {
   supportingFacts: string[];
 }
 
-/** Output of one re-phrasing call: the (possibly rewritten) summary + optional usage. */
+/** Output of one re-phrasing call: the (possibly rewritten) summary + call telemetry. */
 export interface AssistantPhrasingOutput {
   summary: string;
   /** Token usage when the provider reports it (Groq); absent on the draft-fallback path. */
   usage?: AssistantProviderUsage | undefined;
+  /** True when a billed Groq call was issued (false if config failed before any request). */
+  attempted: boolean;
+  /** True when an issued call failed (HTTP/shape/network). */
+  errored: boolean;
 }
 
 /**
@@ -216,12 +220,18 @@ export async function runGroqAnswerPhrasing(
   });
 
   if (!result.ok) {
-    return { summary: input.draftSummary };
+    // attempted-but-failed → errored; pre-request config failure → not attempted.
+    return {
+      summary: input.draftSummary,
+      usage: result.usage,
+      attempted: result.attempted,
+      errored: result.attempted,
+    };
   }
 
   const text = result.content?.trim() ?? "";
 
   return text.length > 0
-    ? { summary: text, usage: result.usage }
-    : { summary: input.draftSummary };
+    ? { summary: text, usage: result.usage, attempted: true, errored: false }
+    : { summary: input.draftSummary, attempted: true, errored: false };
 }
