@@ -119,19 +119,18 @@ describe("buildAssistantTurnLogEvent", () => {
 });
 
 describe("summarizeTurnLlmCalls", () => {
-  it("counts attempts, usage reports, errors, and sums tokens", () => {
-    const summary = summarizeTurnLlmCalls(
-      [
-        {
-          attempted: true,
-          errored: false,
-          usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
-        },
-        { attempted: true, errored: true },
-        { attempted: false, errored: false },
-      ],
-      { provider: "groq", model: "llama-3.3-70b-versatile" },
-    );
+  it("counts attempts, usage reports, errors, sums tokens, and takes provider/model from records", () => {
+    const summary = summarizeTurnLlmCalls([
+      {
+        attempted: true,
+        errored: false,
+        provider: "groq",
+        model: "llama-3.3-70b-versatile",
+        usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+      },
+      { attempted: true, errored: true, provider: "groq", model: null },
+      { attempted: false, errored: false, provider: null, model: null },
+    ]);
 
     expect(summary).toEqual({
       attemptCount: 2,
@@ -146,10 +145,9 @@ describe("summarizeTurnLlmCalls", () => {
   });
 
   it("returns undefined when no call was attempted", () => {
-    const summary = summarizeTurnLlmCalls(
-      [{ attempted: false, errored: false }],
-      { provider: null, model: null },
-    );
+    const summary = summarizeTurnLlmCalls([
+      { attempted: false, errored: false, provider: null, model: null },
+    ]);
 
     expect(summary).toBeUndefined();
   });
@@ -172,7 +170,7 @@ describe("logAssistantTurnEvent", () => {
 });
 
 describe("logFailedAssistantTurnEvent", () => {
-  it("emits a minimal error line for a failed turn", () => {
+  it("emits an error line with zeroed LLM fields when no call was made", () => {
     const logger = vi.fn();
 
     logFailedAssistantTurnEvent(
@@ -181,11 +179,46 @@ describe("logFailedAssistantTurnEvent", () => {
     );
 
     const payload = JSON.parse(logger.mock.calls[0]?.[0] as string);
-    expect(payload).toEqual({
+    expect(payload).toMatchObject({
       event: "assistant_turn",
       status: "error",
       error_code: "AI_PROVIDER_ERROR",
       duration_ms: 43,
+      llm_attempt_count: 0,
+      llm_error_count: 0,
+      total_tokens: 0,
+      estimated_cost_usd: 0,
+    });
+  });
+
+  it("carries the LLM summary so a failed Groq call is still counted (P1)", () => {
+    const logger = vi.fn();
+
+    logFailedAssistantTurnEvent(
+      {
+        durationMs: 10,
+        errorCode: "AI_PROVIDER_ERROR",
+        llm: {
+          attemptCount: 1,
+          usageReportCount: 0,
+          errorCount: 1,
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0,
+          provider: "groq",
+          model: "llama-3.3-70b-versatile",
+        },
+      },
+      logger,
+    );
+
+    const payload = JSON.parse(logger.mock.calls[0]?.[0] as string);
+    expect(payload).toMatchObject({
+      status: "error",
+      llm_attempt_count: 1,
+      llm_error_count: 1,
+      provider: "groq",
+      model: "llama-3.3-70b-versatile",
     });
   });
 });

@@ -1,18 +1,15 @@
 import type { AssistantRoutedIntent } from "./assistant-intent-router.js";
-import type { AssistantProviderUsage } from "./provider-types.js";
+import type { AssistantProviderCallTelemetry } from "./provider-types.js";
 
 /** Faithfulness outcome bucket for telemetry (`unchecked` = no tool data this turn). */
 type FaithfulnessStatus = "verified" | "flagged" | "unchecked";
 
-/** One LLM (provider) call's telemetry outcome within a turn. */
-export interface AssistantLlmCallRecord {
-  /** True when a billed call was issued (false if config failed before any request). */
-  attempted: boolean;
-  /** True when an issued call failed (HTTP/shape/network). */
-  errored: boolean;
-  /** Token usage when the provider reported it; absent otherwise. */
-  usage?: AssistantProviderUsage | undefined;
-}
+/**
+ * One LLM (provider) call's telemetry outcome within a turn. Same shape the
+ * provider/router/phrasing calls emit, so provider/model/usage flow straight from
+ * the actual client result (no downstream env re-read).
+ */
+export type AssistantLlmCallRecord = AssistantProviderCallTelemetry;
 
 /**
  * Per-turn aggregate across all LLM calls (rescue router + tool-selection +
@@ -59,7 +56,21 @@ export interface AssistantTurnLogInput {
   llm?: AssistantTurnLlmSummary | null | undefined;
 }
 
-export interface AssistantTurnLogEvent {
+/** LLM call/token/cost fields shared by the ok and error turn-log events. */
+interface LlmEventFields {
+  llm_attempt_count: number;
+  llm_usage_report_count: number;
+  llm_error_count: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  provider: "groq" | null;
+  /** List-price cost estimate (USD); `null` for unknown/unpriced models. */
+  model: string | null;
+  estimated_cost_usd: number | null;
+}
+
+export interface AssistantTurnLogEvent extends LlmEventFields {
   event: "assistant_turn";
   status: "ok";
   intent: AssistantRoutedIntent;
@@ -71,20 +82,10 @@ export interface AssistantTurnLogEvent {
   faithfulness_status: FaithfulnessStatus;
   unverified_claim_count: number;
   has_plan: boolean;
-  llm_attempt_count: number;
-  llm_usage_report_count: number;
-  llm_error_count: number;
-  prompt_tokens: number;
-  completion_tokens: number;
-  total_tokens: number;
-  provider: "groq" | null;
-  model: string | null;
-  /** List-price cost estimate (USD); `null` for unknown/unpriced models. */
-  estimated_cost_usd: number | null;
 }
 
 /** A single structured line for a turn that failed before producing a result. */
-export interface FailedAssistantTurnLogEvent {
+export interface FailedAssistantTurnLogEvent extends LlmEventFields {
   event: "assistant_turn";
   status: "error";
   error_code: string;
@@ -92,15 +93,14 @@ export interface FailedAssistantTurnLogEvent {
 }
 
 /**
- * Aggregate per-call LLM telemetry into one turn summary.
+ * Aggregate per-call LLM telemetry into one turn summary. provider/model come
+ * from the records themselves (the actual client results), not a re-read of env.
  *
  * @param records - One entry per LLM call site reached this turn.
- * @param meta - Provider/model that served the calls (from the client config).
  * @returns The summary, or `undefined` when no call was attempted (deterministic path).
  */
 export function summarizeTurnLlmCalls(
   records: ReadonlyArray<AssistantLlmCallRecord>,
-  meta: { provider: "groq" | null; model: string | null },
 ): AssistantTurnLlmSummary | undefined {
   const attempts = records.filter((record) => record.attempted);
 
@@ -108,25 +108,33 @@ export function summarizeTurnLlmCalls(
     return undefined;
   }
 
-  const reported = attempts.filter(
-    (
-      record,
-    ): record is AssistantLlmCallRecord & { usage: AssistantProviderUsage } =>
-      record.usage !== undefined,
-  );
+  // provider/model come from the attempts themselves (the actual client results);
+  // prefer the first that reports a model for pricing.
+  const priced =
+    attempts.find((record) => record.model !== null) ?? attempts[0];
+
+  let usageReportCount = 0;
+  let promptTokens = 0;
+  let completionTokens = 0;
+  let totalTokens = 0;
+  for (const record of attempts) {
+    if (record.usage !== undefined) {
+      usageReportCount += 1;
+      promptTokens += record.usage.prompt_tokens;
+      completionTokens += record.usage.completion_tokens;
+      totalTokens += record.usage.total_tokens;
+    }
+  }
 
   return {
     attemptCount: attempts.length,
-    usageReportCount: reported.length,
+    usageReportCount,
     errorCount: attempts.filter((record) => record.errored).length,
-    promptTokens: reported.reduce((sum, r) => sum + r.usage.prompt_tokens, 0),
-    completionTokens: reported.reduce(
-      (sum, r) => sum + r.usage.completion_tokens,
-      0,
-    ),
-    totalTokens: reported.reduce((sum, r) => sum + r.usage.total_tokens, 0),
-    provider: meta.provider,
-    model: meta.model,
+    promptTokens,
+    completionTokens,
+    totalTokens,
+    provider: priced?.provider ?? null,
+    model: priced?.model ?? null,
   };
 }
 
@@ -150,10 +158,6 @@ export function buildAssistantTurnLogEvent(
     0,
   );
 
-  const llm = input.llm ?? null;
-  const promptTokens = Math.max(0, llm?.promptTokens ?? 0);
-  const completionTokens = Math.max(0, llm?.completionTokens ?? 0);
-
   return {
     event: "assistant_turn",
     status: "ok",
@@ -166,6 +170,24 @@ export function buildAssistantTurnLogEvent(
     faithfulness_status: resolveFaithfulnessStatus(input.faithfulness),
     unverified_claim_count: input.faithfulness?.unverifiedClaims.length ?? 0,
     has_plan: input.hasPlan ?? false,
+    ...buildLlmEventFields(input.llm ?? null),
+  };
+}
+
+/**
+ * Map an LLM turn summary into the flat log fields (counts, tokens, provider,
+ * model, cost). Shared by the ok and error events so both stay in sync.
+ *
+ * @param llm - The turn's aggregated LLM summary, or null/undefined.
+ * @returns The flat LLM event fields.
+ */
+function buildLlmEventFields(
+  llm: AssistantTurnLlmSummary | null,
+): LlmEventFields {
+  const promptTokens = Math.max(0, llm?.promptTokens ?? 0);
+  const completionTokens = Math.max(0, llm?.completionTokens ?? 0);
+
+  return {
     llm_attempt_count: Math.max(0, llm?.attemptCount ?? 0),
     llm_usage_report_count: Math.max(0, llm?.usageReportCount ?? 0),
     llm_error_count: Math.max(0, llm?.errorCount ?? 0),
@@ -225,14 +247,19 @@ export function logAssistantTurnEvent(
 }
 
 /**
- * Logs a minimal structured line for a turn that failed before producing a
- * result, so failed turns are still observable.
+ * Logs a structured line for a turn that failed before producing a result, so
+ * failed turns are still observable — including any LLM calls already made (e.g.
+ * a Groq 429/500 on the routing call still reports attempt/error/model/usage).
  *
- * @param input - Measured latency and the error code.
+ * @param input - Measured latency, the error code, and any LLM summary gathered before the failure.
  * @param logger - Injectable sink (defaults to console.info), for tests.
  */
 export function logFailedAssistantTurnEvent(
-  input: { durationMs: number; errorCode: string },
+  input: {
+    durationMs: number;
+    errorCode: string;
+    llm?: AssistantTurnLlmSummary | null | undefined;
+  },
   logger: (message: string) => void = console.info,
 ): void {
   const event: FailedAssistantTurnLogEvent = {
@@ -240,6 +267,7 @@ export function logFailedAssistantTurnEvent(
     status: "error",
     error_code: input.errorCode,
     duration_ms: Math.max(0, Math.round(input.durationMs)),
+    ...buildLlmEventFields(input.llm ?? null),
   };
 
   logger(JSON.stringify(event));

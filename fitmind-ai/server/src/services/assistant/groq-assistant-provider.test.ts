@@ -78,11 +78,17 @@ describe("runGroqAssistantProvider", () => {
       kind: "tool_call",
       tool_name: "get_weekly_training_report",
       tool_args: { start_date: "2026-05-19", end_date: "2026-06-17" },
-      usage: { prompt_tokens: 120, completion_tokens: 18, total_tokens: 138 },
+      telemetry: {
+        attempted: true,
+        errored: false,
+        provider: "groq",
+        model: "llama-3.3-70b-versatile",
+        usage: { prompt_tokens: 120, completion_tokens: 18, total_tokens: 138 },
+      },
     });
   });
 
-  it("carries usage on a plain text message and leaves it undefined when absent", async () => {
+  it("carries telemetry (with/without usage) on a plain text message", async () => {
     mockFetchOnce(200, {
       choices: [{ message: { content: "渐进超负荷指逐步加量。" } }],
       usage: { prompt_tokens: 60, completion_tokens: 12, total_tokens: 72 },
@@ -92,7 +98,13 @@ describe("runGroqAssistantProvider", () => {
     expect(withUsage).toEqual({
       kind: "message",
       message: "渐进超负荷指逐步加量。",
-      usage: { prompt_tokens: 60, completion_tokens: 12, total_tokens: 72 },
+      telemetry: {
+        attempted: true,
+        errored: false,
+        provider: "groq",
+        model: "llama-3.3-70b-versatile",
+        usage: { prompt_tokens: 60, completion_tokens: 12, total_tokens: 72 },
+      },
     });
 
     mockFetchOnce(200, {
@@ -103,18 +115,24 @@ describe("runGroqAssistantProvider", () => {
     expect(withoutUsage).toEqual({
       kind: "message",
       message: "渐进超负荷指逐步加量。",
-      usage: undefined,
+      telemetry: {
+        attempted: true,
+        errored: false,
+        provider: "groq",
+        model: "llama-3.3-70b-versatile",
+        usage: undefined,
+      },
     });
   });
 
-  it("maps a plain text completion to a message", async () => {
+  it("maps a plain text completion to a message (trimmed)", async () => {
     mockFetchOnce(200, {
       choices: [{ message: { content: "  渐进超负荷指逐步加量。  " } }],
     });
 
     const result = await runGroqAssistantProvider(request);
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       kind: "message",
       message: "渐进超负荷指逐步加量。",
     });
@@ -168,7 +186,13 @@ describe("runGroqAssistantProvider", () => {
       kind: "tool_call",
       tool_name: "get_weekly_training_report",
       tool_args: { start_date: "2026-05-19", end_date: "2026-06-17" },
-      usage: undefined,
+      telemetry: {
+        attempted: true,
+        errored: false,
+        provider: "groq",
+        model: "llama-3.3-70b-versatile",
+        usage: undefined,
+      },
     });
   });
 
@@ -204,7 +228,7 @@ describe("runGroqAnswerPhrasing (Slice 11.3b)", () => {
     }
   });
 
-  it("returns the re-phrased summary, usage, and call telemetry on success", async () => {
+  it("returns the re-phrased summary and call telemetry on success", async () => {
     mockFetchOnce(200, {
       choices: [{ message: { content: "  这周你练了 4 次，一共 20 组。  " } }],
       usage: { prompt_tokens: 80, completion_tokens: 20, total_tokens: 100 },
@@ -214,9 +238,13 @@ describe("runGroqAnswerPhrasing (Slice 11.3b)", () => {
 
     expect(result).toEqual({
       summary: "这周你练了 4 次，一共 20 组。",
-      usage: { prompt_tokens: 80, completion_tokens: 20, total_tokens: 100 },
-      attempted: true,
-      errored: false,
+      call: {
+        attempted: true,
+        errored: false,
+        provider: "groq",
+        model: "llama-3.3-70b-versatile",
+        usage: { prompt_tokens: 80, completion_tokens: 20, total_tokens: 100 },
+      },
     });
   });
 
@@ -226,18 +254,26 @@ describe("runGroqAnswerPhrasing (Slice 11.3b)", () => {
     const result = await runGroqAnswerPhrasing(phrasingInput);
 
     expect(result.summary).toBe(phrasingInput.draftSummary);
-    expect(result.attempted).toBe(true);
-    expect(result.errored).toBe(true);
+    expect(result.call.attempted).toBe(true);
+    expect(result.call.errored).toBe(true);
   });
 
-  it("falls back to the draft (attempted, not errored) on an empty completion", async () => {
-    mockFetchOnce(200, { choices: [{ message: { content: "   " } }] });
+  it("keeps usage on an empty completion (attempted, not errored) — P3", async () => {
+    mockFetchOnce(200, {
+      choices: [{ message: { content: "   " } }],
+      usage: { prompt_tokens: 50, completion_tokens: 0, total_tokens: 50 },
+    });
 
     const result = await runGroqAnswerPhrasing(phrasingInput);
 
     expect(result.summary).toBe(phrasingInput.draftSummary);
-    expect(result.attempted).toBe(true);
-    expect(result.errored).toBe(false);
+    expect(result.call.attempted).toBe(true);
+    expect(result.call.errored).toBe(false);
+    expect(result.call.usage).toEqual({
+      prompt_tokens: 50,
+      completion_tokens: 0,
+      total_tokens: 50,
+    });
   });
 
   it("falls back to the draft (not attempted) when GROQ_API_KEY is missing", async () => {
@@ -246,7 +282,7 @@ describe("runGroqAnswerPhrasing (Slice 11.3b)", () => {
     const result = await runGroqAnswerPhrasing(phrasingInput);
 
     expect(result.summary).toBe(phrasingInput.draftSummary);
-    expect(result.attempted).toBe(false);
-    expect(result.errored).toBe(false);
+    expect(result.call.attempted).toBe(false);
+    expect(result.call.errored).toBe(false);
   });
 });

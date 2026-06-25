@@ -42,12 +42,12 @@ describe("createGroqIntentRouter", () => {
     const result = await createGroqIntentRouter().classify("明天练啥");
 
     expect(result.intent).toBe("recommendation");
-    expect(result.attempted).toBe(true);
-    expect(result.errored).toBe(false);
-    expect(result.usage).toEqual({
-      prompt_tokens: 30,
-      completion_tokens: 2,
-      total_tokens: 32,
+    expect(result.call).toEqual({
+      attempted: true,
+      errored: false,
+      provider: "groq",
+      model: "llama-3.3-70b-versatile",
+      usage: { prompt_tokens: 30, completion_tokens: 2, total_tokens: 32 },
     });
   });
 
@@ -65,8 +65,8 @@ describe("createGroqIntentRouter", () => {
     const result = await createGroqIntentRouter().classify("...");
 
     expect(result.intent).toBeNull();
-    expect(result.attempted).toBe(true);
-    expect(result.errored).toBe(false);
+    expect(result.call.attempted).toBe(true);
+    expect(result.call.errored).toBe(false);
   });
 
   it("returns null intent and marks errored on an HTTP error", async () => {
@@ -75,8 +75,8 @@ describe("createGroqIntentRouter", () => {
     const result = await createGroqIntentRouter().classify("明天练啥");
 
     expect(result.intent).toBeNull();
-    expect(result.attempted).toBe(true);
-    expect(result.errored).toBe(true);
+    expect(result.call.attempted).toBe(true);
+    expect(result.call.errored).toBe(true);
   });
 
   it("does not mark errored (or attempted) when GROQ_API_KEY is missing", async () => {
@@ -86,7 +86,8 @@ describe("createGroqIntentRouter", () => {
     const result = await createGroqIntentRouter().classify("明天练啥");
 
     expect(result.intent).toBeNull();
-    expect(result.attempted).toBe(false);
-    expect(result.errored).toBe(false);
+    expect(result.call.attempted).toBe(false);
+    expect(result.call.errored).toBe(false);
+    expect(result.call.model).toBeNull();
   });
 });

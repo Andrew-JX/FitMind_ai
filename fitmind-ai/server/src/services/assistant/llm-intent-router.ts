@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { runGroqChatCompletion } from "./groq-chat-client.js";
 import type { AssistantRoutedIntent } from "./assistant-intent-router.js";
-import type { AssistantProviderUsage } from "./provider-types.js";
+import type { AssistantProviderCallTelemetry } from "./provider-types.js";
 
 const CLASSIFIER_MAX_TOKENS = 16;
 
@@ -25,18 +25,13 @@ const ROUTABLE_INTENTS = [
 const routableIntentSchema = z.enum(ROUTABLE_INTENTS);
 
 /**
- * Outcome of one rescue classification.
- *
- * `attempted` is true when a Groq call was issued (so the turn telemetry can count
- * it); `errored` is true when that call failed (HTTP/shape/network). `intent` is
- * null when no call ran, the call failed, or the model returned an unusable label.
- * `usage` carries token usage when reported.
+ * Outcome of one rescue classification. `intent` is null when no call ran, the
+ * call failed, or the model returned an unusable label. `call` carries the per-call
+ * telemetry (attempted/errored/provider/model/usage) so the turn can count it.
  */
 export interface LlmIntentClassification {
   intent: AssistantRoutedIntent | null;
-  usage?: AssistantProviderUsage | undefined;
-  attempted: boolean;
-  errored: boolean;
+  call: AssistantProviderCallTelemetry;
 }
 
 /** Classifies a free-text message into one routed intent (with call telemetry). */
@@ -98,21 +93,18 @@ export function createGroqIntentRouter(): LlmIntentRouter {
         temperature: 0,
       });
 
-      if (!result.ok) {
+      const call: AssistantProviderCallTelemetry = {
+        attempted: result.attempted,
         // attempted but failed → errored; config-failure (not attempted) → not errored.
-        return {
-          intent: null,
-          usage: result.usage,
-          attempted: result.attempted,
-          errored: result.attempted,
-        };
-      }
+        errored: result.attempted && !result.ok,
+        provider: result.provider,
+        model: result.model,
+        usage: result.usage,
+      };
 
       return {
-        intent: parseRoutedIntent(result.content ?? ""),
-        usage: result.usage,
-        attempted: true,
-        errored: false,
+        intent: result.ok ? parseRoutedIntent(result.content ?? "") : null,
+        call,
       };
     },
   };

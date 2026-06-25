@@ -41,8 +41,7 @@ vi.mock("./provider-adapter.js", () => ({
   runAssistantAnswerPhrasing: vi.fn(
     async (input: { draftSummary: string }) => ({
       summary: input.draftSummary,
-      attempted: false,
-      errored: false,
+      call: { attempted: false, errored: false, provider: null, model: null },
     }),
   ),
 }));
@@ -71,7 +70,10 @@ vi.mock("../../db/chat-repository.js", () => ({
   hasChatSessionById: vi.fn(async () => false),
 }));
 
-import { runMockAssistantTurn } from "./assistant-orchestrator-service.js";
+import {
+  AssistantTurnError,
+  runMockAssistantTurn,
+} from "./assistant-orchestrator-service.js";
 import { executeAiTool } from "../ai/tools/tool-executor.js";
 import { runAssistantProvider } from "./provider-adapter.js";
 import { getConfiguredAssistantProvider } from "./provider-config.js";
@@ -139,7 +141,13 @@ describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", ()
     mockedRunAssistantProvider.mockResolvedValueOnce({
       kind: "message",
       message: "这是你的周报概述……",
-      usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 },
+      telemetry: {
+        attempted: true,
+        errored: false,
+        provider: "groq",
+        model: "llama-3.3-70b-versatile",
+        usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 },
+      },
     });
 
     const { response, telemetry } = await runMockAssistantTurn("user-1", {
@@ -173,5 +181,45 @@ describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", ()
     });
 
     expect(telemetry.llm).toBeUndefined();
+  });
+
+  it("throws AssistantTurnError carrying llm telemetry when the groq routing call fails (P1)", async () => {
+    mockedGetConfiguredAssistantProvider.mockReturnValue("groq");
+    mockedRunAssistantProvider.mockResolvedValueOnce({
+      kind: "error",
+      error_code: "GROQ_PROVIDER_ERROR",
+      message: "Groq request failed (500): boom",
+      telemetry: {
+        attempted: true,
+        errored: true,
+        provider: "groq",
+        model: "llama-3.3-70b-versatile",
+        usage: { prompt_tokens: 42, completion_tokens: 0, total_tokens: 42 },
+      },
+    });
+
+    const turn = runMockAssistantTurn("user-1", {
+      mode: "auto",
+      message: "周报",
+      start_date: "2026-05-19",
+      end_date: "2026-06-17",
+    });
+
+    await expect(turn).rejects.toBeInstanceOf(AssistantTurnError);
+    await turn.catch((error: unknown) => {
+      if (!(error instanceof AssistantTurnError)) {
+        throw error;
+      }
+      expect(error.turnTelemetry.llm).toEqual({
+        attemptCount: 1,
+        usageReportCount: 1,
+        errorCount: 1,
+        promptTokens: 42,
+        completionTokens: 0,
+        totalTokens: 42,
+        provider: "groq",
+        model: "llama-3.3-70b-versatile",
+      });
+    });
   });
 });

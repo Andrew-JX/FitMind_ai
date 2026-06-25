@@ -1,6 +1,9 @@
 import type { Request, Response } from "express";
 
-import { runMockAssistantTurn } from "../services/assistant/assistant-orchestrator-service.js";
+import {
+  AssistantTurnError,
+  runMockAssistantTurn,
+} from "../services/assistant/assistant-orchestrator-service.js";
 import type { AssistantTurnExecutionResult } from "../services/assistant/assistant-orchestrator-service.js";
 import type { AssistantStreamEvent } from "../services/assistant/assistant-stream-types.js";
 import {
@@ -41,6 +44,14 @@ function writeSseEvent(
 
   res.write(`event: ${event.type}\n`);
   res.write(`data: ${JSON.stringify(event)}\n\n`);
+}
+
+function logFailedTurn(error: unknown, durationMs: number): void {
+  logFailedAssistantTurnEvent({
+    durationMs,
+    errorCode: normalizeStreamError(error).code,
+    llm: error instanceof AssistantTurnError ? error.turnTelemetry.llm : null,
+  });
 }
 
 function normalizeStreamError(error: unknown): {
@@ -85,10 +96,7 @@ export async function postMockAssistantTurnController(
 
     return res.status(200).json(createSuccessResponse(result.response));
   } catch (error) {
-    logFailedAssistantTurnEvent({
-      durationMs: Date.now() - startedAt,
-      errorCode: normalizeStreamError(error).code,
-    });
+    logFailedTurn(error, Date.now() - startedAt);
     throw error;
   }
 }
@@ -129,10 +137,7 @@ export async function postAssistantStreamTurnController(
       res.end();
     }
   } catch (error) {
-    logFailedAssistantTurnEvent({
-      durationMs: Date.now() - startedAt,
-      errorCode: normalizeStreamError(error).code,
-    });
+    logFailedTurn(error, Date.now() - startedAt);
 
     if (!errorEventSent) {
       writeSseEvent(res, {

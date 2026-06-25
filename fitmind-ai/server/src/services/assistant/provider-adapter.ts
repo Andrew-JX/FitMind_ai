@@ -90,13 +90,23 @@ export async function runAssistantProvider(
 export async function runAssistantAnswerPhrasing(
   input: AssistantPhrasingInput,
 ): Promise<AssistantPhrasingOutput> {
+  const noCall = {
+    summary: input.draftSummary,
+    call: {
+      attempted: false,
+      errored: false,
+      provider: null,
+      model: null,
+    },
+  };
+
   try {
     if (getConfiguredAssistantProvider() !== "groq") {
-      return { summary: input.draftSummary, attempted: false, errored: false };
+      return noCall;
     }
 
     return await runGroqAnswerPhrasing(input);
   } catch {
-    return { summary: input.draftSummary, attempted: false, errored: false };
+    return noCall;
   }
 }

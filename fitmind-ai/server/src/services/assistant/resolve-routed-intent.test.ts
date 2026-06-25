@@ -27,9 +27,13 @@ function fakeRouter(
   return {
     classify: vi.fn(async () => ({
       intent,
-      usage,
-      attempted: true,
-      errored: false,
+      call: {
+        attempted: true,
+        errored: false,
+        provider: "groq" as const,
+        model: "llama-3.3-70b-versatile",
+        usage,
+      },
     })),
   };
 }
@@ -44,7 +48,7 @@ describe("resolveRoutedIntent (Slice 11.2b keyword-first + LLM rescue)", () => {
     );
 
     expect(routed.intent).toBe("weekly_report");
-    expect(routed.routerAttempted).toBe(false);
+    expect(routed.routerCall.attempted).toBe(false);
     expect(router.classify).not.toHaveBeenCalled();
   });
 
@@ -58,8 +62,8 @@ describe("resolveRoutedIntent (Slice 11.2b keyword-first + LLM rescue)", () => {
     const routed = await resolveRoutedIntent(autoInput("明天练啥"), router);
 
     expect(routed.intent).toBe("recommendation");
-    expect(routed.routerAttempted).toBe(true);
-    expect(routed.routerUsage).toEqual({
+    expect(routed.routerCall.attempted).toBe(true);
+    expect(routed.routerCall.usage).toEqual({
       prompt_tokens: 40,
       completion_tokens: 3,
       total_tokens: 43,
@@ -73,7 +77,7 @@ describe("resolveRoutedIntent (Slice 11.2b keyword-first + LLM rescue)", () => {
     const routed = await resolveRoutedIntent(autoInput("明天练啥"), router);
 
     expect(routed.intent).toBe("unsupported");
-    expect(routed.routerAttempted).toBe(true);
+    expect(routed.routerCall.attempted).toBe(true);
   });
 
   it("keeps out-of-scope messages refused without calling the LLM", async () => {
@@ -85,7 +89,7 @@ describe("resolveRoutedIntent (Slice 11.2b keyword-first + LLM rescue)", () => {
     );
 
     expect(routed.intent).toBe("unsupported");
-    expect(routed.routerAttempted).toBe(false);
+    expect(routed.routerCall.attempted).toBe(false);
     expect(router.classify).not.toHaveBeenCalled();
   });
 
@@ -93,7 +97,7 @@ describe("resolveRoutedIntent (Slice 11.2b keyword-first + LLM rescue)", () => {
     const routed = await resolveRoutedIntent(autoInput("明天练啥"), null);
 
     expect(routed.intent).toBe("unsupported");
-    expect(routed.routerAttempted).toBe(false);
+    expect(routed.routerCall.attempted).toBe(false);
   });
 
   it("maps explicit (non-auto) modes without consulting keyword or LLM", async () => {
@@ -105,7 +109,7 @@ describe("resolveRoutedIntent (Slice 11.2b keyword-first + LLM rescue)", () => {
     );
 
     expect(routed.intent).toBe("weekly_report");
-    expect(routed.routerAttempted).toBe(false);
+    expect(routed.routerCall.attempted).toBe(false);
     expect(router.classify).not.toHaveBeenCalled();
   });
 });

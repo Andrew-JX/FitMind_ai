@@ -1,14 +1,28 @@
 import {
   runGroqChatCompletion,
+  type GroqChatResult,
   type GroqChatTool,
 } from "./groq-chat-client.js";
 import type {
   AssistantProvider,
+  AssistantProviderCallTelemetry,
   AssistantProviderRequest,
   AssistantProviderResponse,
   AssistantProviderToolDefinition,
-  AssistantProviderUsage,
 } from "./provider-types.js";
+
+/** Map a Groq client result into provider-neutral per-call telemetry. */
+function toCallTelemetry(
+  result: GroqChatResult,
+): AssistantProviderCallTelemetry {
+  return {
+    attempted: result.attempted,
+    errored: result.attempted && !result.ok,
+    provider: result.provider,
+    model: result.model,
+    usage: result.usage,
+  };
+}
 
 const GROQ_MAX_TOKENS = 512;
 
@@ -111,11 +125,14 @@ export async function runGroqAssistantProvider(
     toolChoice: "auto",
   });
 
+  const telemetry = toCallTelemetry(result);
+
   if (!result.ok) {
     return {
       kind: "error",
       error_code: "GROQ_PROVIDER_ERROR",
       message: result.errorMessage ?? "Groq provider request failed.",
+      telemetry,
     };
   }
 
@@ -124,7 +141,7 @@ export async function runGroqAssistantProvider(
       kind: "tool_call",
       tool_name: result.toolCall.name,
       tool_args: normalizeToolArgs(result.toolCall.arguments),
-      usage: result.usage,
+      telemetry,
     };
   }
 
@@ -134,7 +151,7 @@ export async function runGroqAssistantProvider(
     return {
       kind: "message",
       message: text,
-      usage: result.usage,
+      telemetry,
     };
   }
 
@@ -142,6 +159,7 @@ export async function runGroqAssistantProvider(
     kind: "error",
     error_code: "GROQ_PROVIDER_ERROR",
     message: "Groq provider returned neither text nor a tool call.",
+    telemetry,
   };
 }
 
@@ -162,12 +180,8 @@ export interface AssistantPhrasingInput {
 /** Output of one re-phrasing call: the (possibly rewritten) summary + call telemetry. */
 export interface AssistantPhrasingOutput {
   summary: string;
-  /** Token usage when the provider reports it (Groq); absent on the draft-fallback path. */
-  usage?: AssistantProviderUsage | undefined;
-  /** True when a billed Groq call was issued (false if config failed before any request). */
-  attempted: boolean;
-  /** True when an issued call failed (HTTP/shape/network). */
-  errored: boolean;
+  /** Per-call telemetry (attempted/errored/provider/model/usage). */
+  call: AssistantProviderCallTelemetry;
 }
 
 /**
@@ -219,19 +233,17 @@ export async function runGroqAnswerPhrasing(
     temperature: 0.3,
   });
 
+  const call = toCallTelemetry(result);
+
   if (!result.ok) {
-    // attempted-but-failed → errored; pre-request config failure → not attempted.
-    return {
-      summary: input.draftSummary,
-      usage: result.usage,
-      attempted: result.attempted,
-      errored: result.attempted,
-    };
+    return { summary: input.draftSummary, call };
   }
 
   const text = result.content?.trim() ?? "";
 
+  // Either branch keeps `call` (incl. usage): an empty completion still happened
+  // and may carry usage, so its tokens/cost must be counted (P2/P3).
   return text.length > 0
-    ? { summary: text, usage: result.usage, attempted: true, errored: false }
-    : { summary: input.draftSummary, attempted: true, errored: false };
+    ? { summary: text, call }
+    : { summary: input.draftSummary, call };
 }

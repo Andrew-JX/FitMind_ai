@@ -42,7 +42,6 @@ import {
 } from "./llm-intent-router.js";
 import {
   getConfiguredAssistantProvider,
-  getGroqAssistantProviderConfig,
   isAssistantAnswerPhrasingEnabled,
 } from "./provider-config.js";
 import {
@@ -72,7 +71,6 @@ import type {
   AssistantProviderRequest,
   AssistantProviderResponse,
   AssistantProviderToolDefinition,
-  AssistantProviderUsage,
 } from "./provider-types.js";
 
 const assistantModeSchema = z.enum([
@@ -279,6 +277,27 @@ export interface AssistantTurnTelemetry {
 export interface AssistantTurnExecutionResult {
   response: MockAssistantTurnResponseData;
   telemetry: AssistantTurnTelemetry;
+}
+
+/**
+ * HttpError that also carries the turn's server-only telemetry, so a failed turn
+ * (e.g. a Groq 429/500 on the routing call) can still be logged with its LLM
+ * attempt/error/model/usage. `turnTelemetry` is never serialized to the client.
+ */
+export class AssistantTurnError extends HttpError {
+  public readonly turnTelemetry: AssistantTurnTelemetry;
+
+  public constructor(
+    statusCode: number,
+    code: "AI_PROVIDER_ERROR",
+    message: string,
+    details: Record<string, unknown> | undefined,
+    turnTelemetry: AssistantTurnTelemetry,
+  ) {
+    super(statusCode, code, message, details);
+    this.name = "AssistantTurnError";
+    this.turnTelemetry = turnTelemetry;
+  }
 }
 
 interface PersistedTextBlock {
@@ -750,23 +769,28 @@ function parseProviderSimulation(message: string): ProviderSimulationResult {
 }
 
 /**
- * Resolved intent plus telemetry about any rescue-classifier (Groq) call made
- * while routing. The router call is billed, so its `usage`/`attempted`/`errored`
- * must reach the turn telemetry even on paths (knowledge/unsupported) that make no
- * further provider call.
+ * Resolved intent plus the rescue-classifier (Groq) call record made while routing.
+ * The router call is billed, so its telemetry must reach the turn telemetry even on
+ * paths (knowledge/unsupported) that make no further provider call.
  */
 export interface ResolvedRoutedIntent {
   intent: AssistantRoutedIntent;
-  routerUsage?: AssistantProviderUsage | undefined;
-  routerAttempted: boolean;
-  routerErrored: boolean;
+  routerCall: AssistantLlmCallRecord;
 }
+
+/** A record for a call site that issued no LLM call. */
+const NO_LLM_CALL: AssistantLlmCallRecord = {
+  attempted: false,
+  errored: false,
+  provider: null,
+  model: null,
+};
 
 /** Wrap an intent resolved without any rescue-classifier call. */
 function withoutRouterCall(
   intent: AssistantRoutedIntent,
 ): ResolvedRoutedIntent {
-  return { intent, routerAttempted: false, routerErrored: false };
+  return { intent, routerCall: NO_LLM_CALL };
 }
 
 function mapExplicitModeToIntent(
@@ -826,9 +850,7 @@ export async function resolveRoutedIntent(
 
     return {
       intent: classification.intent ?? "unsupported",
-      routerUsage: classification.usage,
-      routerAttempted: classification.attempted,
-      routerErrored: classification.errored,
+      routerCall: classification.call,
     };
   }
 
@@ -1094,27 +1116,8 @@ function buildToolAnswer(
  *   call reported usage (the deterministic mock path).
  */
 /**
- * Resolve the Groq model serving this turn's calls.
- *
- * Reads the same config the client uses within this request (single env snapshot),
- * so the logged model never drifts from what actually ran; non-groq → null.
- *
- * @returns The active Groq model, or null when not on the groq provider.
- */
-function resolveTurnGroqModel(): string | null {
-  if (getConfiguredAssistantProvider() !== "groq") {
-    return null;
-  }
-
-  try {
-    return getGroqAssistantProviderConfig().model;
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Build the per-turn telemetry envelope from the LLM call records made this turn.
+ * provider/model come from the records themselves (the actual client results).
  *
  * @param records - One entry per LLM call site reached (router / routing / phrasing).
  * @returns Telemetry with an aggregated `llm` summary (undefined when no call ran).
@@ -1122,12 +1125,7 @@ function resolveTurnGroqModel(): string | null {
 function buildTurnTelemetry(
   records: AssistantLlmCallRecord[],
 ): AssistantTurnTelemetry {
-  return {
-    llm: summarizeTurnLlmCalls(records, {
-      provider: getConfiguredAssistantProvider() === "groq" ? "groq" : null,
-      model: resolveTurnGroqModel(),
-    }),
-  };
+  return { llm: summarizeTurnLlmCalls(records) };
 }
 
 export async function runMockAssistantTurn(
@@ -1158,12 +1156,8 @@ export async function runMockAssistantTurn(
         : null;
   const routed = await resolveRoutedIntent(input, intentRouter);
   const intent = routed.intent;
-  // Router rescue call is billed; its outcome must be counted on every path below.
-  const routerRecord: AssistantLlmCallRecord = {
-    attempted: routed.routerAttempted,
-    errored: routed.routerErrored,
-    usage: routed.routerUsage,
-  };
+  // Router rescue call is billed; its record must be counted on every path below.
+  const routerRecord = routed.routerCall;
   const executionMode = resolveExecutionModeForIntent(input, intent);
 
   if (intent === "unsupported") {
@@ -1317,14 +1311,19 @@ export async function runMockAssistantTurn(
 
   const rawProviderResponse = await runAssistantProvider(providerRequest);
 
+  // C1 token/cost observability: the routing tool-selection call's telemetry comes
+  // straight from the provider response (present even on error → failed turns are
+  // still countable); mock makes no billed call → NO_LLM_CALL.
+  const routingRecord: AssistantLlmCallRecord =
+    rawProviderResponse.telemetry ?? NO_LLM_CALL;
+
   if (rawProviderResponse.kind === "error") {
-    const error = new HttpError(
+    const error = new AssistantTurnError(
       502,
       "AI_PROVIDER_ERROR",
       rawProviderResponse.message,
-      {
-        provider_error_code: rawProviderResponse.error_code,
-      },
+      { provider_error_code: rawProviderResponse.error_code },
+      buildTurnTelemetry([routerRecord, routingRecord]),
     );
 
     await emitEvent(options, {
@@ -1349,14 +1348,6 @@ export async function runMockAssistantTurn(
     },
   );
 
-  // C1 token/cost observability: the routing tool-selection call is a billed Groq
-  // call on the groq provider (deterministic mock makes no LLM call). Usage is read
-  // from the raw response (kept off the synthesized coercion result).
-  const routingRecord: AssistantLlmCallRecord = {
-    attempted: getConfiguredAssistantProvider() === "groq",
-    errored: false,
-    usage: rawProviderResponse.usage,
-  };
   let phrasingRecord: AssistantLlmCallRecord | undefined;
 
   const toolCalls: MockAssistantTurnResponseData["tool_calls"] = [];
@@ -1494,11 +1485,7 @@ export async function runMockAssistantTurn(
         draftSummary: answer.summary,
         supportingFacts: answer.bullets,
       });
-      phrasingRecord = {
-        attempted: phrasing.attempted,
-        errored: phrasing.errored,
-        usage: phrasing.usage,
-      };
+      phrasingRecord = phrasing.call;
       answer = applyFaithfulPhrasing(answer, phrasing.summary, (candidate) =>
         verifyAnswerFaithfulness(candidate, toolOutputs),
       ).answer;

@@ -44,25 +44,41 @@ export interface AssistantProviderUsage {
   total_tokens: number;
 }
 
+/**
+ * Telemetry for one provider (LLM) call, carried on every response variant —
+ * including errors — so failed/edge calls are still countable. `provider`/`model`
+ * come from the actual client config (not re-read downstream). Absent for the
+ * deterministic mock provider, which makes no billed call.
+ */
+export interface AssistantProviderCallTelemetry {
+  attempted: boolean;
+  errored: boolean;
+  provider: "groq" | null;
+  model: string | null;
+  usage?: AssistantProviderUsage | undefined;
+}
+
 export interface AssistantProviderMessageResponse {
   kind: "message";
   message: string;
-  /** Token usage for this call when the provider reports it (e.g. Groq); absent for mock. */
-  usage?: AssistantProviderUsage | undefined;
+  /** Per-call telemetry when the provider reports it (e.g. Groq); absent for mock. */
+  telemetry?: AssistantProviderCallTelemetry | undefined;
 }
 
 export interface AssistantProviderToolCallResponse {
   kind: "tool_call";
   tool_name: string;
   tool_args: Record<string, string>;
-  /** Token usage for this call when the provider reports it (e.g. Groq); absent for mock. */
-  usage?: AssistantProviderUsage | undefined;
+  /** Per-call telemetry when the provider reports it (e.g. Groq); absent for mock. */
+  telemetry?: AssistantProviderCallTelemetry | undefined;
 }
 
 export interface AssistantProviderErrorResponse {
   kind: "error";
   error_code: string;
   message: string;
+  /** Per-call telemetry — present even on failure so the failed turn is countable. */
+  telemetry?: AssistantProviderCallTelemetry | undefined;
 }
 
 export type AssistantProviderResponse =
