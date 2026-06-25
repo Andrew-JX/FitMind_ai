@@ -1,43 +1,67 @@
 import type { AssistantRoutedIntent } from "./assistant-intent-router.js";
+import type { AssistantProviderUsage } from "./provider-types.js";
 
 /** Faithfulness outcome bucket for telemetry (`unchecked` = no tool data this turn). */
 type FaithfulnessStatus = "verified" | "flagged" | "unchecked";
 
-/**
- * Aggregated LLM token usage for one turn (sum across all provider calls, e.g.
- * the routing/tool-selection call plus the optional 11.3b phrasing call).
- */
-export interface AssistantTokenUsage {
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-  /** Number of billed LLM calls this turn (0 for the deterministic mock path). */
-  llmCallCount: number;
+/** One LLM (provider) call's telemetry outcome within a turn. */
+export interface AssistantLlmCallRecord {
+  /** True when a billed call was issued (false if config failed before any request). */
+  attempted: boolean;
+  /** True when an issued call failed (HTTP/shape/network). */
+  errored: boolean;
+  /** Token usage when the provider reported it; absent otherwise. */
+  usage?: AssistantProviderUsage | undefined;
 }
 
 /**
- * Estimated USD list price per 1M tokens (Groq llama-3.3-70b reference rate).
- * The actual Groq free tier bills $0; this is a cost *estimate* for visibility,
- * not a billing figure. Update if the default GROQ_MODEL changes.
+ * Per-turn aggregate across all LLM calls (rescue router + tool-selection +
+ * phrasing). Counts are kept distinct because they answer different questions:
+ * how many calls we made, how many reported usage, and how many failed.
  */
-const USD_PER_1M_PROMPT_TOKENS = 0.59;
-const USD_PER_1M_COMPLETION_TOKENS = 0.79;
+export interface AssistantTurnLlmSummary {
+  attemptCount: number;
+  usageReportCount: number;
+  errorCount: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  provider: "groq" | null;
+  /** Model that actually served the calls (from the client), for cost pricing. */
+  model: string | null;
+}
+
+/**
+ * List-price USD per 1M tokens, keyed by model. Estimates for visibility only —
+ * the Groq free tier bills $0. Unknown models price to `null` (never a wrong
+ * number). Add an entry when a new GROQ_MODEL is adopted.
+ */
+const MODEL_PRICING_USD_PER_1M: Record<
+  string,
+  { prompt: number; completion: number }
+> = {
+  "llama-3.3-70b-versatile": { prompt: 0.59, completion: 0.79 },
+};
 
 export interface AssistantTurnLogInput {
   intent: AssistantRoutedIntent;
   durationMs: number;
-  toolCalls: ReadonlyArray<{ status: "success" | "error"; duration_ms: number }>;
+  toolCalls: ReadonlyArray<{
+    status: "success" | "error";
+    duration_ms: number;
+  }>;
   agentStepCount?: number | null | undefined;
   faithfulness?:
     | { status: "verified" | "flagged"; unverifiedClaims: string[] }
     | null
     | undefined;
   hasPlan?: boolean | undefined;
-  tokenUsage?: AssistantTokenUsage | null | undefined;
+  llm?: AssistantTurnLlmSummary | null | undefined;
 }
 
 export interface AssistantTurnLogEvent {
   event: "assistant_turn";
+  status: "ok";
   intent: AssistantRoutedIntent;
   duration_ms: number;
   tool_call_count: number;
@@ -47,23 +71,73 @@ export interface AssistantTurnLogEvent {
   faithfulness_status: FaithfulnessStatus;
   unverified_claim_count: number;
   has_plan: boolean;
-  llm_call_count: number;
+  llm_attempt_count: number;
+  llm_usage_report_count: number;
+  llm_error_count: number;
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
-  /** List-price cost estimate (USD); see rate constants. Groq free tier actual = 0. */
-  estimated_cost_usd: number;
+  provider: "groq" | null;
+  model: string | null;
+  /** List-price cost estimate (USD); `null` for unknown/unpriced models. */
+  estimated_cost_usd: number | null;
+}
+
+/** A single structured line for a turn that failed before producing a result. */
+export interface FailedAssistantTurnLogEvent {
+  event: "assistant_turn";
+  status: "error";
+  error_code: string;
+  duration_ms: number;
+}
+
+/**
+ * Aggregate per-call LLM telemetry into one turn summary.
+ *
+ * @param records - One entry per LLM call site reached this turn.
+ * @param meta - Provider/model that served the calls (from the client config).
+ * @returns The summary, or `undefined` when no call was attempted (deterministic path).
+ */
+export function summarizeTurnLlmCalls(
+  records: ReadonlyArray<AssistantLlmCallRecord>,
+  meta: { provider: "groq" | null; model: string | null },
+): AssistantTurnLlmSummary | undefined {
+  const attempts = records.filter((record) => record.attempted);
+
+  if (attempts.length === 0) {
+    return undefined;
+  }
+
+  const reported = attempts.filter(
+    (
+      record,
+    ): record is AssistantLlmCallRecord & { usage: AssistantProviderUsage } =>
+      record.usage !== undefined,
+  );
+
+  return {
+    attemptCount: attempts.length,
+    usageReportCount: reported.length,
+    errorCount: attempts.filter((record) => record.errored).length,
+    promptTokens: reported.reduce((sum, r) => sum + r.usage.prompt_tokens, 0),
+    completionTokens: reported.reduce(
+      (sum, r) => sum + r.usage.completion_tokens,
+      0,
+    ),
+    totalTokens: reported.reduce((sum, r) => sum + r.usage.total_tokens, 0),
+    provider: meta.provider,
+    model: meta.model,
+  };
 }
 
 /**
  * Builds the structured per-turn telemetry event (latency, tool counts/durations,
- * faithfulness status, plan presence) for one assistant turn.
+ * faithfulness status, plan presence, LLM call/token/cost telemetry).
  *
- * Pure + deterministic; token cost is intentionally omitted until a real
- * (billed) provider is wired in (roadmap Slice 7).
+ * Pure + deterministic.
  *
- * @param input - Routed intent, measured latency, tool calls, and optional agent/faithfulness/plan signals
- * @returns The structured telemetry event
+ * @param input - Routed intent, latency, tool calls, and optional agent/faithfulness/plan/LLM signals.
+ * @returns The structured telemetry event.
  */
 export function buildAssistantTurnLogEvent(
   input: AssistantTurnLogInput,
@@ -76,12 +150,13 @@ export function buildAssistantTurnLogEvent(
     0,
   );
 
-  const usage = input.tokenUsage ?? null;
-  const promptTokens = Math.max(0, usage?.promptTokens ?? 0);
-  const completionTokens = Math.max(0, usage?.completionTokens ?? 0);
+  const llm = input.llm ?? null;
+  const promptTokens = Math.max(0, llm?.promptTokens ?? 0);
+  const completionTokens = Math.max(0, llm?.completionTokens ?? 0);
 
   return {
     event: "assistant_turn",
+    status: "ok",
     intent: input.intent,
     duration_ms: Math.max(0, Math.round(input.durationMs)),
     tool_call_count: input.toolCalls.length,
@@ -91,25 +166,47 @@ export function buildAssistantTurnLogEvent(
     faithfulness_status: resolveFaithfulnessStatus(input.faithfulness),
     unverified_claim_count: input.faithfulness?.unverifiedClaims.length ?? 0,
     has_plan: input.hasPlan ?? false,
-    llm_call_count: Math.max(0, usage?.llmCallCount ?? 0),
+    llm_attempt_count: Math.max(0, llm?.attemptCount ?? 0),
+    llm_usage_report_count: Math.max(0, llm?.usageReportCount ?? 0),
+    llm_error_count: Math.max(0, llm?.errorCount ?? 0),
     prompt_tokens: promptTokens,
     completion_tokens: completionTokens,
-    total_tokens: Math.max(0, usage?.totalTokens ?? 0),
-    estimated_cost_usd: estimateCostUsd(promptTokens, completionTokens),
+    total_tokens: Math.max(0, llm?.totalTokens ?? 0),
+    provider: llm?.provider ?? null,
+    model: llm?.model ?? null,
+    estimated_cost_usd: estimateCostUsd(
+      llm?.model ?? null,
+      promptTokens,
+      completionTokens,
+    ),
   };
 }
 
 /**
- * Estimate the list-price USD cost of one turn from its token counts.
+ * Estimate the list-price USD cost of one turn.
  *
- * @param promptTokens - Prompt (input) tokens summed across the turn's LLM calls.
- * @param completionTokens - Completion (output) tokens summed across the turn's LLM calls.
- * @returns Estimated cost in USD, rounded to 6 decimals (0 when no tokens).
+ * @param model - Model that served the calls (or null).
+ * @param promptTokens - Prompt tokens summed across the turn.
+ * @param completionTokens - Completion tokens summed across the turn.
+ * @returns Estimated USD (6 decimals), or `null` for an unknown/unpriced model.
  */
-function estimateCostUsd(promptTokens: number, completionTokens: number): number {
+function estimateCostUsd(
+  model: string | null,
+  promptTokens: number,
+  completionTokens: number,
+): number | null {
+  if (model === null) {
+    return promptTokens === 0 && completionTokens === 0 ? 0 : null;
+  }
+
+  const pricing = MODEL_PRICING_USD_PER_1M[model];
+  if (pricing === undefined) {
+    return null;
+  }
+
   const cost =
-    (promptTokens / 1_000_000) * USD_PER_1M_PROMPT_TOKENS +
-    (completionTokens / 1_000_000) * USD_PER_1M_COMPLETION_TOKENS;
+    (promptTokens / 1_000_000) * pricing.prompt +
+    (completionTokens / 1_000_000) * pricing.completion;
 
   return Math.round(cost * 1_000_000) / 1_000_000;
 }
@@ -117,14 +214,35 @@ function estimateCostUsd(promptTokens: number, completionTokens: number): number
 /**
  * Logs the per-turn telemetry event as a single structured JSON line.
  *
- * @param input - Telemetry input for the turn
- * @param logger - Injectable sink (defaults to console.info), for tests
+ * @param input - Telemetry input for the turn.
+ * @param logger - Injectable sink (defaults to console.info), for tests.
  */
 export function logAssistantTurnEvent(
   input: AssistantTurnLogInput,
   logger: (message: string) => void = console.info,
 ): void {
   logger(JSON.stringify(buildAssistantTurnLogEvent(input)));
+}
+
+/**
+ * Logs a minimal structured line for a turn that failed before producing a
+ * result, so failed turns are still observable.
+ *
+ * @param input - Measured latency and the error code.
+ * @param logger - Injectable sink (defaults to console.info), for tests.
+ */
+export function logFailedAssistantTurnEvent(
+  input: { durationMs: number; errorCode: string },
+  logger: (message: string) => void = console.info,
+): void {
+  const event: FailedAssistantTurnLogEvent = {
+    event: "assistant_turn",
+    status: "error",
+    error_code: input.errorCode,
+    duration_ms: Math.max(0, Math.round(input.durationMs)),
+  };
+
+  logger(JSON.stringify(event));
 }
 
 function resolveFaithfulnessStatus(

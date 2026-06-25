@@ -17,9 +17,7 @@ const { CANNED_REPORT } = vi.hoisted(() => ({
     top_exercises: [
       { exercise_name: "卧推", set_count: 8, total_volume: 2000 },
     ],
-    top_muscle_groups: [
-      { muscle_group_name: "胸", contribution_ratio: 0.4 },
-    ],
+    top_muscle_groups: [{ muscle_group_name: "胸", contribution_ratio: 0.4 }],
     low_volume_muscle_groups: [
       { muscle_group_name: "小腿", contribution_ratio: 0.1 },
     ],
@@ -40,13 +38,23 @@ vi.mock("./provider-adapter.js", () => ({
     kind: "message",
     message: "这是你的周报概述……",
   })),
-  runAssistantAnswerPhrasing: vi.fn(async (input: { draftSummary: string }) => input.draftSummary),
+  runAssistantAnswerPhrasing: vi.fn(
+    async (input: { draftSummary: string }) => ({
+      summary: input.draftSummary,
+      attempted: false,
+      errored: false,
+    }),
+  ),
 }));
 
 // mock provider keeps the deterministic keyword router (no Groq), so "周报" routes
 // via the keyword fast path without any LLM call. Phrasing stays off.
 vi.mock("./provider-config.js", () => ({
   getConfiguredAssistantProvider: vi.fn(() => "mock"),
+  getGroqAssistantProviderConfig: vi.fn(() => ({
+    apiKey: "test-key",
+    model: "llama-3.3-70b-versatile",
+  })),
   isAssistantAnswerPhrasingEnabled: vi.fn(() => false),
 }));
 
@@ -66,14 +74,19 @@ vi.mock("../../db/chat-repository.js", () => ({
 import { runMockAssistantTurn } from "./assistant-orchestrator-service.js";
 import { executeAiTool } from "../ai/tools/tool-executor.js";
 import { runAssistantProvider } from "./provider-adapter.js";
+import { getConfiguredAssistantProvider } from "./provider-config.js";
 
 const mockedExecuteAiTool = vi.mocked(executeAiTool);
 const mockedRunAssistantProvider = vi.mocked(runAssistantProvider);
+const mockedGetConfiguredAssistantProvider = vi.mocked(
+  getConfiguredAssistantProvider,
+);
 
 describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockedExecuteAiTool.mockResolvedValue(CANNED_REPORT);
+    mockedGetConfiguredAssistantProvider.mockReturnValue("mock");
   });
 
   it('runs get_weekly_training_report for "周报" with no exercise_id when the provider only returns prose', async () => {
@@ -121,7 +134,8 @@ describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", ()
     expect(response.faithfulness?.status).toBe("verified");
   });
 
-  it("aggregates the routing call's token usage into telemetry (C1, not the public response)", async () => {
+  it("counts the routing call's token usage in telemetry on the groq path (not the public response)", async () => {
+    mockedGetConfiguredAssistantProvider.mockReturnValue("groq");
     mockedRunAssistantProvider.mockResolvedValueOnce({
       kind: "message",
       message: "这是你的周报概述……",
@@ -135,17 +149,22 @@ describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", ()
       end_date: "2026-06-17",
     });
 
-    expect(telemetry.tokenUsage).toEqual({
+    expect(telemetry.llm).toEqual({
+      attemptCount: 1,
+      usageReportCount: 1,
+      errorCount: 0,
       promptTokens: 100,
       completionTokens: 20,
       totalTokens: 120,
-      llmCallCount: 1,
+      provider: "groq",
+      model: "llama-3.3-70b-versatile",
     });
-    // Token usage is server-only telemetry, never on the public response DTO.
+    // Token telemetry is server-only, never on the public response DTO.
     expect(response).not.toHaveProperty("token_usage");
+    expect(response).not.toHaveProperty("telemetry");
   });
 
-  it("leaves telemetry token usage undefined when the provider reports no usage (mock path)", async () => {
+  it("leaves telemetry undefined on the deterministic mock path (no billed call)", async () => {
     const { telemetry } = await runMockAssistantTurn("user-1", {
       mode: "auto",
       message: "周报",
@@ -153,6 +172,6 @@ describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", ()
       end_date: "2026-06-17",
     });
 
-    expect(telemetry.tokenUsage).toBeUndefined();
+    expect(telemetry.llm).toBeUndefined();
   });
 });

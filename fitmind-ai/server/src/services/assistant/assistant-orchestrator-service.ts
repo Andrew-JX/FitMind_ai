@@ -31,13 +31,18 @@ import {
 import { coerceMessageToEvidenceToolCall } from "./assistant-provider-fallback.js";
 import { applyFaithfulPhrasing } from "./answer-phrasing.js";
 import { getToolDefinitionForMode } from "./assistant-tool-routing.js";
-import type { AssistantTokenUsage } from "./assistant-turn-observability.js";
+import {
+  summarizeTurnLlmCalls,
+  type AssistantLlmCallRecord,
+  type AssistantTurnLlmSummary,
+} from "./assistant-turn-observability.js";
 import {
   createGroqIntentRouter,
   type LlmIntentRouter,
 } from "./llm-intent-router.js";
 import {
   getConfiguredAssistantProvider,
+  getGroqAssistantProviderConfig,
   isAssistantAnswerPhrasingEnabled,
 } from "./provider-config.js";
 import {
@@ -266,8 +271,8 @@ export interface MockAssistantTurnResponseData {
  * so clients never depend on Groq/OpenAI usage shapes (C1).
  */
 export interface AssistantTurnTelemetry {
-  /** Aggregated LLM token usage (Groq); undefined on deterministic/mock paths. */
-  tokenUsage?: AssistantTokenUsage | undefined;
+  /** Aggregated LLM call/token telemetry (Groq); undefined on deterministic/mock paths. */
+  llm?: AssistantTurnLlmSummary | undefined;
 }
 
 /** Internal envelope: the public response plus server-only telemetry. */
@@ -1088,25 +1093,40 @@ function buildToolAnswer(
  * @returns Aggregated usage with the reporting-call count, or `undefined` when no
  *   call reported usage (the deterministic mock path).
  */
-function aggregateTurnTokenUsage(
-  usages: ReadonlyArray<AssistantProviderUsage | undefined>,
-): AssistantTokenUsage | undefined {
-  const reported = usages.filter(
-    (usage): usage is AssistantProviderUsage => usage !== undefined,
-  );
-
-  if (reported.length === 0) {
-    return undefined;
+/**
+ * Resolve the Groq model serving this turn's calls.
+ *
+ * Reads the same config the client uses within this request (single env snapshot),
+ * so the logged model never drifts from what actually ran; non-groq → null.
+ *
+ * @returns The active Groq model, or null when not on the groq provider.
+ */
+function resolveTurnGroqModel(): string | null {
+  if (getConfiguredAssistantProvider() !== "groq") {
+    return null;
   }
 
+  try {
+    return getGroqAssistantProviderConfig().model;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Build the per-turn telemetry envelope from the LLM call records made this turn.
+ *
+ * @param records - One entry per LLM call site reached (router / routing / phrasing).
+ * @returns Telemetry with an aggregated `llm` summary (undefined when no call ran).
+ */
+function buildTurnTelemetry(
+  records: AssistantLlmCallRecord[],
+): AssistantTurnTelemetry {
   return {
-    promptTokens: reported.reduce((sum, usage) => sum + usage.prompt_tokens, 0),
-    completionTokens: reported.reduce(
-      (sum, usage) => sum + usage.completion_tokens,
-      0,
-    ),
-    totalTokens: reported.reduce((sum, usage) => sum + usage.total_tokens, 0),
-    llmCallCount: reported.length,
+    llm: summarizeTurnLlmCalls(records, {
+      provider: getConfiguredAssistantProvider() === "groq" ? "groq" : null,
+      model: resolveTurnGroqModel(),
+    }),
   };
 }
 
@@ -1138,8 +1158,12 @@ export async function runMockAssistantTurn(
         : null;
   const routed = await resolveRoutedIntent(input, intentRouter);
   const intent = routed.intent;
-  // Router rescue call is billed; its usage must be counted on every path below.
-  const routerUsage = routed.routerUsage;
+  // Router rescue call is billed; its outcome must be counted on every path below.
+  const routerRecord: AssistantLlmCallRecord = {
+    attempted: routed.routerAttempted,
+    errored: routed.routerErrored,
+    usage: routed.routerUsage,
+  };
   const executionMode = resolveExecutionModeForIntent(input, intent);
 
   if (intent === "unsupported") {
@@ -1206,7 +1230,7 @@ export async function runMockAssistantTurn(
 
     return {
       response,
-      telemetry: { tokenUsage: aggregateTurnTokenUsage([routerUsage]) },
+      telemetry: buildTurnTelemetry([routerRecord]),
     };
   }
 
@@ -1263,7 +1287,7 @@ export async function runMockAssistantTurn(
 
     return {
       response,
-      telemetry: { tokenUsage: aggregateTurnTokenUsage([routerUsage]) },
+      telemetry: buildTurnTelemetry([routerRecord]),
     };
   }
 
@@ -1280,7 +1304,7 @@ export async function runMockAssistantTurn(
 
     return {
       response: planResponse,
-      telemetry: { tokenUsage: aggregateTurnTokenUsage([routerUsage]) },
+      telemetry: buildTurnTelemetry([routerRecord]),
     };
   }
 
@@ -1325,10 +1349,15 @@ export async function runMockAssistantTurn(
     },
   );
 
-  // C1 token/cost observability: capture the routing call's usage (kept off the
-  // synthesized coercion result), and the phrasing call's usage if it runs.
-  const routingUsage = rawProviderResponse.usage;
-  let phrasingUsage: AssistantProviderUsage | undefined;
+  // C1 token/cost observability: the routing tool-selection call is a billed Groq
+  // call on the groq provider (deterministic mock makes no LLM call). Usage is read
+  // from the raw response (kept off the synthesized coercion result).
+  const routingRecord: AssistantLlmCallRecord = {
+    attempted: getConfiguredAssistantProvider() === "groq",
+    errored: false,
+    usage: rawProviderResponse.usage,
+  };
+  let phrasingRecord: AssistantLlmCallRecord | undefined;
 
   const toolCalls: MockAssistantTurnResponseData["tool_calls"] = [];
   const toolOutputs: unknown[] = [];
@@ -1465,7 +1494,11 @@ export async function runMockAssistantTurn(
         draftSummary: answer.summary,
         supportingFacts: answer.bullets,
       });
-      phrasingUsage = phrasing.usage;
+      phrasingRecord = {
+        attempted: phrasing.attempted,
+        errored: phrasing.errored,
+        usage: phrasing.usage,
+      };
       answer = applyFaithfulPhrasing(answer, phrasing.summary, (candidate) =>
         verifyAnswerFaithfulness(candidate, toolOutputs),
       ).answer;
@@ -1512,13 +1545,11 @@ export async function runMockAssistantTurn(
 
   return {
     response,
-    telemetry: {
-      tokenUsage: aggregateTurnTokenUsage([
-        routerUsage,
-        routingUsage,
-        phrasingUsage,
-      ]),
-    },
+    telemetry: buildTurnTelemetry(
+      phrasingRecord === undefined
+        ? [routerRecord, routingRecord]
+        : [routerRecord, routingRecord, phrasingRecord],
+    ),
   };
 }
 

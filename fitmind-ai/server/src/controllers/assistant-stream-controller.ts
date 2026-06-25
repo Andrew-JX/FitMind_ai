@@ -3,7 +3,10 @@ import type { Request, Response } from "express";
 import { runMockAssistantTurn } from "../services/assistant/assistant-orchestrator-service.js";
 import type { AssistantTurnExecutionResult } from "../services/assistant/assistant-orchestrator-service.js";
 import type { AssistantStreamEvent } from "../services/assistant/assistant-stream-types.js";
-import { logAssistantTurnEvent } from "../services/assistant/assistant-turn-observability.js";
+import {
+  logAssistantTurnEvent,
+  logFailedAssistantTurnEvent,
+} from "../services/assistant/assistant-turn-observability.js";
 import { createSuccessResponse } from "../utils/api-response.js";
 import { isHttpError } from "../utils/http-error.js";
 
@@ -24,7 +27,7 @@ function logTurnTelemetry(
     agentStepCount: response.agent_trace?.steps.length ?? null,
     faithfulness: response.faithfulness ?? null,
     hasPlan: response.plan !== undefined,
-    tokenUsage: telemetry.tokenUsage ?? null,
+    llm: telemetry.llm ?? null,
   });
 }
 
@@ -40,7 +43,10 @@ function writeSseEvent(
   res.write(`data: ${JSON.stringify(event)}\n\n`);
 }
 
-function normalizeStreamError(error: unknown): { code: string; message: string } {
+function normalizeStreamError(error: unknown): {
+  code: string;
+  message: string;
+} {
   if (isHttpError(error)) {
     return {
       code: error.code,
@@ -73,10 +79,18 @@ export async function postMockAssistantTurnController(
   res: Response<unknown, AuthLocals>,
 ) {
   const startedAt = Date.now();
-  const result = await runMockAssistantTurn(res.locals.userId, req.body);
-  logTurnTelemetry(result, Date.now() - startedAt);
+  try {
+    const result = await runMockAssistantTurn(res.locals.userId, req.body);
+    logTurnTelemetry(result, Date.now() - startedAt);
 
-  return res.status(200).json(createSuccessResponse(result.response));
+    return res.status(200).json(createSuccessResponse(result.response));
+  } catch (error) {
+    logFailedAssistantTurnEvent({
+      durationMs: Date.now() - startedAt,
+      errorCode: normalizeStreamError(error).code,
+    });
+    throw error;
+  }
 }
 
 /**
@@ -115,6 +129,11 @@ export async function postAssistantStreamTurnController(
       res.end();
     }
   } catch (error) {
+    logFailedAssistantTurnEvent({
+      durationMs: Date.now() - startedAt,
+      errorCode: normalizeStreamError(error).code,
+    });
+
     if (!errorEventSent) {
       writeSseEvent(res, {
         type: "error",

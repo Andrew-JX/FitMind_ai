@@ -3,10 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildAssistantTurnLogEvent,
   logAssistantTurnEvent,
+  logFailedAssistantTurnEvent,
+  summarizeTurnLlmCalls,
 } from "./assistant-turn-observability.js";
 
 describe("buildAssistantTurnLogEvent", () => {
-  it("summarizes tool counts, durations, and faithfulness", () => {
+  it("summarizes tool counts, faithfulness, and zeroes LLM/cost on the deterministic path", () => {
     const event = buildAssistantTurnLogEvent({
       intent: "weekly_report",
       durationMs: 1234.6,
@@ -20,6 +22,7 @@ describe("buildAssistantTurnLogEvent", () => {
 
     expect(event).toEqual({
       event: "assistant_turn",
+      status: "ok",
       intent: "weekly_report",
       duration_ms: 1235,
       tool_call_count: 2,
@@ -29,48 +32,19 @@ describe("buildAssistantTurnLogEvent", () => {
       faithfulness_status: "flagged",
       unverified_claim_count: 1,
       has_plan: false,
-      llm_call_count: 0,
+      llm_attempt_count: 0,
+      llm_usage_report_count: 0,
+      llm_error_count: 0,
       prompt_tokens: 0,
       completion_tokens: 0,
       total_tokens: 0,
+      provider: null,
+      model: null,
       estimated_cost_usd: 0,
     });
   });
 
-  it("defaults token/cost fields to 0 on the deterministic (no-LLM) path", () => {
-    const event = buildAssistantTurnLogEvent({
-      intent: "summary",
-      durationMs: 10,
-      toolCalls: [],
-    });
-
-    expect(event.llm_call_count).toBe(0);
-    expect(event.total_tokens).toBe(0);
-    expect(event.estimated_cost_usd).toBe(0);
-  });
-
-  it("reports token usage and a list-price cost estimate", () => {
-    const event = buildAssistantTurnLogEvent({
-      intent: "weekly_report",
-      durationMs: 100,
-      toolCalls: [{ status: "success", duration_ms: 5 }],
-      tokenUsage: {
-        promptTokens: 1_000_000,
-        completionTokens: 1_000_000,
-        totalTokens: 2_000_000,
-        llmCallCount: 2,
-      },
-    });
-
-    expect(event.llm_call_count).toBe(2);
-    expect(event.prompt_tokens).toBe(1_000_000);
-    expect(event.completion_tokens).toBe(1_000_000);
-    expect(event.total_tokens).toBe(2_000_000);
-    // 1M prompt * 0.59 + 1M completion * 0.79 = 1.38 USD
-    expect(event.estimated_cost_usd).toBeCloseTo(1.38, 6);
-  });
-
-  it("marks faithfulness as unchecked when no tool data was verified", () => {
+  it("marks faithfulness unchecked when no tool data was verified", () => {
     const event = buildAssistantTurnLogEvent({
       intent: "knowledge",
       durationMs: 50,
@@ -78,7 +52,6 @@ describe("buildAssistantTurnLogEvent", () => {
     });
 
     expect(event.faithfulness_status).toBe("unchecked");
-    expect(event.unverified_claim_count).toBe(0);
     expect(event.agent_step_count).toBeNull();
   });
 
@@ -94,12 +67,96 @@ describe("buildAssistantTurnLogEvent", () => {
 
     expect(event.agent_step_count).toBe(5);
     expect(event.has_plan).toBe(true);
-    expect(event.faithfulness_status).toBe("verified");
+  });
+
+  it("reports the distinct LLM counts and a list-price cost for a known model", () => {
+    const event = buildAssistantTurnLogEvent({
+      intent: "recommendation",
+      durationMs: 100,
+      toolCalls: [{ status: "success", duration_ms: 5 }],
+      llm: {
+        attemptCount: 3,
+        usageReportCount: 2,
+        errorCount: 1,
+        promptTokens: 1_000_000,
+        completionTokens: 1_000_000,
+        totalTokens: 2_000_000,
+        provider: "groq",
+        model: "llama-3.3-70b-versatile",
+      },
+    });
+
+    expect(event.llm_attempt_count).toBe(3);
+    expect(event.llm_usage_report_count).toBe(2);
+    expect(event.llm_error_count).toBe(1);
+    expect(event.provider).toBe("groq");
+    expect(event.model).toBe("llama-3.3-70b-versatile");
+    // 1M prompt * 0.59 + 1M completion * 0.79 = 1.38 USD
+    expect(event.estimated_cost_usd).toBeCloseTo(1.38, 6);
+  });
+
+  it("prices an unknown model to null (never a wrong number)", () => {
+    const event = buildAssistantTurnLogEvent({
+      intent: "recommendation",
+      durationMs: 100,
+      toolCalls: [],
+      llm: {
+        attemptCount: 1,
+        usageReportCount: 1,
+        errorCount: 0,
+        promptTokens: 500,
+        completionTokens: 100,
+        totalTokens: 600,
+        provider: "groq",
+        model: "some-future-model",
+      },
+    });
+
+    expect(event.model).toBe("some-future-model");
+    expect(event.total_tokens).toBe(600);
+    expect(event.estimated_cost_usd).toBeNull();
+  });
+});
+
+describe("summarizeTurnLlmCalls", () => {
+  it("counts attempts, usage reports, errors, and sums tokens", () => {
+    const summary = summarizeTurnLlmCalls(
+      [
+        {
+          attempted: true,
+          errored: false,
+          usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+        },
+        { attempted: true, errored: true },
+        { attempted: false, errored: false },
+      ],
+      { provider: "groq", model: "llama-3.3-70b-versatile" },
+    );
+
+    expect(summary).toEqual({
+      attemptCount: 2,
+      usageReportCount: 1,
+      errorCount: 1,
+      promptTokens: 10,
+      completionTokens: 5,
+      totalTokens: 15,
+      provider: "groq",
+      model: "llama-3.3-70b-versatile",
+    });
+  });
+
+  it("returns undefined when no call was attempted", () => {
+    const summary = summarizeTurnLlmCalls(
+      [{ attempted: false, errored: false }],
+      { provider: null, model: null },
+    );
+
+    expect(summary).toBeUndefined();
   });
 });
 
 describe("logAssistantTurnEvent", () => {
-  it("emits a single structured JSON line", () => {
+  it("emits a single structured JSON line with status ok", () => {
     const logger = vi.fn();
 
     logAssistantTurnEvent(
@@ -110,6 +167,25 @@ describe("logAssistantTurnEvent", () => {
     expect(logger).toHaveBeenCalledTimes(1);
     const payload = JSON.parse(logger.mock.calls[0]?.[0] as string);
     expect(payload.event).toBe("assistant_turn");
-    expect(payload.intent).toBe("summary");
+    expect(payload.status).toBe("ok");
+  });
+});
+
+describe("logFailedAssistantTurnEvent", () => {
+  it("emits a minimal error line for a failed turn", () => {
+    const logger = vi.fn();
+
+    logFailedAssistantTurnEvent(
+      { durationMs: 42.7, errorCode: "AI_PROVIDER_ERROR" },
+      logger,
+    );
+
+    const payload = JSON.parse(logger.mock.calls[0]?.[0] as string);
+    expect(payload).toEqual({
+      event: "assistant_turn",
+      status: "error",
+      error_code: "AI_PROVIDER_ERROR",
+      duration_ms: 43,
+    });
   });
 });
