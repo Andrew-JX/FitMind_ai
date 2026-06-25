@@ -1,10 +1,9 @@
 import { z } from "zod";
 
-import { getGroqAssistantProviderConfig } from "./provider-config.js";
+import { runGroqChatCompletion } from "./groq-chat-client.js";
 import type { AssistantRoutedIntent } from "./assistant-intent-router.js";
+import type { AssistantProviderUsage } from "./provider-types.js";
 
-const GROQ_CHAT_COMPLETIONS_URL =
-  "https://api.groq.com/openai/v1/chat/completions";
 const CLASSIFIER_MAX_TOKENS = 16;
 
 /** Intents the LLM may return. Mirrors AssistantRoutedIntent exactly. */
@@ -25,15 +24,24 @@ const ROUTABLE_INTENTS = [
 
 const routableIntentSchema = z.enum(ROUTABLE_INTENTS);
 
-const groqChatCompletionSchema = z.object({
-  choices: z
-    .array(z.object({ message: z.object({ content: z.string().nullable().optional() }) }))
-    .min(1),
-});
+/**
+ * Outcome of one rescue classification.
+ *
+ * `attempted` is true when a Groq call was issued (so the turn telemetry can count
+ * it); `errored` is true when that call failed (HTTP/shape/network). `intent` is
+ * null when no call ran, the call failed, or the model returned an unusable label.
+ * `usage` carries token usage when reported.
+ */
+export interface LlmIntentClassification {
+  intent: AssistantRoutedIntent | null;
+  usage?: AssistantProviderUsage | undefined;
+  attempted: boolean;
+  errored: boolean;
+}
 
-/** Classifies a free-text message into one routed intent, or null when unavailable. */
+/** Classifies a free-text message into one routed intent (with call telemetry). */
 export interface LlmIntentRouter {
-  classify(message: string): Promise<AssistantRoutedIntent | null>;
+  classify(message: string): Promise<LlmIntentClassification>;
 }
 
 function buildClassifierSystemPrompt(): string {
@@ -57,7 +65,10 @@ function buildClassifierSystemPrompt(): string {
 }
 
 function parseRoutedIntent(content: string): AssistantRoutedIntent | null {
-  const normalized = content.trim().toLowerCase().replace(/[^a-z_]/gu, "");
+  const normalized = content
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z_]/gu, "");
   const parsed = routableIntentSchema.safeParse(normalized);
 
   return parsed.success ? parsed.data : null;
@@ -68,50 +79,41 @@ function parseRoutedIntent(content: string): AssistantRoutedIntent | null {
  *
  * Used only as a rescue when the deterministic keyword classifier returns
  * `unsupported` for a non-blocklisted message. Any failure (missing key, HTTP
- * error, bad shape, unrecognized label) resolves to `null` so the caller falls
- * back to the deterministic unsupported handling — the LLM never crashes or
- * forces an out-of-set intent.
+ * error, bad shape, unrecognized label) yields `intent: null` so the caller falls
+ * back to deterministic unsupported handling — the LLM never crashes or forces an
+ * out-of-set intent. The result also reports `attempted`/`errored`/`usage` so the
+ * turn telemetry can count this billed call.
  *
  * @returns An {@link LlmIntentRouter}.
  */
 export function createGroqIntentRouter(): LlmIntentRouter {
   return {
-    async classify(message: string): Promise<AssistantRoutedIntent | null> {
-      try {
-        const config = getGroqAssistantProviderConfig();
-        const response = await fetch(GROQ_CHAT_COMPLETIONS_URL, {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${config.apiKey}`,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            model: config.model,
-            max_tokens: CLASSIFIER_MAX_TOKENS,
-            temperature: 0,
-            messages: [
-              { role: "system", content: buildClassifierSystemPrompt() },
-              { role: "user", content: message },
-            ],
-          }),
-        });
+    async classify(message: string): Promise<LlmIntentClassification> {
+      const result = await runGroqChatCompletion({
+        messages: [
+          { role: "system", content: buildClassifierSystemPrompt() },
+          { role: "user", content: message },
+        ],
+        maxTokens: CLASSIFIER_MAX_TOKENS,
+        temperature: 0,
+      });
 
-        if (!response.ok) {
-          return null;
-        }
-
-        const parsed = groqChatCompletionSchema.safeParse(await response.json());
-
-        if (!parsed.success) {
-          return null;
-        }
-
-        const content = parsed.data.choices[0]?.message.content ?? "";
-
-        return parseRoutedIntent(content);
-      } catch {
-        return null;
+      if (!result.ok) {
+        // attempted but failed → errored; config-failure (not attempted) → not errored.
+        return {
+          intent: null,
+          usage: result.usage,
+          attempted: result.attempted,
+          errored: result.attempted,
+        };
       }
+
+      return {
+        intent: parseRoutedIntent(result.content ?? ""),
+        usage: result.usage,
+        attempted: true,
+        errored: false,
+      };
     },
   };
 }

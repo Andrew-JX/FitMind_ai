@@ -523,7 +523,8 @@ function buildPlateauDiagnosisAnswer(input: {
   sources: Awaited<ReturnType<typeof retrieveKnowledgeChunks>>;
 }): AssistantStructuredAnswer {
   const evidence = buildEvidence("get_exercise_progress", input.result);
-  const exerciseName = input.result.exercise.exercise_name ?? "selected exercise";
+  const exerciseName =
+    input.result.exercise.exercise_name ?? "selected exercise";
   const sources = input.sources.map((source) => ({
     id: source.id,
     title: source.title,
@@ -743,33 +744,30 @@ function parseProviderSimulation(message: string): ProviderSimulationResult {
   };
 }
 
-export async function resolveRoutedIntent(
-  input: MockAssistantTurnInput,
-  router: LlmIntentRouter | null,
-): Promise<AssistantRoutedIntent> {
-  if (input.mode === "auto") {
-    const keywordIntent = classifyAssistantIntent(input.message).intent;
+/**
+ * Resolved intent plus telemetry about any rescue-classifier (Groq) call made
+ * while routing. The router call is billed, so its `usage`/`attempted`/`errored`
+ * must reach the turn telemetry even on paths (knowledge/unsupported) that make no
+ * further provider call.
+ */
+export interface ResolvedRoutedIntent {
+  intent: AssistantRoutedIntent;
+  routerUsage?: AssistantProviderUsage | undefined;
+  routerAttempted: boolean;
+  routerErrored: boolean;
+}
 
-    // Fast path: a confident keyword match wins (deterministic, eval-stable, no LLM call).
-    if (keywordIntent !== "unsupported") {
-      return keywordIntent;
-    }
+/** Wrap an intent resolved without any rescue-classifier call. */
+function withoutRouterCall(
+  intent: AssistantRoutedIntent,
+): ResolvedRoutedIntent {
+  return { intent, routerAttempted: false, routerErrored: false };
+}
 
-    // Slice 11.2b: keyword fell through. Genuinely out-of-scope (blocklist/empty)
-    // stays a refusal; otherwise let the LLM rescue-route into the known intent
-    // set (validated upstream; null → unsupported). No LLM → keep deterministic.
-    if (isOutOfScopeMessage(input.message)) {
-      return "unsupported";
-    }
-
-    if (router === null) {
-      return "unsupported";
-    }
-
-    return (await router.classify(input.message)) ?? "unsupported";
-  }
-
-  switch (input.mode) {
+function mapExplicitModeToIntent(
+  mode: MockAssistantTurnInput["mode"],
+): AssistantRoutedIntent {
+  switch (mode) {
     case "training_overview":
       return "summary";
     case "weekly_report":
@@ -788,11 +786,48 @@ export async function resolveRoutedIntent(
       return "imbalance";
     case "evidence_explain":
       return "evidence";
+    case "auto":
     case "unsupported":
       return "unsupported";
     default:
       return "unsupported";
   }
+}
+
+export async function resolveRoutedIntent(
+  input: MockAssistantTurnInput,
+  router: LlmIntentRouter | null,
+): Promise<ResolvedRoutedIntent> {
+  if (input.mode === "auto") {
+    const keywordIntent = classifyAssistantIntent(input.message).intent;
+
+    // Fast path: a confident keyword match wins (deterministic, eval-stable, no LLM call).
+    if (keywordIntent !== "unsupported") {
+      return withoutRouterCall(keywordIntent);
+    }
+
+    // Slice 11.2b: keyword fell through. Genuinely out-of-scope (blocklist/empty)
+    // stays a refusal; otherwise let the LLM rescue-route into the known intent
+    // set (validated upstream; null → unsupported). No LLM → keep deterministic.
+    if (isOutOfScopeMessage(input.message)) {
+      return withoutRouterCall("unsupported");
+    }
+
+    if (router === null) {
+      return withoutRouterCall("unsupported");
+    }
+
+    const classification = await router.classify(input.message);
+
+    return {
+      intent: classification.intent ?? "unsupported",
+      routerUsage: classification.usage,
+      routerAttempted: classification.attempted,
+      routerErrored: classification.errored,
+    };
+  }
+
+  return withoutRouterCall(mapExplicitModeToIntent(input.mode));
 }
 
 function resolveExecutionModeForIntent(
@@ -1033,7 +1068,9 @@ function buildToolAnswer(
   }
 
   if (toolName === "get_weekly_training_report") {
-    return buildWeeklyTrainingReportAnswer(result as WeeklyTrainingReportResult);
+    return buildWeeklyTrainingReportAnswer(
+      result as WeeklyTrainingReportResult,
+    );
   }
 
   return buildRecommendationContextAnswer(
@@ -1099,7 +1136,10 @@ export async function runMockAssistantTurn(
       : getConfiguredAssistantProvider() === "groq"
         ? createGroqIntentRouter()
         : null;
-  const intent = await resolveRoutedIntent(input, intentRouter);
+  const routed = await resolveRoutedIntent(input, intentRouter);
+  const intent = routed.intent;
+  // Router rescue call is billed; its usage must be counted on every path below.
+  const routerUsage = routed.routerUsage;
   const executionMode = resolveExecutionModeForIntent(input, intent);
 
   if (intent === "unsupported") {
@@ -1126,7 +1166,8 @@ export async function runMockAssistantTurn(
         intent: "knowledge",
         retrievalMode: retrieved[0]?.retrieval_mode ?? "fallback",
         sources,
-        fallbackReason: sources.length === 0 ? "no_relevant_sources" : undefined,
+        fallbackReason:
+          sources.length === 0 ? "no_relevant_sources" : undefined,
       });
 
       if (sources.length > 0) {
@@ -1163,7 +1204,10 @@ export async function runMockAssistantTurn(
       session_id: resolvedSession.sessionId,
     });
 
-    return { response, telemetry: {} };
+    return {
+      response,
+      telemetry: { tokenUsage: aggregateTurnTokenUsage([routerUsage]) },
+    };
   }
 
   if (intent === "knowledge") {
@@ -1217,11 +1261,15 @@ export async function runMockAssistantTurn(
       session_id: resolvedSession.sessionId,
     });
 
-    return { response, telemetry: {} };
+    return {
+      response,
+      telemetry: { tokenUsage: aggregateTurnTokenUsage([routerUsage]) },
+    };
   }
 
   if (intent === "next_week_plan") {
-    // Deterministic ReAct agent path makes no billed provider call → empty telemetry.
+    // Deterministic ReAct agent path makes no billed provider call, but the rescue
+    // router call (if any) still counts.
     const planResponse = await runNextWeekPlanAgentTurn({
       userId,
       input,
@@ -1230,7 +1278,10 @@ export async function runMockAssistantTurn(
       options,
     });
 
-    return { response: planResponse, telemetry: {} };
+    return {
+      response: planResponse,
+      telemetry: { tokenUsage: aggregateTurnTokenUsage([routerUsage]) },
+    };
   }
 
   const providerRequest = buildProviderRequest(input, executionMode);
@@ -1359,7 +1410,8 @@ export async function runMockAssistantTurn(
         intent,
         retrievalMode: retrieved[0]?.retrieval_mode ?? "fallback",
         sources,
-        fallbackReason: sources.length === 0 ? "no_relevant_sources" : undefined,
+        fallbackReason:
+          sources.length === 0 ? "no_relevant_sources" : undefined,
       });
 
       answer = composeMixedToolRagAnswer({
@@ -1381,7 +1433,8 @@ export async function runMockAssistantTurn(
         intent,
         retrievalMode: retrieved[0]?.retrieval_mode ?? "fallback",
         sources,
-        fallbackReason: sources.length === 0 ? "no_relevant_sources" : undefined,
+        fallbackReason:
+          sources.length === 0 ? "no_relevant_sources" : undefined,
       });
 
       answer = buildPlateauDiagnosisAnswer({
@@ -1460,7 +1513,11 @@ export async function runMockAssistantTurn(
   return {
     response,
     telemetry: {
-      tokenUsage: aggregateTurnTokenUsage([routingUsage, phrasingUsage]),
+      tokenUsage: aggregateTurnTokenUsage([
+        routerUsage,
+        routingUsage,
+        phrasingUsage,
+      ]),
     },
   };
 }

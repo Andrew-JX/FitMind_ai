@@ -33,38 +33,60 @@ describe("createGroqIntentRouter", () => {
     }
   });
 
-  it("returns the routed intent for a valid label", async () => {
-    mockFetchOnce(200, completion("recommendation"));
+  it("returns the routed intent (attempted, not errored) for a valid label, with usage", async () => {
+    mockFetchOnce(200, {
+      choices: [{ message: { content: "recommendation" } }],
+      usage: { prompt_tokens: 30, completion_tokens: 2, total_tokens: 32 },
+    });
 
-    expect(await createGroqIntentRouter().classify("明天练啥")).toBe(
-      "recommendation",
-    );
+    const result = await createGroqIntentRouter().classify("明天练啥");
+
+    expect(result.intent).toBe("recommendation");
+    expect(result.attempted).toBe(true);
+    expect(result.errored).toBe(false);
+    expect(result.usage).toEqual({
+      prompt_tokens: 30,
+      completion_tokens: 2,
+      total_tokens: 32,
+    });
   });
 
   it("tolerates surrounding whitespace/punctuation in the label", async () => {
     mockFetchOnce(200, completion("  Unsupported.\n"));
 
-    expect(await createGroqIntentRouter().classify("1+1等于几")).toBe(
-      "unsupported",
-    );
+    const result = await createGroqIntentRouter().classify("1+1等于几");
+
+    expect(result.intent).toBe("unsupported");
   });
 
-  it("returns null for an unrecognized label", async () => {
+  it("returns null intent (attempted, not errored) for an unrecognized label", async () => {
     mockFetchOnce(200, completion("definitely_not_an_intent"));
 
-    expect(await createGroqIntentRouter().classify("...")).toBeNull();
+    const result = await createGroqIntentRouter().classify("...");
+
+    expect(result.intent).toBeNull();
+    expect(result.attempted).toBe(true);
+    expect(result.errored).toBe(false);
   });
 
-  it("returns null on an HTTP error", async () => {
+  it("returns null intent and marks errored on an HTTP error", async () => {
     mockFetchOnce(429, { error: { message: "rate limited" } });
 
-    expect(await createGroqIntentRouter().classify("明天练啥")).toBeNull();
+    const result = await createGroqIntentRouter().classify("明天练啥");
+
+    expect(result.intent).toBeNull();
+    expect(result.attempted).toBe(true);
+    expect(result.errored).toBe(true);
   });
 
-  it("returns null when GROQ_API_KEY is missing (caller falls back)", async () => {
+  it("does not mark errored (or attempted) when GROQ_API_KEY is missing", async () => {
     delete process.env.GROQ_API_KEY;
     mockFetchOnce(200, completion("recommendation"));
 
-    expect(await createGroqIntentRouter().classify("明天练啥")).toBeNull();
+    const result = await createGroqIntentRouter().classify("明天练啥");
+
+    expect(result.intent).toBeNull();
+    expect(result.attempted).toBe(false);
+    expect(result.errored).toBe(false);
   });
 });
