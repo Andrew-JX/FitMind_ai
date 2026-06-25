@@ -51,10 +51,13 @@ function ensureAllowedTool(
     return response;
   }
 
+  // Hallucinated tool name: still a billed Groq call — preserve its telemetry so
+  // the failed turn reports attempt/error/model/usage.
   return {
     kind: "error",
     error_code: "PROVIDER_ADAPTER_ERROR",
     message: `Provider requested unsupported tool ${response.tool_name}.`,
+    telemetry: response.telemetry,
   };
 }
 
