@@ -4764,3 +4764,14 @@ Codex 二审 a8aa58e/dc1265d 后判 C1 计数/成本不可信，逐条修实（�
 - **Batch 4（P2d + P3b）**：重写 D40/roadmap 当前结论（最多三次调用、telemetry 信封、按模型计价）；progress 初版条加"已取代"标注；本轮触及文件均跑 Prettier（仓库 156 个历史 format 欠债不动）。
 
 Verification: `pnpm type-check` / `pnpm test:unit`(328) / `pnpm eval`(13/13·12/12·3/3 PASS) 通过；改动文件 eslint + Prettier 干净。决策见 ai-decisions D40（含演进史）。
+
+## 2026-06-23 C1 三审：失败/边缘路径 telemetry 封死（Codex C1 复审 #2）
+
+二审定稿后 Codex 复审发现失败/边缘路径仍失真，逐条修（一组 cohesive 改动，telemetry 语义跨层）：
+
+- **P1 失败 provider 调用计入**：provider 响应所有 variant（含 `error`）现都带 `telemetry`；编排层 provider 失败时抛 `AssistantTurnError`（HttpError 子类带 `turnTelemetry`，不序列化给客户端），控制器错误分支用它发 `logFailedAssistantTurnEvent({..., llm})`。Groq 429/500 失败轮现有 `llm_attempt_count=1 / llm_error_count=1 / model / usage`。补端到端单测（groq 500 routing path）。
+- **P2 provider/model 取自实际 client 结果**：统一 `AssistantProviderCallTelemetry {attempted, errored, provider, model, usage}`；意图救场（`{intent, call}`）、措辞（`{summary, call}`）、工具选择（response.telemetry）都带它；`summarizeTurnLlmCalls(records)` 从 records 聚合 provider/model，删 `resolveTurnGroqModel`/meta re-read env。
+- **P3 空响应保留 usage**：措辞/路由空文本回退 draft 时仍带 `call.usage`，token/成本不漏。补单测。
+- **P2d 文档**：roadmap §8.2 B1 / §8.3 标 token/成本 observability ✅；D40 加"三审"演进 + provider/model 从 records 的表述。
+
+Verification: `pnpm type-check` / `pnpm test:unit`(330) / `pnpm eval`(13/13·12/12·3/3 PASS) 通过；改动文件 eslint + Prettier 干净。决策见 ai-decisions D40。

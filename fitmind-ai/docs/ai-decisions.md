@@ -978,15 +978,17 @@ Decision（最小且安全）：
 
 Decision（定稿）：
 - **共享 Groq client**（`groq-chat-client.ts`）：统一 fetch + 排空 body + **核心响应与 usage 分开解析**（usage 用 `int().nonnegative()` 校验，非法只丢 usage、绝不拖垮 tool_call/message）。返回 `{ attempted, provider, model, ok, content, toolCall, usage, errorMessage }`——`attempted` 仅在配置失败（未发请求）时 false；`provider/model` 来自**实际调用配置**，杜绝与真实调用漂移。路由 provider、措辞、意图救场三处都走它。
-- **三处调用各报 telemetry**：意图救场（`LlmIntentClassification {intent, usage, attempted, errored}`）、措辞（`AssistantPhrasingOutput` 加 `attempted/errored`）、工具选择（provider 响应带 `usage`，attempted = provider 为 groq）。编排层把三者收成 `AssistantLlmCallRecord[]`，`summarizeTurnLlmCalls` 聚合。**救场 usage 在所有路径（含 knowledge/unsupported/agent）都计入**。
+- **三处调用各报统一 call record**（`AssistantProviderCallTelemetry {attempted, errored, provider, model, usage}`）：意图救场（`LlmIntentClassification {intent, call}`）、措辞（`AssistantPhrasingOutput {summary, call}`）、工具选择（provider 响应**所有 variant 含 error** 都带 `telemetry`）。编排层把三者收成 `AssistantLlmCallRecord[]`，`summarizeTurnLlmCalls(records)` 聚合——**provider/model 直接取自 records（真实 client 结果），不再 re-read env**。救场 usage 在所有路径（含 knowledge/unsupported/agent）都计入。
 - **服务端 telemetry 信封（不污染公开 DTO）**：`runMockAssistantTurn` 返回内部 `AssistantTurnExecutionResult { response, telemetry }`；`telemetry.llm` 是服务端运维元数据，**不进** `MockAssistantTurnResponseData` / `structured_output`。客户端不依赖 Groq/OpenAI 的 usage 结构；`telemetry` 后续可扩展 `trace_id`、各调用耗时。
 - **日志字段**：`assistant_turn` 单行 JSON 加 `status`（ok/error）、`llm_attempt_count`、`llm_usage_report_count`、`llm_error_count`（三者语义不同：发起数 / 上报 usage 数 / 失败数）、`prompt/completion/total_tokens`、`provider`、`model`、`estimated_cost_usd`。
 - **按模型计价，未知→null**：`MODEL_PRICING_USD_PER_1M` 表按模型查价（llama-3.3-70b：$0.59/$0.79 per 1M）；未知/未配模型 → `estimated_cost_usd: null`（绝不输出看似精确的错数）；注明是 list-price 估算，Groq 免费层实际 $0。
-- **失败 turn 也落日志**：`logFailedAssistantTurnEvent` 在两个控制器的错误分支各发一条 `status:"error"` 行。
+- **失败 turn 也落日志且带 LLM telemetry**：provider 调用失败时编排层抛 `AssistantTurnError`（HttpError 子类，带 `turnTelemetry`，**不序列化给客户端**）；控制器在错误分支用它发 `logFailedAssistantTurnEvent({..., llm})`——Groq 429/500 这类失败轮也有 `llm_attempt_count=1 / llm_error_count=1 / model / usage`。
+- **空响应保留 usage**：措辞/路由空文本回退 draft 时仍带 `call.usage`（调用已发生、可能有 usage）→ 上报数与成本不漏算。
 
 演进（历史，已被取代）：
-- 初版（commit a8aa58e）把 `token_usage` 放进公开 `MockAssistantTurnResponseData` DTO → Codex 标 API 契约污染 P2 → 改内部 telemetry 信封（dc1265d）。
-- 二审发现：救场调用未计（"最多两次"表述错，实为最多三次）、成本写死模型、usage 挤主 schema 可拖垮 tool_call、`llm_call_count` 实为"usage 上报数"、失败 turn 不记日志 → 本次定稿全部修正，并抽共享 client 消除重复漂移。
+- 初版（a8aa58e）把 `token_usage` 放进公开 DTO → API 契约污染 P2 → 改内部 telemetry 信封（dc1265d）。
+- 二审（890ccee–95efb43）：救场调用未计（"最多两次"错，实为三次）、成本写死模型、usage 挤主 schema 可拖垮 tool_call、`llm_call_count` 实为"usage 上报数"、失败 turn 不记日志 → 拆 attempt/usage_report/error 计数 + 按模型计价 + 失败轮日志 + 抽共享 client。
+- 三审（本次）：失败的 provider 调用仍丢 telemetry（throw 前不带）、provider/model 仍 orchestrator re-read env、空响应丢 usage → 统一成 `AssistantProviderCallTelemetry` call record（所有 response variant 含 error 都带），provider/model 从 records 聚合，`AssistantTurnError` 把 telemetry 带到失败日志，空响应保留 usage。
 
 边界 / 未做：
 - **LangSmith 外部 tracing**（C1 的另一半）：需新依赖 + key + PII 去除，单独片。
@@ -994,4 +996,4 @@ Decision（定稿）：
 - "救场分类后又做一次工具选择"两次调用能否合并（省延迟/成本）——留作单独优化评估。
 - eval 不受影响（离线 + 不走 provider）。
 
-验证：type-check / 改动文件 eslint + Prettier / test:unit 328 / eval 13·12·3 全绿。
+验证：type-check / 改动文件 eslint + Prettier / test:unit 330 / eval 13·12·3 全绿。
