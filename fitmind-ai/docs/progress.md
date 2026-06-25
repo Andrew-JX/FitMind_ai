@@ -4732,6 +4732,8 @@ Verification: `pnpm type-check` / `pnpm test:unit`(312,+1) / `pnpm eval`(13/13·
 
 ## 2026-06-23 C1：Token/成本 observability（聚合 Groq usage 进每轮日志 + 可选 token_usage DTO）
 
+> ⚠️ **本条为初版方案，已被后续提交取代**：① token_usage 进公开 DTO → 改内部 telemetry 信封（见下方"审查改进"条 + ai-decisions D40）；② 后续二审又补：意图救场调用计入、按模型计价（未知→null）、计数语义拆分、失败 turn 记日志、抽共享 Groq client（见下方"C1 二审定稿"条）。当前结论以 D40 为准。
+
 11.3b 引入第二次计费调用后补成本可观测（小、稳、无行为风险）；LangSmith 外部 tracing 单独评估、本片不做。两小批：
 
 - **Batch 1（取 usage + schema，零行为变更）**：`provider-types.ts`（message/tool_call 响应加可选 `usage` + `AssistantProviderUsage`）；`groq-assistant-provider.ts`（路由调用解析 usage）；`assistant-turn-observability.ts`（event/input 加 `llm_call_count/prompt_tokens/completion_tokens/total_tokens/estimated_cost_usd`，list-price 估算）；+groq/observability 单测。无人消费 usage → 全绿零变更。
@@ -4751,3 +4753,14 @@ Codex 审查 a8aa58e：把 `token_usage` 放进公开 `MockAssistantTurnResponse
 - api-contract 改为"Token/成本是服务端 telemetry，不进响应"。
 
 Verification: `pnpm type-check` / `pnpm test:unit`(317) / `pnpm eval`(13/13·12/12·3/3 PASS) 通过；改动文件 eslint EXIT 0。涉及 3 代码文件（orchestrator / 控制器 / 端到端测试）+ docs。
+
+## 2026-06-23 C1 二审定稿：可信 token/成本 telemetry（Codex C1 复审）
+
+Codex 二审 a8aa58e/dc1265d 后判 C1 计数/成本不可信，逐条修实（拆 4 批，每批 ≤5 文件、各自过门禁 + Prettier）：
+
+- **Batch 1（P3a + P2b）**：抽共享 `groq-chat-client.ts`（统一 fetch + 排空 body + 核心响应与 usage 分开解析，usage `int().nonnegative()` 非法只丢 usage；返回 `attempted/provider/model`，配置失败 attempted=false、不调 fetch）。`groq-assistant-provider` 改用它，删重复 fetch/schema。
+- **Batch 2（P1）**：`llm-intent-router` 改用 client，返回 `{intent, usage, attempted, errored}`；`resolveRoutedIntent` 透传为 `ResolvedRoutedIntent`；编排层把救场调用 usage 计入**所有**路径 telemetry。
+- **Batch 3a/3b（P2a + P2c）**：措辞返回 `attempted/errored`；telemetry 拆 `llm_attempt/usage_report/error_count` + provider/model；成本按模型查价表（未知→`estimated_cost_usd: null`），model 取自本轮实际配置（非 observability 层 re-read env）；失败 turn 经 `logFailedAssistantTurnEvent` 落 `status:"error"` 行（两控制器）。三处调用收成 `AssistantLlmCallRecord[]` → `summarizeTurnLlmCalls`。
+- **Batch 4（P2d + P3b）**：重写 D40/roadmap 当前结论（最多三次调用、telemetry 信封、按模型计价）；progress 初版条加"已取代"标注；本轮触及文件均跑 Prettier（仓库 156 个历史 format 欠债不动）。
+
+Verification: `pnpm type-check` / `pnpm test:unit`(328) / `pnpm eval`(13/13·12/12·3/3 PASS) 通过；改动文件 eslint + Prettier 干净。决策见 ai-decisions D40（含演进史）。

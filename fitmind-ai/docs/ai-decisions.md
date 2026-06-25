@@ -968,25 +968,30 @@ Decision（最小且安全）：
 
 验证：type-check / 改动文件 eslint / test:unit 311（groq 措辞 4 例 + answer-phrasing 4 例）/ eval 13·12·3 全绿。真链路（groq + 开关）质量靠 prod 验证。
 
-## [D40] Token/成本 observability：聚合 Groq usage 进每轮日志 + 可选 token_usage DTO（C1）
+## [D40] Token/成本 observability：聚合 Groq usage 进每轮 telemetry 日志（C1）
 
 - **Date**: 2026-06-23
 - **Status**: Accepted（已落地 + 单测；LangSmith 外部 tracing 暂缓）
+- **当前结论（多轮审查后定稿；下方"演进"记历史）**
 
-背景：11.3b 上了第二次（计费）LLM 调用（措辞），加上路由选工具调用，一轮最多两次 Groq 调用。此前完全没记 token/成本，无法观测。C1 先做这块（小、稳、无行为风险）；LangSmith 外部 tracing 因需引新依赖 + API key + trace 去 PII，单独评估，本片不做。
+背景：一条自由表达 turn 最多 **3 次** Groq 调用——① 关键词落空时的**意图救场分类**（`llm-intent-router`）、② provider 路径的**工具选择**、③ 11.3b 的**措辞**。此前完全没记 token/成本，且救场调用根本没被计入。C1 把它做实；LangSmith 外部 tracing 因需引新依赖 + key + PII 去除，单独评估，本片不做。
 
-Decision：
-- **接缝取 usage**：Groq 响应（OpenAI 兼容）带 `usage`。`provider-types` 给 message/tool_call 响应加可选 `usage`；`runGroqAssistantProvider`（路由）与 `runGroqAnswerPhrasing`（措辞，返回 `{summary, usage}`）各自解析上报；mock/anthropic 不带（usage 可选）。
-- **聚合**：编排层 `aggregateTurnTokenUsage([routingUsage, phrasingUsage])` 求和（忽略 undefined，记 `llm_call_count`）；仅当有调用上报 usage 时产出，否则 undefined（mock 路径）。
-- **服务端 telemetry 信封（不污染公开 DTO，审查改进）**：`runMockAssistantTurn` 返回内部 `AssistantTurnExecutionResult { response, telemetry }`；`telemetry.tokenUsage` 是服务端运维元数据，**不进** `MockAssistantTurnResponseData` / `structured_output`。控制器 `const { response, telemetry } = ...` → 记日志用 telemetry，响应只回 `response`。这样客户端不依赖 Groq/OpenAI 的 usage 结构；`telemetry` 后续可自然扩展 `trace_id`、模型、各调用耗时/成本。（初版曾把 `token_usage` 放进公开 DTO，Codex 标为 API 契约污染 P2，已改为信封。）
-- **日志出口**：控制器把 `telemetry.tokenUsage` 映射进 `logAssistantTurnEvent` 的 `assistant_turn` 单行 JSON，新增 `llm_call_count/prompt_tokens/completion_tokens/total_tokens/estimated_cost_usd`。
-- **成本估算**：`estimated_cost_usd` 按 llama-3.3-70b list price 常量（$0.59/1M prompt、$0.79/1M completion）算，**注明是估算**——Groq 免费层实际计费 $0；tokens 才是真信号。默认/mock 路径全 0。
+Decision（定稿）：
+- **共享 Groq client**（`groq-chat-client.ts`）：统一 fetch + 排空 body + **核心响应与 usage 分开解析**（usage 用 `int().nonnegative()` 校验，非法只丢 usage、绝不拖垮 tool_call/message）。返回 `{ attempted, provider, model, ok, content, toolCall, usage, errorMessage }`——`attempted` 仅在配置失败（未发请求）时 false；`provider/model` 来自**实际调用配置**，杜绝与真实调用漂移。路由 provider、措辞、意图救场三处都走它。
+- **三处调用各报 telemetry**：意图救场（`LlmIntentClassification {intent, usage, attempted, errored}`）、措辞（`AssistantPhrasingOutput` 加 `attempted/errored`）、工具选择（provider 响应带 `usage`，attempted = provider 为 groq）。编排层把三者收成 `AssistantLlmCallRecord[]`，`summarizeTurnLlmCalls` 聚合。**救场 usage 在所有路径（含 knowledge/unsupported/agent）都计入**。
+- **服务端 telemetry 信封（不污染公开 DTO）**：`runMockAssistantTurn` 返回内部 `AssistantTurnExecutionResult { response, telemetry }`；`telemetry.llm` 是服务端运维元数据，**不进** `MockAssistantTurnResponseData` / `structured_output`。客户端不依赖 Groq/OpenAI 的 usage 结构；`telemetry` 后续可扩展 `trace_id`、各调用耗时。
+- **日志字段**：`assistant_turn` 单行 JSON 加 `status`（ok/error）、`llm_attempt_count`、`llm_usage_report_count`、`llm_error_count`（三者语义不同：发起数 / 上报 usage 数 / 失败数）、`prompt/completion/total_tokens`、`provider`、`model`、`estimated_cost_usd`。
+- **按模型计价，未知→null**：`MODEL_PRICING_USD_PER_1M` 表按模型查价（llama-3.3-70b：$0.59/$0.79 per 1M）；未知/未配模型 → `estimated_cost_usd: null`（绝不输出看似精确的错数）；注明是 list-price 估算，Groq 免费层实际 $0。
+- **失败 turn 也落日志**：`logFailedAssistantTurnEvent` 在两个控制器的错误分支各发一条 `status:"error"` 行。
 
-落地三步：Batch 1 = provider-types/groq/observability + 取 usage + schema（不接线，零行为变更）；Batch 2 = 措辞返回 usage（groq/adapter）+ 编排层聚合 + 控制器记日志 + 端到端单测；Batch 3（审查后）= 收敛到内部 telemetry 信封，把 token_usage 移出公开 DTO。
+演进（历史，已被取代）：
+- 初版（commit a8aa58e）把 `token_usage` 放进公开 `MockAssistantTurnResponseData` DTO → Codex 标 API 契约污染 P2 → 改内部 telemetry 信封（dc1265d）。
+- 二审发现：救场调用未计（"最多两次"表述错，实为最多三次）、成本写死模型、usage 挤主 schema 可拖垮 tool_call、`llm_call_count` 实为"usage 上报数"、失败 turn 不记日志 → 本次定稿全部修正，并抽共享 client 消除重复漂移。
 
 边界 / 未做：
 - **LangSmith 外部 tracing**（C1 的另一半）：需新依赖 + key + PII 去除，单独片。
 - anthropic provider 未上报 usage（接口已留可选位，后续补）。
+- "救场分类后又做一次工具选择"两次调用能否合并（省延迟/成本）——留作单独优化评估。
 - eval 不受影响（离线 + 不走 provider）。
 
-验证：type-check / 改动文件 eslint / test:unit 317（groq usage 2 例 + observability token 2 例 + orchestrator token_usage 2 例）/ eval 13·12·3 全绿。
+验证：type-check / 改动文件 eslint + Prettier / test:unit 328 / eval 13·12·3 全绿。
