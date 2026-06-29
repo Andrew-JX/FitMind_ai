@@ -32,6 +32,12 @@ import { coerceMessageToEvidenceToolCall } from "./assistant-provider-fallback.j
 import { applyFaithfulPhrasing } from "./answer-phrasing.js";
 import { getToolDefinitionForMode } from "./assistant-tool-routing.js";
 import {
+  classifyAssistantSafety,
+  composeMedicalSafetyAnswer,
+  isAssistantSafetyGateEnabled,
+  type AssistantSafetyReason,
+} from "./assistant-safety.js";
+import {
   summarizeTurnLlmCalls,
   type AssistantLlmCallRecord,
   type AssistantTurnLlmSummary,
@@ -271,6 +277,10 @@ export interface MockAssistantTurnResponseData {
 export interface AssistantTurnTelemetry {
   /** Aggregated LLM call/token telemetry (Groq); undefined on deterministic/mock paths. */
   llm?: AssistantTurnLlmSummary | undefined;
+  /** Server-only safety marker for pre-routing medical boundary hits. */
+  safety?:
+    | { boundary: "medical_boundary"; reason: AssistantSafetyReason }
+    | undefined;
 }
 
 /** Internal envelope: the public response plus server-only telemetry. */
@@ -1148,6 +1158,56 @@ export async function runMockAssistantTurn(
     type: "session",
     session_id: resolvedSession.sessionId,
   });
+
+  if (isAssistantSafetyGateEnabled()) {
+    const safetyClassification = classifyAssistantSafety(input.message);
+
+    if (
+      safetyClassification.boundary === "medical_boundary" &&
+      safetyClassification.reason !== null
+    ) {
+      const answer = composeMedicalSafetyAnswer(safetyClassification);
+
+      await emitAnswerEvents(answer, options);
+
+      const response: MockAssistantTurnResponseData = {
+        session_id: resolvedSession.sessionId,
+        mode: input.mode,
+        assistant_type: "deterministic_mock",
+        intent: "unsupported",
+        tool_calls: [],
+        answer,
+      };
+
+      const messageId = await persistMockTurnMessages({
+        sessionId: resolvedSession.sessionId,
+        request: input,
+        response,
+      });
+      response.message_id = messageId;
+
+      await emitEvent(options, {
+        type: "structured_output",
+        output: response,
+      });
+      await emitEvent(options, {
+        type: "done",
+        message_id: messageId,
+        session_id: resolvedSession.sessionId,
+      });
+
+      return {
+        response,
+        telemetry: {
+          safety: {
+            boundary: "medical_boundary",
+            reason: safetyClassification.reason,
+          },
+        },
+      };
+    }
+  }
+
   const intentRouter =
     options?.intentRouter !== undefined
       ? options.intentRouter

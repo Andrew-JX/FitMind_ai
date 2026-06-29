@@ -1,4 +1,8 @@
 import type { AssistantRoutedIntent } from "./assistant-intent-router.js";
+import type {
+  AssistantSafetyBoundary,
+  AssistantSafetyReason,
+} from "./assistant-safety.js";
 import type { AssistantProviderCallTelemetry } from "./provider-types.js";
 
 /** Faithfulness outcome bucket for telemetry (`unchecked` = no tool data this turn). */
@@ -54,6 +58,10 @@ export interface AssistantTurnLogInput {
     | undefined;
   hasPlan?: boolean | undefined;
   llm?: AssistantTurnLlmSummary | null | undefined;
+  safety?:
+    | { boundary: "medical_boundary"; reason: AssistantSafetyReason }
+    | null
+    | undefined;
 }
 
 /** LLM call/token/cost fields shared by the ok and error turn-log events. */
@@ -82,6 +90,8 @@ export interface AssistantTurnLogEvent extends LlmEventFields {
   faithfulness_status: FaithfulnessStatus;
   unverified_claim_count: number;
   has_plan: boolean;
+  safety_boundary: AssistantSafetyBoundary;
+  safety_reason: AssistantSafetyReason | null;
 }
 
 /** A single structured line for a turn that failed before producing a result. */
@@ -170,6 +180,8 @@ export function buildAssistantTurnLogEvent(
     faithfulness_status: resolveFaithfulnessStatus(input.faithfulness),
     unverified_claim_count: input.faithfulness?.unverifiedClaims.length ?? 0,
     has_plan: input.hasPlan ?? false,
+    safety_boundary: input.safety?.boundary ?? "none",
+    safety_reason: input.safety?.reason ?? null,
     ...buildLlmEventFields(input.llm ?? null),
   };
 }

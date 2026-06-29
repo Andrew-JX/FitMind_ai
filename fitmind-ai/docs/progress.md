@@ -4775,3 +4775,11 @@ Verification: `pnpm type-check` / `pnpm test:unit`(328) / `pnpm eval`(13/13·12/
 - **P2d 文档**：roadmap §8.2 B1 / §8.3 标 token/成本 observability ✅；D40 加"三审"演进 + provider/model 从 records 的表述。
 
 Verification: `pnpm type-check` / `pnpm test:unit`(330) / `pnpm eval`(13/13·12/12·3/3 PASS) 通过；改动文件 eslint + Prettier 干净。决策见 ai-decisions D40。
+
+## 2026-06-29 C3 / Slice 10：确定性安全分类器（疼痛/医疗边界 pre-routing gate）
+
+新增医疗安全边界：`assistant-safety.ts` 在 `resolveRoutedIntent` / Groq 救场 / RAG / 工具执行之前判定急性疼痛、模糊疼痛/症状、红旗症状、诊断/治疗请求和用药请求。命中后直接返回确定性安全模板（不诊断、不开药、不走 LLM），`intent` 仍为 `unsupported` 以保持公开 DTO 稳定；内部 `AssistantTurnTelemetry.safety` 经 `assistant_turn` 日志落 `safety_boundary` / `safety_reason`，LLM 计数保持完整 0 值。
+
+关键边界：明确慢性约束（如“膝盖以前受过伤，想避开深蹲”）继续走档案/训练调整；但出现疼痛/症状 token 且没有明确过去/已恢复/规避框架时 fail-safe 判 `medical_boundary`。`ASSISTANT_SAFETY_GATE` 默认开，只有 off/false/0/no 显式关闭；`.env.example` 已记录。
+
+门禁：新增 safety eval（急性/模糊疼痛正例 + 慢性约束反例）纳入 `pnpm eval` 的 fail-closed 检查；新增分类器、编排短路、telemetry 单测。决策见 ai-decisions D41。

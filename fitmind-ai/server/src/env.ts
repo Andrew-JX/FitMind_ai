@@ -28,6 +28,18 @@ const booleanFlag = z.preprocess(
   z.boolean().default(false),
 );
 
+/**
+ * Fail-safe boolean flag for safety gates: only an explicit disable token turns
+ * it off. Unset, blank, typo, and normal enable tokens all keep protection on.
+ */
+const safetyFlagDefaultOn = z.preprocess((value) => {
+  if (typeof value !== "string") {
+    return true;
+  }
+
+  return !["0", "false", "no", "off"].includes(value.trim().toLowerCase());
+}, z.boolean().default(true));
+
 const serverEnvSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
@@ -44,6 +56,9 @@ const serverEnvSchema = z.object({
   // Slice 11.3b: opt-in LLM re-phrasing of the answer summary (still gated by
   // ASSISTANT_PROVIDER=groq + runtime faithfulness fallback). Default off.
   ASSISTANT_PHRASING: booleanFlag,
+  // Slice 10: fail-safe medical boundary gate. Default on; only explicit
+  // disable tokens turn it off for rollback.
+  ASSISTANT_SAFETY_GATE: safetyFlagDefaultOn,
   WORKOUT_INTAKE_LLM_PROVIDER: z
     .enum(["off", "mock", "anthropic", "gemini", "groq"])
     .default("mock")
@@ -63,6 +78,7 @@ export interface ServerEnv {
   jwtSecret?: string | undefined;
   assistantProvider: "mock" | "anthropic" | "groq";
   assistantPhrasing: boolean;
+  assistantSafetyGate: boolean;
   workoutIntakeLlmProvider: "off" | "mock" | "anthropic" | "gemini" | "groq";
   anthropicApiKey?: string | undefined;
   geminiApiKey?: string | undefined;
@@ -84,6 +100,7 @@ export function loadServerEnv(
     jwtSecret: parsed.JWT_SECRET,
     assistantProvider: parsed.ASSISTANT_PROVIDER,
     assistantPhrasing: parsed.ASSISTANT_PHRASING,
+    assistantSafetyGate: parsed.ASSISTANT_SAFETY_GATE,
     workoutIntakeLlmProvider: parsed.WORKOUT_INTAKE_LLM_PROVIDER,
     anthropicApiKey: parsed.ANTHROPIC_API_KEY,
     geminiApiKey: parsed.GEMINI_API_KEY,

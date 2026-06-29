@@ -32,6 +32,8 @@ describe("buildAssistantTurnLogEvent", () => {
       faithfulness_status: "flagged",
       unverified_claim_count: 1,
       has_plan: false,
+      safety_boundary: "none",
+      safety_reason: null,
       llm_attempt_count: 0,
       llm_usage_report_count: 0,
       llm_error_count: 0,
@@ -67,6 +69,24 @@ describe("buildAssistantTurnLogEvent", () => {
 
     expect(event.agent_step_count).toBe(5);
     expect(event.has_plan).toBe(true);
+  });
+
+  it("logs safety boundary fields with zeroed LLM counters on safety turns", () => {
+    const event = buildAssistantTurnLogEvent({
+      intent: "unsupported",
+      durationMs: 25,
+      toolCalls: [],
+      safety: {
+        boundary: "medical_boundary",
+        reason: "ambiguous_pain_or_symptom",
+      },
+    });
+
+    expect(event.safety_boundary).toBe("medical_boundary");
+    expect(event.safety_reason).toBe("ambiguous_pain_or_symptom");
+    expect(event.llm_attempt_count).toBe(0);
+    expect(event.llm_usage_report_count).toBe(0);
+    expect(event.llm_error_count).toBe(0);
   });
 
   it("reports the distinct LLM counts and a list-price cost for a known model", () => {

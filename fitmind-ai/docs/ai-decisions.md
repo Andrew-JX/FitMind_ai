@@ -997,3 +997,28 @@ Decision（定稿）：
 - eval 不受影响（离线 + 不走 provider）。
 
 验证：type-check / 改动文件 eslint + Prettier / test:unit 330 / eval 13·12·3 全绿。
+
+## [D41] Slice 10 安全分类器：医疗边界 pre-routing gate
+
+- **Date**: 2026-06-29
+- **Status**: Accepted（已落地 + 单测；服务端 telemetry，不进公开 DTO）
+
+背景：B1 后真实模型可自由表达，疼痛/医疗边界不能再靠普通训练路由或 RAG 硬答。安全判定必须先于 `resolveRoutedIntent`、Groq 救场、工具和 RAG。
+
+Decision：
+- **独立 pre-routing gate，不扩公开 intent**：`runMockAssistantTurn` 在 session 建立后先跑 `classifyAssistantSafety`。命中后短路到 `composeMedicalSafetyAnswer`，公开响应仍为 `intent: "unsupported"`，不新增 DTO 字段。这样两端点（mock-turn / stream-turn）共享覆盖，也避免前端立刻承担新公开状态。
+- **确定性 fail-safe**：规则覆盖急性疼痛、模糊疼痛/症状、红旗症状、诊断/治疗请求、用药请求。tie-break 明确保守：出现真实疼痛/症状 token 且没有“避开/避免/少安排/伤病约束/档案约束”等规划性语义 → `medical_boundary`。
+- **当前/复发疼痛赢过慢性历史**：`最近/这几天/这两天/又/还是/复发/开始疼` 等当前或复发标记与疼痛并存时，旧伤/以前/老伤不会豁免；例如“膝盖以前受过伤，最近又开始疼了”会主动短路。
+- **DOMS 裸酸痛不误伤**：`酸痛/酸/sore/soreness` 先按 soreness-only 处理；剥离这些词后没有其它疼痛/症状 token，且没有“越来越/加重/严重/持续/无法缓解/剧烈”等严重度标记时，不触发医疗边界。带严重度的酸痛仍走 safety。
+- **慢性规划约束不误伤**：明确避开动作/加入伤病约束/少安排某类动作的表达继续走正常训练或档案能力，例如“膝盖以前受过伤，想避开深蹲”“肩旧伤，下周计划少安排推举”。
+- **安全文案确定性**：模板只做共情、声明不能诊断/开药/治疗、建议急性或红旗症状优先停止训练并就医、提示急性问题处理后可把稳定伤病限制写进训练档案。不经 LLM，不编造数字。
+- **服务端 telemetry 信封**：`AssistantTurnTelemetry.safety` 经 `logTurnTelemetry` 落 `assistant_turn.safety_boundary` / `safety_reason`；C1 LLM 计数完整保留，安全轮是合法的 0 LLM / 0 工具 turn。公开 `structured_output` 不带 safety。
+- **回退开关默认安全**：`ASSISTANT_SAFETY_GATE` 默认 on；只有 off/false/0/no 显式关闭。空串、未设、typo 都保持开启；不复用默认 false 的 `booleanFlag`。
+
+已知局限：
+- 公开层 Phase 1 无法区分普通 unsupported 和 safety refusal；前端当前只用 unsupported 抑制 saved insights / debug 展示，因此可接受。未来如需安全样式或用户教育，可引入公开 safety 维度。
+- 确定性词表会漏掉未预料的急性表述（假阴性是危险方向）。本片用保守 tie-break 和 eval 承重兜底；LLM 辅助召回可作为 Phase 2，但不能成为唯一裁决，失败时必须回到确定性结果。
+- 否定式当前疼痛（如“现在不疼了，想继续练腿”）可能仍过度拒答；这是安全方向的假阳性，留待后续用更细的否定检测处理。
+- 既有平台诊断里的“疼痛/伤病不是医疗建议”仍作为正常训练答案的被动免责声明；本 gate 是对用户主动报告急性/医疗边界时的主动短路，两者并存。
+
+验证：新增 safety eval 纳入 `pnpm eval`（急性/模糊疼痛正例 + 复发疼痛中段 + DOMS/慢性约束反例）；新增分类器、编排短路、telemetry 单测。门禁结果见 progress 对应条。
