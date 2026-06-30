@@ -1,12 +1,12 @@
 import { anthropicAssistantProvider } from "./anthropic-provider.js";
-import { getConfiguredAssistantProvider } from "./provider-config.js";
+import { mockAssistantProvider } from "./mock-provider.js";
 import {
-  groqAssistantProvider,
-  runGroqAnswerPhrasing,
+  openAiCompatibleAssistantProvider,
+  runOpenAiCompatibleAnswerPhrasing,
   type AssistantPhrasingInput,
   type AssistantPhrasingOutput,
-} from "./groq-assistant-provider.js";
-import { mockAssistantProvider } from "./mock-provider.js";
+} from "./openai-compatible-assistant-provider.js";
+import { getConfiguredAssistantProvider } from "./provider-config.js";
 import type {
   AssistantProvider,
   AssistantProviderRequest,
@@ -18,7 +18,8 @@ function getAssistantProvider(): AssistantProvider {
     case "anthropic":
       return anthropicAssistantProvider;
     case "groq":
-      return groqAssistantProvider;
+    case "openai_compatible":
+      return openAiCompatibleAssistantProvider;
     default:
       return mockAssistantProvider;
   }
@@ -51,7 +52,7 @@ function ensureAllowedTool(
     return response;
   }
 
-  // Hallucinated tool name: still a billed Groq call — preserve its telemetry so
+  // Hallucinated tool name: still a billed provider call. Preserve telemetry so
   // the failed turn reports attempt/error/model/usage.
   return {
     kind: "error",
@@ -83,12 +84,13 @@ export async function runAssistantProvider(
 /**
  * Re-phrase one answer summary through the configured provider (Slice 11.3b).
  *
- * Only `groq` performs a real re-phrasing call; every other provider (and any
- * failure) returns the original draft summary unchanged, so this is a safe no-op
- * outside the groq path. Faithfulness still validates the result upstream.
+ * Only OpenAI-compatible providers perform a real re-phrasing call; every other
+ * provider (and any failure) returns the original draft summary unchanged, so
+ * this is a safe no-op outside that path. Faithfulness still validates the
+ * result upstream.
  *
  * @param input - The draft summary plus supporting fact lines.
- * @returns The (possibly) re-phrased summary + usage; the draft (no usage) on any non-groq path or failure.
+ * @returns The (possibly) re-phrased summary + usage; the draft (no usage) on any non-compatible path or failure.
  */
 export async function runAssistantAnswerPhrasing(
   input: AssistantPhrasingInput,
@@ -104,11 +106,12 @@ export async function runAssistantAnswerPhrasing(
   };
 
   try {
-    if (getConfiguredAssistantProvider() !== "groq") {
+    const provider = getConfiguredAssistantProvider();
+    if (provider !== "groq" && provider !== "openai_compatible") {
       return noCall;
     }
 
-    return await runGroqAnswerPhrasing(input);
+    return await runOpenAiCompatibleAnswerPhrasing(input);
   } catch {
     return noCall;
   }

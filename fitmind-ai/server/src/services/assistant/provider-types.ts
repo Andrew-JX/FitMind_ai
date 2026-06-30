@@ -55,7 +55,7 @@ export interface AssistantProviderUsage {
 export interface AssistantProviderCallTelemetry {
   attempted: boolean;
   errored: boolean;
-  provider: "groq" | null;
+  provider: OpenAiCompatibleProviderName | null;
   model: string | null;
   usage?: AssistantProviderUsage | undefined;
 }

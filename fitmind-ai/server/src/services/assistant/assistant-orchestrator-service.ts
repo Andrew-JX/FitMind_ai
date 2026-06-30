@@ -46,7 +46,7 @@ import {
   type AssistantTurnLlmSummary,
 } from "./assistant-turn-observability.js";
 import {
-  createGroqIntentRouter,
+  createOpenAiCompatibleIntentRouter,
   type LlmIntentRouter,
 } from "./llm-intent-router.js";
 import {
@@ -1214,8 +1214,9 @@ export async function runMockAssistantTurn(
   const intentRouter =
     options?.intentRouter !== undefined
       ? options.intentRouter
-      : getConfiguredAssistantProvider() === "groq"
-        ? createGroqIntentRouter()
+      : getConfiguredAssistantProvider() === "groq" ||
+          getConfiguredAssistantProvider() === "openai_compatible"
+        ? createOpenAiCompatibleIntentRouter()
         : null;
   const routed = await resolveRoutedIntent(input, intentRouter);
   const intent = routed.intent;

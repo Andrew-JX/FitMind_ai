@@ -1,8 +1,8 @@
 import {
-  runGroqChatCompletion,
-  type GroqChatResult,
-  type GroqChatTool,
-} from "./groq-chat-client.js";
+  runConfiguredAssistantOpenAiCompatibleChatCompletion,
+  type OpenAiCompatibleChatResult,
+  type OpenAiCompatibleChatTool,
+} from "./openai-compatible-chat-client.js";
 import type {
   AssistantProvider,
   AssistantProviderCallTelemetry,
@@ -11,9 +11,9 @@ import type {
   AssistantProviderToolDefinition,
 } from "./provider-types.js";
 
-/** Map a Groq client result into provider-neutral per-call telemetry. */
+/** Map an OpenAI-compatible client result into provider-neutral telemetry. */
 function toCallTelemetry(
-  result: GroqChatResult,
+  result: OpenAiCompatibleChatResult,
 ): AssistantProviderCallTelemetry {
   return {
     attempted: result.attempted,
@@ -24,7 +24,17 @@ function toCallTelemetry(
   };
 }
 
-const GROQ_MAX_TOKENS = 512;
+function providerErrorCode(result: OpenAiCompatibleChatResult): string {
+  return result.provider === "groq"
+    ? "GROQ_PROVIDER_ERROR"
+    : "OPENAI_COMPATIBLE_PROVIDER_ERROR";
+}
+
+function providerName(result: OpenAiCompatibleChatResult): string {
+  return result.provider === "groq" ? "Groq" : "OpenAI-compatible provider";
+}
+
+const OPENAI_COMPATIBLE_MAX_TOKENS = 512;
 
 /**
  * Build the provider-neutral system prompt for the assistant turn.
@@ -45,9 +55,9 @@ function buildSystemPrompt(): string {
   ].join(" ");
 }
 
-function buildGroqTools(
+function buildOpenAiCompatibleTools(
   allowedTools: AssistantProviderToolDefinition[],
-): GroqChatTool[] {
+): OpenAiCompatibleChatTool[] {
   return allowedTools.map((tool) => ({
     type: "function" as const,
     function: {
@@ -97,31 +107,31 @@ function normalizeToolArgs(rawArguments: string): Record<string, string> {
   }
 
   return Object.fromEntries(
-    Object.entries(parsed as Record<string, unknown>).map(([key, value]) => [
-      key,
-      String(value),
-    ]),
+    Object.entries(parsed).map(([key, value]) => [key, String(value)]),
   );
 }
 
 /**
- * Execute one non-streaming Groq (OpenAI-compatible) assistant request and
- * normalize the result into a provider-neutral response.
+ * Execute one non-streaming OpenAI-compatible assistant request and normalize
+ * the result into a provider-neutral response.
+ *
+ * Groq and BYO use this same path, so tool allowlisting, telemetry, and fallback
+ * semantics remain provider-independent.
  *
  * @param request - Provider-neutral assistant request.
  * @returns Provider-neutral provider response.
  */
-export async function runGroqAssistantProvider(
+export async function runOpenAiCompatibleAssistantProvider(
   request: AssistantProviderRequest,
 ): Promise<AssistantProviderResponse> {
-  const result = await runGroqChatCompletion({
+  const result = await runConfiguredAssistantOpenAiCompatibleChatCompletion({
     messages: [
       { role: "system", content: buildSystemPrompt() },
       { role: "user", content: buildUserPrompt(request) },
     ],
-    maxTokens: GROQ_MAX_TOKENS,
+    maxTokens: OPENAI_COMPATIBLE_MAX_TOKENS,
     temperature: 0,
-    tools: buildGroqTools(request.allowed_tools),
+    tools: buildOpenAiCompatibleTools(request.allowed_tools),
     toolChoice: "auto",
   });
 
@@ -130,8 +140,8 @@ export async function runGroqAssistantProvider(
   if (!result.ok) {
     return {
       kind: "error",
-      error_code: "GROQ_PROVIDER_ERROR",
-      message: result.errorMessage ?? "Groq provider request failed.",
+      error_code: providerErrorCode(result),
+      message: result.errorMessage ?? `${providerName(result)} request failed.`,
       telemetry,
     };
   }
@@ -157,17 +167,17 @@ export async function runGroqAssistantProvider(
 
   return {
     kind: "error",
-    error_code: "GROQ_PROVIDER_ERROR",
-    message: "Groq provider returned neither text nor a tool call.",
+    error_code: providerErrorCode(result),
+    message: `${providerName(result)} returned neither text nor a tool call.`,
     telemetry,
   };
 }
 
-export const groqAssistantProvider: AssistantProvider = {
-  run: runGroqAssistantProvider,
+export const openAiCompatibleAssistantProvider: AssistantProvider = {
+  run: runOpenAiCompatibleAssistantProvider,
 };
 
-const GROQ_PHRASING_MAX_TOKENS = 256;
+const OPENAI_COMPATIBLE_PHRASING_MAX_TOKENS = 256;
 
 /** Input for one answer-summary re-phrasing call (Slice 11.3b). */
 export interface AssistantPhrasingInput {
@@ -194,7 +204,7 @@ function buildPhrasingSystemPrompt(): string {
     "You rewrite a fitness assistant's answer summary into natural, fluent Chinese.",
     "Preserve every number, percentage, unit, and factual claim EXACTLY as given.",
     "Never introduce, drop, or alter any number, and never add facts not present in the draft.",
-    "Return only the rewritten summary text — one or two sentences, no preamble, no explanation.",
+    "Return only the rewritten summary text - one or two sentences, no preamble, no explanation.",
   ].join(" ");
 }
 
@@ -202,7 +212,7 @@ function buildPhrasingUserPrompt(input: AssistantPhrasingInput): string {
   const facts =
     input.supportingFacts.length > 0
       ? input.supportingFacts.map((fact) => `- ${fact}`).join("\n")
-      : "（无）";
+      : "(none)";
 
   return [
     `draft_summary=${input.draftSummary}`,
@@ -211,7 +221,8 @@ function buildPhrasingUserPrompt(input: AssistantPhrasingInput): string {
 }
 
 /**
- * Re-phrase one answer summary with Groq, preserving all numbers/facts.
+ * Re-phrase one answer summary with the configured OpenAI-compatible provider,
+ * preserving all numbers/facts.
  *
  * Graceful by contract: any failure (missing key, HTTP error, malformed/empty
  * response) returns the original `draftSummary` so a phrasing attempt can never
@@ -219,17 +230,17 @@ function buildPhrasingUserPrompt(input: AssistantPhrasingInput): string {
  * upstream before it is shown.
  *
  * @param input - The draft summary plus supporting fact lines.
- * @returns The re-phrased summary + token usage, or the original draft (no usage) on any failure.
+ * @returns The re-phrased summary + token usage, or the original draft on any failure.
  */
-export async function runGroqAnswerPhrasing(
+export async function runOpenAiCompatibleAnswerPhrasing(
   input: AssistantPhrasingInput,
 ): Promise<AssistantPhrasingOutput> {
-  const result = await runGroqChatCompletion({
+  const result = await runConfiguredAssistantOpenAiCompatibleChatCompletion({
     messages: [
       { role: "system", content: buildPhrasingSystemPrompt() },
       { role: "user", content: buildPhrasingUserPrompt(input) },
     ],
-    maxTokens: GROQ_PHRASING_MAX_TOKENS,
+    maxTokens: OPENAI_COMPATIBLE_PHRASING_MAX_TOKENS,
     temperature: 0.3,
   });
 
@@ -241,8 +252,6 @@ export async function runGroqAnswerPhrasing(
 
   const text = result.content?.trim() ?? "";
 
-  // Either branch keeps `call` (incl. usage): an empty completion still happened
-  // and may carry usage, so its tokens/cost must be counted (P2/P3).
   return text.length > 0
     ? { summary: text, call }
     : { summary: input.draftSummary, call };

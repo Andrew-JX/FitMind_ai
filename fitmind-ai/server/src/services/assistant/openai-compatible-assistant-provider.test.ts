@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  runGroqAnswerPhrasing,
-  runGroqAssistantProvider,
-} from "./groq-assistant-provider.js";
+  runOpenAiCompatibleAnswerPhrasing,
+  runOpenAiCompatibleAssistantProvider,
+} from "./openai-compatible-assistant-provider.js";
 import type { AssistantProviderRequest } from "./provider-types.js";
 
 const request: AssistantProviderRequest = {
@@ -35,20 +35,29 @@ function mockFetchOnce(status: number, body: unknown): void {
   );
 }
 
-describe("runGroqAssistantProvider", () => {
+describe("runOpenAiCompatibleAssistantProvider", () => {
+  const originalAssistantProvider = process.env.ASSISTANT_PROVIDER;
   const originalKey = process.env.GROQ_API_KEY;
+  const originalCompatBaseUrl = process.env.OPENAI_COMPAT_BASE_URL;
+  const originalCompatModel = process.env.OPENAI_COMPAT_MODEL;
+  const originalCompatApiKey = process.env.OPENAI_COMPAT_API_KEY;
 
   beforeEach(() => {
+    process.env.ASSISTANT_PROVIDER = "groq";
     process.env.GROQ_API_KEY = "test-groq-key";
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    restoreEnv("ASSISTANT_PROVIDER", originalAssistantProvider);
     if (originalKey === undefined) {
       delete process.env.GROQ_API_KEY;
     } else {
       process.env.GROQ_API_KEY = originalKey;
     }
+    restoreEnv("OPENAI_COMPAT_BASE_URL", originalCompatBaseUrl);
+    restoreEnv("OPENAI_COMPAT_MODEL", originalCompatModel);
+    restoreEnv("OPENAI_COMPAT_API_KEY", originalCompatApiKey);
   });
 
   it("maps an OpenAI-style tool call to a provider tool_call with parsed args and usage", async () => {
@@ -72,7 +81,7 @@ describe("runGroqAssistantProvider", () => {
       usage: { prompt_tokens: 120, completion_tokens: 18, total_tokens: 138 },
     });
 
-    const result = await runGroqAssistantProvider(request);
+    const result = await runOpenAiCompatibleAssistantProvider(request);
 
     expect(result).toEqual({
       kind: "tool_call",
@@ -94,7 +103,7 @@ describe("runGroqAssistantProvider", () => {
       usage: { prompt_tokens: 60, completion_tokens: 12, total_tokens: 72 },
     });
 
-    const withUsage = await runGroqAssistantProvider(request);
+    const withUsage = await runOpenAiCompatibleAssistantProvider(request);
     expect(withUsage).toEqual({
       kind: "message",
       message: "渐进超负荷指逐步加量。",
@@ -111,7 +120,7 @@ describe("runGroqAssistantProvider", () => {
       choices: [{ message: { content: "渐进超负荷指逐步加量。" } }],
     });
 
-    const withoutUsage = await runGroqAssistantProvider(request);
+    const withoutUsage = await runOpenAiCompatibleAssistantProvider(request);
     expect(withoutUsage).toEqual({
       kind: "message",
       message: "渐进超负荷指逐步加量。",
@@ -130,7 +139,7 @@ describe("runGroqAssistantProvider", () => {
       choices: [{ message: { content: "  渐进超负荷指逐步加量。  " } }],
     });
 
-    const result = await runGroqAssistantProvider(request);
+    const result = await runOpenAiCompatibleAssistantProvider(request);
 
     expect(result).toMatchObject({
       kind: "message",
@@ -143,7 +152,7 @@ describe("runGroqAssistantProvider", () => {
       error: { message: "rate limited", type: "rate_limit" },
     });
 
-    const result = await runGroqAssistantProvider(request);
+    const result = await runOpenAiCompatibleAssistantProvider(request);
 
     expect(result.kind).toBe("error");
     if (result.kind === "error") {
@@ -155,7 +164,7 @@ describe("runGroqAssistantProvider", () => {
   it("errors when the response has neither text nor a tool call", async () => {
     mockFetchOnce(200, { choices: [{ message: { content: "" } }] });
 
-    const result = await runGroqAssistantProvider(request);
+    const result = await runOpenAiCompatibleAssistantProvider(request);
 
     expect(result.kind).toBe("error");
   });
@@ -180,7 +189,7 @@ describe("runGroqAssistantProvider", () => {
       usage: { prompt_tokens: "oops" },
     });
 
-    const result = await runGroqAssistantProvider(request);
+    const result = await runOpenAiCompatibleAssistantProvider(request);
 
     expect(result).toEqual({
       kind: "tool_call",
@@ -199,16 +208,42 @@ describe("runGroqAssistantProvider", () => {
   it("returns a provider error (not a throw) when GROQ_API_KEY is missing", async () => {
     delete process.env.GROQ_API_KEY;
 
-    const result = await runGroqAssistantProvider(request);
+    const result = await runOpenAiCompatibleAssistantProvider(request);
 
     expect(result.kind).toBe("error");
     if (result.kind === "error") {
       expect(result.message).toMatch(/GROQ_API_KEY/u);
     }
   });
+
+  it("uses BYO config and reports OpenAI-compatible telemetry", async () => {
+    process.env.ASSISTANT_PROVIDER = "openai_compatible";
+    process.env.OPENAI_COMPAT_BASE_URL = "https://api.deepseek.com";
+    process.env.OPENAI_COMPAT_MODEL = "deepseek-chat";
+    process.env.OPENAI_COMPAT_API_KEY = "test-openai-key";
+    mockFetchOnce(200, {
+      choices: [{ message: { content: "ok" } }],
+      usage: { prompt_tokens: 10, completion_tokens: 1, total_tokens: 11 },
+    });
+
+    const result = await runOpenAiCompatibleAssistantProvider(request);
+
+    expect(result).toEqual({
+      kind: "message",
+      message: "ok",
+      telemetry: {
+        attempted: true,
+        errored: false,
+        provider: "openai_compatible",
+        model: "deepseek-chat",
+        usage: { prompt_tokens: 10, completion_tokens: 1, total_tokens: 11 },
+      },
+    });
+  });
 });
 
-describe("runGroqAnswerPhrasing (Slice 11.3b)", () => {
+describe("runOpenAiCompatibleAnswerPhrasing (Slice 11.3b)", () => {
+  const originalAssistantProvider = process.env.ASSISTANT_PROVIDER;
   const originalKey = process.env.GROQ_API_KEY;
   const phrasingInput = {
     draftSummary: "本周共记录 4 次训练，20 组。",
@@ -216,11 +251,13 @@ describe("runGroqAnswerPhrasing (Slice 11.3b)", () => {
   };
 
   beforeEach(() => {
+    process.env.ASSISTANT_PROVIDER = "groq";
     process.env.GROQ_API_KEY = "test-groq-key";
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    restoreEnv("ASSISTANT_PROVIDER", originalAssistantProvider);
     if (originalKey === undefined) {
       delete process.env.GROQ_API_KEY;
     } else {
@@ -234,7 +271,7 @@ describe("runGroqAnswerPhrasing (Slice 11.3b)", () => {
       usage: { prompt_tokens: 80, completion_tokens: 20, total_tokens: 100 },
     });
 
-    const result = await runGroqAnswerPhrasing(phrasingInput);
+    const result = await runOpenAiCompatibleAnswerPhrasing(phrasingInput);
 
     expect(result).toEqual({
       summary: "这周你练了 4 次，一共 20 组。",
@@ -251,7 +288,7 @@ describe("runGroqAnswerPhrasing (Slice 11.3b)", () => {
   it("falls back to the draft and marks attempted+errored on an HTTP error", async () => {
     mockFetchOnce(429, { error: { message: "rate limited" } });
 
-    const result = await runGroqAnswerPhrasing(phrasingInput);
+    const result = await runOpenAiCompatibleAnswerPhrasing(phrasingInput);
 
     expect(result.summary).toBe(phrasingInput.draftSummary);
     expect(result.call.attempted).toBe(true);
@@ -264,7 +301,7 @@ describe("runGroqAnswerPhrasing (Slice 11.3b)", () => {
       usage: { prompt_tokens: 50, completion_tokens: 0, total_tokens: 50 },
     });
 
-    const result = await runGroqAnswerPhrasing(phrasingInput);
+    const result = await runOpenAiCompatibleAnswerPhrasing(phrasingInput);
 
     expect(result.summary).toBe(phrasingInput.draftSummary);
     expect(result.call.attempted).toBe(true);
@@ -279,10 +316,18 @@ describe("runGroqAnswerPhrasing (Slice 11.3b)", () => {
   it("falls back to the draft (not attempted) when GROQ_API_KEY is missing", async () => {
     delete process.env.GROQ_API_KEY;
 
-    const result = await runGroqAnswerPhrasing(phrasingInput);
+    const result = await runOpenAiCompatibleAnswerPhrasing(phrasingInput);
 
     expect(result.summary).toBe(phrasingInput.draftSummary);
     expect(result.call.attempted).toBe(false);
     expect(result.call.errored).toBe(false);
   });
 });
+
+function restoreEnv(key: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[key];
+  } else {
+    process.env[key] = value;
+  }
+}

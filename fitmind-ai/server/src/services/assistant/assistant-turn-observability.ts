@@ -27,15 +27,15 @@ export interface AssistantTurnLlmSummary {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
-  provider: "groq" | null;
+  provider: AssistantProviderCallTelemetry["provider"];
   /** Model that actually served the calls (from the client), for cost pricing. */
   model: string | null;
 }
 
 /**
  * List-price USD per 1M tokens, keyed by model. Estimates for visibility only —
- * the Groq free tier bills $0. Unknown models price to `null` (never a wrong
- * number). Add an entry when a new GROQ_MODEL is adopted.
+ * the Groq free tier bills $0. Unknown BYO models price to `null` (never a
+ * wrong number). Add an entry only when a model's list price is known.
  */
 const MODEL_PRICING_USD_PER_1M: Record<
   string,
@@ -72,7 +72,7 @@ interface LlmEventFields {
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
-  provider: "groq" | null;
+  provider: AssistantProviderCallTelemetry["provider"];
   /** List-price cost estimate (USD); `null` for unknown/unpriced models. */
   model: string | null;
   estimated_cost_usd: number | null;

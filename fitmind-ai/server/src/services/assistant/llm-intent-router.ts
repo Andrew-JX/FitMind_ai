@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { runGroqChatCompletion } from "./groq-chat-client.js";
+import { runConfiguredAssistantOpenAiCompatibleChatCompletion } from "./openai-compatible-chat-client.js";
 import type { AssistantRoutedIntent } from "./assistant-intent-router.js";
 import type { AssistantProviderCallTelemetry } from "./provider-types.js";
 
@@ -70,7 +70,7 @@ function parseRoutedIntent(content: string): AssistantRoutedIntent | null {
 }
 
 /**
- * Build a Groq-backed intent router.
+ * Build an OpenAI-compatible intent router.
  *
  * Used only as a rescue when the deterministic keyword classifier returns
  * `unsupported` for a non-blocklisted message. Any failure (missing key, HTTP
@@ -81,17 +81,19 @@ function parseRoutedIntent(content: string): AssistantRoutedIntent | null {
  *
  * @returns An {@link LlmIntentRouter}.
  */
-export function createGroqIntentRouter(): LlmIntentRouter {
+export function createOpenAiCompatibleIntentRouter(): LlmIntentRouter {
   return {
     async classify(message: string): Promise<LlmIntentClassification> {
-      const result = await runGroqChatCompletion({
-        messages: [
-          { role: "system", content: buildClassifierSystemPrompt() },
-          { role: "user", content: message },
-        ],
-        maxTokens: CLASSIFIER_MAX_TOKENS,
-        temperature: 0,
-      });
+      const result = await runConfiguredAssistantOpenAiCompatibleChatCompletion(
+        {
+          messages: [
+            { role: "system", content: buildClassifierSystemPrompt() },
+            { role: "user", content: message },
+          ],
+          maxTokens: CLASSIFIER_MAX_TOKENS,
+          temperature: 0,
+        },
+      );
 
       const call: AssistantProviderCallTelemetry = {
         attempted: result.attempted,
