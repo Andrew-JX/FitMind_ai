@@ -56,6 +56,9 @@ const serverEnvSchema = z.object({
   // Slice 11.3b: opt-in LLM re-phrasing of the answer summary (still gated by
   // ASSISTANT_PROVIDER=groq + runtime faithfulness fallback). Default off.
   ASSISTANT_PHRASING: booleanFlag,
+  // Learning-loop opt-in: previous accepted plan adherence can adjust the next
+  // deterministic plan. Default off for dogfood/A-B comparison.
+  ASSISTANT_PLAN_ADHERENCE_CONTEXT: booleanFlag,
   // Slice 10: fail-safe medical boundary gate. Default on; only explicit
   // disable tokens turn it off for rollback.
   ASSISTANT_SAFETY_GATE: safetyFlagDefaultOn,
@@ -78,6 +81,7 @@ export interface ServerEnv {
   jwtSecret?: string | undefined;
   assistantProvider: "mock" | "anthropic" | "groq";
   assistantPhrasing: boolean;
+  assistantPlanAdherenceContext: boolean;
   assistantSafetyGate: boolean;
   workoutIntakeLlmProvider: "off" | "mock" | "anthropic" | "gemini" | "groq";
   anthropicApiKey?: string | undefined;
@@ -100,6 +104,7 @@ export function loadServerEnv(
     jwtSecret: parsed.JWT_SECRET,
     assistantProvider: parsed.ASSISTANT_PROVIDER,
     assistantPhrasing: parsed.ASSISTANT_PHRASING,
+    assistantPlanAdherenceContext: parsed.ASSISTANT_PLAN_ADHERENCE_CONTEXT,
     assistantSafetyGate: parsed.ASSISTANT_SAFETY_GATE,
     workoutIntakeLlmProvider: parsed.WORKOUT_INTAKE_LLM_PROVIDER,
     anthropicApiKey: parsed.ANTHROPIC_API_KEY,

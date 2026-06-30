@@ -6,6 +6,7 @@ import {
   findChatSessionByIdForUser,
   hasChatSessionById,
 } from "../../db/chat-repository.js";
+import { loadServerEnv } from "../../env.js";
 import { HttpError } from "../../utils/http-error.js";
 import { executeAiTool } from "../ai/tools/tool-executor.js";
 import {
@@ -16,9 +17,11 @@ import { runNextWeekPlanAgent } from "../agent/next-week-plan-agent.js";
 import type {
   AgentTrace,
   NextWeekPlanDraft,
+  PlanAdherenceContext,
   PlanProfileContext,
 } from "../agent/react-planner-types.js";
 import { getAthleteProfile } from "../athlete-profile-service.js";
+import { getPlanAdherenceContextForPlanner } from "../planned-workout-service.js";
 import {
   enforceFaithfulnessInDev,
   verifyAnswerFaithfulness,
@@ -1623,6 +1626,7 @@ async function runNextWeekPlanAgentTurn(args: {
   const capturedToolOutputs: unknown[] = [];
   // 运动员档案注入计划生成（个性化 + 安全）；加载失败不影响规划。
   const profile = await loadPlanProfile(userId);
+  const planAdherence = await loadPlanAdherenceContext(userId, input);
 
   try {
     agentOutput = await runNextWeekPlanAgent(
@@ -1632,6 +1636,7 @@ async function runNextWeekPlanAgentTurn(args: {
         endDate: input.end_date,
         exerciseId: input.exercise_id ?? null,
         profile,
+        planAdherence,
       },
       {
         runTool: async (toolName, toolArgs) => {
@@ -1755,6 +1760,25 @@ async function loadPlanProfile(
         };
   } catch {
     // Personalization is best-effort; a profile load failure must not break planning.
+    return null;
+  }
+}
+
+async function loadPlanAdherenceContext(
+  userId: string,
+  input: MockAssistantTurnInput,
+): Promise<PlanAdherenceContext | null> {
+  if (!loadServerEnv().assistantPlanAdherenceContext) {
+    return null;
+  }
+
+  try {
+    return await getPlanAdherenceContextForPlanner(userId, {
+      startDate: input.start_date,
+      endDate: input.end_date,
+    });
+  } catch {
+    // Learning-loop context is best-effort; a load failure must not break planning.
     return null;
   }
 }

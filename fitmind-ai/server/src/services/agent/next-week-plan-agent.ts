@@ -116,20 +116,17 @@ export async function runNextWeekPlanAgent(
 
   // Step 4 — retrieve training knowledge for progression / deload / volume.
   const weakArea = resolveWeakArea(weeklyResult, recommendationResult);
-  const retrievalQuery = `${input.message} 训练容量 渐进超负荷 deload ${weakArea ?? ""}`.trim();
-  const sources = await runRetrievalStep(accumulator, deps, now, retrievalQuery);
+  const retrievalQuery =
+    `${input.message} 训练容量 渐进超负荷 deload ${weakArea ?? ""}`.trim();
+  const sources = await runRetrievalStep(
+    accumulator,
+    deps,
+    now,
+    retrievalQuery,
+  );
 
   // Step 5 — synthesize the conservative draft.
   const progressionMode = resolveProgressionMode(weeklyResult);
-  const answer = await runSynthesisStep(accumulator, deps, now, {
-    input,
-    weeklyResult,
-    weakArea,
-    progressionMode,
-    progressResult,
-    sources,
-  });
-
   // Structured executable draft (动作 × 组 × 次 × 目标重量); rides on structured_output.
   const plan = generateNextWeekPlan(
     buildGeneratorInput({
@@ -138,8 +135,17 @@ export async function runNextWeekPlanAgent(
       progressionMode,
       progressResult,
       profile: input.profile ?? null,
+      planAdherence: input.planAdherence ?? null,
     }),
   );
+  const answer = await runSynthesisStep(accumulator, deps, now, {
+    input,
+    weeklyResult,
+    weakArea,
+    progressionMode: plan.strategy,
+    progressResult,
+    sources,
+  });
 
   return {
     trace: buildTrace(accumulator.steps, "completed"),
@@ -155,6 +161,7 @@ function buildGeneratorInput(context: {
   progressionMode: ProgressionMode;
   progressResult: unknown;
   profile: NextWeekPlanGeneratorInput["profile"];
+  planAdherence: NextWeekPlanGeneratorInput["planAdherence"];
 }): NextWeekPlanGeneratorInput {
   const weekly = asRecord(context.weeklyResult);
   const topExercises = asArray(weekly?.top_exercises)
@@ -194,6 +201,7 @@ function buildGeneratorInput(context: {
             maxWeightKg: readNumber(totals?.max_weight_kg),
           },
     profile: context.profile,
+    planAdherence: context.planAdherence,
   };
 }
 
@@ -279,7 +287,8 @@ async function runRetrievalStep(
   query: string,
 ): Promise<RetrievedKnowledgeChunk[]> {
   const index = accumulator.steps.length + 1;
-  const thought = "检索渐进超负荷、训练容量与减量相关的训练知识，给草案提供依据。";
+  const thought =
+    "检索渐进超负荷、训练容量与减量相关的训练知识，给草案提供依据。";
   await emitStarted(deps, {
     index,
     kind: "retrieval",
@@ -342,7 +351,8 @@ async function runSynthesisStep(
   },
 ): Promise<AssistantStructuredAnswer> {
   const index = accumulator.steps.length + 1;
-  const thought = "综合容量、弱项、进展与知识来源，给出只改一个变量的保守下周草案。";
+  const thought =
+    "综合容量、弱项、进展与知识来源，给出只改一个变量的保守下周草案。";
   await emitStarted(deps, {
     index,
     kind: "synthesis",
@@ -408,7 +418,10 @@ function buildPlanAnswer(
     bullets,
     conclusion:
       "多步规划只整合已记录训练与检索到的通用训练知识，给出下一步草案，而不是完整训练处方。",
-    recommendation: describeProgressionRecommendation(context.progressionMode, context.weakArea),
+    recommendation: describeProgressionRecommendation(
+      context.progressionMode,
+      context.weakArea,
+    ),
     evidence: buildAggregatedEvidence(accumulator),
     sources: toAnswerSources(context.sources),
     intent: "next_week_plan",
@@ -553,8 +566,12 @@ function summarizeToolObservation(toolName: string, result: unknown): string {
     return [
       `训练 ${readNumber(totals?.workout_count) ?? 0} 次 / ${readNumber(totals?.set_count) ?? 0} 组`,
       `约每周 ${readNumber(frequency?.workouts_per_week) ?? 0} 次`,
-      topMuscle ? `占比最高：${readString(topMuscle.muscle_group_name) ?? "未知"}` : null,
-      lowMuscle ? `偏少：${readString(lowMuscle.muscle_group_name) ?? "未知"}` : null,
+      topMuscle
+        ? `占比最高：${readString(topMuscle.muscle_group_name) ?? "未知"}`
+        : null,
+      lowMuscle
+        ? `偏少：${readString(lowMuscle.muscle_group_name) ?? "未知"}`
+        : null,
     ]
       .filter((part): part is string => part !== null)
       .join("；");
@@ -583,7 +600,9 @@ function summarizeToolObservation(toolName: string, result: unknown): string {
   return "已获取结果。";
 }
 
-function buildAggregatedEvidence(accumulator: StepAccumulator): AssistantAnswerEvidence {
+function buildAggregatedEvidence(
+  accumulator: StepAccumulator,
+): AssistantAnswerEvidence {
   return {
     source: "deterministic_tool_executor",
     tool_names: [...accumulator.toolNames],
@@ -734,7 +753,13 @@ async function emitFinishedFor(
     return;
   }
 
-  await emitFinished(deps, step.index, step.status, step.duration_ms, step.observation);
+  await emitFinished(
+    deps,
+    step.index,
+    step.status,
+    step.duration_ms,
+    step.observation,
+  );
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -748,7 +773,9 @@ function asArray(value: unknown): unknown[] {
 }
 
 function asStringArray(value: unknown): string[] {
-  return asArray(value).filter((item): item is string => typeof item === "string");
+  return asArray(value).filter(
+    (item): item is string => typeof item === "string",
+  );
 }
 
 function readNumber(value: unknown): number | null {

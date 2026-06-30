@@ -55,6 +55,26 @@ export interface PlanProfileContext {
   injuryConstraints: string[];
 }
 
+export type PlanAdherenceExerciseStatus = "done" | "partial" | "missed";
+
+export interface PlanAdherenceExerciseContext {
+  exerciseName: string;
+  plannedSets: number;
+  performedSets: number;
+  status: PlanAdherenceExerciseStatus;
+  setCompletionRatio: number;
+  targetWeightKg: number | null;
+}
+
+/** Thin previous-plan adherence slice injected into the planner for deterministic load adjustment. */
+export interface PlanAdherenceContext {
+  startDate: string;
+  endDate: string;
+  exerciseAdherenceRatio: number;
+  setAdherenceRatio: number;
+  exercises: PlanAdherenceExerciseContext[];
+}
+
 /** One prescribed exercise in the executable draft. `target_weight_kg` is null when no weight baseline exists (never fabricated). */
 export interface PlannedExercise {
   exercise_name: string;
@@ -109,6 +129,7 @@ export interface NextWeekPlanAgentInput {
   endDate: string;
   exerciseId?: string | null | undefined;
   profile?: PlanProfileContext | null | undefined;
+  planAdherence?: PlanAdherenceContext | null | undefined;
 }
 
 export interface NextWeekPlanAgentDeps {

@@ -46,4 +46,14 @@ describe("loadServerEnv", () => {
 
     expect(env.workoutIntakeLlmProvider).toBe("gemini");
   });
+
+  it("keeps plan-adherence context opt-in by default", () => {
+    const defaultEnv = loadServerEnv({} as NodeJS.ProcessEnv);
+    const enabledEnv = loadServerEnv({
+      ASSISTANT_PLAN_ADHERENCE_CONTEXT: "on",
+    } as NodeJS.ProcessEnv);
+
+    expect(defaultEnv.assistantPlanAdherenceContext).toBe(false);
+    expect(enabledEnv.assistantPlanAdherenceContext).toBe(true);
+  });
 });

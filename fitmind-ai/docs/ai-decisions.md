@@ -1022,3 +1022,25 @@ Decision：
 - 既有平台诊断里的“疼痛/伤病不是医疗建议”仍作为正常训练答案的被动免责声明；本 gate 是对用户主动报告急性/医疗边界时的主动短路，两者并存。
 
 验证：新增 safety eval 纳入 `pnpm eval`（急性/模糊疼痛正例 + 复发疼痛中段 + DOMS/慢性约束反例）；新增分类器、编排短路、telemetry 单测。门禁结果见 progress 对应条。
+
+## [D42] 学习闭环：上一计划依从度 opt-in 注入 next_week_plan
+
+- **Date**: 2026-06-30
+- **Status**: Accepted（已落地 + 单测；env 默认 off，零默认行为变更）
+
+背景：Slice 5 已经能把草案接受成 planned workout，并在读取时计算 planned-vs-performed 依从度；但 `next_week_plan` 生成链路只读训练汇总 + 档案，不读上一计划依从度。产品闭环“记录→分析→计划→依从度→再计划”最后一环未闭。
+
+Decision：
+- **opt-in 开关，默认 off**：新增 `ASSISTANT_PLAN_ADHERENCE_CONTEXT`，复用默认 false 的 `booleanFlag`（仅 `1/true/on/yes` 开启），不复用 safety 的 default-on helper。原因：这是会改变计划输出的新功能，先 dogfood / A-B 对比，避免 demo/mock 流悄悄变化；验证 OK 后再考虑默认 on。
+- **best-effort 上下文**：orchestrator 仅在 `next_week_plan` 路径、开关开启时读取 `getPlanAdherenceContextForPlanner`；无计划、首周、abandoned、读取失败都返回 `null`，不破坏规划。上一计划定义为最近一份 `active/completed` 且与本次 evidence window 相交的 accepted plan；`abandoned` 排除。
+- **读取时计算，不新增模型**：repository 增最近 accepted overlapping plan 查询；service 用该计划自身 `start_date/end_date` 调 `getTrainingSummary`，复用 `computePlanAdherence`，映射成内部 `PlanAdherenceContext`（日期、整体比例、逐动作 done/partial/missed、planned/performed sets、上一计划 target）。
+- **确定性调整规则**：先由现有 `progressionMode + profile.goal` 生成基础方案；依从度只做保守调整。`setAdherenceRatio >= 0.8` 保留 mode；`0.5~0.8` 时 `add_frequency → maintain`；`<0.5` 强制 `consolidate`。动作级：done 正常；partial 不加量（sets 不超过上一计划 sets，重量不高于上一计划 target）；missed 降一组（`max(1, min(baseSets, previousSets)-1)`）且重量不高于上一计划 target。partial/missed 且本轮 top/focus 没覆盖的动作会 carry over 到草案（focus 后、top 前，仍受 4 动作上限约束）。
+- **faithfulness 不变量**：依从度派生数字（如“完成 2/4 组”）只允许留在结构化 `plan.exercises[].basis` / `plan.notes`，不写入 answer summary/bullets/recommendation/conclusion。strategy mode 变化可以反映到 answer 的无数字策略措辞（如巩固/维持/更保守），但不写依从比例或组数。
+- **保守重量取舍**：partial/missed 的 target 上限使用上一计划 target；若用户实际 performed 超过 planned，v1 可能略微 under-prescribe。这里刻意偏保守，先保证“没完成就不加码”，后续若加入 performed 重量粒度再放宽。
+
+边界 / 未做：
+- 不改前端卡片、不做 day split、不新增 migration；本阶段只看最近一份计划，不做连续多周历史扫描。
+- 依从度粒度仍是动作×组数，不比较 reps/重量/RPE；沿用 D26 的依从度定义。
+- 默认 off 下所有现有 next-week-plan 输出应保持不变。
+
+验证：生成器单测覆盖无上下文零回归、done 正常、partial cap、missed 降组、整体低依从强制 consolidate、低整体+missed 复合不退化；service 单测覆盖 active/completed、无计划、summary 失败上抛；orchestrator 单测覆盖默认 off 不加载、opt-in 成功注入、读取失败回退、answer prose 不泄露依从度数字。

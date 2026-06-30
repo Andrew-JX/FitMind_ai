@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Canned weekly-report tool result, shared between the executeAiTool mock and the
 // assertions. Hoisted so the (hoisted) vi.mock factory below can reference it.
@@ -70,26 +70,56 @@ vi.mock("../../db/chat-repository.js", () => ({
   hasChatSessionById: vi.fn(async () => false),
 }));
 
+vi.mock("../athlete-profile-service.js", () => ({
+  getAthleteProfile: vi.fn(async () => null),
+}));
+
+vi.mock("../planned-workout-service.js", () => ({
+  getPlanAdherenceContextForPlanner: vi.fn(async () => null),
+}));
+
 import {
   AssistantTurnError,
   runMockAssistantTurn,
 } from "./assistant-orchestrator-service.js";
 import { executeAiTool } from "../ai/tools/tool-executor.js";
+import { getPlanAdherenceContextForPlanner } from "../planned-workout-service.js";
 import { runAssistantProvider } from "./provider-adapter.js";
 import { getConfiguredAssistantProvider } from "./provider-config.js";
 
 const mockedExecuteAiTool = vi.mocked(executeAiTool);
+const mockedGetPlanAdherenceContext = vi.mocked(
+  getPlanAdherenceContextForPlanner,
+);
 const mockedRunAssistantProvider = vi.mocked(runAssistantProvider);
 const mockedGetConfiguredAssistantProvider = vi.mocked(
   getConfiguredAssistantProvider,
 );
 
 describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", () => {
+  const originalPlanAdherenceFlag =
+    process.env.ASSISTANT_PLAN_ADHERENCE_CONTEXT;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    restorePlanAdherenceFlag();
     mockedExecuteAiTool.mockResolvedValue(CANNED_REPORT);
+    mockedGetPlanAdherenceContext.mockResolvedValue(null);
     mockedGetConfiguredAssistantProvider.mockReturnValue("mock");
   });
+
+  afterEach(() => {
+    restorePlanAdherenceFlag();
+  });
+
+  function restorePlanAdherenceFlag(): void {
+    if (originalPlanAdherenceFlag === undefined) {
+      delete process.env.ASSISTANT_PLAN_ADHERENCE_CONTEXT;
+      return;
+    }
+
+    process.env.ASSISTANT_PLAN_ADHERENCE_CONTEXT = originalPlanAdherenceFlag;
+  }
 
   it('runs get_weekly_training_report for "周报" with no exercise_id when the provider only returns prose', async () => {
     const { response } = await runMockAssistantTurn("user-1", {
@@ -221,5 +251,78 @@ describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", ()
         model: "llama-3.3-70b-versatile",
       });
     });
+  });
+
+  it("keeps plan-adherence context off by default for next-week plans", async () => {
+    const { response } = await runMockAssistantTurn("user-1", {
+      mode: "next_week_plan",
+      message: "帮我安排下周训练",
+      start_date: "2026-05-19",
+      end_date: "2026-06-17",
+    });
+
+    expect(response.intent).toBe("next_week_plan");
+    expect(response.plan?.strategy).toBe("add_frequency");
+    expect(mockedGetPlanAdherenceContext).not.toHaveBeenCalled();
+  });
+
+  it("injects plan-adherence context when opted in without leaking derived adherence numbers into answer prose", async () => {
+    process.env.ASSISTANT_PLAN_ADHERENCE_CONTEXT = "on";
+    mockedGetPlanAdherenceContext.mockResolvedValue({
+      startDate: "2026-05-19",
+      endDate: "2026-06-17",
+      exerciseAdherenceRatio: 0.5,
+      setAdherenceRatio: 0.25,
+      exercises: [
+        {
+          exerciseName: "卧推",
+          plannedSets: 4,
+          performedSets: 2,
+          status: "partial",
+          setCompletionRatio: 0.5,
+          targetWeightKg: 70,
+        },
+      ],
+    });
+
+    const { response } = await runMockAssistantTurn("user-1", {
+      mode: "next_week_plan",
+      message: "帮我安排下周训练",
+      start_date: "2026-05-19",
+      end_date: "2026-06-17",
+    });
+
+    const answerText = [
+      response.answer.summary,
+      ...response.answer.bullets,
+      response.answer.recommendation,
+      response.answer.conclusion,
+    ].join("\n");
+
+    expect(mockedGetPlanAdherenceContext).toHaveBeenCalledWith("user-1", {
+      startDate: "2026-05-19",
+      endDate: "2026-06-17",
+    });
+    expect(response.plan?.strategy).toBe("consolidate");
+    expect(response.plan?.exercises[0]?.basis).toContain("完成 2/4 组");
+    expect(response.answer.recommendation).toContain("保持相近频率");
+    expect(answerText).not.toContain("2/4");
+    expect(answerText).not.toContain("0.25");
+  });
+
+  it("falls back cleanly when opted-in plan-adherence loading fails", async () => {
+    process.env.ASSISTANT_PLAN_ADHERENCE_CONTEXT = "on";
+    mockedGetPlanAdherenceContext.mockRejectedValue(new Error("db down"));
+
+    const { response } = await runMockAssistantTurn("user-1", {
+      mode: "next_week_plan",
+      message: "帮我安排下周训练",
+      start_date: "2026-05-19",
+      end_date: "2026-06-17",
+    });
+
+    expect(response.intent).toBe("next_week_plan");
+    expect(response.plan?.strategy).toBe("add_frequency");
+    expect(mockedGetPlanAdherenceContext).toHaveBeenCalledTimes(1);
   });
 });

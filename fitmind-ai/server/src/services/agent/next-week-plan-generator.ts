@@ -1,5 +1,7 @@
 import type {
   NextWeekPlanDraft,
+  PlanAdherenceContext,
+  PlanAdherenceExerciseContext,
   PlanGoal,
   PlanProfileContext,
   PlannedExercise,
@@ -26,6 +28,10 @@ const DEFAULT_GOAL: PlanGoal = "hypertrophy";
 const WEIGHT_ROUNDING_KG = 2.5;
 /** 草案最多排几个动作（保持精简、聚焦）。 */
 const MAX_PLANNED_EXERCISES = 4;
+/** Set adherence at or above this keeps the original progression mode. */
+const HIGH_ADHERENCE_RATIO = 0.8;
+/** Set adherence below this consolidates the next plan. */
+const LOW_ADHERENCE_RATIO = 0.5;
 /** 不同进展策略下每个动作的工作组数。 */
 const SETS_BY_MODE: Record<ProgressionMode, number> = {
   consolidate: 3,
@@ -48,6 +54,7 @@ export interface NextWeekPlanGeneratorInput {
   >;
   focusExercise: ({ exerciseName: string } & ExerciseWeightBaseline) | null;
   profile?: PlanProfileContext | null | undefined;
+  planAdherence?: PlanAdherenceContext | null | undefined;
 }
 
 /**
@@ -68,20 +75,45 @@ export function generateNextWeekPlan(
   input: NextWeekPlanGeneratorInput,
 ): NextWeekPlanDraft {
   const scheme = GOAL_SCHEMES[input.profile?.goal ?? DEFAULT_GOAL];
-  const sets = SETS_BY_MODE[input.progressionMode];
+  const adjustedMode = resolveAdherenceAdjustedMode(
+    input.progressionMode,
+    input.planAdherence ?? null,
+  );
+  const sets = SETS_BY_MODE[adjustedMode];
   const exercises: PlannedExercise[] = [];
   const seen = new Set<string>();
+  const adherenceByName = buildAdherenceMap(input.planAdherence ?? null);
 
   if (input.focusExercise) {
+    const adherence = adherenceByName.get(
+      normalizeName(input.focusExercise.exerciseName),
+    );
     exercises.push(
-      buildPlannedExercise(
-        input.focusExercise.exerciseName,
-        input.focusExercise,
-        sets,
-        scheme,
+      applyExerciseAdherence(
+        buildPlannedExercise(
+          input.focusExercise.exerciseName,
+          input.focusExercise,
+          sets,
+          scheme,
+        ),
+        adherence,
       ),
     );
-    seen.add(input.focusExercise.exerciseName);
+    seen.add(normalizeName(input.focusExercise.exerciseName));
+  }
+
+  for (const previous of getCarryOverExercises(input.planAdherence ?? null)) {
+    if (exercises.length >= MAX_PLANNED_EXERCISES) {
+      break;
+    }
+
+    const key = normalizeName(previous.exerciseName);
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    exercises.push(buildCarryOverExercise(previous, sets, scheme));
   }
 
   for (const topExercise of input.topExercises) {
@@ -89,25 +121,30 @@ export function generateNextWeekPlan(
       break;
     }
 
-    if (seen.has(topExercise.exerciseName)) {
+    const key = normalizeName(topExercise.exerciseName);
+    if (seen.has(key)) {
       continue;
     }
 
-    seen.add(topExercise.exerciseName);
+    const adherence = adherenceByName.get(key);
+    seen.add(key);
     exercises.push(
-      buildPlannedExercise(
-        topExercise.exerciseName,
-        topExercise,
-        sets,
-        scheme,
+      applyExerciseAdherence(
+        buildPlannedExercise(
+          topExercise.exerciseName,
+          topExercise,
+          sets,
+          scheme,
+        ),
+        adherence,
       ),
     );
   }
 
   return {
-    strategy: input.progressionMode,
+    strategy: adjustedMode,
     exercises,
-    notes: buildNotes(input),
+    notes: buildNotes(input, adjustedMode),
   };
 }
 
@@ -130,7 +167,12 @@ function buildPlannedExercise(
   sets: number,
   scheme: GoalScheme,
 ): PlannedExercise {
-  const base = { exercise_name: exerciseName, sets, rep_min: scheme.repMin, rep_max: scheme.repMax };
+  const base = {
+    exercise_name: exerciseName,
+    sets,
+    rep_min: scheme.repMin,
+    rep_max: scheme.repMax,
+  };
 
   if (baseline.estimated1RmKg !== null && baseline.estimated1RmKg > 0) {
     return {
@@ -160,8 +202,148 @@ function buildPlannedExercise(
   };
 }
 
-function buildNotes(input: NextWeekPlanGeneratorInput): string[] {
-  const notes = [describeStrategy(input.progressionMode), "一次只改一个变量（组数 / 重量 / 次数 / 休息）。"];
+function buildCarryOverExercise(
+  previous: PlanAdherenceExerciseContext,
+  baseSets: number,
+  scheme: GoalScheme,
+): PlannedExercise {
+  const sets = resolveAdherenceAdjustedSets(baseSets, previous);
+
+  return {
+    exercise_name: previous.exerciseName,
+    sets,
+    rep_min: scheme.repMin,
+    rep_max: scheme.repMax,
+    target_weight_kg: previous.targetWeightKg,
+    basis: buildAdherenceBasis(
+      previous,
+      previous.targetWeightKg === null
+        ? "上次没有可靠重量目标，本次继续不编造重量。"
+        : "本次沿用上一计划重量上限，先把动作完成度补回来。",
+    ),
+  };
+}
+
+function applyExerciseAdherence(
+  exercise: PlannedExercise,
+  adherence: PlanAdherenceExerciseContext | undefined,
+): PlannedExercise {
+  if (adherence === undefined || adherence.status === "done") {
+    return exercise;
+  }
+
+  const adjustedSets = resolveAdherenceAdjustedSets(exercise.sets, adherence);
+  const cappedWeight = capTargetWeight(
+    exercise.target_weight_kg,
+    adherence.targetWeightKg,
+  );
+
+  return {
+    ...exercise,
+    sets: adjustedSets,
+    target_weight_kg: cappedWeight,
+    basis: buildAdherenceBasis(
+      adherence,
+      cappedWeight === null
+        ? "上次没有可靠重量目标，本次继续不编造重量。"
+        : "本次不高于上一计划重量，先巩固完成度。",
+    ),
+  };
+}
+
+function buildAdherenceBasis(
+  adherence: PlanAdherenceExerciseContext,
+  guidance: string,
+): string {
+  const statusCopy = adherence.status === "partial" ? "部分完成" : "未完成";
+
+  return `上次计划 ${statusCopy}：完成 ${adherence.performedSets}/${adherence.plannedSets} 组。${guidance}`;
+}
+
+function resolveAdherenceAdjustedSets(
+  baseSets: number,
+  adherence: PlanAdherenceExerciseContext,
+): number {
+  if (adherence.status === "missed") {
+    return Math.max(1, Math.min(baseSets, adherence.plannedSets) - 1);
+  }
+
+  if (adherence.status === "partial") {
+    return Math.max(1, Math.min(baseSets, adherence.plannedSets));
+  }
+
+  return baseSets;
+}
+
+function capTargetWeight(
+  targetWeightKg: number | null,
+  previousTargetWeightKg: number | null,
+): number | null {
+  if (previousTargetWeightKg === null) {
+    return null;
+  }
+
+  if (targetWeightKg === null) {
+    return previousTargetWeightKg;
+  }
+
+  return Math.min(targetWeightKg, previousTargetWeightKg);
+}
+
+function resolveAdherenceAdjustedMode(
+  mode: ProgressionMode,
+  adherence: PlanAdherenceContext | null,
+): ProgressionMode {
+  if (
+    adherence === null ||
+    adherence.setAdherenceRatio >= HIGH_ADHERENCE_RATIO
+  ) {
+    return mode;
+  }
+
+  if (adherence.setAdherenceRatio < LOW_ADHERENCE_RATIO) {
+    return "consolidate";
+  }
+
+  return mode === "add_frequency" ? "maintain" : mode;
+}
+
+function getCarryOverExercises(
+  adherence: PlanAdherenceContext | null,
+): PlanAdherenceExerciseContext[] {
+  if (adherence === null) {
+    return [];
+  }
+
+  return adherence.exercises.filter(
+    (exercise) => exercise.status === "partial" || exercise.status === "missed",
+  );
+}
+
+function buildAdherenceMap(
+  adherence: PlanAdherenceContext | null,
+): Map<string, PlanAdherenceExerciseContext> {
+  const map = new Map<string, PlanAdherenceExerciseContext>();
+
+  if (adherence === null) {
+    return map;
+  }
+
+  for (const exercise of adherence.exercises) {
+    map.set(normalizeName(exercise.exerciseName), exercise);
+  }
+
+  return map;
+}
+
+function buildNotes(
+  input: NextWeekPlanGeneratorInput,
+  adjustedMode: ProgressionMode,
+): string[] {
+  const notes = [
+    describeStrategy(adjustedMode),
+    "一次只改一个变量（组数 / 重量 / 次数 / 休息）。",
+  ];
 
   if (input.profile) {
     notes.push(describeGoal(input.profile.goal));
@@ -177,12 +359,20 @@ function buildNotes(input: NextWeekPlanGeneratorInput): string[] {
   }
 
   if (input.weakArea) {
-    notes.push(`弱项 ${input.weakArea}：可加一点可控的针对性补充，不必加大强度。`);
+    notes.push(
+      `弱项 ${input.weakArea}：可加一点可控的针对性补充，不必加大强度。`,
+    );
   }
 
-  notes.push("这是规划草案而非处方；出现疼痛、麻木或异常疲劳不要硬按草案执行。");
+  notes.push(
+    "这是规划草案而非处方；出现疼痛、麻木或异常疲劳不要硬按草案执行。",
+  );
 
   return notes;
+}
+
+function normalizeName(name: string): string {
+  return name.trim().toLowerCase();
 }
 
 function describeStrategy(mode: ProgressionMode): string {

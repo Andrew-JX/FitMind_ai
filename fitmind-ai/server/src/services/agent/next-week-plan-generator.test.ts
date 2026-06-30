@@ -4,6 +4,10 @@ import {
   generateNextWeekPlan,
   type NextWeekPlanGeneratorInput,
 } from "./next-week-plan-generator.js";
+import type {
+  PlanAdherenceContext,
+  PlanAdherenceExerciseContext,
+} from "./react-planner-types.js";
 
 const baseInput: NextWeekPlanGeneratorInput = {
   progressionMode: "maintain",
@@ -23,6 +27,23 @@ const baseInput: NextWeekPlanGeneratorInput = {
     },
   ],
   focusExercise: null,
+};
+
+const partialBenchAdherence: PlanAdherenceExerciseContext = {
+  exerciseName: "Barbell Bench Press",
+  plannedSets: 4,
+  performedSets: 2,
+  status: "partial",
+  setCompletionRatio: 0.5,
+  targetWeightKg: 70,
+};
+
+const partialAdherence: PlanAdherenceContext = {
+  startDate: "2026-06-15",
+  endDate: "2026-06-21",
+  exerciseAdherenceRatio: 0.5,
+  setAdherenceRatio: 0.75,
+  exercises: [partialBenchAdherence],
 };
 
 describe("generateNextWeekPlan", () => {
@@ -168,7 +189,9 @@ describe("generateNextWeekPlan", () => {
     });
 
     const names = plan.exercises.map((exercise) => exercise.exercise_name);
-    expect(names.filter((name) => name === "Barbell Bench Press")).toHaveLength(1);
+    expect(names.filter((name) => name === "Barbell Bench Press")).toHaveLength(
+      1,
+    );
   });
 
   it("caps the plan at four exercises", () => {
@@ -247,5 +270,161 @@ describe("generateNextWeekPlan", () => {
     expect(addFrequency.exercises[0]?.sets).toBe(4);
     expect(addFrequency.strategy).toBe("add_frequency");
     expect(addFrequency.notes.some((note) => note.includes("腿"))).toBe(true);
+  });
+
+  it("leaves the generated plan unchanged when no adherence context is provided", () => {
+    const withoutContext = generateNextWeekPlan({
+      ...baseInput,
+      progressionMode: "add_frequency",
+      focusExercise: {
+        exerciseName: "Barbell Bench Press",
+        estimated1RmKg: 100,
+        maxWeightKg: 90,
+      },
+    });
+    const withNullContext = generateNextWeekPlan({
+      ...baseInput,
+      progressionMode: "add_frequency",
+      focusExercise: {
+        exerciseName: "Barbell Bench Press",
+        estimated1RmKg: 100,
+        maxWeightKg: 90,
+      },
+      planAdherence: null,
+    });
+
+    expect(withNullContext).toEqual(withoutContext);
+  });
+
+  it("keeps done exercises on the normal progression path", () => {
+    const plan = generateNextWeekPlan({
+      ...baseInput,
+      focusExercise: {
+        exerciseName: "Barbell Bench Press",
+        estimated1RmKg: 100,
+        maxWeightKg: 90,
+      },
+      planAdherence: {
+        ...partialAdherence,
+        setAdherenceRatio: 1,
+        exercises: [
+          {
+            ...partialBenchAdherence,
+            performedSets: 4,
+            status: "done",
+            setCompletionRatio: 1,
+          },
+        ],
+      },
+    });
+
+    expect(plan.strategy).toBe("maintain");
+    expect(plan.exercises[0]?.sets).toBe(3);
+    expect(plan.exercises[0]?.target_weight_kg).toBe(72.5);
+    expect(plan.exercises[0]?.basis).toContain("1RM");
+  });
+
+  it("caps partial exercises at the adjusted base sets and previous target weight", () => {
+    const plan = generateNextWeekPlan({
+      ...baseInput,
+      progressionMode: "add_frequency",
+      focusExercise: {
+        exerciseName: "Barbell Bench Press",
+        estimated1RmKg: 120,
+        maxWeightKg: 100,
+      },
+      planAdherence: partialAdherence,
+    });
+
+    const bench = plan.exercises[0];
+    expect(plan.strategy).toBe("maintain");
+    expect(bench?.sets).toBe(3);
+    expect(bench?.target_weight_kg).toBe(70);
+    expect(bench?.basis).toContain("完成 2/4 组");
+  });
+
+  it("reduces missed exercises by one set and keeps null targets null", () => {
+    const plan = generateNextWeekPlan({
+      ...baseInput,
+      focusExercise: {
+        exerciseName: "Barbell Bench Press",
+        estimated1RmKg: 100,
+        maxWeightKg: 90,
+      },
+      planAdherence: {
+        ...partialAdherence,
+        exercises: [
+          {
+            ...partialBenchAdherence,
+            plannedSets: 3,
+            performedSets: 0,
+            status: "missed",
+            setCompletionRatio: 0,
+            targetWeightKg: null,
+          },
+        ],
+      },
+    });
+
+    const bench = plan.exercises[0];
+    expect(bench?.sets).toBe(2);
+    expect(bench?.target_weight_kg).toBeNull();
+    expect(bench?.basis).toContain("未完成");
+  });
+
+  it("carries partial and missed exercises forward before unmatched top exercises", () => {
+    const plan = generateNextWeekPlan({
+      ...baseInput,
+      focusExercise: {
+        exerciseName: "Barbell Bench Press",
+        estimated1RmKg: 100,
+        maxWeightKg: 90,
+      },
+      planAdherence: {
+        ...partialAdherence,
+        exercises: [
+          {
+            exerciseName: "Barbell Row",
+            plannedSets: 4,
+            performedSets: 2,
+            status: "partial",
+            setCompletionRatio: 0.5,
+            targetWeightKg: 60,
+          },
+        ],
+      },
+    });
+
+    expect(plan.exercises.map((exercise) => exercise.exercise_name)).toEqual([
+      "Barbell Bench Press",
+      "Barbell Row",
+      "Barbell Squat",
+    ]);
+    expect(plan.exercises[1]?.target_weight_kg).toBe(60);
+  });
+
+  it("keeps low-adherence missed plans non-empty and non-degenerate", () => {
+    const plan = generateNextWeekPlan({
+      ...baseInput,
+      progressionMode: "add_frequency",
+      planAdherence: {
+        ...partialAdherence,
+        setAdherenceRatio: 0.25,
+        exercises: [
+          {
+            ...partialBenchAdherence,
+            plannedSets: 2,
+            performedSets: 0,
+            status: "missed",
+            setCompletionRatio: 0,
+          },
+        ],
+      },
+    });
+
+    expect(plan.strategy).toBe("consolidate");
+    expect(plan.exercises.length).toBeGreaterThan(0);
+    expect(plan.exercises.some((exercise) => exercise.sets > 1)).toBe(true);
+    expect(plan.exercises.every((exercise) => exercise.sets >= 1)).toBe(true);
   });
 });

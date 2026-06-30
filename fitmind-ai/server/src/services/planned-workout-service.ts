@@ -3,12 +3,16 @@ import { z } from "zod";
 import {
   createPlannedWorkout,
   getActivePlannedWorkoutForUser,
+  getLatestAcceptedPlannedWorkoutForUser,
   updatePlannedWorkoutStatus,
   type PlannedWorkoutRow,
   type PlannedWorkoutStatus,
 } from "../db/planned-workout-repository.js";
 import { getTrainingSummary } from "../db/training-summary-repository.js";
-import type { NextWeekPlanDraft } from "./agent/react-planner-types.js";
+import type {
+  NextWeekPlanDraft,
+  PlanAdherenceContext,
+} from "./agent/react-planner-types.js";
 import {
   computePlanAdherence,
   type PlanAdherenceSummary,
@@ -80,6 +84,7 @@ export interface PlannedWorkoutWithAdherenceDto extends PlannedWorkoutDto {
 interface PlannedWorkoutDependencies {
   createPlannedWorkout: typeof createPlannedWorkout;
   getActivePlannedWorkoutForUser: typeof getActivePlannedWorkoutForUser;
+  getLatestAcceptedPlannedWorkoutForUser: typeof getLatestAcceptedPlannedWorkoutForUser;
   updatePlannedWorkoutStatus: typeof updatePlannedWorkoutStatus;
   getTrainingSummary: typeof getTrainingSummary;
 }
@@ -87,6 +92,7 @@ interface PlannedWorkoutDependencies {
 const defaultDependencies: PlannedWorkoutDependencies = {
   createPlannedWorkout,
   getActivePlannedWorkoutForUser,
+  getLatestAcceptedPlannedWorkoutForUser,
   updatePlannedWorkoutStatus,
   getTrainingSummary,
 };
@@ -156,6 +162,71 @@ export async function getCurrentPlanWithAdherence(
 }
 
 /**
+ * Builds the best-effort previous-plan adherence context used by the planner.
+ *
+ * @param userId - Owner user id
+ * @param input - Planner evidence date range used to find an overlapping accepted plan
+ * @param dependencies - Injectable repository functions (for tests)
+ * @returns Previous accepted plan adherence context, or null when none overlaps
+ */
+export async function getPlanAdherenceContextForPlanner(
+  userId: string,
+  input: { startDate: string; endDate: string },
+  dependencies: PlannedWorkoutDependencies = defaultDependencies,
+): Promise<PlanAdherenceContext | null> {
+  const row = await dependencies.getLatestAcceptedPlannedWorkoutForUser({
+    userId,
+    startDate: input.startDate,
+    endDate: input.endDate,
+  });
+
+  if (row === null) {
+    return null;
+  }
+
+  const dto = mapRow(row);
+  const summary = await dependencies.getTrainingSummary({
+    userId,
+    startDate: dto.startDate,
+    endDate: dto.endDate,
+  });
+
+  const adherence = computePlanAdherence({
+    plannedExercises: dto.plan.exercises.map((exercise) => ({
+      exerciseName: exercise.exercise_name,
+      sets: exercise.sets,
+    })),
+    performedExercises: summary.byExercise.map((exercise) => ({
+      exerciseName: exercise.exercise_name,
+      setCount: exercise.set_count,
+    })),
+  });
+  const targetWeightByName = new Map(
+    dto.plan.exercises.map((exercise) => [
+      normalizeExerciseName(exercise.exercise_name),
+      exercise.target_weight_kg,
+    ]),
+  );
+
+  return {
+    startDate: dto.startDate,
+    endDate: dto.endDate,
+    exerciseAdherenceRatio: adherence.exercise_adherence_ratio,
+    setAdherenceRatio: adherence.set_adherence_ratio,
+    exercises: adherence.exercises.map((exercise) => ({
+      exerciseName: exercise.exercise_name,
+      plannedSets: exercise.planned_sets,
+      performedSets: exercise.performed_sets,
+      status: exercise.status,
+      setCompletionRatio: exercise.set_completion_ratio,
+      targetWeightKg:
+        targetWeightByName.get(normalizeExerciseName(exercise.exercise_name)) ??
+        null,
+    })),
+  };
+}
+
+/**
  * Marks a user's planned workout as completed or abandoned.
  *
  * @param userId - Owner user id
@@ -195,4 +266,8 @@ function mapRow(row: PlannedWorkoutRow): PlannedWorkoutDto {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+function normalizeExerciseName(name: string): string {
+  return name.trim().toLowerCase();
 }

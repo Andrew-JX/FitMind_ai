@@ -4783,3 +4783,9 @@ Verification: `pnpm type-check` / `pnpm test:unit`(330) / `pnpm eval`(13/13·12/
 关键边界：明确慢性约束（如“膝盖以前受过伤，想避开深蹲”）继续走档案/训练调整；但出现疼痛/症状 token 且没有明确过去/已恢复/规避框架时 fail-safe 判 `medical_boundary`。`ASSISTANT_SAFETY_GATE` 默认开，只有 off/false/0/no 显式关闭；`.env.example` 已记录。
 
 门禁：新增 safety eval（急性/模糊疼痛正例 + 慢性约束反例）纳入 `pnpm eval` 的 fail-closed 检查；新增分类器、编排短路、telemetry 单测。决策见 ai-decisions D41。
+
+## 2026-06-30 学习闭环：上一计划依从度 opt-in 注入 next_week_plan
+
+把 Slice 5 的 planned-vs-performed 依从度接回下一次计划生成，补上“依从度→再计划”的闭环。新增 `ASSISTANT_PLAN_ADHERENCE_CONTEXT`（默认 off，`1/true/on/yes` 开启）；orchestrator 在 `next_week_plan` 路径 best-effort 读取最近 active/completed 且与 evidence window 相交的 accepted plan，复用 `getTrainingSummary` + `computePlanAdherence` 生成内部 `PlanAdherenceContext`。无计划、abandoned、读取失败或开关关闭都回到原行为。
+
+生成器新增确定性保守规则：整体低依从会把 strategy 降到 `consolidate`，中等依从会把 `add_frequency` 降到 `maintain`；partial/missed 动作不加量、重量不高于上一计划 target，missed 降一组，未覆盖的 partial/missed 动作会 carry over。依从度派生数字只留在结构化 plan basis/notes，不进 answer 自由文本；answer 只同步无数字策略措辞。决策见 ai-decisions D42。

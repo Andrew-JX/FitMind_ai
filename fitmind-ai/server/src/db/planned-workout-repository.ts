@@ -142,6 +142,44 @@ export async function getActivePlannedWorkoutForUser(
 }
 
 /**
+ * Reads the most recent non-abandoned planned workout that overlaps a planner
+ * evidence window, or null when none exists.
+ *
+ * @param input - Owner user id plus the evidence date range to overlap.
+ * @param pool - Optional injected pool (owns and closes its own pool otherwise)
+ * @returns The latest active/completed overlapping planned workout row, or null
+ */
+export async function getLatestAcceptedPlannedWorkoutForUser(
+  input: { userId: string; startDate: string; endDate: string },
+  pool?: DbPoolLike,
+): Promise<PlannedWorkoutRow | null> {
+  const activePool = pool ?? (await createRepositoryPool());
+  const ownsPool = pool === undefined;
+
+  try {
+    const result = await activePool.query(
+      `
+        SELECT ${RETURNED_COLUMNS}
+        FROM planned_workouts
+        WHERE user_id = $1
+          AND status IN ('active', 'completed')
+          AND start_date <= $3::date
+          AND end_date >= $2::date
+        ORDER BY end_date DESC, created_at DESC, id DESC
+        LIMIT 1
+      `,
+      [input.userId, input.startDate, input.endDate],
+    );
+
+    return (result.rows[0] as PlannedWorkoutRow | undefined) ?? null;
+  } finally {
+    if (ownsPool) {
+      await activePool.end?.();
+    }
+  }
+}
+
+/**
  * Updates the status of a user's planned workout (e.g. complete / abandon).
  *
  * @param input - Plan id, owner user id, and the new status

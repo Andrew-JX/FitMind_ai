@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { getLatestAcceptedPlannedWorkoutForUser } from "../db/planned-workout-repository.js";
 import type { PlannedWorkoutRow } from "../db/planned-workout-repository.js";
 import type { TrainingSummaryRepositoryResult } from "../db/training-summary-repository.js";
 import type { NextWeekPlanDraft } from "./agent/react-planner-types.js";
 import {
   acceptPlan,
   getCurrentPlanWithAdherence,
+  getPlanAdherenceContextForPlanner,
   setPlanStatus,
 } from "./planned-workout-service.js";
 
@@ -32,7 +34,9 @@ const planDraft: NextWeekPlanDraft = {
   notes: ["一次只改一个变量。"],
 };
 
-function buildRow(overrides: Partial<PlannedWorkoutRow> = {}): PlannedWorkoutRow {
+function buildRow(
+  overrides: Partial<PlannedWorkoutRow> = {},
+): PlannedWorkoutRow {
   return {
     id: "plan-1",
     user_id: "u1",
@@ -83,6 +87,7 @@ function deps(overrides: Partial<Parameters<typeof acceptPlan>[2]> = {}) {
   return {
     createPlannedWorkout: vi.fn(),
     getActivePlannedWorkoutForUser: vi.fn(),
+    getLatestAcceptedPlannedWorkoutForUser: vi.fn(),
     updatePlannedWorkoutStatus: vi.fn(),
     getTrainingSummary: vi.fn(),
     ...overrides,
@@ -139,6 +144,94 @@ describe("getCurrentPlanWithAdherence", () => {
     );
 
     expect(dto).toBeNull();
+  });
+});
+
+describe("getPlanAdherenceContextForPlanner", () => {
+  it("computes planner adherence context from a completed overlapping plan", async () => {
+    const context = await getPlanAdherenceContextForPlanner(
+      "u1",
+      { startDate: "2026-06-15", endDate: "2026-06-21" },
+      deps({
+        getLatestAcceptedPlannedWorkoutForUser: vi
+          .fn()
+          .mockResolvedValue(buildRow({ status: "completed" })),
+        getTrainingSummary: vi.fn().mockResolvedValue(buildSummary()),
+      }),
+    );
+
+    expect(context).not.toBeNull();
+    expect(context?.startDate).toBe("2026-06-15");
+    expect(context?.endDate).toBe("2026-06-21");
+    expect(context?.setAdherenceRatio).toBeCloseTo(5 / 7, 3);
+    expect(context?.exercises[0]).toMatchObject({
+      exerciseName: "Barbell Bench Press",
+      plannedSets: 3,
+      performedSets: 3,
+      status: "done",
+      targetWeightKg: 72.5,
+    });
+    expect(context?.exercises[1]).toMatchObject({
+      exerciseName: "Barbell Squat",
+      status: "partial",
+      targetWeightKg: null,
+    });
+  });
+
+  it("returns null when no accepted plan overlaps the planner window", async () => {
+    const context = await getPlanAdherenceContextForPlanner(
+      "u1",
+      { startDate: "2026-06-22", endDate: "2026-06-28" },
+      deps({
+        getLatestAcceptedPlannedWorkoutForUser: vi.fn().mockResolvedValue(null),
+      }),
+    );
+
+    expect(context).toBeNull();
+  });
+
+  it("lets training summary failures bubble to the best-effort orchestrator caller", async () => {
+    await expect(
+      getPlanAdherenceContextForPlanner(
+        "u1",
+        { startDate: "2026-06-15", endDate: "2026-06-21" },
+        deps({
+          getLatestAcceptedPlannedWorkoutForUser: vi
+            .fn()
+            .mockResolvedValue(buildRow()),
+          getTrainingSummary: vi.fn().mockRejectedValue(new Error("db down")),
+        }),
+      ),
+    ).rejects.toThrow("db down");
+  });
+});
+
+describe("getLatestAcceptedPlannedWorkoutForUser", () => {
+  it("queries only active or completed plans that overlap the evidence window", async () => {
+    const query = vi.fn(async (sql: string, params?: readonly unknown[]) => {
+      void sql;
+      void params;
+
+      return {
+        rows: [buildRow({ status: "completed" })],
+      };
+    });
+
+    const row = await getLatestAcceptedPlannedWorkoutForUser(
+      { userId: "u1", startDate: "2026-06-15", endDate: "2026-06-21" },
+      { query },
+    );
+    const sql = query.mock.calls[0]?.[0] ?? "";
+
+    expect(row?.status).toBe("completed");
+    expect(sql).toContain("status IN ('active', 'completed')");
+    expect(sql).toContain("start_date <= $3::date");
+    expect(sql).toContain("end_date >= $2::date");
+    expect(query).toHaveBeenCalledWith(expect.any(String), [
+      "u1",
+      "2026-06-15",
+      "2026-06-21",
+    ]);
   });
 });
 
