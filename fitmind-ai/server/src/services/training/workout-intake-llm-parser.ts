@@ -1,6 +1,15 @@
 import { z } from "zod";
 
 import { loadServerEnv } from "../../env.js";
+import {
+  runOpenAiCompatibleChatCompletion,
+  type OpenAiCompatibleChatRequest,
+} from "../assistant/openai-compatible-chat-client.js";
+import {
+  getGroqAssistantProviderConfig,
+  getOpenAiCompatibleProviderConfig,
+  type OpenAiCompatibleProviderConfig,
+} from "../assistant/provider-config.js";
 
 export type WorkoutIntakeLlmProviderMode =
   | "off"
@@ -84,6 +93,10 @@ export function createWorkoutIntakeLlmParser(
 
   if (provider === "groq") {
     return parseWithGroqWorkoutIntakeLlm;
+  }
+
+  if (provider === "openai_compatible") {
+    return parseWithOpenAiCompatibleWorkoutIntakeLlm;
   }
 
   return parseWithMockWorkoutIntakeLlm;
@@ -281,50 +294,48 @@ async function parseWithGeminiWorkoutIntakeLlm(input: {
 async function parseWithGroqWorkoutIntakeLlm(input: {
   text: string;
 }): Promise<string> {
-  const env = loadServerEnv();
+  return parseWithOpenAiCompatibleWorkoutIntakeLlmConfig(
+    input,
+    getGroqAssistantProviderConfig(),
+  );
+}
 
-  if (env.groqApiKey === undefined) {
-    throw new Error("GROQ_API_KEY is required for workout intake LLM parsing.");
-  }
+async function parseWithOpenAiCompatibleWorkoutIntakeLlm(input: {
+  text: string;
+}): Promise<string> {
+  return parseWithOpenAiCompatibleWorkoutIntakeLlmConfig(
+    input,
+    getOpenAiCompatibleProviderConfig(),
+  );
+}
 
-  const model = env.groqModel ?? "llama-3.3-70b-versatile";
-  const requestInit: RequestInit = {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${env.groqApiKey}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 1000,
-      temperature: 0,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: buildWorkoutIntakeSystemPrompt() },
-        { role: "user", content: input.text },
-      ],
-    }),
+async function parseWithOpenAiCompatibleWorkoutIntakeLlmConfig(
+  input: { text: string },
+  config: OpenAiCompatibleProviderConfig,
+): Promise<string> {
+  const request: OpenAiCompatibleChatRequest = {
+    maxTokens: 1000,
+    temperature: 0,
+    responseFormat: { type: "json_object" },
+    messages: [
+      { role: "system", content: buildWorkoutIntakeSystemPrompt() },
+      { role: "user", content: input.text },
+    ],
   };
-  const url = "https://api.groq.com/openai/v1/chat/completions";
 
-  // Retry once on a transient rate limit (free-tier per-minute limit).
-  let response = await fetch(url, requestInit);
-  if (response.status === 429) {
+  let result = await runOpenAiCompatibleChatCompletion(request, config);
+  if (result.status === 429) {
     await new Promise((resolve) => setTimeout(resolve, 2000));
-    response = await fetch(url, requestInit);
+    result = await runOpenAiCompatibleChatCompletion(request, config);
   }
 
-  if (!response.ok) {
+  if (!result.ok) {
     throw new Error(
-      `Workout intake LLM request failed with HTTP ${response.status} (model ${model}).`,
+      `Workout intake LLM request failed with HTTP ${result.status} (model ${config.model}).`,
     );
   }
 
-  const payload = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const text = payload.choices?.[0]?.message?.content?.trim();
-
+  const text = result.content?.trim();
   if (!text) {
     throw new Error("Workout intake LLM returned no text output.");
   }
