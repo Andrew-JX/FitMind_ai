@@ -11,7 +11,10 @@ export type AssistantStreamEvent =
         | "answering";
     }
   | { type: "session"; session_id: string }
-  | { type: "provider_selected"; provider: "mock" | "anthropic" | "groq" }
+  | {
+      type: "provider_selected";
+      provider: "mock" | "anthropic" | "groq" | "openai_compatible";
+    }
   | { type: "tool_call_started"; tool_name: string }
   | {
       type: "tool_call_finished";

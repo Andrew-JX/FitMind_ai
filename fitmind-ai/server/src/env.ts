@@ -17,6 +17,25 @@ const optionalSecret = z.preprocess(
   z.string().min(1).optional(),
 );
 
+const optionalHttpsUrl = z.preprocess(
+  (value) => {
+    if (typeof value !== "string") {
+      return value;
+    }
+
+    const trimmed = value.trim();
+    return trimmed === "" ? undefined : trimmed;
+  },
+  z
+    .string()
+    .url()
+    .refine((value) => new URL(value).protocol === "https:", {
+      message: "URL must use https.",
+    })
+    .optional()
+    .catch(undefined),
+);
+
 /**
  * Boolean feature flag: `"1"/"true"/"on"/"yes"` (case-insensitive) → `true`;
  * anything else, blank, or unset → `false`. Keeps a typo/blank from throwing.
@@ -50,7 +69,7 @@ const serverEnvSchema = z.object({
   // `.catch("mock")` keeps an unknown/typo provider value from throwing and
   // taking down every request that loads env (e.g. auth); it degrades to mock.
   ASSISTANT_PROVIDER: z
-    .enum(["mock", "anthropic", "groq"])
+    .enum(["mock", "anthropic", "groq", "openai_compatible"])
     .default("mock")
     .catch("mock"),
   // Slice 11.3b: opt-in LLM re-phrasing of the answer summary (still gated by
@@ -63,7 +82,7 @@ const serverEnvSchema = z.object({
   // disable tokens turn it off for rollback.
   ASSISTANT_SAFETY_GATE: safetyFlagDefaultOn,
   WORKOUT_INTAKE_LLM_PROVIDER: z
-    .enum(["off", "mock", "anthropic", "gemini", "groq"])
+    .enum(["off", "mock", "anthropic", "gemini", "groq", "openai_compatible"])
     .default("mock")
     .catch("mock"),
   ANTHROPIC_API_KEY: optionalSecret,
@@ -71,6 +90,9 @@ const serverEnvSchema = z.object({
   GEMINI_MODEL: optionalSecret,
   GROQ_API_KEY: optionalSecret,
   GROQ_MODEL: optionalSecret,
+  OPENAI_COMPAT_BASE_URL: optionalHttpsUrl,
+  OPENAI_COMPAT_MODEL: optionalSecret,
+  OPENAI_COMPAT_API_KEY: optionalSecret,
   VOYAGE_API_KEY: optionalSecret,
 });
 
@@ -79,16 +101,25 @@ export interface ServerEnv {
   port: number;
   databaseUrl?: string | undefined;
   jwtSecret?: string | undefined;
-  assistantProvider: "mock" | "anthropic" | "groq";
+  assistantProvider: "mock" | "anthropic" | "groq" | "openai_compatible";
   assistantPhrasing: boolean;
   assistantPlanAdherenceContext: boolean;
   assistantSafetyGate: boolean;
-  workoutIntakeLlmProvider: "off" | "mock" | "anthropic" | "gemini" | "groq";
+  workoutIntakeLlmProvider:
+    | "off"
+    | "mock"
+    | "anthropic"
+    | "gemini"
+    | "groq"
+    | "openai_compatible";
   anthropicApiKey?: string | undefined;
   geminiApiKey?: string | undefined;
   geminiModel?: string | undefined;
   groqApiKey?: string | undefined;
   groqModel?: string | undefined;
+  openAiCompatBaseUrl?: string | undefined;
+  openAiCompatModel?: string | undefined;
+  openAiCompatApiKey?: string | undefined;
   voyageApiKey?: string | undefined;
 }
 
@@ -112,6 +143,9 @@ export function loadServerEnv(
     geminiModel: parsed.GEMINI_MODEL,
     groqApiKey: parsed.GROQ_API_KEY,
     groqModel: parsed.GROQ_MODEL,
+    openAiCompatBaseUrl: parsed.OPENAI_COMPAT_BASE_URL,
+    openAiCompatModel: parsed.OPENAI_COMPAT_MODEL,
+    openAiCompatApiKey: parsed.OPENAI_COMPAT_API_KEY,
     voyageApiKey: parsed.VOYAGE_API_KEY,
   };
 }

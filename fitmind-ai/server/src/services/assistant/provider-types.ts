@@ -9,6 +9,8 @@ export interface AssistantProviderSimulationHint {
   normalized_message: string;
 }
 
+export type OpenAiCompatibleProviderName = "groq" | "openai_compatible";
+
 export type AssistantIntentMode =
   | "auto"
   | "training_overview"

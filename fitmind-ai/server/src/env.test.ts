@@ -9,6 +9,8 @@ describe("loadServerEnv", () => {
       JWT_SECRET: "   ",
       ANTHROPIC_API_KEY: "",
       GEMINI_API_KEY: "",
+      OPENAI_COMPAT_API_KEY: "",
+      OPENAI_COMPAT_MODEL: "",
       VOYAGE_API_KEY: "",
     } as NodeJS.ProcessEnv);
 
@@ -16,6 +18,8 @@ describe("loadServerEnv", () => {
     expect(env.jwtSecret).toBeUndefined();
     expect(env.anthropicApiKey).toBeUndefined();
     expect(env.geminiApiKey).toBeUndefined();
+    expect(env.openAiCompatApiKey).toBeUndefined();
+    expect(env.openAiCompatModel).toBeUndefined();
     expect(env.voyageApiKey).toBeUndefined();
   });
 
@@ -23,10 +27,14 @@ describe("loadServerEnv", () => {
     const env = loadServerEnv({
       ANTHROPIC_API_KEY: "sk-ant-123",
       GEMINI_API_KEY: "gem-123",
+      OPENAI_COMPAT_API_KEY: "compat-123",
+      OPENAI_COMPAT_MODEL: "deepseek-chat",
     } as NodeJS.ProcessEnv);
 
     expect(env.anthropicApiKey).toBe("sk-ant-123");
     expect(env.geminiApiKey).toBe("gem-123");
+    expect(env.openAiCompatApiKey).toBe("compat-123");
+    expect(env.openAiCompatModel).toBe("deepseek-chat");
   });
 
   it("degrades an unknown provider value to mock", () => {
@@ -45,6 +53,32 @@ describe("loadServerEnv", () => {
     } as NodeJS.ProcessEnv);
 
     expect(env.workoutIntakeLlmProvider).toBe("gemini");
+  });
+
+  it("accepts OpenAI-compatible assistant and intake providers", () => {
+    const env = loadServerEnv({
+      ASSISTANT_PROVIDER: "openai_compatible",
+      WORKOUT_INTAKE_LLM_PROVIDER: "openai_compatible",
+    } as NodeJS.ProcessEnv);
+
+    expect(env.assistantProvider).toBe("openai_compatible");
+    expect(env.workoutIntakeLlmProvider).toBe("openai_compatible");
+  });
+
+  it("keeps only valid https OpenAI-compatible base URLs", () => {
+    const validEnv = loadServerEnv({
+      OPENAI_COMPAT_BASE_URL: " https://api.deepseek.com ",
+    } as NodeJS.ProcessEnv);
+    const invalidEnv = loadServerEnv({
+      OPENAI_COMPAT_BASE_URL: "http://api.deepseek.com",
+    } as NodeJS.ProcessEnv);
+    const blankEnv = loadServerEnv({
+      OPENAI_COMPAT_BASE_URL: "   ",
+    } as NodeJS.ProcessEnv);
+
+    expect(validEnv.openAiCompatBaseUrl).toBe("https://api.deepseek.com");
+    expect(invalidEnv.openAiCompatBaseUrl).toBeUndefined();
+    expect(blankEnv.openAiCompatBaseUrl).toBeUndefined();
   });
 
   it("keeps plan-adherence context opt-in by default", () => {

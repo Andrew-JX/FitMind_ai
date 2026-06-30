@@ -7,7 +7,8 @@ export type WorkoutIntakeLlmProviderMode =
   | "mock"
   | "anthropic"
   | "gemini"
-  | "groq";
+  | "groq"
+  | "openai_compatible";
 
 export type WorkoutIntakeLlmRawParser = (input: {
   text: string;
@@ -94,7 +95,10 @@ export async function parseWithMockWorkoutIntakeLlm(input: {
   const text = normalizeMockText(input.text);
   const spokenName = findMockSpokenName(text);
   const groupCount = parsePositiveInteger(text, /(\d+)\s*\u7ec4/u);
-  const weightKg = parsePositiveNumber(text, /(\d+(?:\.\d+)?)\s*(?:kg|\u516c\u65a4|\u5343\u514b)/iu);
+  const weightKg = parsePositiveNumber(
+    text,
+    /(\d+(?:\.\d+)?)\s*(?:kg|\u516c\u65a4|\u5343\u514b)/iu,
+  );
   const reps = parseMockReps(text);
 
   if (spokenName === null) {
@@ -165,7 +169,9 @@ async function parseWithAnthropicWorkoutIntakeLlm(input: {
   const env = loadServerEnv();
 
   if (env.anthropicApiKey === undefined) {
-    throw new Error("ANTHROPIC_API_KEY is required for workout intake LLM parsing.");
+    throw new Error(
+      "ANTHROPIC_API_KEY is required for workout intake LLM parsing.",
+    );
   }
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -189,7 +195,9 @@ async function parseWithAnthropicWorkoutIntakeLlm(input: {
   });
 
   if (!response.ok) {
-    throw new Error(`Workout intake LLM request failed with HTTP ${response.status}.`);
+    throw new Error(
+      `Workout intake LLM request failed with HTTP ${response.status}.`,
+    );
   }
 
   const payload = (await response.json()) as {
@@ -214,7 +222,9 @@ async function parseWithGeminiWorkoutIntakeLlm(input: {
   const env = loadServerEnv();
 
   if (env.geminiApiKey === undefined) {
-    throw new Error("GEMINI_API_KEY is required for workout intake LLM parsing.");
+    throw new Error(
+      "GEMINI_API_KEY is required for workout intake LLM parsing.",
+    );
   }
 
   const model = env.geminiModel ?? "gemini-2.0-flash";
@@ -326,7 +336,7 @@ function buildWorkoutIntakeSystemPrompt(): string {
   return [
     "You parse workout logging text into strict JSON only.",
     "Return no markdown and no prose outside JSON.",
-    "Schema: {\"exercises\":[{\"spoken_name\":\"string\",\"sets\":[{\"weight_kg\":number,\"reps\":number}],\"incomplete_sets\":[{\"group_count\":number|null,\"weight_kg\":number|null,\"reps\":number|null,\"missing_fields\":[\"weight_kg\"|\"reps\"]}]}],\"warnings\":[\"string\"]}.",
+    'Schema: {"exercises":[{"spoken_name":"string","sets":[{"weight_kg":number,"reps":number}],"incomplete_sets":[{"group_count":number|null,"weight_kg":number|null,"reps":number|null,"missing_fields":["weight_kg"|"reps"]}]}],"warnings":["string"]}.',
     "Parse every exercise mentioned, even when the speaker lists exercises first and then describes each one's sets later; merge those into one entry per exercise.",
     "Preserve user-provided numbers exactly, including decimals like 27.5.",
     "Convert Chinese numerals such as \u4e09\u7ec4 and \u5341\u7ec4.",
