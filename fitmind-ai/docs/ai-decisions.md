@@ -1044,3 +1044,27 @@ Decision：
 - 默认 off 下所有现有 next-week-plan 输出应保持不变。
 
 验证：生成器单测覆盖无上下文零回归、done 正常、partial cap、missed 降组、整体低依从强制 consolidate、低整体+missed 复合不退化；service 单测覆盖 active/completed、无计划、summary 失败上抛；orchestrator 单测覆盖默认 off 不加载、opt-in 成功注入、读取失败回退、answer prose 不泄露依从度数字。
+
+## [D43] ENV 级 OpenAI-Compatible BYO 模型（Tier 1）
+
+- **Date**: 2026-07-01
+- **Status**: Accepted（已落地 + 单测；默认行为不变）
+
+背景：语音 STT 当前是浏览器 Web Speech API，不调用模型 API；真正的模型接缝是两条文本 LLM seam：训练录入解析和助手（工具选择 / 意图救场 / summary phrasing）。DeepSeek、Qwen/DashScope、Kimi、智谱、OpenAI、Groq 等大多暴露 OpenAI-compatible `/chat/completions`，因此 v1 做一个 ENV 级通用 BYO 适配器，而不是为每家写平行 adapter。
+
+Decision：
+- **新增 provider**：`ASSISTANT_PROVIDER=openai_compatible` 与 `WORKOUT_INTAKE_LLM_PROVIDER=openai_compatible`。默认仍是 `mock` / 既有 Groq 行为；未知 provider 继续 `.catch("mock")`，配置错误不让 env load 崩。
+- **共享 ENV 三件套**：`OPENAI_COMPAT_BASE_URL`（必须为合法 `https` URL；空/非法视为未配置）、`OPENAI_COMPAT_MODEL`、`OPENAI_COMPAT_API_KEY`。v1 限制：助手和录入解析若都选 `openai_compatible`，共享同一 endpoint/model/key；一个 seam 用 Groq、另一个用 BYO 仍可混用。
+- **重命名通用 client**：`groq-chat-client.ts` / `groq-assistant-provider.ts` 泛化并重命名为 `openai-compatible-chat-client.ts` / `openai-compatible-assistant-provider.ts`。Groq 只是 preset（`https://api.groq.com/openai/v1` + `GROQ_API_KEY` + `GROQ_MODEL` 默认），BYO 是另一组 preset。
+- **同一 adapter path，不旁路护栏**：Groq 和 BYO 都走同一个 OpenAI-compatible assistant provider，再经过 `provider-adapter` 的 `ensureAllowedTool`、provider fallback、faithfulness、safety、eval 体系；模型不能新增工具名，也不能绕过确定性数字生成。
+- **三处助手 LLM 调用统一配置**：工具选择、意图救场、summary phrasing 都走 configured OpenAI-compatible client。`ASSISTANT_PHRASING=on` 现在可配合 `groq` 或 `openai_compatible`，仍由 runtime faithfulness 决定是否采用改写文本。
+- **录入解析复用同 client**：Groq intake 不再手写 fetch/model default；`createWorkoutIntakeLlmParser("openai_compatible")` 复用通用 client，解析失败继续由 hybrid/rule fallback 兜底。
+- **telemetry 诚实**：provider/model 来自实际 client result；未知 BYO 模型不在价格表时 `estimated_cost_usd: null`，不编成本数字。
+- **密钥/URL 卫生**：API key 只进 Authorization header，不进 DTO/log/error；错误消息不回显 Authorization 或 key。base URL 强制 `https`，保护 key 传输。
+- **失败降级**：BYO 缺配置、HTTP/shape/network 失败与 Groq 一样返回 provider error + telemetry；助手上层沿用 C1 失败 turn telemetry / fallback 路径，不硬崩、不空答。录入解析失败继续回到 hybrid/rule parser。
+
+Tier 2 backlog（等多用户需求再做）：每用户 BYO 设置 UI + 加密密钥存储。安全门槛包括：密钥加密存储、永不回传/打日志/串户、tenant isolation、用户输入 URL 的 SSRF allowlist、限流、连接校验 UX、密钥脱敏显示和审计。
+
+Out of scope：云端 STT、RAG embedding BYO、Anthropic 原生 schema 收编、每用户密钥 UI/DB 存储。
+
+验证：env 单测覆盖 `openai_compatible` provider、非法/空 BYO URL 不崩；通用 client 单测覆盖 Groq preset、BYO URL/key/model、usage 宽松解析、config failure 不发 fetch；assistant provider/intent router 单测覆盖 BYO telemetry 与工具护栏路径；intake parser 单测覆盖 BYO/Groq 均走通用 client、缺 BYO 配置不发 fetch。最终门禁：type-check / 改动文件 eslint + Prettier / unit / eval。

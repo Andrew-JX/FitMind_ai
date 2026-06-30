@@ -30,6 +30,10 @@ DATABASE_URL=your_neon_postgres_url
 JWT_SECRET=your_local_secret
 ASSISTANT_PROVIDER=mock
 ANTHROPIC_API_KEY=optional_only_for_anthropic
+GROQ_API_KEY=optional_for_groq
+OPENAI_COMPAT_BASE_URL=optional_https_openai_compatible_base_url
+OPENAI_COMPAT_MODEL=optional_model_for_openai_compatible
+OPENAI_COMPAT_API_KEY=optional_key_for_openai_compatible
 ```
 
 说明：
@@ -234,3 +238,12 @@ Accepted workaround:
 
 - 本地前端端口以当前仓库代码为准，是 `5173`，不是任务描述里曾出现过的 `5174`。
 - 本批没有改后端 API、assistant SSE contract、quick prompt mode、训练 CRUD 或 `set_index` 逻辑。
+
+### 2026-07-01 OpenAI-Compatible BYO
+
+- `ASSISTANT_PROVIDER` supports `mock`, `anthropic`, `groq`, and `openai_compatible`; default is still `mock`.
+- `WORKOUT_INTAKE_LLM_PROVIDER` supports `off`, `mock`, `anthropic`, `gemini`, `groq`, and `openai_compatible`.
+- `openai_compatible` uses the shared `OPENAI_COMPAT_BASE_URL` (must be `https`), `OPENAI_COMPAT_MODEL`, and `OPENAI_COMPAT_API_KEY` env vars for both assistant and intake. DeepSeek, Qwen/DashScope, Kimi, Zhipu, OpenAI, and similar `/chat/completions` endpoints fit this path.
+- v1 limitation: if assistant and intake both select `openai_compatible`, they share the same endpoint/model/key. Mixing Groq for one seam and BYO for the other still works.
+- `ASSISTANT_PHRASING=on` can run with `ASSISTANT_PROVIDER=groq` or `openai_compatible`; runtime faithfulness still gates the rewrite.
+- Browser speech recognition remains Web Speech API. These settings configure the text LLM after speech-to-text, not cloud STT.

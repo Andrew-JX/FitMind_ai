@@ -4789,3 +4789,14 @@ Verification: `pnpm type-check` / `pnpm test:unit`(330) / `pnpm eval`(13/13·12/
 把 Slice 5 的 planned-vs-performed 依从度接回下一次计划生成，补上“依从度→再计划”的闭环。新增 `ASSISTANT_PLAN_ADHERENCE_CONTEXT`（默认 off，`1/true/on/yes` 开启）；orchestrator 在 `next_week_plan` 路径 best-effort 读取最近 active/completed 且与 evidence window 相交的 accepted plan，复用 `getTrainingSummary` + `computePlanAdherence` 生成内部 `PlanAdherenceContext`。无计划、abandoned、读取失败或开关关闭都回到原行为。
 
 生成器新增确定性保守规则：整体低依从会把 strategy 降到 `consolidate`，中等依从会把 `add_frequency` 降到 `maintain`；partial/missed 动作不加量、重量不高于上一计划 target，missed 降一组，未覆盖的 partial/missed 动作会 carry over。依从度派生数字只留在结构化 plan basis/notes，不进 answer 自由文本；answer 只同步无数字策略措辞。决策见 ai-decisions D42。
+
+## 2026-07-01 Tier 1：ENV 级 OpenAI-compatible BYO 模型
+
+新增 `openai_compatible` 文本 LLM provider，用共享 `OPENAI_COMPAT_BASE_URL` / `OPENAI_COMPAT_MODEL` / `OPENAI_COMPAT_API_KEY` 覆盖助手和训练录入解析两条文本 seam。默认仍是 `mock` / 既有 Groq 行为；语音 STT 仍是浏览器 Web Speech API，RAG embedding 和每用户密钥 UI/存储不做。
+
+- **Batch 1（env/config）**：`ASSISTANT_PROVIDER` 与 `WORKOUT_INTAKE_LLM_PROVIDER` 接受 `openai_compatible`；BYO base URL 只接受 `https`，空/非法视为未配置，不让 env load 崩；`provider-config` 新增 Groq preset + BYO config。验证：env 单测、type-check、改动文件 eslint/Prettier。
+- **Batch 2（通用助手 client/provider）**：`groq-chat-client` / `groq-assistant-provider` 重命名并泛化为 `openai-compatible-*`；Groq 变 preset，BYO 走同一 adapter path。工具选择、意图救场、summary phrasing 均走 configured OpenAI-compatible client；telemetry provider/model 取实际 result，未知 BYO 模型 cost 为 `null`。验证：client/provider/intent/adapter/observability 单测、type-check、eslint/Prettier。
+- **Batch 3（录入解析）**：`createWorkoutIntakeLlmParser("openai_compatible")` 接共享 BYO endpoint；Groq intake 也复用通用 client，收掉重复 fetch/model default；缺 BYO 配置不发 fetch，hybrid/rule fallback 继续兜底。验证：intake parser + hybrid + intent router 单测、type-check、eslint/Prettier。
+- **Batch 4（文档）**：`.env.example`、`local-run-guide`、`api-contract`、`roadmap`、`ai-decisions` 同步；D43 记录 v1 共享配置限制和 Tier 2 backlog 安全要求。
+
+已知边界：助手和录入解析若都选 `openai_compatible`，v1 共享同一 endpoint/model/key；一个 seam 用 Groq、另一个用 BYO 仍可混用。每用户 BYO UI + 加密密钥存储等到真实多用户需求出现再做。

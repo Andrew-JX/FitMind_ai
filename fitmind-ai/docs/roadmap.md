@@ -119,7 +119,7 @@ saved-insight 分享链接、知识管理后台、离线编辑 / 同步。优先
 >
 > 共识约束：
 > - 两类岗位**均衡**：Track 1（AI 工程：评估/护栏/可观测）与 Track 2（产品：闭环/目标/留存）交替推进。
-> - **暂只用 Groq 免费 provider**，但保留干净的 provider seam + 文档说明（见 Slice 7）。接真实大模型推迟，理由是成本。
+> - **默认仍用 mock/Groq 免费 provider**，但已支持 ENV 级 OpenAI-compatible BYO（DeepSeek / Qwen / Kimi / OpenAI 等；见 Slice 7.1 / D43）。每用户密钥 UI/存储等到多用户需求出现再做。
 > - **慢慢做、按投入产出比从高到低、每片最小杠杆**；一次只动一片，遵守 AGENTS「单次改动 ≤ 5 代码文件 + 文档同步」。
 
 执行顺序（ROI 高→低）：
@@ -181,6 +181,11 @@ saved-insight 分享链接、知识管理后台、离线编辑 / 同步。优先
   - 落地：审计三处接缝（助手轮 `AssistantProvider`/adapter、录入解析 `WorkoutIntakeLlmRawParser` 工厂、RAG `voyage-embedding-client`），结论是三处都「换模型只动一层」成立；记录 3 个接缝气味为后续片（A 助手轮缺 Groq 免费 provider、B 模型 id+api version 硬编码且两处重复、C「流式」实为 SSE 推确定性步骤而非 token 级流式）。决策见 `ai-decisions.md` D28。纯文档，零代码改动。
   - 价值：AI 面试↑｜成本：极低（文档为主）｜依赖：无。
   - 后续：接真实模型那一片按 D28「会变维度」清单逐项落地，并可顺手清掉气味 A/B/C。
+
+- **Slice 7.1 — ENV 级 OpenAI-compatible BYO 模型　✅ 2026-07-01 完成（Tier 1）**
+  - 落地：新增 `openai_compatible` provider，助手（工具选择 / 意图救场 / summary phrasing）和录入解析共享 `OPENAI_COMPAT_BASE_URL` / `OPENAI_COMPAT_MODEL` / `OPENAI_COMPAT_API_KEY`；Groq 被收编为 OpenAI-compatible preset，通用 client/provider 已重命名为 `openai-compatible-*`；telemetry provider/model 来自实际调用，未知 BYO 模型成本为 `null`。决策见 `ai-decisions.md` D43。
+  - 边界：语音 STT 仍是浏览器 Web Speech API；RAG embedding、Anthropic 原生 schema、每用户密钥 UI/存储不做。
+  - **Tier 2 backlog**：每用户 BYO 设置 UI + 加密密钥存储，门槛=出现多用户需求。安全要求：密钥加密存储、永不回传/打日志/串户、tenant isolation、用户输入 URL 的 SSRF allowlist、限流、连接校验 UX、密钥脱敏显示和审计。
 
 - **Slice 8 — 主动周报推送**（定时任务 + PWA 通知）：留存 / agent 主动性。🟢
 - ~~**Slice 9 — MCP Server（原 6.1）**：确定性工具暴露给 Claude Desktop。~~　**❌ 取消（2026-06-30）**：纯产品镜头下产品价值低、不再考虑面试镜头，故砍掉，不做。

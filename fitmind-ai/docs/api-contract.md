@@ -782,7 +782,8 @@ Fallback boundaries:
 - LLM output can contain `spoken_name`, complete `sets`, incomplete set facts, and warnings.
 - LLM output must not contain `exercise_id`; database exercise matching still uses the deterministic exercise matching service.
 - LLM fallback never creates `workouts` or `sets`; user confirmation and the existing create workout API remain the only persistence path.
-- `WORKOUT_INTAKE_LLM_PROVIDER` supports `off`, `mock`, `anthropic`, `gemini`, and `groq`, defaulting to `mock` for local tests and smoke (prod uses `groq`).
+- `WORKOUT_INTAKE_LLM_PROVIDER` supports `off`, `mock`, `anthropic`, `gemini`, `groq`, and `openai_compatible`, defaulting to `mock` for local tests and smoke (prod can use `groq` or an OpenAI-compatible BYO endpoint).
+- `openai_compatible` uses the shared `OPENAI_COMPAT_BASE_URL` / `OPENAI_COMPAT_MODEL` / `OPENAI_COMPAT_API_KEY` env vars and must point at an HTTPS `/chat/completions` compatible service. This is text parsing only; browser speech recognition remains Web Speech API.
 - Phase 4.4 Batch 6B treats a matched exercise with no valid sets as low quality and attempts fallback, so oral phrases like `我今天训练了背部做了高位下拉做了3组每组做的是70公斤然后每组做了10次` can return a saveable draft instead of a matched empty row.
 - **roadmap §8.2 Slice 12 (varied-set escalation, `ai-decisions.md` D30)**: when the text mentions ≥2 distinct weights but the rule parser captured fewer distinct weights (oral filler like 做了/加到 dropping `weight×reps` pairs and flattening per-set weights), the hybrid parser escalates to the LLM fallback even though the rule draft looked "complete". Compares distinct-weight counts (not values), so it is safe across lb→kg conversion.
 - User-facing parse warnings are Chinese product copy; provider/debug failures remain in `evidence.fallback_warnings`.
