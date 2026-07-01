@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 
+import type { KnowledgeChunkRow } from "../../db/knowledge-repository.js";
 import {
   filterRelevantKnowledgeChunks,
   rankKnowledgeChunks,
   rankHybridKnowledgeChunks,
   retrieveKnowledgeChunks,
   tokenizeKnowledgeQuery,
+  type KnowledgeReranker,
   type RetrievedKnowledgeChunk,
 } from "./knowledge-retriever.js";
 
@@ -162,15 +164,168 @@ describe("retrieveKnowledgeChunks", () => {
   });
 
   it("retrieves plateau and progressive overload sources for mixed bench questions", async () => {
-    const chunks = await retrieveKnowledgeChunks("卧推没进步是不是训练量不够？", {
-      repository: {
-        listKnowledgeChunks: async () => dbRows,
+    const chunks = await retrieveKnowledgeChunks(
+      "卧推没进步是不是训练量不够？",
+      {
+        repository: {
+          listKnowledgeChunks: async () => dbRows,
+        },
       },
-    });
+    );
     const joinedTitles = chunks.map((chunk) => chunk.title).join(" ");
 
     expect(joinedTitles).toContain("卧推");
     expect(joinedTitles).toContain("渐进超负荷");
+  });
+  it("keeps reranking off by default even when a reranker is injectable", async () => {
+    const reranker: KnowledgeReranker = {
+      rerankKnowledgeChunks: async () => {
+        throw new Error("reranker should not run");
+      },
+    };
+
+    const chunks = await retrieveKnowledgeChunks("RPE 鏄粈涔堬紵", {
+      repository: {
+        listKnowledgeChunks: async () => dbRows,
+      },
+      reranker,
+    });
+
+    expect(chunks[0]?.id).toBe("chunk-rpe");
+    expect(chunks[0]?.retrieval_mode).toBe("keyword");
+    expect(chunks[0]?.rerank).toBeUndefined();
+  });
+
+  it("widens candidates, applies the lexical floor, then reranks down to top-k", async () => {
+    const capturedCandidateIds: string[][] = [];
+    const rows: KnowledgeChunkRow[] = [
+      {
+        id: "rpe-low",
+        title: "RPE low priority",
+        category: "training_concept",
+        chunk_text: "RPE low source",
+        source_type: "seed",
+        tags: ["RPE"],
+        search_text: "RPE low source",
+      },
+      {
+        id: "rpe-high",
+        title: "RPE high priority",
+        category: "training_concept",
+        chunk_text: "RPE high source",
+        source_type: "seed",
+        tags: ["RPE"],
+        search_text: "RPE high source",
+      },
+      {
+        id: "sleep",
+        title: "Sleep hygiene",
+        category: "recovery",
+        chunk_text: "Sleep source",
+        source_type: "seed",
+        tags: ["sleep"],
+        search_text: "Sleep source",
+      },
+    ];
+    const reranker: KnowledgeReranker = {
+      rerankKnowledgeChunks: async (input) => {
+        capturedCandidateIds.push(input.candidates.map((chunk) => chunk.id));
+
+        return {
+          chunks: input.candidates
+            .filter((chunk) => chunk.id === "rpe-high")
+            .map((chunk) => ({
+              ...chunk,
+              score: 0.99,
+            })),
+          model: "fixture-reranker",
+          totalTokens: 7,
+        };
+      },
+    };
+
+    const chunks = await retrieveKnowledgeChunks("RPE", 1, {
+      repository: {
+        listKnowledgeChunks: async () => rows,
+      },
+      reranker,
+      rerankingEnabled: true,
+    });
+
+    expect(capturedCandidateIds).toEqual([["rpe-high", "rpe-low"]]);
+    expect(chunks).toEqual([
+      expect.objectContaining({
+        id: "rpe-high",
+        retrieval_mode: "reranked",
+        rerank: expect.objectContaining({
+          status: "success",
+          model: "fixture-reranker",
+          candidate_count: 2,
+          total_tokens: 7,
+          estimated_cost_usd: null,
+        }),
+      }),
+    ]);
+  });
+
+  it("does not let reranking revive chunks removed by the lexical floor", async () => {
+    const unrelated: RetrievedKnowledgeChunk = {
+      id: "sleep",
+      title: "Sleep hygiene",
+      category: "recovery",
+      chunk_text: "Sleep source",
+      source_type: "seed",
+      tags: ["sleep"],
+      score: 1,
+      retrieval_mode: "keyword",
+    };
+    const reranker: KnowledgeReranker = {
+      rerankKnowledgeChunks: async () => ({
+        chunks: [unrelated],
+        model: "fixture-reranker",
+        totalTokens: null,
+      }),
+    };
+
+    const chunks = await retrieveKnowledgeChunks("RPE", 1, {
+      repository: {
+        listKnowledgeChunks: async () => dbRows,
+      },
+      reranker,
+      rerankingEnabled: true,
+    });
+
+    expect(chunks[0]?.id).toBe("chunk-rpe");
+    expect(chunks[0]?.retrieval_mode).toBe("keyword");
+    expect(chunks[0]?.rerank?.status).toBe("fallback");
+    expect(chunks[0]?.rerank?.fallback_reason).toBe("reranker_empty");
+  });
+
+  it("fails safe to the lexical candidate order when reranking throws", async () => {
+    const reranker: KnowledgeReranker = {
+      rerankKnowledgeChunks: async () => {
+        throw new Error("fixture failure");
+      },
+    };
+
+    const chunks = await retrieveKnowledgeChunks("RPE", 1, {
+      repository: {
+        listKnowledgeChunks: async () => dbRows,
+      },
+      reranker,
+      rerankingEnabled: true,
+    });
+
+    expect(chunks[0]?.id).toBe("chunk-rpe");
+    expect(chunks[0]?.retrieval_mode).toBe("keyword");
+    expect(chunks[0]?.rerank).toEqual({
+      status: "fallback",
+      model: null,
+      candidate_count: 1,
+      total_tokens: null,
+      estimated_cost_usd: null,
+      fallback_reason: "reranker_failed",
+    });
   });
 });
 

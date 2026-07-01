@@ -103,4 +103,14 @@ describe("loadServerEnv", () => {
     expect(enabledEnv.weeklyReportDeliveryEnabled).toBe(true);
     expect(enabledEnv.weeklyReportCronSecret).toBe("cron-secret");
   });
+
+  it("keeps RAG reranking opt-in by default", () => {
+    const defaultEnv = loadServerEnv({} as NodeJS.ProcessEnv);
+    const enabledEnv = loadServerEnv({
+      RAG_RERANKING_ENABLED: "true",
+    } as NodeJS.ProcessEnv);
+
+    expect(defaultEnv.ragRerankingEnabled).toBe(false);
+    expect(enabledEnv.ragRerankingEnabled).toBe(true);
+  });
 });

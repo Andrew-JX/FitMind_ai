@@ -5,12 +5,31 @@ import {
   type KnowledgeChunkSearchRow,
 } from "../../db/knowledge-repository.js";
 import { loadServerEnv } from "../../env.js";
-import { createVoyageEmbeddingProvider } from "./voyage-embedding-client.js";
+import {
+  createVoyageEmbeddingProvider,
+  RERANK_MODEL,
+  rerankWithVoyage,
+} from "./voyage-embedding-client.js";
 
 export type RetrievedKnowledgeChunk = Omit<KnowledgeChunkRow, "search_text"> & {
   score: number;
-  retrieval_mode: "keyword" | "vector" | "hybrid";
+  retrieval_mode: "keyword" | "vector" | "hybrid" | "reranked";
+  rerank?: KnowledgeRerankTrace | undefined;
 };
+
+export type KnowledgeRetrievalMode = RetrievedKnowledgeChunk["retrieval_mode"];
+
+export interface KnowledgeRerankTrace {
+  status: "success" | "fallback";
+  model: string | null;
+  candidate_count: number;
+  total_tokens: number | null;
+  estimated_cost_usd: null;
+  fallback_reason?:
+    | "reranker_unavailable"
+    | "reranker_failed"
+    | "reranker_empty";
+}
 
 export interface KnowledgeChunkRepository {
   listKnowledgeChunks: () => Promise<KnowledgeChunkRow[]>;
@@ -24,13 +43,30 @@ export interface KnowledgeEmbeddingProvider {
   embedQuery: (query: string) => Promise<number[]>;
 }
 
+export interface KnowledgeRerankResult {
+  chunks: RetrievedKnowledgeChunk[];
+  model: string;
+  totalTokens: number | null;
+}
+
+export interface KnowledgeReranker {
+  rerankKnowledgeChunks: (input: {
+    query: string;
+    candidates: RetrievedKnowledgeChunk[];
+    limit: number;
+  }) => Promise<KnowledgeRerankResult>;
+}
+
 export interface RetrieveKnowledgeChunksOptions {
   repository?: KnowledgeChunkRepository | undefined;
   embeddingProvider?: KnowledgeEmbeddingProvider | null | undefined;
+  reranker?: KnowledgeReranker | null | undefined;
+  rerankingEnabled?: boolean | undefined;
 }
 
 const HYBRID_VECTOR_WEIGHT = 0.7;
 const HYBRID_KEYWORD_WEIGHT = 0.3;
+const RERANK_TIMEOUT_MS = 2000;
 
 export function tokenizeKnowledgeQuery(input: string): string[] {
   const normalizedInput = input.trim().toLowerCase();
@@ -93,7 +129,12 @@ export function filterRelevantKnowledgeChunks(
   }
 
   return chunks.filter((chunk) => {
-    const haystack = [chunk.title, chunk.category, chunk.chunk_text, ...chunk.tags]
+    const haystack = [
+      chunk.title,
+      chunk.category,
+      chunk.chunk_text,
+      ...chunk.tags,
+    ]
       .join(" ")
       .toLowerCase();
 
@@ -101,10 +142,7 @@ export function filterRelevantKnowledgeChunks(
   });
 }
 
-function scoreChunk(
-  chunk: KnowledgeChunkRow,
-  queryTokens: string[],
-): number {
+function scoreChunk(chunk: KnowledgeChunkRow, queryTokens: string[]): number {
   const haystack = [
     chunk.title,
     chunk.category,
@@ -187,7 +225,10 @@ export function rankHybridKnowledgeChunks(input: {
   limit?: number | undefined;
 }): RetrievedKnowledgeChunk[] {
   const limit = input.limit ?? 3;
-  const vectorMax = Math.max(0, ...input.vectorChunks.map((chunk) => chunk.score));
+  const vectorMax = Math.max(
+    0,
+    ...input.vectorChunks.map((chunk) => chunk.score),
+  );
   const keywordMax = Math.max(
     0,
     ...input.keywordChunks.map((chunk) => chunk.score),
@@ -259,12 +300,176 @@ export function rankHybridKnowledgeChunks(input: {
 
 function createDefaultEmbeddingProvider(): KnowledgeEmbeddingProvider | null {
   const env = loadServerEnv();
+  const apiKey = env.voyageApiKey;
 
-  if (env.voyageApiKey === undefined) {
+  if (apiKey === undefined) {
     return null;
   }
 
-  return createVoyageEmbeddingProvider(env.voyageApiKey);
+  return createVoyageEmbeddingProvider(apiKey);
+}
+
+function createChunkRerankDocument(chunk: RetrievedKnowledgeChunk): string {
+  return [
+    chunk.title,
+    chunk.category,
+    chunk.tags.join(" "),
+    chunk.chunk_text,
+  ].join("\n");
+}
+
+function createDefaultReranker(enabled: boolean): KnowledgeReranker | null {
+  if (!enabled) {
+    return null;
+  }
+
+  const env = loadServerEnv();
+  const apiKey = env.voyageApiKey;
+
+  if (apiKey === undefined) {
+    return null;
+  }
+
+  return {
+    rerankKnowledgeChunks: async (input) => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, RERANK_TIMEOUT_MS);
+
+      try {
+        const response = await rerankWithVoyage({
+          apiKey,
+          query: input.query,
+          documents: input.candidates.map(createChunkRerankDocument),
+          topK: Math.min(input.limit, input.candidates.length),
+          signal: controller.signal,
+        });
+        const rerankedChunks: RetrievedKnowledgeChunk[] = [];
+
+        for (const result of response.results) {
+          const candidate = input.candidates[result.index];
+
+          if (candidate !== undefined) {
+            rerankedChunks.push({
+              ...candidate,
+              score: roundScore(result.relevanceScore),
+            });
+          }
+        }
+
+        return {
+          chunks: rerankedChunks,
+          model: RERANK_MODEL,
+          totalTokens: response.totalTokens,
+        };
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    },
+  };
+}
+
+function withRerankSuccess(
+  chunks: RetrievedKnowledgeChunk[],
+  input: {
+    model: string;
+    candidateCount: number;
+    totalTokens: number | null;
+  },
+): RetrievedKnowledgeChunk[] {
+  return chunks.map((chunk) => ({
+    ...chunk,
+    retrieval_mode: "reranked",
+    rerank: {
+      status: "success",
+      model: input.model,
+      candidate_count: input.candidateCount,
+      total_tokens: input.totalTokens,
+      estimated_cost_usd: null,
+    },
+  }));
+}
+
+function withRerankFallback(
+  chunks: RetrievedKnowledgeChunk[],
+  input: {
+    candidateCount: number;
+    fallbackReason: NonNullable<KnowledgeRerankTrace["fallback_reason"]>;
+  },
+): RetrievedKnowledgeChunk[] {
+  return chunks.map((chunk) => ({
+    ...chunk,
+    rerank: {
+      status: "fallback",
+      model: null,
+      candidate_count: input.candidateCount,
+      total_tokens: null,
+      estimated_cost_usd: null,
+      fallback_reason: input.fallbackReason,
+    },
+  }));
+}
+
+function keepKnownRerankedChunks(
+  rerankedChunks: RetrievedKnowledgeChunk[],
+  candidates: RetrievedKnowledgeChunk[],
+  limit: number,
+): RetrievedKnowledgeChunk[] {
+  const candidateIds = new Set(candidates.map((candidate) => candidate.id));
+
+  return rerankedChunks
+    .filter((chunk) => candidateIds.has(chunk.id))
+    .slice(0, limit);
+}
+
+async function applyOptionalReranking(input: {
+  query: string;
+  candidates: RetrievedKnowledgeChunk[];
+  limit: number;
+  reranker: KnowledgeReranker | null;
+}): Promise<RetrievedKnowledgeChunk[]> {
+  if (input.candidates.length === 0) {
+    return [];
+  }
+
+  if (input.reranker === null) {
+    return withRerankFallback(input.candidates.slice(0, input.limit), {
+      candidateCount: input.candidates.length,
+      fallbackReason: "reranker_unavailable",
+    });
+  }
+
+  try {
+    const result = await input.reranker.rerankKnowledgeChunks({
+      query: input.query,
+      candidates: input.candidates,
+      limit: input.limit,
+    });
+    const knownRerankedChunks = keepKnownRerankedChunks(
+      result.chunks,
+      input.candidates,
+      input.limit,
+    );
+
+    if (knownRerankedChunks.length === 0) {
+      return withRerankFallback(input.candidates.slice(0, input.limit), {
+        candidateCount: input.candidates.length,
+        fallbackReason: "reranker_empty",
+      });
+    }
+
+    return withRerankSuccess(knownRerankedChunks, {
+      model: result.model,
+      candidateCount: input.candidates.length,
+      totalTokens: result.totalTokens,
+    });
+  } catch {
+    return withRerankFallback(input.candidates.slice(0, input.limit), {
+      candidateCount: input.candidates.length,
+      fallbackReason: "reranker_failed",
+    });
+  }
 }
 
 async function tryRetrieveWithEmbeddings(input: {
@@ -281,7 +486,9 @@ async function tryRetrieveWithEmbeddings(input: {
   }
 
   try {
-    const queryEmbedding = await input.embeddingProvider.embedQuery(input.query);
+    const queryEmbedding = await input.embeddingProvider.embedQuery(
+      input.query,
+    );
     const chunks = await input.repository.searchKnowledgeChunksByEmbedding(
       queryEmbedding,
       input.limit,
@@ -313,32 +520,70 @@ export async function retrieveKnowledgeChunks(
     resolvedOptions.embeddingProvider === undefined
       ? createDefaultEmbeddingProvider()
       : resolvedOptions.embeddingProvider;
+  const envRerankingEnabled =
+    resolvedOptions.rerankingEnabled ?? loadServerEnv().ragRerankingEnabled;
+  const reranker =
+    resolvedOptions.reranker === undefined
+      ? createDefaultReranker(envRerankingEnabled)
+      : resolvedOptions.reranker;
+  const candidateLimit = Math.max(limit * 4, 10);
   const vectorChunks = await tryRetrieveWithEmbeddings({
     query,
-    limit: Math.max(limit * 4, 10),
+    limit: candidateLimit,
     repository,
     embeddingProvider,
   });
   const chunks = await repository.listKnowledgeChunks();
 
   if (vectorChunks.length > 0) {
-    const keywordChunks = rankKnowledgeChunks(
-      chunks,
-      query,
-      Math.max(limit * 4, 10),
-    );
-    const hybridChunks = rankHybridKnowledgeChunks({
+    const keywordChunks = rankKnowledgeChunks(chunks, query, candidateLimit);
+    const limitedHybridChunks = rankHybridKnowledgeChunks({
       vectorChunks,
       keywordChunks,
       limit,
     });
 
-    if (hybridChunks.length > 0) {
-      return hybridChunks;
+    if (!envRerankingEnabled) {
+      if (limitedHybridChunks.length > 0) {
+        return limitedHybridChunks;
+      }
+
+      return toRetrievedKnowledgeChunks(vectorChunks).slice(0, limit);
     }
 
-    return toRetrievedKnowledgeChunks(vectorChunks).slice(0, limit);
+    const wideHybridChunks = rankHybridKnowledgeChunks({
+      vectorChunks,
+      keywordChunks,
+      limit: candidateLimit,
+    });
+    const candidates =
+      wideHybridChunks.length > 0
+        ? wideHybridChunks
+        : toRetrievedKnowledgeChunks(vectorChunks).slice(0, candidateLimit);
+    const relevantCandidates = filterRelevantKnowledgeChunks(candidates, query);
+
+    return applyOptionalReranking({
+      query,
+      candidates: relevantCandidates,
+      limit,
+      reranker,
+    });
   }
 
-  return rankKnowledgeChunks(chunks, query, limit);
+  if (!envRerankingEnabled) {
+    return rankKnowledgeChunks(chunks, query, limit);
+  }
+
+  const keywordCandidates = rankKnowledgeChunks(chunks, query, candidateLimit);
+  const relevantCandidates = filterRelevantKnowledgeChunks(
+    keywordCandidates,
+    query,
+  );
+
+  return applyOptionalReranking({
+    query,
+    candidates: relevantCandidates,
+    limit,
+    reranker,
+  });
 }

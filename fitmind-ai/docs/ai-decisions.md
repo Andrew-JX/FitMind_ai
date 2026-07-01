@@ -1087,3 +1087,22 @@ Decision:
 
 Tier 2 backlog:
 - Per-user opt-in/preferences, notification settings UI, Web Push VAPID secrets, push subscriptions, subscribe/unsubscribe APIs, SW `push`/`notificationclick`, permission UX, iOS installed-PWA caveat, dead-subscription cleanup, and OS-level opt-out.
+
+## [D45] C2 RAG reranking seam + in-process Voyage reranker
+
+- **Date**: 2026-07-01
+- **Status**: Accepted / implemented
+
+Background: hybrid vector+keyword retrieval is already in place, but candidate order can still be noisy. The safety boundary from D33 is more important than reranking quality: a reranker must never bring back chunks that failed the lexical relevance floor.
+
+Decision:
+- Add a `KnowledgeReranker` seam beside the existing repository and embedding seams. It is injectable for tests/eval and has a first in-process Voyage implementation using the existing `VOYAGE_API_KEY`.
+- Keep `RAG_RERANKING_ENABLED` default off. Flag off preserves current retrieval behavior and does not call any reranker.
+- When enabled, the pipeline is: widened hybrid/keyword candidates (`max(limit * 4, 10)`) -> `filterRelevantKnowledgeChunks` lexical floor -> rerank -> final topK. Rerank only sees candidates that passed the floor.
+- Fail safe: missing key, unavailable reranker, timeout, bad response, empty rerank result, or thrown error returns the lexical-floor candidate order. It never returns unrelated chunks and never makes retrieval fail.
+- Voyage uses `/v1/rerank`, `rerank-2.5-lite`, `return_documents:false`, `truncation:true`, and topK equal to the requested final limit. The historical `voyage-embedding-client.ts` module now covers both embeddings and rerank to avoid a rename-only churn.
+- Observability is server-only: `retrieval_mode:"reranked"` on success, original mode on fallback, and safe rerank metadata (`status/model/candidate_count/total_tokens/estimated_cost_usd:null/fallback_reason`) in retrieval logs. Raw query, raw documents, API keys, and public answer DTOs stay unchanged.
+- Eval stays deterministic. RAG eval metrics now include top1, top3, MRR, and expected-source rank. When rerank comparison is enabled, it injects a fixture reranker; CI/gate eval does not hit live Voyage. Live Voyage quality checks are manual opt-in only.
+
+Out of scope:
+- Python/FastAPI reranker microservice, LangSmith, embedding/ingestion changes, corpus edits, public DTO changes, and live Voyage eval as a regression gate.

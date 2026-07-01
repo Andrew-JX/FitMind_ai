@@ -1,12 +1,20 @@
 import type { AssistantRoutedIntent } from "../assistant/assistant-intent-router.js";
-import type { RetrievedKnowledgeChunk } from "./knowledge-retriever.js";
+import type {
+  KnowledgeRerankTrace,
+  RetrievedKnowledgeChunk,
+} from "./knowledge-retriever.js";
 
-export type RetrievalLogMode = "keyword" | "vector" | "hybrid" | "fallback";
+export type RetrievalLogMode =
+  | "keyword"
+  | "vector"
+  | "hybrid"
+  | "reranked"
+  | "fallback";
 
 export interface RetrievalLogEventInput {
   intent: AssistantRoutedIntent;
   retrievalMode: RetrievalLogMode;
-  sources: Array<Pick<RetrievedKnowledgeChunk, "title" | "score">>;
+  sources: Array<Pick<RetrievedKnowledgeChunk, "title" | "score" | "rerank">>;
   fallbackReason?: string | undefined;
 }
 
@@ -20,6 +28,7 @@ export interface RetrievalLogEvent {
     max: number;
     min: number;
   };
+  rerank?: KnowledgeRerankTrace | undefined;
   fallback_reason?: string | undefined;
 }
 
@@ -42,6 +51,9 @@ export function buildRetrievalLogEvent(
       max: scores.length > 0 ? roundScore(Math.max(...scores)) : 0,
       min: scores.length > 0 ? roundScore(Math.min(...scores)) : 0,
     },
+    ...(input.sources[0]?.rerank !== undefined
+      ? { rerank: input.sources[0].rerank }
+      : {}),
     ...(input.fallbackReason !== undefined
       ? { fallback_reason: input.fallbackReason }
       : {}),

@@ -20,6 +20,19 @@ export interface RagEvalResult {
   passed: boolean;
   failures: string[];
   total: number;
+  metrics: RagEvalMetrics;
+}
+
+export interface RagEvalCaseRank {
+  id: string;
+  expectedRank: number | null;
+}
+
+export interface RagEvalMetrics {
+  top1HitRate: number;
+  top3HitRate: number;
+  mrr: number;
+  caseRanks: RagEvalCaseRank[];
 }
 
 export const ragEvalCases: RagEvalCase[] = [
@@ -80,7 +93,8 @@ export const ragEvalCases: RagEvalCase[] = [
   {
     id: "recovery-en",
     topic: "recovery",
-    question: "How do I judge training fatigue and recovery 训练疲劳和恢复判断?",
+    question:
+      "How do I judge training fatigue and recovery 训练疲劳和恢复判断?",
     expectedSourceIncludes: "恢复",
   },
   {
@@ -119,12 +133,16 @@ export async function evaluateRagCases(
   cases: RagEvalCase[],
   retrieve: (
     question: string,
-  ) => Promise<Array<Pick<RetrievedKnowledgeChunk, "title" | "retrieval_mode">>>,
+    testCase: RagEvalCase,
+  ) => Promise<
+    Array<Pick<RetrievedKnowledgeChunk, "title" | "retrieval_mode">>
+  >,
 ): Promise<RagEvalResult> {
   const failures: string[] = [];
+  const caseRanks: RagEvalCaseRank[] = [];
 
   for (const testCase of cases) {
-    const sources = await retrieve(testCase.question);
+    const sources = await retrieve(testCase.question, testCase);
     const topThreeTitles = sources
       .slice(0, 3)
       .map((source) => source.title.toLowerCase());
@@ -138,6 +156,18 @@ export async function evaluateRagCases(
     }
 
     const expected = testCase.expectedSourceIncludes?.toLowerCase();
+    const expectedRank =
+      expected === undefined
+        ? null
+        : sources.findIndex((source) =>
+            source.title.toLowerCase().includes(expected),
+          );
+
+    caseRanks.push({
+      id: testCase.id,
+      expectedRank:
+        expectedRank === null || expectedRank < 0 ? null : expectedRank + 1,
+    });
 
     if (
       expected !== undefined &&
@@ -153,5 +183,34 @@ export async function evaluateRagCases(
     passed: failures.length === 0,
     failures,
     total: cases.length,
+    metrics: calculateRagEvalMetrics(caseRanks),
+  };
+}
+
+function calculateRagEvalMetrics(caseRanks: RagEvalCaseRank[]): RagEvalMetrics {
+  if (caseRanks.length === 0) {
+    return {
+      top1HitRate: 0,
+      top3HitRate: 0,
+      mrr: 0,
+      caseRanks,
+    };
+  }
+
+  const top1Hits = caseRanks.filter((rank) => rank.expectedRank === 1).length;
+  const top3Hits = caseRanks.filter(
+    (rank) => rank.expectedRank !== null && rank.expectedRank <= 3,
+  ).length;
+  const reciprocalRankSum = caseRanks.reduce(
+    (sum, rank) =>
+      sum + (rank.expectedRank === null ? 0 : 1 / rank.expectedRank),
+    0,
+  );
+
+  return {
+    top1HitRate: top1Hits / caseRanks.length,
+    top3HitRate: top3Hits / caseRanks.length,
+    mrr: reciprocalRankSum / caseRanks.length,
+    caseRanks,
   };
 }

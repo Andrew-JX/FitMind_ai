@@ -230,7 +230,7 @@ saved-insight 分享链接、知识管理后台、离线编辑 / 同步。优先
 | | A3 = 稳定性体检 + A/B 止血 | 体检发现 3 类问题（路由双轨 / 无相关性下限 / RAG 抖动）；本批先做 B 类止血（回退扩词 + `filterRelevantKnowledgeChunks` 词法重叠下限），把"自信错答"→"诚实没资料"。①路由双轨 ③向量召回非确定 留 Slice 11。决策见 D33 | 无 | ✅ 2026-06-21 |
 | **B 理解层质变**（核心一跳，计划见 §8.3） | B1 = **Slice 11** | 接 Groq 真实模型做意图路由 + 工具选择 + 措辞；正则分类器降级为快路径/eval 基线；faithfulness(D21)+eval(D22) 当承重护栏 | D28 接缝、Slice 1/2 护栏、Groq key | 🟠 进行中：**11.1 接缝 ✅ 06-21（D34）**；**11.2a 数据意图必出工具 ✅ 06-22（D35，治①）**；**11.2b LLM 自由表达路由 ✅ 06-22（D36，关键词优先+Groq 救场，待切 prod groq 生效）**；**11.3a 收敛单轨路由 ✅ 06-22（D38）**；**11.3b summary 措辞 ✅ 06-23（D39，env 默认 off）**；**token/成本 observability ✅ 06-23（C1/D40）** |
 | **C 真实模型后的增强**（全部依赖 B1） | C1 | tracing + LangSmith eval（选择性，独立 SDK 不引 LangChain；trace 去 PII） | B1 | 🟠 **token/成本 observability ✅ 2026-06-23（D40）**：三处 Groq 调用（意图救场+工具选择+措辞）的 usage 经共享 client 聚合进 `assistant_turn` 日志（`llm_attempt/usage_report/error_count` + provider/model + 按模型计价、未知→null），走**服务端 telemetry 信封**不进公开 DTO，失败 turn 也落日志；**LangSmith 外部 tracing 待做**（需新依赖 + key + PII 去除，单独评估）。见 D29 |
-| | C2 | retriever 接口可换性 + RAG reranking（原 Phase 7.0 + D29）；reranker 可作为 Python/FastAPI 微服务的最佳切入点（D31） | B1 | ⚪ |
+| | C2 | retriever 接口可换性 + RAG reranking（原 Phase 7.0 + D29）；in-process Voyage rerank 默认 off，eval 用确定性 fixture reranker，不进 live API；决策见 D45 | B1 | ✅ 2026-07-01 |
 | | C3 = **Slice 10** | 安全分类器（疼痛/医疗边界→安全路由）；真实模型能自由表达后，安全路由的必要性才真正抬升 | B1、Slice 4 伤病字段 | ✅ 2026-06-29：确定性 pre-routing gate（急性/模糊疼痛、红旗症状、诊断/治疗/用药请求→安全模板），服务端 telemetry 标记，不进公开 DTO；见 D41 |
 | **D 叙事 / 彩蛋**（面试向，按需） | ~~D1 = Slice 9~~ | ~~MCP Server~~ | 无 | ❌ 取消 2026-06-30（纯产品镜头、价值低，不做） |
 | | D2 = **Slice 8** | 主动周报推送（定时任务 + PWA 通知） | 无 | 🟢 |

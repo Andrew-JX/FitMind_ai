@@ -4809,3 +4809,13 @@ Verification: `pnpm type-check` / `pnpm test:unit`(330) / `pnpm eval`(13/13·12/
 - Added Cloudflare Worker `scheduled()` cron bridge (`0 9 * * MON`) that reuses `VERCEL_API_ORIGIN` and calls the Vercel API directly.
 - Added a compact Assistant workspace weekly digest banner; no Web Push, VAPID, PushManager, service-worker push handler, notification permissions, or per-user preference UI.
 - Documented D44, API contract, DB schema, and Tier 2 backlog. v1 uses UTC ISO weeks because there is no user timezone setting.
+
+## 2026-07-01 C2：RAG reranking seam + Voyage in-process reranker
+
+Added a swappable `KnowledgeReranker` seam to the RAG retriever and a first in-process Voyage rerank implementation behind `RAG_RERANKING_ENABLED=off` by default. Flag off preserves current retrieval behavior and does not call rerank.
+
+Enabled pipeline: widened hybrid/keyword candidates (`max(limit * 4, 10)`) -> `filterRelevantKnowledgeChunks` lexical floor -> rerank -> final topK. Rerank only receives candidates that passed the lexical floor, and fail-safe fallback returns that same candidate order on missing key, timeout, API/schema failure, thrown error, or empty rerank output.
+
+Observability is server-only: successful chunks use `retrieval_mode:"reranked"` and retrieval logs include safe rerank metadata (`status/model/candidate_count/total_tokens/estimated_cost_usd:null/fallback_reason`). Public answer sources stay unchanged and logs do not include raw query, raw documents, or `VOYAGE_API_KEY`.
+
+RAG eval now reports top1/top3/MRR and per-case expected-source ranks. Reranked eval comparison uses an injected deterministic fixture reranker, not live Voyage, so regression gates remain offline, zero-cost, and reproducible. Live Voyage comparison remains manual opt-in only. Decision: ai-decisions D45; roadmap C2 marked complete.

@@ -64,4 +64,48 @@ describe("retrieval observability", () => {
       }),
     );
   });
+
+  it("includes safe rerank metadata when present", () => {
+    const event = buildRetrievalLogEvent({
+      intent: "knowledge",
+      retrievalMode: "reranked",
+      sources: [
+        {
+          title: "RPE scale",
+          score: 0.91,
+          rerank: {
+            status: "success",
+            model: "fixture-reranker",
+            candidate_count: 4,
+            total_tokens: 22,
+            estimated_cost_usd: null,
+          },
+        },
+      ],
+    });
+    const serialized = JSON.stringify(event);
+
+    expect(event).toEqual({
+      event: "rag_retrieval",
+      intent: "knowledge",
+      retrieval_mode: "reranked",
+      top_source_titles: ["RPE scale"],
+      score_summary: {
+        count: 1,
+        max: 0.91,
+        min: 0.91,
+      },
+      rerank: {
+        status: "success",
+        model: "fixture-reranker",
+        candidate_count: 4,
+        total_tokens: 22,
+        estimated_cost_usd: null,
+      },
+    });
+    expect(serialized).not.toContain("VOYAGE_API_KEY");
+    expect(serialized).not.toContain("test-key");
+    expect(serialized).not.toContain("raw query");
+    expect(serialized).not.toContain("raw document");
+  });
 });

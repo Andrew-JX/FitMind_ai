@@ -82,6 +82,8 @@ const serverEnvSchema = z.object({
   // deploying the code does not create proactive app content.
   WEEKLY_REPORT_DELIVERY_ENABLED: booleanFlag,
   WEEKLY_REPORT_CRON_SECRET: optionalSecret,
+  // C2 RAG reranking: opt-in only; default off keeps existing retrieval behavior.
+  RAG_RERANKING_ENABLED: booleanFlag,
   // Slice 10: fail-safe medical boundary gate. Default on; only explicit
   // disable tokens turn it off for rollback.
   ASSISTANT_SAFETY_GATE: safetyFlagDefaultOn,
@@ -110,6 +112,7 @@ export interface ServerEnv {
   assistantPlanAdherenceContext: boolean;
   weeklyReportDeliveryEnabled: boolean;
   weeklyReportCronSecret?: string | undefined;
+  ragRerankingEnabled: boolean;
   assistantSafetyGate: boolean;
   workoutIntakeLlmProvider:
     | "off"
@@ -144,6 +147,7 @@ export function loadServerEnv(
     assistantPlanAdherenceContext: parsed.ASSISTANT_PLAN_ADHERENCE_CONTEXT,
     weeklyReportDeliveryEnabled: parsed.WEEKLY_REPORT_DELIVERY_ENABLED,
     weeklyReportCronSecret: parsed.WEEKLY_REPORT_CRON_SECRET,
+    ragRerankingEnabled: parsed.RAG_RERANKING_ENABLED,
     assistantSafetyGate: parsed.ASSISTANT_SAFETY_GATE,
     workoutIntakeLlmProvider: parsed.WORKOUT_INTAKE_LLM_PROVIDER,
     anthropicApiKey: parsed.ANTHROPIC_API_KEY,
