@@ -78,6 +78,10 @@ const serverEnvSchema = z.object({
   // Learning-loop opt-in: previous accepted plan adherence can adjust the next
   // deterministic plan. Default off for dogfood/A-B comparison.
   ASSISTANT_PLAN_ADHERENCE_CONTEXT: booleanFlag,
+  // Slice 8 Tier 1: scheduled weekly digest generation. Default off so merely
+  // deploying the code does not create proactive app content.
+  WEEKLY_REPORT_DELIVERY_ENABLED: booleanFlag,
+  WEEKLY_REPORT_CRON_SECRET: optionalSecret,
   // Slice 10: fail-safe medical boundary gate. Default on; only explicit
   // disable tokens turn it off for rollback.
   ASSISTANT_SAFETY_GATE: safetyFlagDefaultOn,
@@ -104,6 +108,8 @@ export interface ServerEnv {
   assistantProvider: "mock" | "anthropic" | "groq" | "openai_compatible";
   assistantPhrasing: boolean;
   assistantPlanAdherenceContext: boolean;
+  weeklyReportDeliveryEnabled: boolean;
+  weeklyReportCronSecret?: string | undefined;
   assistantSafetyGate: boolean;
   workoutIntakeLlmProvider:
     | "off"
@@ -136,6 +142,8 @@ export function loadServerEnv(
     assistantProvider: parsed.ASSISTANT_PROVIDER,
     assistantPhrasing: parsed.ASSISTANT_PHRASING,
     assistantPlanAdherenceContext: parsed.ASSISTANT_PLAN_ADHERENCE_CONTEXT,
+    weeklyReportDeliveryEnabled: parsed.WEEKLY_REPORT_DELIVERY_ENABLED,
+    weeklyReportCronSecret: parsed.WEEKLY_REPORT_CRON_SECRET,
     assistantSafetyGate: parsed.ASSISTANT_SAFETY_GATE,
     workoutIntakeLlmProvider: parsed.WORKOUT_INTAKE_LLM_PROVIDER,
     anthropicApiKey: parsed.ANTHROPIC_API_KEY,

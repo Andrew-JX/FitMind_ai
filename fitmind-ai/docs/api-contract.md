@@ -1034,3 +1034,87 @@ Response 200：
 ### PATCH /api/planned-workouts/:id
 
 更新计划状态。Body：`{ "status": "completed" | "abandoned" }`（`.strict()`）。计划不存在 → 404 `NOT_FOUND`；Response 200 返回更新后的 `{ plannedWorkout }`。
+## Slice 8 Addition - Weekly Report Digests
+
+Tier 1 weekly report delivery generates deterministic weekly report snapshots on a schedule and shows them in-app. It does not implement Web Push.
+
+### POST /api/cron/weekly-reports
+
+Runs the weekly digest generator. Intended only for the Cloudflare scheduled worker.
+
+Authentication:
+
+- Requires `Authorization: Bearer <WEEKLY_REPORT_CRON_SECRET>`.
+- Missing, wrong, or unconfigured secrets return `401 UNAUTHORIZED`.
+- The response never includes the secret, user ids, raw report payloads, or per-user errors.
+
+Response 200 data:
+
+```json
+{
+  "enabled": true,
+  "attempted": 1,
+  "created": 1,
+  "updated": 0,
+  "skipped": 0,
+  "failed": 0
+}
+```
+
+Behavior:
+
+- `WEEKLY_REPORT_DELIVERY_ENABLED=off` returns a safe no-op count response.
+- Active users are users with at least one workout in the last 30 UTC days.
+- The generated week is the previous UTC ISO week.
+- Idempotency key is `(user_id, iso_year, iso_week)`.
+
+### GET /api/training/weekly-report-digest
+
+Returns the authenticated user's latest undismissed weekly report digest.
+
+Response 200 data:
+
+```json
+{
+  "digest": {
+    "id": "uuid",
+    "iso_year": 2026,
+    "iso_week": 26,
+    "week_start_date": "2026-06-22",
+    "week_end_date": "2026-06-28",
+    "status": "ready",
+    "title": "Weekly report 2026-06-22 to 2026-06-28",
+    "summary": "Recorded 2 workouts and 12 sets from 2026-06-22 to 2026-06-28. Top exercise: Bench Press.",
+    "report_snapshot": {},
+    "generated_at": "2026-07-01T00:00:00.000Z",
+    "dismissed_at": null,
+    "created_at": "2026-07-01T00:00:00.000Z",
+    "updated_at": "2026-07-01T00:00:00.000Z"
+  }
+}
+```
+
+When no digest is visible, `digest` is `null`.
+
+### PATCH /api/training/weekly-report-digests/:id
+
+Dismisses one digest for the authenticated user.
+
+Request:
+
+```json
+{
+  "dismissed": true
+}
+```
+
+Response 200 data:
+
+```json
+{
+  "dismissed": true,
+  "id": "uuid"
+}
+```
+
+Rejects cross-user ids and unknown ids with `404 NOT_FOUND`.

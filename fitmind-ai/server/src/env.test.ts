@@ -90,4 +90,17 @@ describe("loadServerEnv", () => {
     expect(defaultEnv.assistantPlanAdherenceContext).toBe(false);
     expect(enabledEnv.assistantPlanAdherenceContext).toBe(true);
   });
+
+  it("keeps weekly report delivery opt-in and secret server-only", () => {
+    const defaultEnv = loadServerEnv({} as NodeJS.ProcessEnv);
+    const enabledEnv = loadServerEnv({
+      WEEKLY_REPORT_DELIVERY_ENABLED: "yes",
+      WEEKLY_REPORT_CRON_SECRET: "cron-secret",
+    } as NodeJS.ProcessEnv);
+
+    expect(defaultEnv.weeklyReportDeliveryEnabled).toBe(false);
+    expect(defaultEnv.weeklyReportCronSecret).toBeUndefined();
+    expect(enabledEnv.weeklyReportDeliveryEnabled).toBe(true);
+    expect(enabledEnv.weeklyReportCronSecret).toBe("cron-secret");
+  });
 });

@@ -456,3 +456,33 @@ Constraints and indexes:
 
 - **不新增 performed 数据**：依从度在**读取时**确定性计算（`plan-adherence.ts`），把 `plan.exercises` 与该周期内已记录训练的 by-exercise（来自 `getTrainingSummary`）按动作名匹配，得出逐动作 done/partial/missed + 动作级/组级依从比例。
 - 计划是快照，不随后续动作字典变化漂移。
+## 12. Weekly Report Digests
+
+Slice 8 Tier 1 adds `weekly_report_digests` for in-app proactive weekly report delivery. The report body remains the deterministic weekly report snapshot; no LLM output is stored here.
+
+Columns:
+
+- `id uuid primary key default uuid_generate_v4()`
+- `user_id uuid not null references users(id) on delete cascade`
+- `iso_year integer not null`
+- `iso_week integer not null check (iso_week between 1 and 53)`
+- `week_start_date date not null`
+- `week_end_date date not null`
+- `status text not null check (status in ('ready', 'empty'))`
+- `title varchar(160) not null`
+- `summary text not null`
+- `report_snapshot jsonb not null`
+- `generated_at timestamptz not null default now()`
+- `dismissed_at timestamptz`
+- `created_at timestamptz not null default now()`
+- `updated_at timestamptz not null default now()`
+
+Constraints and indexes:
+
+- Unique `(user_id, iso_year, iso_week)` makes cron idempotent.
+- `(user_id, dismissed_at, generated_at)` supports latest visible digest reads.
+
+Safety:
+
+- `dismissed_at` is preserved on cron upsert so a dismissed digest does not reappear after a retry.
+- `report_snapshot` is user-scoped and must not be exposed cross-user.

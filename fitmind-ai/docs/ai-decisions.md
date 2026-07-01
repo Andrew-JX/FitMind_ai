@@ -1068,3 +1068,22 @@ Tier 2 backlog（等多用户需求再做）：每用户 BYO 设置 UI + 加密�
 Out of scope：云端 STT、RAG embedding BYO、Anthropic 原生 schema 收编、每用户密钥 UI/DB 存储。
 
 验证：env 单测覆盖 `openai_compatible` provider、非法/空 BYO URL 不崩；通用 client 单测覆盖 Groq preset、BYO URL/key/model、usage 宽松解析、config failure 不发 fetch；assistant provider/intent router 单测覆盖 BYO telemetry 与工具护栏路径；intake parser 单测覆盖 BYO/Groq 均走通用 client、缺 BYO 配置不发 fetch。最终门禁：type-check / 改动文件 eslint + Prettier / unit / eval。
+## [D44] Slice 8 Tier 1 weekly report digests
+
+- **Date**: 2026-07-01
+- **Status**: Accepted / implemented
+
+Background: the deterministic weekly report already exists (`getUserWeeklyTrainingReport`). Slice 8 adds proactive delivery without introducing Web Push infrastructure.
+
+Decision:
+- Tier 1 is intentionally light: Cloudflare Cron Trigger calls the Vercel API, the server generates weekly digest snapshots for active users, and the client shows a compact in-app digest when the user next opens Assistant.
+- No Web Push, VAPID keys, PushManager subscription table, service-worker push handler, notification permission UX, or iOS PWA notification support is implemented in Tier 1.
+- No per-user preference table/API/UI in Tier 1. Delivery is guarded by the global `WEEKLY_REPORT_DELIVERY_ENABLED` flag, default off, plus a recent-workout active-user filter. Per-user opt-in moves to Tier 2 with true notification settings.
+- Cron host is the existing Cloudflare worker `scheduled()` handler. It reuses `VERCEL_API_ORIGIN` and calls `${VERCEL_API_ORIGIN}/api/cron/weekly-reports` directly with `Authorization: Bearer $WEEKLY_REPORT_CRON_SECRET`.
+- The Vercel endpoint is public at the edge, so bearer validation is the security boundary. Missing, wrong, or unconfigured secrets return 401 and never echo the secret.
+- Digests are idempotent by `(user_id, iso_year, iso_week)`. Re-running cron refreshes the snapshot and summary but preserves `dismissed_at`, so dismissed digests do not reappear.
+- Digest title and summary are deterministic and derived only from the weekly report payload. They do not call an LLM and do not introduce numbers outside the report/range facts.
+- v1 uses UTC ISO weeks. The scheduled trigger runs Monday 09:00 UTC and generates the previous Monday-Sunday UTC week. There is no user timezone setting yet, so local week boundaries are a known limitation.
+
+Tier 2 backlog:
+- Per-user opt-in/preferences, notification settings UI, Web Push VAPID secrets, push subscriptions, subscribe/unsubscribe APIs, SW `push`/`notificationclick`, permission UX, iOS installed-PWA caveat, dead-subscription cleanup, and OS-level opt-out.

@@ -4800,3 +4800,12 @@ Verification: `pnpm type-check` / `pnpm test:unit`(330) / `pnpm eval`(13/13·12/
 - **Batch 4（文档）**：`.env.example`、`local-run-guide`、`api-contract`、`roadmap`、`ai-decisions` 同步；D43 记录 v1 共享配置限制和 Tier 2 backlog 安全要求。
 
 已知边界：助手和录入解析若都选 `openai_compatible`，v1 共享同一 endpoint/model/key；一个 seam 用 Groq、另一个用 BYO 仍可混用。每用户 BYO UI + 加密密钥存储等到真实多用户需求出现再做。
+## 2026-07-01 - Slice 8 Tier 1 weekly report digests
+
+- Added `weekly_report_digests` with idempotency on `(user_id, iso_year, iso_week)` and owner-scoped dismissal.
+- Added deterministic weekly digest generation behind `WEEKLY_REPORT_DELIVERY_ENABLED=off` by default, using existing weekly report service output and no LLM.
+- Added `POST /api/cron/weekly-reports` with bearer `WEEKLY_REPORT_CRON_SECRET` auth; responses are counts only.
+- Added authenticated `GET /api/training/weekly-report-digest` and `PATCH /api/training/weekly-report-digests/:id` for in-app display and dismissal.
+- Added Cloudflare Worker `scheduled()` cron bridge (`0 9 * * MON`) that reuses `VERCEL_API_ORIGIN` and calls the Vercel API directly.
+- Added a compact Assistant workspace weekly digest banner; no Web Push, VAPID, PushManager, service-worker push handler, notification permissions, or per-user preference UI.
+- Documented D44, API contract, DB schema, and Tier 2 backlog. v1 uses UTC ISO weeks because there is no user timezone setting.

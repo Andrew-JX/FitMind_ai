@@ -8,6 +8,7 @@ import { feedbackRouter } from "./routes/feedback.js";
 import { healthRouter } from "./routes/health.js";
 import { apiRouter } from "./routes/api.js";
 import { plannedWorkoutsRouter } from "./routes/planned-workouts.js";
+import { weeklyReportDigestRouter } from "./routes/weekly-report-digests.js";
 import { workoutsRouter } from "./routes/workouts.js";
 import { createErrorResponse } from "./utils/api-response.js";
 import { HttpError, isHttpError } from "./utils/http-error.js";
@@ -24,6 +25,7 @@ export function createApp() {
   app.use("/api", feedbackRouter);
   app.use("/api", athleteProfileRouter);
   app.use("/api", plannedWorkoutsRouter);
+  app.use("/api", weeklyReportDigestRouter);
   app.use("/api", workoutsRouter);
 
   app.use(

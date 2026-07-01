@@ -1,3 +1,5 @@
+/* global Headers, URL, fetch */
+
 const DEFAULT_API_ORIGIN = "https://fitmind-ai-psi.vercel.app";
 
 export default {
@@ -28,5 +30,24 @@ export default {
     }
 
     return env.ASSETS.fetch(request);
+  },
+
+  async scheduled(_event, env) {
+    const cronSecret = env.WEEKLY_REPORT_CRON_SECRET;
+
+    if (!cronSecret) {
+      return;
+    }
+
+    const apiOrigin = env.VERCEL_API_ORIGIN || DEFAULT_API_ORIGIN;
+    const targetUrl = new URL("/api/cron/weekly-reports", apiOrigin);
+
+    await fetch(targetUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${cronSecret}`,
+        Accept: "application/json",
+      },
+    });
   },
 };
