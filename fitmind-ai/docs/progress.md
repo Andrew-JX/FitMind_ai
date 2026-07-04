@@ -4819,3 +4819,9 @@ Enabled pipeline: widened hybrid/keyword candidates (`max(limit * 4, 10)`) -> `f
 Observability is server-only: successful chunks use `retrieval_mode:"reranked"` and retrieval logs include safe rerank metadata (`status/model/candidate_count/total_tokens/estimated_cost_usd:null/fallback_reason`). Public answer sources stay unchanged and logs do not include raw query, raw documents, or `VOYAGE_API_KEY`.
 
 RAG eval now reports top1/top3/MRR and per-case expected-source ranks. Reranked eval comparison uses an injected deterministic fixture reranker, not live Voyage, so regression gates remain offline, zero-cost, and reproducible. Live Voyage comparison remains manual opt-in only. Decision: ai-decisions D45; roadmap C2 marked complete.
+
+## 2026-07-04 hardening-1 T0: Cloudflare config authority cleanup
+
+Removed the stale root `test:integration` placeholder script and deleted `wrangler.json` so `wrangler.toml` is the only Cloudflare Wrangler config authority. The TOML file retains the weekly cron trigger (`0 9 * * MON`), while the removed JSON config had no `[triggers]` equivalent.
+
+Verification note: the next Cloudflare deploy needs a visual check that the cron trigger remains registered after the config-file cleanup.

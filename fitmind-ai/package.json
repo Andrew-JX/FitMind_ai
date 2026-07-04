@@ -12,7 +12,6 @@
     "test:unit": "vitest run",
     "test:e2e": "pnpm --filter @fitmind/client run test:e2e",
     "eval": "pnpm --filter @fitmind/server exec tsx scripts/run-eval.ts",
-    "test:integration": "node -e \"console.log('No root integration test suite is configured. Use the DB-backed smoke commands instead.')\"",
     "smoke:auth": "pnpm --filter @fitmind/server run smoke:auth",
     "smoke:assistant": "pnpm --filter @fitmind/server run smoke:assistant",
     "smoke:assistant-insights": "pnpm --filter @fitmind/server run smoke:assistant-insights",
