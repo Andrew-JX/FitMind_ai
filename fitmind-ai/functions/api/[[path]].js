@@ -1,3 +1,5 @@
+/* global Headers, URL, fetch */
+
 const DEFAULT_API_ORIGIN = "https://fitmind-ai-psi.vercel.app";
 
 export async function onRequest(context) {
