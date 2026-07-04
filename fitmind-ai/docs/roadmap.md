@@ -54,8 +54,8 @@
   - 未匹配分支加"搜动作库替换"、多候选分支加"都不是？搜动作库"，复用 `ExerciseLibraryScreen`（`mode="replace"`，portal 全屏）选词典动作即确认为 matched。
 - **D. 性能精确数字回填** 🟢
   - 按 `production-smoke-checklist.md` 的 Lighthouse/远程调试流程实测 `§11`，回填结果表 + README + 面试稿。
-- **E. Prettier 格式欠债（~118 文件）** ⚪
-  - `pnpm verify` 的 `format:check` 红是历史欠债；`npx prettier --write .` 统一修复并加 `.gitattributes`/`endOfLine` 防复发（注意 Windows CRLF）。
+- **E. Prettier 格式欠债（~118 文件）** ✅ 2026-07-04 完成
+  - 已用 formatting-only 豁免批执行 `npx prettier --write .`，并加 `.gitattributes` + `git add --renormalize .` 一次性清理格式与行尾欠债；从 T1 起 `pnpm format:check` 全仓绿是常规硬门禁。
 - **F. 中期方向**：Phase 6.0 多步 Agent、6.1 MCP（见下）。
 
 ---

@@ -4825,3 +4825,9 @@ RAG eval now reports top1/top3/MRR and per-case expected-source ranks. Reranked 
 Removed the stale root `test:integration` placeholder script and deleted `wrangler.json` so `wrangler.toml` is the only Cloudflare Wrangler config authority. The TOML file retains the weekly cron trigger (`0 9 * * MON`), while the removed JSON config had no `[triggers]` equivalent.
 
 Verification note: the next Cloudflare deploy needs a visual check that the cron trigger remains registered after the config-file cleanup.
+
+## 2026-07-04 hardening-1 T0.5: formatting debt cleanup
+
+Cleared the historical Prettier debt in a formatting-only exception batch: ran `npx prettier --write .` under the existing `.prettierignore`, added `.gitattributes` with `* text=auto eol=lf`, and ran `git add --renormalize .` so line-ending normalization is paid down in one reviewable batch instead of leaking into later feature diffs.
+
+Roadmap item E is now complete. From T1 onward, `pnpm format:check` is a normal hard gate for the whole repo because the historical formatting debt has been cleared.
