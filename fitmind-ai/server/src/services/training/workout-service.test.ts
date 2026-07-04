@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../db/repositories/workouts-repository.js", () => ({
   addSetToWorkoutForUser: vi.fn(),
   createWorkoutWithSets: vi.fn(),
+  decodeWorkoutCursor: vi.fn(),
   deleteSetByIdForUser: vi.fn(),
   deleteWorkoutByIdForUser: vi.fn(),
   findWorkoutByIdForUser: vi.fn(),
@@ -16,6 +17,7 @@ vi.mock("../../db/repositories/workouts-repository.js", () => ({
 import {
   addSetToWorkoutForUser,
   createWorkoutWithSets,
+  decodeWorkoutCursor,
   deleteSetByIdForUser,
   deleteWorkoutByIdForUser,
   findWorkoutByIdForUser,
@@ -38,6 +40,7 @@ import {
 
 const mockedAddSetToWorkoutForUser = vi.mocked(addSetToWorkoutForUser);
 const mockedCreateWorkoutWithSets = vi.mocked(createWorkoutWithSets);
+const mockedDecodeWorkoutCursor = vi.mocked(decodeWorkoutCursor);
 const mockedDeleteSetByIdForUser = vi.mocked(deleteSetByIdForUser);
 const mockedDeleteWorkoutByIdForUser = vi.mocked(deleteWorkoutByIdForUser);
 const mockedFindWorkoutByIdForUser = vi.mocked(findWorkoutByIdForUser);
@@ -113,10 +116,10 @@ describe("workout-service", () => {
     });
   });
 
-  it("maps invalid cursor errors to validation errors", async () => {
-    mockedListWorkoutsByUser.mockRejectedValueOnce(
-      new Error("Invalid workout cursor."),
-    );
+  it("rejects invalid cursors before querying workouts", async () => {
+    mockedDecodeWorkoutCursor.mockImplementationOnce(() => {
+      throw new Error("Invalid workout cursor.");
+    });
 
     await expect(
       listUserWorkouts(userId, { cursor: "bad-cursor" }),
@@ -124,6 +127,8 @@ describe("workout-service", () => {
       statusCode: 400,
       code: "VALIDATION_ERROR",
     });
+    expect(mockedDecodeWorkoutCursor).toHaveBeenCalledWith("bad-cursor");
+    expect(mockedListWorkoutsByUser).not.toHaveBeenCalled();
   });
 
   it("returns one user-owned workout detail", async () => {

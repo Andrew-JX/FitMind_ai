@@ -138,6 +138,20 @@ describe("auth-middleware", () => {
     });
   });
 
+  it("treats malformed session cookies as missing credentials", async () => {
+    const result = await makeRequest(undefined, "fitmind_token=%zz");
+
+    expect(mockedVerifyJwt).not.toHaveBeenCalled();
+    expect(result.status).toBe(401);
+    expect(result.payload).toEqual({
+      ok: false,
+      error: {
+        code: "UNAUTHORIZED",
+        message: "Missing authentication credentials.",
+      },
+    });
+  });
+
   it("passes through valid bearer tokens", async () => {
     mockedVerifyJwt.mockResolvedValueOnce({
       userId: "11111111-1111-4111-8111-111111111111",

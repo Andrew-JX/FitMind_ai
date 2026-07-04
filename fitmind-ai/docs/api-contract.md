@@ -225,6 +225,7 @@ GET /api/workouts?cursor=<id>&limit=20
 - `from`: ISO 日期，默认无下限
 - `to`: ISO 日期，默认 now
 - `cursor` / `limit`: 分页
+- Invalid `cursor` values return `400 VALIDATION_ERROR` with message `Invalid workout cursor.` before any workout repository query is attempted.
 
 **Response 200**：
 

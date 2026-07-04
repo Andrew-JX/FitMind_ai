@@ -4831,3 +4831,9 @@ Verification note: the next Cloudflare deploy needs a visual check that the cron
 Cleared the historical Prettier debt in a formatting-only exception batch: ran `npx prettier --write .` under the existing `.prettierignore`, added `.gitattributes` with `* text=auto eol=lf`, and ran `git add --renormalize .` so line-ending normalization is paid down in one reviewable batch instead of leaking into later feature diffs.
 
 Roadmap item E is now complete. From T1 onward, `pnpm format:check` is a normal hard gate for the whole repo because the historical formatting debt has been cleared.
+
+## 2026-07-04 hardening-1 T1: 4xx user-input boundaries
+
+Closed two user-input paths that could surface as server errors. Malformed auth cookies now behave like missing credentials, returning `401 UNAUTHORIZED` without attempting JWT verification. Malformed workout pagination cursors are prevalidated in the service layer via the repository cursor decoder and return `400 VALIDATION_ERROR` before any workout repository query runs.
+
+API docs now state the workouts list cursor error contract. These are intentional boundary hardening changes: malformed cookie `500 -> 401`; malformed cursor repository-failure path `-> 400` before DB access.

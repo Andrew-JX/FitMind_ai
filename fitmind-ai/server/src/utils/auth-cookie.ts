@@ -78,7 +78,19 @@ export function readAuthCookie(req: Request): string | undefined {
 
     const rawValue = part.slice(separatorIndex + 1).trim();
 
-    return rawValue.length > 0 ? decodeURIComponent(rawValue) : undefined;
+    if (rawValue.length === 0) {
+      return undefined;
+    }
+
+    try {
+      return decodeURIComponent(rawValue);
+    } catch (error) {
+      if (error instanceof URIError) {
+        return undefined;
+      }
+
+      throw error;
+    }
   }
 
   return undefined;

@@ -8,6 +8,7 @@ import {
   findWorkoutByIdForUser,
   hasSetById,
   hasWorkoutById,
+  decodeWorkoutCursor,
   listWorkoutsByUser,
   updateSetByIdForUser,
   updateWorkoutByIdForUser,
@@ -183,6 +184,22 @@ function isInvalidCursorError(error: unknown): boolean {
   return error instanceof Error && error.message === "Invalid workout cursor.";
 }
 
+function validateWorkoutCursor(cursor: string | undefined): void {
+  if (cursor === undefined) {
+    return;
+  }
+
+  try {
+    decodeWorkoutCursor(cursor);
+  } catch (error) {
+    if (isInvalidCursorError(error) || error instanceof SyntaxError) {
+      throw new HttpError(400, "VALIDATION_ERROR", "Invalid workout cursor.");
+    }
+
+    throw error;
+  }
+}
+
 async function resolveWorkoutAccess(
   workoutId: string,
   userId: string,
@@ -219,6 +236,8 @@ export async function listUserWorkouts(
   userId: string,
   input: ListWorkoutsServiceInput,
 ): Promise<WorkoutListResponseData> {
+  validateWorkoutCursor(input.cursor);
+
   try {
     const result = await listWorkoutsByUser({
       userId,
