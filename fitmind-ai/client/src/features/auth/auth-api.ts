@@ -29,7 +29,9 @@ export async function registerWithEmail(
  * @param input - Login request payload
  * @returns The authenticated user plus the issued token
  */
-export async function loginWithEmail(input: LoginRequest): Promise<AuthSuccessData> {
+export async function loginWithEmail(
+  input: LoginRequest,
+): Promise<AuthSuccessData> {
   return requestJson<AuthSuccessData, LoginRequest>("/api/auth/login", {
     method: "POST",
     body: input,

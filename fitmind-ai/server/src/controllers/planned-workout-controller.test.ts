@@ -82,7 +82,11 @@ describe("planned-workout-controller", () => {
 
     await postAcceptPlanController(
       createRequest({
-        body: { startDate: "2026-06-15", endDate: "2026-06-21", plan: validPlan },
+        body: {
+          startDate: "2026-06-15",
+          endDate: "2026-06-21",
+          plan: validPlan,
+        },
       }),
       response,
     );
@@ -99,7 +103,11 @@ describe("planned-workout-controller", () => {
     await expect(
       postAcceptPlanController(
         createRequest({
-          body: { startDate: "2026-06-21", endDate: "2026-06-15", plan: validPlan },
+          body: {
+            startDate: "2026-06-21",
+            endDate: "2026-06-15",
+            plan: validPlan,
+          },
         }),
         createResponse(),
       ),

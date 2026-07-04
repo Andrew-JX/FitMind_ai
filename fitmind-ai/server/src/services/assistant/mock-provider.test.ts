@@ -22,7 +22,9 @@ function createRequest(
       start_date: "2026-05-01",
       end_date: "2026-05-15",
       exercise_id:
-        overrides.exercise_id === undefined ? "exercise-1" : overrides.exercise_id,
+        overrides.exercise_id === undefined
+          ? "exercise-1"
+          : overrides.exercise_id,
     },
     allowed_tools: [],
     simulation: {

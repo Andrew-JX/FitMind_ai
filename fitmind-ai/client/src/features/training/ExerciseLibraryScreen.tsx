@@ -40,10 +40,10 @@ export function ExerciseLibraryScreen(props: ExerciseLibraryScreenProps) {
     searchError,
   } = props;
   const [keyword, setKeyword] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<ExerciseCategory>("全部");
-  const [selectedExercise, setSelectedExercise] = useState<DictionaryExercise | null>(
-    null,
-  );
+  const [selectedCategory, setSelectedCategory] =
+    useState<ExerciseCategory>("全部");
+  const [selectedExercise, setSelectedExercise] =
+    useState<DictionaryExercise | null>(null);
 
   useEffect(() => {
     if (!isOpen) {
@@ -58,7 +58,8 @@ export function ExerciseLibraryScreen(props: ExerciseLibraryScreenProps) {
 
     return exercises.filter((exercise) => {
       const category = getExerciseCategory(exercise);
-      const categoryMatch = selectedCategory === "全部" || category === selectedCategory;
+      const categoryMatch =
+        selectedCategory === "全部" || category === selectedCategory;
 
       if (!categoryMatch) {
         return false;
@@ -130,7 +131,9 @@ export function ExerciseLibraryScreen(props: ExerciseLibraryScreenProps) {
           <p style={loadingCopyStyle(theme)}>正在加载动作库...</p>
         ) : null}
 
-        {!searchError && !isLoadingExercises && filteredExercises.length === 0 ? (
+        {!searchError &&
+        !isLoadingExercises &&
+        filteredExercises.length === 0 ? (
           <StateNotice
             description={
               selectedCategory === "全部"
@@ -150,7 +153,9 @@ export function ExerciseLibraryScreen(props: ExerciseLibraryScreenProps) {
                 .filter((muscle) => muscle.is_primary)
                 .slice(0, 2)
                 .map((muscle) => muscle.code);
-              const movementLabel = getMovementPatternLabel(exercise.movement_pattern);
+              const movementLabel = getMovementPatternLabel(
+                exercise.movement_pattern,
+              );
               const equipmentLabel = getEquipmentLabel(exercise.equipment);
 
               return (
@@ -167,8 +172,12 @@ export function ExerciseLibraryScreen(props: ExerciseLibraryScreenProps) {
                       <Pill tone="info">{category}</Pill>
                     </div>
                     <div style={metaRowStyle}>
-                      {movementLabel ? <Pill tone="analysis">{movementLabel}</Pill> : null}
-                      {equipmentLabel ? <Pill tone="neutral">{equipmentLabel}</Pill> : null}
+                      {movementLabel ? (
+                        <Pill tone="analysis">{movementLabel}</Pill>
+                      ) : null}
+                      {equipmentLabel ? (
+                        <Pill tone="neutral">{equipmentLabel}</Pill>
+                      ) : null}
                       {primaryMuscles.map((muscleCode) => (
                         <Pill key={muscleCode} tone="accent">
                           {getMuscleCodeLabel(muscleCode)}
@@ -197,7 +206,9 @@ export function ExerciseLibraryScreen(props: ExerciseLibraryScreenProps) {
   );
 }
 
-function screenStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function screenStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.bg,
     display: "grid",
@@ -228,7 +239,9 @@ const titleStyle: React.CSSProperties = {
   margin: 0,
 };
 
-function subtitleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function subtitleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 12,
@@ -271,7 +284,9 @@ const contentStyle: React.CSSProperties = {
   paddingBottom: 12,
 };
 
-function loadingCopyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function loadingCopyStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 12,
@@ -288,7 +303,9 @@ const listStyle: React.CSSProperties = {
   padding: 0,
 };
 
-function cardStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function cardStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf,
     border: `1px solid ${theme.colors.bdr}`,

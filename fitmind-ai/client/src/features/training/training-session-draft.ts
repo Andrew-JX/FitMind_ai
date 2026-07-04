@@ -82,7 +82,9 @@ export function createDraftSet(previousSet?: DraftSet): DraftSet {
   };
 }
 
-export function getCompletedValidSetCount(draftExercises: DraftExercise[]): number {
+export function getCompletedValidSetCount(
+  draftExercises: DraftExercise[],
+): number {
   return draftExercises.reduce((sum, exercise) => {
     return (
       sum +
@@ -129,7 +131,12 @@ export function isDraftSetValid(
   const weightKg = getDraftSetWeightKg(setDraft, draftExercise);
   const reps = Number.parseInt(setDraft.reps, 10);
 
-  return Number.isFinite(weightKg) && weightKg >= 0 && Number.isInteger(reps) && reps > 0;
+  return (
+    Number.isFinite(weightKg) &&
+    weightKg >= 0 &&
+    Number.isInteger(reps) &&
+    reps > 0
+  );
 }
 
 export function mapEffortToRpe(effort: EffortLevel): number {
@@ -179,7 +186,8 @@ export function buildWorkoutRequestFromDraft(input: {
     return null;
   }
 
-  const durationMinutes = input.durationMinutes ?? Math.floor(input.elapsedSeconds / 60);
+  const durationMinutes =
+    input.durationMinutes ?? Math.floor(input.elapsedSeconds / 60);
   const request: CreateWorkoutRequest = {
     performed_at: input.performedAt.toISOString(),
     sets: assignSetIndexes(preparedSets),
@@ -211,7 +219,8 @@ function assignSetIndexes(
   const setIndexByExerciseId = new Map<string, number>();
 
   return setInputs.map((setInput) => {
-    const currentIndex = (setIndexByExerciseId.get(setInput.exercise_id) ?? 0) + 1;
+    const currentIndex =
+      (setIndexByExerciseId.get(setInput.exercise_id) ?? 0) + 1;
     setIndexByExerciseId.set(setInput.exercise_id, currentIndex);
 
     return {
@@ -225,12 +234,17 @@ function createDraftSetId(): string {
   return `set-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function getExerciseLoadType(exercise: DictionaryExercise): ExerciseLoadType {
+export function getExerciseLoadType(
+  exercise: DictionaryExercise,
+): ExerciseLoadType {
   if (exercise.code === "plank_bodyweight") {
     return "timed";
   }
 
-  if (exercise.equipment?.toLowerCase() === "bodyweight" || isBodyweightCode(exercise.code)) {
+  if (
+    exercise.equipment?.toLowerCase() === "bodyweight" ||
+    isBodyweightCode(exercise.code)
+  ) {
     return "bodyweight";
   }
 
@@ -241,7 +255,10 @@ function getDraftSetWeightKg(
   setDraft: DraftSet,
   draftExercise?: Pick<DraftExercise, "loadType">,
 ): number {
-  if (draftExercise?.loadType === "bodyweight" && setDraft.weightKg.trim() === "") {
+  if (
+    draftExercise?.loadType === "bodyweight" &&
+    setDraft.weightKg.trim() === ""
+  ) {
     return 0;
   }
 

@@ -1,13 +1,12 @@
 import { useEffect, useEffectEvent, useState } from "react";
 
-import type { WorkoutDetailDto, WorkoutSummaryDto } from "../../../../shared/src/training";
+import type {
+  WorkoutDetailDto,
+  WorkoutSummaryDto,
+} from "../../../../shared/src/training";
 
 import { HttpClientError } from "../../services/http-client";
-import {
-  deleteWorkout,
-  getWorkoutDetail,
-  listWorkouts,
-} from "./workout-api";
+import { deleteWorkout, getWorkoutDetail, listWorkouts } from "./workout-api";
 
 export interface UseWorkoutsResult {
   deleteError: string | null;
@@ -32,14 +31,19 @@ export interface UseWorkoutsResult {
  */
 export function useWorkouts(token: string | null): UseWorkoutsResult {
   const [workouts, setWorkouts] = useState<WorkoutSummaryDto[]>([]);
-  const [selectedWorkoutId, setSelectedWorkoutId] = useState<string | null>(null);
-  const [selectedWorkout, setSelectedWorkout] = useState<WorkoutDetailDto | null>(null);
+  const [selectedWorkoutId, setSelectedWorkoutId] = useState<string | null>(
+    null,
+  );
+  const [selectedWorkout, setSelectedWorkout] =
+    useState<WorkoutDetailDto | null>(null);
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [deletingWorkoutId, setDeletingWorkoutId] = useState<string | null>(null);
+  const [deletingWorkoutId, setDeletingWorkoutId] = useState<string | null>(
+    null,
+  );
 
   const refreshWorkoutsOnTokenChange = useEffectEvent(async () => {
     await refreshWorkouts();
@@ -76,7 +80,10 @@ export function useWorkouts(token: string | null): UseWorkoutsResult {
       const items = await listWorkouts(token);
       setWorkouts(items);
 
-      if (selectedWorkoutId && items.some((item) => item.id === selectedWorkoutId)) {
+      if (
+        selectedWorkoutId &&
+        items.some((item) => item.id === selectedWorkoutId)
+      ) {
         return;
       }
 
@@ -86,7 +93,12 @@ export function useWorkouts(token: string | null): UseWorkoutsResult {
       setWorkouts([]);
       setSelectedWorkoutId(null);
       setSelectedWorkout(null);
-      setListError(getReadableErrorMessage(error, "Workout list is unavailable right now."));
+      setListError(
+        getReadableErrorMessage(
+          error,
+          "Workout list is unavailable right now.",
+        ),
+      );
     } finally {
       setIsLoadingList(false);
     }
@@ -107,7 +119,12 @@ export function useWorkouts(token: string | null): UseWorkoutsResult {
       setSelectedWorkout(detail);
     } catch (error) {
       setSelectedWorkout(null);
-      setDetailError(getReadableErrorMessage(error, "Workout detail is unavailable right now."));
+      setDetailError(
+        getReadableErrorMessage(
+          error,
+          "Workout detail is unavailable right now.",
+        ),
+      );
     } finally {
       setIsLoadingDetail(false);
     }
@@ -136,7 +153,12 @@ export function useWorkouts(token: string | null): UseWorkoutsResult {
 
       return true;
     } catch (error) {
-      setDeleteError(getReadableErrorMessage(error, "Workout deletion is unavailable right now."));
+      setDeleteError(
+        getReadableErrorMessage(
+          error,
+          "Workout deletion is unavailable right now.",
+        ),
+      );
       return false;
     } finally {
       setDeletingWorkoutId(null);
@@ -159,7 +181,10 @@ export function useWorkouts(token: string | null): UseWorkoutsResult {
   };
 }
 
-function getReadableErrorMessage(error: unknown, fallbackMessage: string): string {
+function getReadableErrorMessage(
+  error: unknown,
+  fallbackMessage: string,
+): string {
   if (error instanceof HttpClientError) {
     return error.message;
   }

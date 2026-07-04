@@ -29,7 +29,9 @@ function createExercise(
   };
 }
 
-function createWorkout(overrides: Partial<WorkoutDetailDto> = {}): WorkoutDetailDto {
+function createWorkout(
+  overrides: Partial<WorkoutDetailDto> = {},
+): WorkoutDetailDto {
   return {
     duration_minutes: 45,
     ended_at: "2026-05-31T09:15:00.000Z",

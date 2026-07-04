@@ -104,7 +104,9 @@ function extractProviderErrorMessage(payload: unknown, status: number): string {
   return `Anthropic provider request failed with HTTP ${status}.`;
 }
 
-function normalizeToolArgs(input: Record<string, unknown>): Record<string, string> {
+function normalizeToolArgs(
+  input: Record<string, unknown>,
+): Record<string, string> {
   return Object.fromEntries(
     Object.entries(input).map(([key, value]) => [key, String(value)]),
   );
@@ -162,7 +164,9 @@ export async function runAnthropicProvider(
   }
 
   const toolUseBlock = parsedMessage.data.content.find(
-    (block): block is z.infer<typeof anthropicContentBlockSchema> & {
+    (
+      block,
+    ): block is z.infer<typeof anthropicContentBlockSchema> & {
       type: "tool_use";
     } => block.type === "tool_use",
   );
@@ -177,7 +181,9 @@ export async function runAnthropicProvider(
 
   const combinedText = parsedMessage.data.content
     .filter(
-      (block): block is z.infer<typeof anthropicContentBlockSchema> & {
+      (
+        block,
+      ): block is z.infer<typeof anthropicContentBlockSchema> & {
         type: "text";
       } => block.type === "text",
     )

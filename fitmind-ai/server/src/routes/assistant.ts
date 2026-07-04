@@ -17,9 +17,18 @@ export const assistantRouter = Router();
 
 assistantRouter.use(authMiddleware);
 
-assistantRouter.post("/assistant/insights", postAssistantSavedInsightController);
-assistantRouter.get("/assistant/insights", listAssistantSavedInsightsController);
-assistantRouter.get("/assistant/insights/:id", getAssistantSavedInsightController);
+assistantRouter.post(
+  "/assistant/insights",
+  postAssistantSavedInsightController,
+);
+assistantRouter.get(
+  "/assistant/insights",
+  listAssistantSavedInsightsController,
+);
+assistantRouter.get(
+  "/assistant/insights/:id",
+  getAssistantSavedInsightController,
+);
 assistantRouter.delete(
   "/assistant/insights/:id",
   deleteAssistantSavedInsightController,

@@ -8,10 +8,7 @@ export interface AiToolDefinition<TArgs, TResult> {
   name: string;
   description: string;
   inputSchema: ZodType<TArgs>;
-  execute: (
-    context: AiToolExecutionContext,
-    args: TArgs,
-  ) => Promise<TResult>;
+  execute: (context: AiToolExecutionContext, args: TArgs) => Promise<TResult>;
 }
 
 export class UnknownAiToolError extends Error {

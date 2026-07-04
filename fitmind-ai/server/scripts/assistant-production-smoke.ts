@@ -244,7 +244,13 @@ async function main(): Promise<void> {
       await createWorkout(baseUrl, token, bench.id, "2026-05-01T09:00:00Z", 80),
     );
     workoutIds.push(
-      await createWorkout(baseUrl, token, bench.id, "2026-05-08T09:00:00Z", 82.5),
+      await createWorkout(
+        baseUrl,
+        token,
+        bench.id,
+        "2026-05-08T09:00:00Z",
+        82.5,
+      ),
     );
 
     const rpe = await askAssistant(baseUrl, token, "RPE 是什么？");
@@ -285,7 +291,9 @@ async function main(): Promise<void> {
       "PRE uppercase typo prompt should route to knowledge.",
     );
     assert(
-      preUpperTypo.answer.sources.some((source) => source.title.includes("RPE")),
+      preUpperTypo.answer.sources.some((source) =>
+        source.title.includes("RPE"),
+      ),
       "PRE uppercase typo prompt should include an RPE source.",
     );
     assert(

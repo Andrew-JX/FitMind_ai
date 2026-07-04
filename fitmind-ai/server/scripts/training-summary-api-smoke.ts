@@ -259,12 +259,16 @@ async function deleteWorkoutIfNeeded(
   }
 
   try {
-    await requestJson<DeleteResponseData>(baseUrl, `/api/workouts/${workoutId}`, {
-      method: "DELETE",
-      headers: {
-        authorization: `Bearer ${token}`,
+    await requestJson<DeleteResponseData>(
+      baseUrl,
+      `/api/workouts/${workoutId}`,
+      {
+        method: "DELETE",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
       },
-    });
+    );
   } catch {
     // Best-effort cleanup keeps the main smoke result actionable.
   }
@@ -294,8 +298,7 @@ async function main(): Promise<void> {
   const { server, baseUrl } = await startServer();
   const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const primaryEmail = `training-summary-smoke-${uniqueSuffix}@example.com`;
-  const secondaryEmail =
-    `training-summary-smoke-other-${uniqueSuffix}@example.com`;
+  const secondaryEmail = `training-summary-smoke-other-${uniqueSuffix}@example.com`;
   let primaryToken: string | null = null;
   let primaryWorkoutId: string | null = null;
   let secondaryToken: string | null = null;

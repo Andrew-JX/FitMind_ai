@@ -20,7 +20,9 @@ export interface UseTrainingSummaryResult {
  * @param token - Current in-memory auth token
  * @returns Summary state and a refresh action
  */
-export function useTrainingSummary(token: string | null): UseTrainingSummaryResult {
+export function useTrainingSummary(
+  token: string | null,
+): UseTrainingSummaryResult {
   const [summary, setSummary] = useState<TrainingSummary | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);

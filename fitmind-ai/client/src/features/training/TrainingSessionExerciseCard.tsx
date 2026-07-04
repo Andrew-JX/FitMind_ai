@@ -4,10 +4,7 @@ import type { DraftExercise, DraftSet } from "./training-session-draft";
 
 import { Pill } from "../../components/Pill";
 import { useTheme } from "../../theme/ThemeContext";
-import {
-  getExerciseSummary,
-  isDraftSetValid,
-} from "./training-session-draft";
+import { getExerciseSummary, isDraftSetValid } from "./training-session-draft";
 import {
   formatWeight,
   getEquipmentLabel,
@@ -40,7 +37,9 @@ export interface TrainingSessionExerciseCardProps {
   ) => void;
 }
 
-export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardProps) {
+export function TrainingSessionExerciseCard(
+  props: TrainingSessionExerciseCardProps,
+) {
   const { theme } = useTheme();
   const summary = getExerciseSummary(props.draftExercise);
   const primaryMuscles = (props.draftExercise.exercise?.muscles ?? [])
@@ -50,7 +49,9 @@ export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardPr
   const movementLabel = getMovementPatternLabel(
     props.draftExercise.exercise?.movement_pattern,
   );
-  const equipmentLabel = getEquipmentLabel(props.draftExercise.exercise?.equipment);
+  const equipmentLabel = getEquipmentLabel(
+    props.draftExercise.exercise?.equipment,
+  );
   const [activeSetId, setActiveSetId] = useState<string | null>(null);
   const [isActionLayerOpen, setIsActionLayerOpen] = useState(false);
   const editorScrollerRef = useRef<HTMLDivElement | null>(null);
@@ -79,7 +80,11 @@ export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardPr
           props.onToggleExpanded();
         }
       }}
-      style={cardStyle(theme, props.draftExercise.isExpanded, isActionLayerOpen)}
+      style={cardStyle(
+        theme,
+        props.draftExercise.isExpanded,
+        isActionLayerOpen,
+      )}
     >
       <TrainingSessionExerciseActions
         canMoveDown={props.canMoveDown}
@@ -92,7 +97,11 @@ export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardPr
         onReplace={props.onReplace}
       />
 
-      <button onClick={props.onToggleExpanded} style={headerButtonStyle} type="button">
+      <button
+        onClick={props.onToggleExpanded}
+        style={headerButtonStyle}
+        type="button"
+      >
         <div style={titleRowStyle}>
           <div>
             <strong style={{ color: theme.colors.tx, fontSize: 15 }}>
@@ -110,7 +119,11 @@ export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardPr
               </p>
             ) : null}
           </div>
-          <Pill tone={props.draftExercise.matchStatus === "matched" ? "info" : "warning"}>
+          <Pill
+            tone={
+              props.draftExercise.matchStatus === "matched" ? "info" : "warning"
+            }
+          >
             {props.draftExercise.matchStatus === "matched"
               ? props.draftExercise.categoryLabel
               : "\u9700\u8981\u786e\u8ba4"}
@@ -118,7 +131,8 @@ export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardPr
         </div>
 
         <p style={statsStyle(theme)}>
-          {summary.completedSets} 组 · 总容量 {formatWeight(formatVolume(summary.totalVolumeKg))}
+          {summary.completedSets} 组 · 总容量{" "}
+          {formatWeight(formatVolume(summary.totalVolumeKg))}
         </p>
 
         <div style={metaRowStyle}>
@@ -133,7 +147,10 @@ export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardPr
       </button>
 
       {props.draftExercise.isExpanded ? (
-        <div onClick={(event) => event.stopPropagation()} style={editorShellStyle}>
+        <div
+          onClick={(event) => event.stopPropagation()}
+          style={editorShellStyle}
+        >
           {props.draftExercise.matchStatus !== "matched" ? (
             <div style={resolutionPanelStyle(theme)}>
               <p style={resolutionCopyStyle(theme)}>
@@ -146,7 +163,9 @@ export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardPr
                   {props.draftExercise.candidateExercises.map((candidate) => (
                     <button
                       key={candidate.exerciseId}
-                      onClick={() => props.onResolveCandidate(candidate.exerciseId)}
+                      onClick={() =>
+                        props.onResolveCandidate(candidate.exerciseId)
+                      }
                       style={candidateButtonStyle(theme)}
                       type="button"
                     >
@@ -171,7 +190,8 @@ export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardPr
                   >
                     <strong style={{ fontSize: 12 }}>第 {index + 1} 组</strong>
                     <span style={collapsedMetaStyle(theme)}>
-                      {setDraft.weightKg || "--"} 公斤 · {setDraft.reps || "--"} 次
+                      {setDraft.weightKg || "--"} 公斤 · {setDraft.reps || "--"}{" "}
+                      次
                     </span>
                     {setDraft.completed ? (
                       <span style={completedBadgeStyle(theme)}>已完成</span>
@@ -191,8 +211,12 @@ export function TrainingSessionExerciseCard(props: TrainingSessionExerciseCardPr
                   onCopy={() => props.onCopySet(setDraft.id)}
                   onDelete={() => props.onDeleteSet(setDraft.id)}
                   onStartRestTimer={() => props.onStartRestTimer(setDraft.id)}
-                  onToggleCompleted={() => props.onToggleSetCompleted(setDraft.id)}
-                  onUpdate={(field, value) => props.onUpdateSet(setDraft.id, field, value)}
+                  onToggleCompleted={() =>
+                    props.onToggleSetCompleted(setDraft.id)
+                  }
+                  onUpdate={(field, value) =>
+                    props.onUpdateSet(setDraft.id, field, value)
+                  }
                   setDraft={setDraft}
                 />
               );
@@ -259,7 +283,9 @@ const titleRowStyle: React.CSSProperties = {
   justifyContent: "space-between",
 };
 
-function secondaryTextStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function secondaryTextStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 12,
@@ -268,7 +294,9 @@ function secondaryTextStyle(theme: ReturnType<typeof useTheme>["theme"]): React.
   };
 }
 
-function statsStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function statsStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 13,
@@ -288,7 +316,9 @@ const editorShellStyle: React.CSSProperties = {
   gap: 12,
 };
 
-function resolutionPanelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function resolutionPanelStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf2,
     border: `1px solid ${theme.colors.orange}`,
@@ -299,7 +329,9 @@ function resolutionPanelStyle(theme: ReturnType<typeof useTheme>["theme"]): Reac
   };
 }
 
-function resolutionCopyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function resolutionCopyStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 12,
@@ -314,7 +346,9 @@ const candidateRowStyle: React.CSSProperties = {
   gap: 8,
 };
 
-function candidateButtonStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function candidateButtonStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf,
     border: `1px solid ${theme.colors.bdr}`,
@@ -363,14 +397,18 @@ function collapsedSetStyle(
   };
 }
 
-function collapsedMetaStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function collapsedMetaStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 12,
   };
 }
 
-function completedBadgeStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function completedBadgeStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.ac,
     fontSize: 11,
@@ -378,14 +416,18 @@ function completedBadgeStyle(theme: ReturnType<typeof useTheme>["theme"]): React
   };
 }
 
-function collapsedHintStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function collapsedHintStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx3,
     fontSize: 11,
   };
 }
 
-function addSetButtonStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function addSetButtonStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf2,
     border: `1px dashed ${theme.colors.bdr2}`,

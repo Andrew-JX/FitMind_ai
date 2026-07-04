@@ -124,7 +124,9 @@ export function shouldStrictlyVerify(): boolean {
  * @param result - faithfulness 校验结果
  * @throws 当 {@link shouldStrictlyVerify} 为真且 status 为 flagged
  */
-export function enforceFaithfulnessInDev(result: AnswerFaithfulnessResult): void {
+export function enforceFaithfulnessInDev(
+  result: AnswerFaithfulnessResult,
+): void {
   if (shouldStrictlyVerify() && result.status === "flagged") {
     throw new Error(
       `Answer faithfulness check flagged unverified claims: ${result.unverifiedClaims.join(", ")}`,

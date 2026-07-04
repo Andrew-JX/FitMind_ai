@@ -17,7 +17,9 @@ export function ExerciseInsightCard(props: ExerciseInsightCardProps) {
     <article style={cardStyle(theme, props.isSelected)}>
       <div style={topRowStyle}>
         <div>
-          <strong style={titleStyle(theme)}>{props.exercise.exercise_name}</strong>
+          <strong style={titleStyle(theme)}>
+            {props.exercise.exercise_name}
+          </strong>
           <p style={metaStyle(theme)}>
             总容量 {props.exercise.total_volume.toLocaleString()} 公斤
           </p>
@@ -61,7 +63,9 @@ function cardStyle(
   };
 }
 
-function titleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function titleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx,
     display: "block",
@@ -70,7 +74,9 @@ function titleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPrope
   };
 }
 
-function metaStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function metaStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 12,
@@ -79,7 +85,9 @@ function metaStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProper
   };
 }
 
-function subMetaStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function subMetaStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx3,
     fontSize: 11,

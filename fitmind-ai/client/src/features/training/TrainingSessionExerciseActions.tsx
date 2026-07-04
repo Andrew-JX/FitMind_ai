@@ -4,10 +4,7 @@ import type { DraftExercise } from "./training-session-draft";
 
 import { Pill } from "../../components/Pill";
 import { useTheme } from "../../theme/ThemeContext";
-import {
-  formatWeight,
-  getExerciseDisplayName,
-} from "./exercise-display";
+import { formatWeight, getExerciseDisplayName } from "./exercise-display";
 import { getExerciseSummary } from "./training-session-draft";
 
 export interface TrainingSessionExerciseActionsProps {
@@ -25,7 +22,9 @@ interface MenuPosition {
   placement: "above" | "below";
 }
 
-export function TrainingSessionExerciseActions(props: TrainingSessionExerciseActionsProps) {
+export function TrainingSessionExerciseActions(
+  props: TrainingSessionExerciseActionsProps,
+) {
   const { theme } = useTheme();
   const { onOpenChange } = props;
   const actionRootRef = useRef<HTMLDivElement | null>(null);
@@ -33,7 +32,9 @@ export function TrainingSessionExerciseActions(props: TrainingSessionExerciseAct
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [menuPosition, setMenuPosition] = useState<MenuPosition>({ placement: "below" });
+  const [menuPosition, setMenuPosition] = useState<MenuPosition>({
+    placement: "below",
+  });
   const summary = getExerciseSummary(props.draftExercise);
 
   useEffect(() => {
@@ -181,7 +182,9 @@ export function TrainingSessionExerciseActions(props: TrainingSessionExerciseAct
           >
             <header style={detailHeaderStyle}>
               <div>
-                <h3 style={detailTitleStyle(theme)}>{props.draftExercise.name}</h3>
+                <h3 style={detailTitleStyle(theme)}>
+                  {props.draftExercise.name}
+                </h3>
                 {props.draftExercise.exercise ? (
                   <p style={detailSubtitleStyle(theme)}>
                     {getExerciseDisplayName(props.draftExercise.exercise)}
@@ -210,7 +213,8 @@ export function TrainingSessionExerciseActions(props: TrainingSessionExerciseAct
               <div style={detailRowStyle(theme)}>
                 <span>本次训练</span>
                 <strong>
-                  {summary.completedSets} 组 · 总容量 {formatWeight(formatVolume(summary.totalVolumeKg))}
+                  {summary.completedSets} 组 · 总容量{" "}
+                  {formatWeight(formatVolume(summary.totalVolumeKg))}
                 </strong>
               </div>
             </div>
@@ -229,7 +233,9 @@ function formatVolume(totalVolumeKg: number): string {
   return totalVolumeKg.toFixed(2);
 }
 
-function getMenuPosition(buttonElement: HTMLButtonElement | null): MenuPosition {
+function getMenuPosition(
+  buttonElement: HTMLButtonElement | null,
+): MenuPosition {
   if (!buttonElement) {
     return {
       placement: "below",
@@ -239,7 +245,8 @@ function getMenuPosition(buttonElement: HTMLButtonElement | null): MenuPosition 
   const rect = buttonElement.getBoundingClientRect();
   const estimatedMenuHeight = 248;
   const viewportPadding = 12;
-  const hasRoomBelow = window.innerHeight - rect.bottom >= estimatedMenuHeight + viewportPadding;
+  const hasRoomBelow =
+    window.innerHeight - rect.bottom >= estimatedMenuHeight + viewportPadding;
 
   return {
     placement: hasRoomBelow ? "below" : "above",
@@ -253,7 +260,9 @@ const actionRootStyle: React.CSSProperties = {
   zIndex: 2,
 };
 
-function menuButtonStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function menuButtonStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     alignItems: "center",
     backgroundColor: theme.colors.surf2,
@@ -294,7 +303,9 @@ function menuStyle(
   };
 }
 
-function menuTitleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function menuTitleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx3,
     fontSize: 11,
@@ -320,14 +331,18 @@ function menuItemStyle(
   };
 }
 
-function dangerMenuItemStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function dangerMenuItemStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     ...menuItemStyle(theme),
     color: theme.colors.red,
   };
 }
 
-function detailBackdropStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function detailBackdropStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     alignItems: "end",
     backgroundColor: theme.isDark ? "rgba(0,0,0,0.42)" : "rgba(0,0,0,0.24)",
@@ -340,7 +355,9 @@ function detailBackdropStyle(theme: ReturnType<typeof useTheme>["theme"]): React
   };
 }
 
-function detailCardStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function detailCardStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf,
     border: `1px solid ${theme.colors.bdr2}`,
@@ -361,7 +378,9 @@ const detailHeaderStyle: React.CSSProperties = {
   justifyContent: "space-between",
 };
 
-function detailTitleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function detailTitleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx,
     fontSize: 18,
@@ -370,7 +389,9 @@ function detailTitleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CS
   };
 }
 
-function detailSubtitleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function detailSubtitleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 12,
@@ -384,7 +405,9 @@ const detailGridStyle: React.CSSProperties = {
   gap: 10,
 };
 
-function detailRowStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function detailRowStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     alignItems: "center",
     backgroundColor: theme.colors.surf2,
@@ -397,7 +420,9 @@ function detailRowStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSP
   };
 }
 
-function closeButtonStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function closeButtonStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     background: "transparent",
     border: "none",

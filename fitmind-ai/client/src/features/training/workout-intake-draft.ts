@@ -150,8 +150,8 @@ export function getWorkoutIntakeSaveBlockReason(
     draft.exercises.some(
       (exercise) =>
         exercise.sets.length === 0 ||
-        exercise.sets.some((set) =>
-          !isValidDraftSet(set.weight_kg, set.reps, set.rpe),
+        exercise.sets.some(
+          (set) => !isValidDraftSet(set.weight_kg, set.reps, set.rpe),
         ),
     )
   ) {
@@ -224,7 +224,9 @@ export function buildWorkoutRequestFromIntakeDraft(
   return request;
 }
 
-function getDictionaryExerciseDisplayName(exercise: DictionaryExercise): string {
+function getDictionaryExerciseDisplayName(
+  exercise: DictionaryExercise,
+): string {
   return getExerciseDisplayName(exercise);
 }
 
@@ -272,7 +274,9 @@ function buildMissingFields(
   return missingFields;
 }
 
-function normalizePositiveNumber(value: number | null | undefined): number | null {
+function normalizePositiveNumber(
+  value: number | null | undefined,
+): number | null {
   return typeof value === "number" && Number.isFinite(value) && value > 0
     ? value
     : null;

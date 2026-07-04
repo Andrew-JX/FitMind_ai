@@ -7,10 +7,7 @@ import type {
 } from "../../../../shared/src/training";
 
 import { HttpClientError } from "../../services/http-client";
-import {
-  searchExercises,
-  type DictionaryExercise,
-} from "./dictionary-api";
+import { searchExercises, type DictionaryExercise } from "./dictionary-api";
 import { getExerciseDisplayName } from "./exercise-display";
 import { createWorkout } from "./workout-api";
 
@@ -77,11 +74,17 @@ export function useWorkoutForm(token: string | null): UseWorkoutFormResult {
   const [performedAt, setPerformedAt] = useState(defaultPerformedAt);
   const [workoutDurationMinutes, setDurationMinutes] = useState("");
   const [workoutNotes, setNotes] = useState("");
-  const [setDrafts, setSetDrafts] = useState<WorkoutSetDraft[]>([createEmptySetDraft()]);
+  const [setDrafts, setSetDrafts] = useState<WorkoutSetDraft[]>([
+    createEmptySetDraft(),
+  ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [createdWorkout, setCreatedWorkout] = useState<WorkoutDetailDto | null>(null);
-  const [formErrors, setFormErrors] = useState<WorkoutFormErrors>(createEmptyFormErrors(1));
+  const [createdWorkout, setCreatedWorkout] = useState<WorkoutDetailDto | null>(
+    null,
+  );
+  const [formErrors, setFormErrors] = useState<WorkoutFormErrors>(
+    createEmptyFormErrors(1),
+  );
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   function addSetDraft(): void {
@@ -112,7 +115,9 @@ export function useWorkoutForm(token: string | null): UseWorkoutFormResult {
 
       return {
         ...currentErrors,
-        setDrafts: currentErrors.setDrafts.filter((_, currentIndex) => currentIndex !== index),
+        setDrafts: currentErrors.setDrafts.filter(
+          (_, currentIndex) => currentIndex !== index,
+        ),
       };
     });
     clearFeedback();
@@ -173,7 +178,10 @@ export function useWorkoutForm(token: string | null): UseWorkoutFormResult {
     }
   }
 
-  function selectExerciseForSet(index: number, exercise: DictionaryExercise): void {
+  function selectExerciseForSet(
+    index: number,
+    exercise: DictionaryExercise,
+  ): void {
     setSetDrafts((currentDrafts) => {
       return currentDrafts.map((draft, currentIndex) => {
         if (currentIndex !== index) {
@@ -224,7 +232,9 @@ export function useWorkoutForm(token: string | null): UseWorkoutFormResult {
     setFormErrors(submission.errors);
 
     if (!submission.payload) {
-      setErrorMessage("Please fix the highlighted workout fields and try again.");
+      setErrorMessage(
+        "Please fix the highlighted workout fields and try again.",
+      );
       return null;
     }
 
@@ -412,7 +422,8 @@ function assignSetIndexes(
   const setIndexByExerciseId = new Map<string, number>();
 
   return setInputs.map((setInput) => {
-    const currentIndex = (setIndexByExerciseId.get(setInput.exercise_id) ?? 0) + 1;
+    const currentIndex =
+      (setIndexByExerciseId.get(setInput.exercise_id) ?? 0) + 1;
     setIndexByExerciseId.set(setInput.exercise_id, currentIndex);
 
     return {
@@ -489,9 +500,9 @@ function hasWorkoutFormErrors(errors: WorkoutFormErrors): boolean {
   return errors.setDrafts.some((setErrors) => {
     return Boolean(
       setErrors.exerciseId ||
-        setErrors.reps ||
-        setErrors.rpe ||
-        setErrors.weightKg,
+      setErrors.reps ||
+      setErrors.rpe ||
+      setErrors.weightKg,
     );
   });
 }
@@ -500,7 +511,11 @@ function clearSetErrorForField(
   errors: WorkoutSetDraftErrors,
   field: keyof WorkoutSetDraft,
 ): WorkoutSetDraftErrors {
-  if (field === "exerciseId" || field === "exerciseName" || field === "exerciseQuery") {
+  if (
+    field === "exerciseId" ||
+    field === "exerciseName" ||
+    field === "exerciseQuery"
+  ) {
     return {
       ...errors,
       exerciseId: undefined,

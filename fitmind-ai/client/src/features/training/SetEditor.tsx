@@ -1,4 +1,7 @@
-import type { WorkoutSetDraft, WorkoutSetDraftErrors } from "./use-workout-form";
+import type {
+  WorkoutSetDraft,
+  WorkoutSetDraftErrors,
+} from "./use-workout-form";
 
 import { Badge } from "../../components/Badge";
 import { Button } from "../../components/Button";
@@ -22,7 +25,9 @@ export interface SetEditorProps {
   ) => void;
   onRemove: () => void;
   onSearch: () => Promise<void>;
-  onSelectExercise: (exercise: WorkoutSetDraft["exerciseResults"][number]) => void;
+  onSelectExercise: (
+    exercise: WorkoutSetDraft["exerciseResults"][number],
+  ) => void;
   setDraft: WorkoutSetDraft;
 }
 
@@ -55,7 +60,9 @@ export function SetEditor(props: SetEditorProps) {
       <label style={labelStyle(theme)}>
         搜索动作
         <Input
-          onChange={(event) => props.onFieldChange("exerciseQuery", event.target.value)}
+          onChange={(event) =>
+            props.onFieldChange("exerciseQuery", event.target.value)
+          }
           placeholder="搜索动作，例如卧推或深蹲"
           type="text"
           value={props.setDraft.exerciseQuery}
@@ -63,13 +70,21 @@ export function SetEditor(props: SetEditorProps) {
       </label>
 
       <div style={searchRowStyle}>
-        <Button onClick={() => void props.onSearch()} type="button" variant="secondary">
+        <Button
+          onClick={() => void props.onSearch()}
+          type="button"
+          variant="secondary"
+        >
           {props.setDraft.isSearchingExercises ? "搜索中..." : "搜索动作"}
         </Button>
-        {props.setDraft.exerciseName ? <Badge tone="accent">已选动作</Badge> : null}
+        {props.setDraft.exerciseName ? (
+          <Badge tone="accent">已选动作</Badge>
+        ) : null}
       </div>
 
-      {props.errors?.exerciseId ? <p style={errorStyle(theme)}>{props.errors.exerciseId}</p> : null}
+      {props.errors?.exerciseId ? (
+        <p style={errorStyle(theme)}>{props.errors.exerciseId}</p>
+      ) : null}
 
       {props.setDraft.exerciseResults.length > 0 ? (
         <ul style={resultListStyle}>
@@ -87,7 +102,9 @@ export function SetEditor(props: SetEditorProps) {
                   type="button"
                 >
                   <div style={resultTitleRowStyle}>
-                    <strong style={{ fontSize: 13 }}>{getExerciseDisplayName(exercise)}</strong>
+                    <strong style={{ fontSize: 13 }}>
+                      {getExerciseDisplayName(exercise)}
+                    </strong>
                   </div>
                   <div style={resultMetaRowStyle}>
                     {getMovementPatternLabel(exercise.movement_pattern) ? (
@@ -113,7 +130,9 @@ export function SetEditor(props: SetEditorProps) {
           次数
           <Input
             min="0"
-            onChange={(event) => props.onFieldChange("reps", event.target.value)}
+            onChange={(event) =>
+              props.onFieldChange("reps", event.target.value)
+            }
             required
             type="number"
             value={props.setDraft.reps}
@@ -123,7 +142,9 @@ export function SetEditor(props: SetEditorProps) {
           重量（公斤）
           <Input
             min="0"
-            onChange={(event) => props.onFieldChange("weightKg", event.target.value)}
+            onChange={(event) =>
+              props.onFieldChange("weightKg", event.target.value)
+            }
             required
             step="0.01"
             type="number"
@@ -143,9 +164,15 @@ export function SetEditor(props: SetEditorProps) {
         </label>
       </div>
 
-      {props.errors?.reps ? <p style={errorStyle(theme)}>{props.errors.reps}</p> : null}
-      {props.errors?.weightKg ? <p style={errorStyle(theme)}>{props.errors.weightKg}</p> : null}
-      {props.errors?.rpe ? <p style={errorStyle(theme)}>{props.errors.rpe}</p> : null}
+      {props.errors?.reps ? (
+        <p style={errorStyle(theme)}>{props.errors.reps}</p>
+      ) : null}
+      {props.errors?.weightKg ? (
+        <p style={errorStyle(theme)}>{props.errors.weightKg}</p>
+      ) : null}
+      {props.errors?.rpe ? (
+        <p style={errorStyle(theme)}>{props.errors.rpe}</p>
+      ) : null}
 
       <label style={labelStyle(theme)}>
         组备注
@@ -160,7 +187,9 @@ export function SetEditor(props: SetEditorProps) {
       <label style={checkboxRowStyle(theme)}>
         <input
           checked={props.setDraft.isWarmup}
-          onChange={(event) => props.onFieldChange("isWarmup", event.target.checked)}
+          onChange={(event) =>
+            props.onFieldChange("isWarmup", event.target.checked)
+          }
           type="checkbox"
         />
         这是一组热身组
@@ -218,7 +247,9 @@ const resultMetaRowStyle: React.CSSProperties = {
   marginTop: 8,
 };
 
-function setCardStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function setCardStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf2,
     border: `1px solid ${theme.colors.bdr}`,
@@ -229,7 +260,9 @@ function setCardStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPro
   };
 }
 
-function setIndexBubbleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function setIndexBubbleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     alignItems: "center",
     backgroundColor: theme.colors.surf3,
@@ -255,7 +288,9 @@ function selectedExerciseStyle(
   };
 }
 
-function labelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function labelStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     display: "grid",
@@ -264,7 +299,9 @@ function labelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPrope
   };
 }
 
-function checkboxRowStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function checkboxRowStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     alignItems: "center",
     color: theme.colors.tx2,
@@ -274,7 +311,9 @@ function checkboxRowStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CS
   };
 }
 
-function resultButtonStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function resultButtonStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf,
     border: `1px solid ${theme.colors.bdr}`,
@@ -287,7 +326,9 @@ function resultButtonStyle(theme: ReturnType<typeof useTheme>["theme"]): React.C
   };
 }
 
-function errorStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function errorStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.orange,
     fontSize: 12,

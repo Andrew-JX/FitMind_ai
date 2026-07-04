@@ -130,7 +130,9 @@ function mapKnowledgeChunkSearchRow(
   };
 }
 
-function mapKnowledgeDocumentRow(row: KnowledgeDocumentRow): KnowledgeDocumentRow {
+function mapKnowledgeDocumentRow(
+  row: KnowledgeDocumentRow,
+): KnowledgeDocumentRow {
   return {
     id: row.id,
     slug: row.slug,
@@ -202,9 +204,9 @@ export async function searchKnowledgeChunksByEmbedding(
       [toVectorLiteral(input.embedding), input.limit],
     );
 
-    return (result.rows as Array<JoinedKnowledgeChunkRow & { score?: unknown }>).map(
-      mapKnowledgeChunkSearchRow,
-    );
+    return (
+      result.rows as Array<JoinedKnowledgeChunkRow & { score?: unknown }>
+    ).map(mapKnowledgeChunkSearchRow);
   } finally {
     if (ownsPool) {
       await activePool.end?.();

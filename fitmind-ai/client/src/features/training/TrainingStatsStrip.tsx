@@ -21,19 +21,31 @@ export function TrainingStatsStrip(props: TrainingStatsStripProps) {
         <div>
           <h2 style={titleStyle}>训练概览</h2>
           <p style={copyStyle(theme)}>
-            {props.summaryLoading ? "正在同步近 30 天训练数据..." : "基于近 30 天训练总结的快速统计"}
+            {props.summaryLoading
+              ? "正在同步近 30 天训练数据..."
+              : "基于近 30 天训练总结的快速统计"}
           </p>
         </div>
       </div>
       <div style={statsGridStyle}>
-        <StatCell label="近 30 天训练" tone="accent" unit="次" value={`${workoutCount}`} />
+        <StatCell
+          label="近 30 天训练"
+          tone="accent"
+          unit="次"
+          value={`${workoutCount}`}
+        />
         <StatCell
           label="总容量"
           tone="info"
           unit="公斤"
           value={totalVolume.toLocaleString()}
         />
-        <StatCell label="总组数" tone="analysis" unit="组" value={`${setCount}`} />
+        <StatCell
+          label="总组数"
+          tone="analysis"
+          unit="组"
+          value={`${setCount}`}
+        />
       </div>
     </Card>
   );
@@ -54,7 +66,9 @@ const statsGridStyle: React.CSSProperties = {
   gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
 };
 
-function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function copyStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 12,

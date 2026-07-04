@@ -61,7 +61,10 @@ export function createAiRateLimiter(options?: {
         return {
           allowed: false,
           code: "AI_QUOTA_EXCEEDED",
-          retryAfterSeconds: secondsUntil(state.dayWindowStart + DAY_WINDOW_MS, now),
+          retryAfterSeconds: secondsUntil(
+            state.dayWindowStart + DAY_WINDOW_MS,
+            now,
+          ),
         };
       }
 

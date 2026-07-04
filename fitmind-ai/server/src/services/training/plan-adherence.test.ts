@@ -26,7 +26,9 @@ describe("computePlanAdherence", () => {
   it("matches exercise names case- and whitespace-insensitively", () => {
     const summary = computePlanAdherence({
       plannedExercises: [{ exerciseName: "Barbell Bench Press", sets: 3 }],
-      performedExercises: [{ exerciseName: "  barbell bench press ", setCount: 3 }],
+      performedExercises: [
+        { exerciseName: "  barbell bench press ", setCount: 3 },
+      ],
     });
 
     expect(summary.exercises[0]?.status).toBe("done");

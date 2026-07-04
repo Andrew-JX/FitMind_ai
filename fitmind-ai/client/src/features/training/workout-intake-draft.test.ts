@@ -143,7 +143,10 @@ describe("buildWorkoutRequestFromIntakeDraft", () => {
   });
 
   it("uses the edited draft training date when building the create workout request", () => {
-    const updated = updateWorkoutIntakeDraftDate(createMatchedDraft(), "2026-05-29");
+    const updated = updateWorkoutIntakeDraftDate(
+      createMatchedDraft(),
+      "2026-05-29",
+    );
     const request = buildWorkoutRequestFromIntakeDraft(updated);
 
     expect(updated).toMatchObject({
@@ -159,7 +162,9 @@ describe("buildWorkoutRequestFromIntakeDraft", () => {
     const [firstExercise, secondExercise] = draft.exercises;
 
     if (!firstExercise || !secondExercise) {
-      throw new Error("Expected matched draft fixture to include two exercises.");
+      throw new Error(
+        "Expected matched draft fixture to include two exercises.",
+      );
     }
 
     draft.exercises[0] = {
@@ -216,10 +221,12 @@ describe("buildWorkoutRequestFromIntakeDraft", () => {
     expect(resolved.exercises[0]?.match_status).toBe("matched");
     expect(resolved.exercises[0]?.matched_exercise_id).toBe("lat-pulldown-id");
     expect(resolved.exercises[0]?.matched_exercise_name).toBe("高位下拉");
-    expect(buildWorkoutRequestFromIntakeDraft(resolved)?.sets[0]).toMatchObject({
-      exercise_id: "lat-pulldown-id",
-      set_index: 1,
-    });
+    expect(buildWorkoutRequestFromIntakeDraft(resolved)?.sets[0]).toMatchObject(
+      {
+        exercise_id: "lat-pulldown-id",
+        set_index: 1,
+      },
+    );
   });
 
   it("allows ambiguous exercises to be manually overridden by a non-candidate exercise", () => {
@@ -310,7 +317,8 @@ describe("buildWorkoutRequestFromIntakeDraft", () => {
       incomplete_sets: [
         {
           group_count: 10,
-          message: "已识别 10 组，每组 70kg，但缺少每组次数，请补充后重新解析。",
+          message:
+            "已识别 10 组，每组 70kg，但缺少每组次数，请补充后重新解析。",
           missing_fields: ["reps"],
           reps: null,
           weight_kg: 70,
@@ -357,7 +365,9 @@ describe("buildWorkoutRequestFromIntakeDraft", () => {
         weight_kg: 70,
       })),
     );
-    expect(buildWorkoutRequestFromIntakeDraft(resolved)?.sets.slice(0, 10)).toEqual(
+    expect(
+      buildWorkoutRequestFromIntakeDraft(resolved)?.sets.slice(0, 10),
+    ).toEqual(
       Array.from({ length: 10 }, (_, index) => ({
         exercise_id: "bench-id",
         is_warmup: false,

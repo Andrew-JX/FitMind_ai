@@ -65,7 +65,9 @@ const PLAN_WINDOW_DAYS = 7;
  * @param plan - The normalized assistant plan draft
  * @returns The snake_case plan snapshot accepted by the API
  */
-export function denormalizePlanDraft(plan: AssistantPlanDraft): PlannedWorkoutPlan {
+export function denormalizePlanDraft(
+  plan: AssistantPlanDraft,
+): PlannedWorkoutPlan {
   return {
     strategy: plan.strategy,
     exercises: plan.exercises.map((exercise) => ({
@@ -90,7 +92,11 @@ export function createForwardWeekRange(today: Date = new Date()): {
   startDate: string;
   endDate: string;
 } {
-  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const start = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  );
   const end = new Date(start);
   end.setDate(end.getDate() + (PLAN_WINDOW_DAYS - 1));
 
@@ -140,13 +146,15 @@ export async function acceptPlannedWorkout(
     startDate: range.startDate,
     endDate: range.endDate,
     plan: denormalizePlanDraft(input.plan),
-    ...(input.sourceMessageId ? { sourceMessageId: input.sourceMessageId } : {}),
+    ...(input.sourceMessageId
+      ? { sourceMessageId: input.sourceMessageId }
+      : {}),
   };
 
-  const data = await requestJson<{ plannedWorkout: PlannedWorkout }, AcceptPlanBody>(
-    "/api/planned-workouts",
-    { method: "POST", body, token },
-  );
+  const data = await requestJson<
+    { plannedWorkout: PlannedWorkout },
+    AcceptPlanBody
+  >("/api/planned-workouts", { method: "POST", body, token });
 
   return data.plannedWorkout;
 }

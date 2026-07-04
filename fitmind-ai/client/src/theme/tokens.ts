@@ -139,7 +139,10 @@ export type SemanticTone =
   | "analysis"
   | "neutral";
 
-export function getToneColors(theme: Theme, tone: SemanticTone): {
+export function getToneColors(
+  theme: Theme,
+  tone: SemanticTone,
+): {
   background: string;
   border: string;
   text: string;

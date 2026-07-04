@@ -4,7 +4,11 @@ import { parseInjuryTags } from "./athlete-profile-api";
 
 describe("parseInjuryTags", () => {
   it("splits on commas and whitespace, trims, lowercases, and dedupes", () => {
-    expect(parseInjuryTags("膝盖, 肩  Knee，knee")).toEqual(["膝盖", "肩", "knee"]);
+    expect(parseInjuryTags("膝盖, 肩  Knee，knee")).toEqual([
+      "膝盖",
+      "肩",
+      "knee",
+    ]);
   });
 
   it("returns an empty array for blank input", () => {
@@ -12,7 +16,9 @@ describe("parseInjuryTags", () => {
   });
 
   it("caps the number of tags at 10", () => {
-    const input = Array.from({ length: 15 }, (_, index) => `t${index}`).join(",");
+    const input = Array.from({ length: 15 }, (_, index) => `t${index}`).join(
+      ",",
+    );
 
     expect(parseInjuryTags(input)).toHaveLength(10);
   });

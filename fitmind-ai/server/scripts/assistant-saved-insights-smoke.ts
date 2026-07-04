@@ -284,14 +284,10 @@ async function main(): Promise<void> {
       "Assistant Saved Insights Other",
     );
 
-    const weeklyReport = await createAssistantTurn(
-      baseUrl,
-      primaryAuth.token,
-      {
-        mode: "weekly_report",
-        message: "Build my weekly training report",
-      },
-    );
+    const weeklyReport = await createAssistantTurn(baseUrl, primaryAuth.token, {
+      mode: "weekly_report",
+      message: "Build my weekly training report",
+    });
     const unsupported = await createAssistantTurn(baseUrl, primaryAuth.token, {
       mode: "unsupported",
       message: "Tell me a joke",
@@ -352,7 +348,10 @@ async function main(): Promise<void> {
       200,
       "GET /api/assistant/insights/:id",
     );
-    assert(detail.share_text === saved.share_text, "Detail should keep share text.");
+    assert(
+      detail.share_text === saved.share_text,
+      "Detail should keep share text.",
+    );
 
     expectError(
       await requestJson<unknown>(baseUrl, "/api/assistant/insights", {

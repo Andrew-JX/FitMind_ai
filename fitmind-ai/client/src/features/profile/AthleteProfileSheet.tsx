@@ -156,7 +156,9 @@ export function AthleteProfileSheet(props: AthleteProfileSheetProps) {
         <span style={labelStyle(theme)}>训练目标</span>
         <select
           onChange={(event) => {
-            const next = TRAINING_GOALS.find((item) => item === event.target.value);
+            const next = TRAINING_GOALS.find(
+              (item) => item === event.target.value,
+            );
             if (next) {
               setGoal(next);
             }

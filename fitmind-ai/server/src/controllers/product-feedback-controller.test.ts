@@ -132,7 +132,10 @@ describe("product-feedback-controller", () => {
 
   it("rejects out-of-range ratings before calling the service", async () => {
     await expect(
-      postProductFeedbackController(createRequest({ rating: 6 }), createResponse()),
+      postProductFeedbackController(
+        createRequest({ rating: 6 }),
+        createResponse(),
+      ),
     ).rejects.toBeTruthy();
     expect(mockedSubmitProductFeedback).not.toHaveBeenCalled();
   });

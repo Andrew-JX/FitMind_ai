@@ -16,7 +16,9 @@ export function WorkoutForm(props: WorkoutFormProps) {
   const { theme } = useTheme();
   const form = useWorkoutForm(token);
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+  async function handleSubmit(
+    event: React.FormEvent<HTMLFormElement>,
+  ): Promise<void> {
     event.preventDefault();
     const createdWorkout = await form.submitWorkout();
 
@@ -30,7 +32,9 @@ export function WorkoutForm(props: WorkoutFormProps) {
       <div style={headerStyle}>
         <div>
           <h2 style={titleStyle}>记录训练</h2>
-          <p style={copyStyle(theme)}>添加本次训练的动作、重量、次数与主观用力。</p>
+          <p style={copyStyle(theme)}>
+            添加本次训练的动作、重量、次数与主观用力。
+          </p>
         </div>
       </div>
 
@@ -63,7 +67,9 @@ export function WorkoutForm(props: WorkoutFormProps) {
           <p style={errorStyle(theme)}>{form.formErrors.performedAt}</p>
         ) : null}
         {form.formErrors.workoutDurationMinutes ? (
-          <p style={errorStyle(theme)}>{form.formErrors.workoutDurationMinutes}</p>
+          <p style={errorStyle(theme)}>
+            {form.formErrors.workoutDurationMinutes}
+          </p>
         ) : null}
 
         <label style={labelStyle(theme)}>
@@ -79,7 +85,9 @@ export function WorkoutForm(props: WorkoutFormProps) {
         <div style={setsHeaderStyle}>
           <div>
             <strong style={{ fontSize: 14 }}>训练组</strong>
-            <p style={subCopyStyle(theme)}>每组需要选择动作，并填写次数和重量。</p>
+            <p style={subCopyStyle(theme)}>
+              每组需要选择动作，并填写次数和重量。
+            </p>
           </div>
           <Button onClick={form.addSetDraft} type="button" variant="secondary">
             添加一组
@@ -93,10 +101,14 @@ export function WorkoutForm(props: WorkoutFormProps) {
               index={index}
               isOnlySet={form.setDrafts.length === 1}
               key={`${index}-${setDraft.exerciseId || "draft"}`}
-              onFieldChange={(field, value) => form.setSetDraftField(index, field, value)}
+              onFieldChange={(field, value) =>
+                form.setSetDraftField(index, field, value)
+              }
               onRemove={() => form.removeSetDraft(index)}
               onSearch={() => form.searchExercisesForSet(index)}
-              onSelectExercise={(exercise) => form.selectExerciseForSet(index, exercise)}
+              onSelectExercise={(exercise) =>
+                form.selectExerciseForSet(index, exercise)
+              }
               setDraft={setDraft}
             />
           ))}
@@ -129,7 +141,9 @@ export function WorkoutForm(props: WorkoutFormProps) {
       ) : null}
 
       {form.successMessage ? (
-        <p style={successStyle(theme)}>{translateMessage(form.successMessage)}</p>
+        <p style={successStyle(theme)}>
+          {translateMessage(form.successMessage)}
+        </p>
       ) : null}
     </Card>
   );
@@ -155,7 +169,10 @@ function translateMessage(message: string): string {
   return message
     .replaceAll("Workout date and time are required.", "请填写训练时间。")
     .replaceAll("Workout date and time must be valid.", "训练时间格式无效。")
-    .replaceAll("Workout duration must be a valid integer.", "训练时长必须是整数。")
+    .replaceAll(
+      "Workout duration must be a valid integer.",
+      "训练时长必须是整数。",
+    )
     .replaceAll("Workout duration must be at least 0.", "训练时长不能小于 0。")
     .replaceAll("must be a valid integer.", "必须是有效整数。")
     .replaceAll("must be a valid number.", "必须是有效数字。")
@@ -206,7 +223,9 @@ const actionRowStyle: React.CSSProperties = {
   gap: 8,
 };
 
-function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function copyStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 13,
@@ -215,7 +234,9 @@ function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProper
   };
 }
 
-function subCopyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function subCopyStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx3,
     fontSize: 11,
@@ -224,7 +245,9 @@ function subCopyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPro
   };
 }
 
-function labelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function labelStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     display: "grid",
@@ -233,7 +256,9 @@ function labelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPrope
   };
 }
 
-function inputLikeStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function inputLikeStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf2,
     border: `1px solid ${theme.colors.bdr}`,
@@ -244,7 +269,9 @@ function inputLikeStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSP
   };
 }
 
-function textareaStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function textareaStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf2,
     border: `1px solid ${theme.colors.bdr}`,
@@ -256,7 +283,9 @@ function textareaStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPr
   };
 }
 
-function errorStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function errorStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.orange,
     fontSize: 12,
@@ -264,7 +293,9 @@ function errorStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPrope
   };
 }
 
-function successStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function successStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.green,
     fontSize: 12,

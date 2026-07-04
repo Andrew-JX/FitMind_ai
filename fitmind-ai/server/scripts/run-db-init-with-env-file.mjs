@@ -5,7 +5,10 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-const serverRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const serverRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+);
 
 const envFileArg = process.argv[2];
 const useProcessEnv = envFileArg === "--from-process-env";

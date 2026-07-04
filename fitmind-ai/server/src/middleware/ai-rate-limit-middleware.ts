@@ -37,9 +37,14 @@ export function createAiRateLimitMiddleware(limiter: AiRateLimiter) {
     }
 
     const code = decision.code ?? "RATE_LIMITED";
-    throw new HttpError(429, code, RATE_LIMIT_MESSAGES[code] ?? "Rate limited.", {
-      retry_after_seconds: decision.retryAfterSeconds,
-    });
+    throw new HttpError(
+      429,
+      code,
+      RATE_LIMIT_MESSAGES[code] ?? "Rate limited.",
+      {
+        retry_after_seconds: decision.retryAfterSeconds,
+      },
+    );
   };
 }
 

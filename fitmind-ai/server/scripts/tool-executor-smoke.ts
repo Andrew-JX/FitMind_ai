@@ -234,12 +234,16 @@ async function deleteWorkoutIfNeeded(
   }
 
   try {
-    await requestJson<DeleteResponseData>(baseUrl, `/api/workouts/${workoutId}`, {
-      method: "DELETE",
-      headers: {
-        authorization: `Bearer ${token}`,
+    await requestJson<DeleteResponseData>(
+      baseUrl,
+      `/api/workouts/${workoutId}`,
+      {
+        method: "DELETE",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
       },
-    });
+    );
   } catch {
     // Best-effort cleanup keeps the main smoke result actionable.
   }
@@ -278,7 +282,9 @@ function assertNoSecretsInLog(
   );
 }
 
-async function loadRecentLogsForUser(userId: string): Promise<ToolCallLogRow[]> {
+async function loadRecentLogsForUser(
+  userId: string,
+): Promise<ToolCallLogRow[]> {
   const pool = createDbPool();
 
   try {
@@ -316,7 +322,10 @@ async function main(): Promise<void> {
   }
 
   const registry = getAiToolRegistry();
-  assert(registry.size === 3, "Tool registry should expose exactly three tools.");
+  assert(
+    registry.size === 3,
+    "Tool registry should expose exactly three tools.",
+  );
   assert(
     registry.has("get_training_summary") &&
       registry.has("get_exercise_progress") &&
@@ -364,7 +373,10 @@ async function main(): Promise<void> {
       "GET /api/exercises?q=bench",
     );
     const benchExercise = benchSearchData.items[0];
-    assert(benchExercise !== undefined, "Bench search should return one exercise.");
+    assert(
+      benchExercise !== undefined,
+      "Bench search should return one exercise.",
+    );
     console.log("OK 200 GET /api/exercises?q=bench");
 
     const squatSearchResponse = await requestJson<ExerciseSearchData>(
@@ -377,7 +389,10 @@ async function main(): Promise<void> {
       "GET /api/exercises?q=squat",
     );
     const squatExercise = squatSearchData.items[0];
-    assert(squatExercise !== undefined, "Squat search should return one exercise.");
+    assert(
+      squatExercise !== undefined,
+      "Squat search should return one exercise.",
+    );
     console.log("OK 200 GET /api/exercises?q=squat");
 
     const primaryWorkoutOneResponse = await requestJson<WorkoutDetailData>(
@@ -503,7 +518,8 @@ async function main(): Promise<void> {
       },
     );
     assert(
-      typeof trainingSummaryResult === "object" && trainingSummaryResult !== null,
+      typeof trainingSummaryResult === "object" &&
+        trainingSummaryResult !== null,
       "Training summary tool should return structured data.",
     );
     const summary = trainingSummaryResult as {
@@ -572,9 +588,15 @@ async function main(): Promise<void> {
         !("by_exercise" in successfulTrainingSummaryLog.tool_output),
       "Successful tool log should persist a compact output summary instead of the full payload.",
     );
-    assertNoSecretsInLog(successfulTrainingSummaryLog, primaryAuth.token, databaseUrl);
+    assertNoSecretsInLog(
+      successfulTrainingSummaryLog,
+      primaryAuth.token,
+      databaseUrl,
+    );
     console.log("OK executeAiTool get_training_summary");
-    console.log("OK successful tool execution persists a sanitized success log");
+    console.log(
+      "OK successful tool execution persists a sanitized success log",
+    );
 
     const exerciseProgressResult = await executeAiTool(
       { userId: primaryAuth.user.id },
@@ -689,7 +711,9 @@ async function main(): Promise<void> {
         "Unknown tool error should expose UNKNOWN_TOOL code.",
       );
     }
-    const logsAfterUnknownTool = await loadRecentLogsForUser(primaryAuth.user.id);
+    const logsAfterUnknownTool = await loadRecentLogsForUser(
+      primaryAuth.user.id,
+    );
     const unknownToolLog = logsAfterUnknownTool.find(
       (log) => log.tool_name === "does_not_exist" && log.status === "error",
     );
@@ -782,7 +806,9 @@ async function main(): Promise<void> {
         "Injected user_id should fail strict object validation.",
       );
     }
-    const logsAfterInjectedUserId = await loadRecentLogsForUser(primaryAuth.user.id);
+    const logsAfterInjectedUserId = await loadRecentLogsForUser(
+      primaryAuth.user.id,
+    );
     const injectedUserIdLog = logsAfterInjectedUserId.find(
       (log) =>
         log.tool_name === "get_training_summary" &&
@@ -804,9 +830,21 @@ async function main(): Promise<void> {
 
     console.log("Tool executor smoke passed.");
   } finally {
-    await deleteWorkoutIfNeeded(baseUrl, primaryToken ?? "", primaryWorkoutIdOne);
-    await deleteWorkoutIfNeeded(baseUrl, primaryToken ?? "", primaryWorkoutIdTwo);
-    await deleteWorkoutIfNeeded(baseUrl, secondaryToken ?? "", secondaryWorkoutId);
+    await deleteWorkoutIfNeeded(
+      baseUrl,
+      primaryToken ?? "",
+      primaryWorkoutIdOne,
+    );
+    await deleteWorkoutIfNeeded(
+      baseUrl,
+      primaryToken ?? "",
+      primaryWorkoutIdTwo,
+    );
+    await deleteWorkoutIfNeeded(
+      baseUrl,
+      secondaryToken ?? "",
+      secondaryWorkoutId,
+    );
     await stopServer(server);
   }
 }

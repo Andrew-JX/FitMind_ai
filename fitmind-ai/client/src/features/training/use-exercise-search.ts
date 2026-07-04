@@ -70,27 +70,30 @@ export function useExerciseSearch(): UseExerciseSearchResult {
     };
   }, []);
 
-  const runExerciseSearch = useCallback(async function runExerciseSearch(input: {
-    muscle: string;
-    q: string;
-  }): Promise<void> {
-    setIsLoadingExercises(true);
-    setSearchError(null);
+  const runExerciseSearch = useCallback(
+    async function runExerciseSearch(input: {
+      muscle: string;
+      q: string;
+    }): Promise<void> {
+      setIsLoadingExercises(true);
+      setSearchError(null);
 
-    try {
-      const items = await searchExercises({
-        muscle: input.muscle || undefined,
-        q: input.q || undefined,
-      });
+      try {
+        const items = await searchExercises({
+          muscle: input.muscle || undefined,
+          q: input.q || undefined,
+        });
 
-      setExercises(items);
-    } catch (error) {
-      setExercises([]);
-      setSearchError(getReadableErrorMessage(error));
-    } finally {
-      setIsLoadingExercises(false);
-    }
-  }, []);
+        setExercises(items);
+      } catch (error) {
+        setExercises([]);
+        setSearchError(getReadableErrorMessage(error));
+      } finally {
+        setIsLoadingExercises(false);
+      }
+    },
+    [],
+  );
 
   return {
     exercises,

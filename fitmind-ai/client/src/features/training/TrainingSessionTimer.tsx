@@ -13,7 +13,9 @@ export function TrainingSessionTimer(props: TrainingSessionTimerProps) {
   return (
     <div style={timerWrapStyle}>
       <div style={timerLabelStyle(theme)}>训练计时</div>
-      <div style={timerValueStyle(theme)}>{formatElapsedTime(props.elapsedSeconds)}</div>
+      <div style={timerValueStyle(theme)}>
+        {formatElapsedTime(props.elapsedSeconds)}
+      </div>
       <Button onClick={props.onToggleRunning} type="button" variant="secondary">
         {props.isRunning ? "暂停" : "开始"}
       </Button>
@@ -37,7 +39,9 @@ const timerWrapStyle: React.CSSProperties = {
   justifyItems: "start",
 };
 
-function timerLabelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function timerLabelStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx3,
     fontSize: 11,
@@ -47,7 +51,9 @@ function timerLabelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSS
   };
 }
 
-function timerValueStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function timerValueStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx,
     fontFamily: "ui-monospace, SFMono-Regular, Consolas, monospace",

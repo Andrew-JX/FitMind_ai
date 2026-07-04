@@ -25,7 +25,9 @@ describe("classifyAssistantIntent", () => {
     expect(classifyAssistantIntent("PRE是什么").intent).toBe("knowledge");
     expect(classifyAssistantIntent("pre 是什么？").intent).toBe("knowledge");
     expect(classifyAssistantIntent("PRE 是什么？").intent).toBe("knowledge");
-    expect(classifyAssistantIntent("主观用力是什么？").intent).toBe("knowledge");
+    expect(classifyAssistantIntent("主观用力是什么？").intent).toBe(
+      "knowledge",
+    );
     expect(classifyAssistantIntent("主观用力程度是什么？").intent).toBe(
       "knowledge",
     );

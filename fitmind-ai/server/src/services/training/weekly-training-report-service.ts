@@ -248,8 +248,7 @@ export async function getUserWeeklyTrainingReport(
     low_volume_muscle_groups: muscleLoad.low_volume_muscle_groups
       .slice(0, REPORT_MUSCLE_GROUP_LIMIT)
       .map(mapMuscleGroup),
-    selected_exercise_progress:
-      mapSelectedExerciseProgress(selectedProgress),
+    selected_exercise_progress: mapSelectedExerciseProgress(selectedProgress),
     recovery_notes: buildRecoveryNotes({
       recentWorkouts: recommendationContext.recent_workouts,
       workoutCount: summary.totals.workout_count,

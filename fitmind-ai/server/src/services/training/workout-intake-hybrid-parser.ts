@@ -30,7 +30,8 @@ const FALLBACK_FAILURE_WARNING =
 const MIN_DISTINCT_WEIGHTS_FOR_VARIED_SET_CHECK = 2;
 
 /** \u5e26\u5355\u4f4d\u7684\u91cd\u91cf\u63d0\u53ca\uff0c\u5982 60\u516c\u65a4 / 27.5kg / 135\u78c5\u3002 */
-const WEIGHT_MENTION_PATTERN = /(\d+(?:\.\d+)?)\s*(?:kg|\u516c\u65a4|\u5343\u514b|\u78c5|lbs?)/giu;
+const WEIGHT_MENTION_PATTERN =
+  /(\d+(?:\.\d+)?)\s*(?:kg|\u516c\u65a4|\u5343\u514b|\u78c5|lbs?)/giu;
 /** "\u91cd\u91cf x \u6b21\u6570"\u6210\u5bf9\u5199\u6cd5\u91cc\u5de6\u4fa7\u7684\u91cd\u91cf\uff0c\u5982 60x10 / 65\u00d78\u3002 */
 const WEIGHT_BEFORE_REPS_PAIR_PATTERN = /(\d+(?:\.\d+)?)\s*[x\u00d7*]\s*\d/giu;
 
@@ -50,8 +51,7 @@ export async function parseHybridWorkoutIntakeDraft(
   }
 
   const provider = options.provider ?? getConfiguredWorkoutIntakeLlmProvider();
-  const llmParser =
-    options.llmParser ?? createWorkoutIntakeLlmParser(provider);
+  const llmParser = options.llmParser ?? createWorkoutIntakeLlmParser(provider);
 
   if (!llmParser) {
     return markFallbackUnavailable(ruleResult, [
@@ -71,7 +71,12 @@ export async function parseHybridWorkoutIntakeDraft(
       return markFallbackUnavailable(ruleResult, [FALLBACK_FAILURE_WARNING]);
     }
 
-    return buildResponseFromLlmOutput(input, ruleResult, exerciseDictionary, llmOutput);
+    return buildResponseFromLlmOutput(
+      input,
+      ruleResult,
+      exerciseDictionary,
+      llmOutput,
+    );
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
 
@@ -200,7 +205,10 @@ function buildResponseFromLlmOutput(
 
   for (const exercise of exercises) {
     if (exercise.match_status === "unresolved") {
-      unresolvedItems.push({ reason: "no_candidates", text: exercise.input_name });
+      unresolvedItems.push({
+        reason: "no_candidates",
+        text: exercise.input_name,
+      });
       continue;
     }
 
@@ -267,15 +275,21 @@ function buildWarnings(
   const warnings: string[] = [];
 
   if (unresolvedItems.some((item) => item.reason === "multiple_candidates")) {
-    warnings.push("\u90e8\u5206\u52a8\u4f5c\u6709\u591a\u4e2a\u5019\u9009\uff0c\u9700\u8981\u4f60\u786e\u8ba4\u540e\u518d\u4fdd\u5b58\u3002");
+    warnings.push(
+      "\u90e8\u5206\u52a8\u4f5c\u6709\u591a\u4e2a\u5019\u9009\uff0c\u9700\u8981\u4f60\u786e\u8ba4\u540e\u518d\u4fdd\u5b58\u3002",
+    );
   }
 
   if (unresolvedItems.some((item) => item.reason === "no_candidates")) {
-    warnings.push("\u6709\u52a8\u4f5c\u6ca1\u6709\u8bc6\u522b\u5230\u6807\u51c6\u52a8\u4f5c\uff0c\u8bf7\u9009\u62e9\u6807\u51c6\u52a8\u4f5c\u6216\u5220\u9664\u8be5\u884c\u3002");
+    warnings.push(
+      "\u6709\u52a8\u4f5c\u6ca1\u6709\u8bc6\u522b\u5230\u6807\u51c6\u52a8\u4f5c\uff0c\u8bf7\u9009\u62e9\u6807\u51c6\u52a8\u4f5c\u6216\u5220\u9664\u8be5\u884c\u3002",
+    );
   }
 
   if (unresolvedItems.some((item) => item.reason === "no_sets")) {
-    warnings.push("\u6709\u52a8\u4f5c\u6ca1\u6709\u89e3\u6790\u51fa\u6709\u6548\u7ec4\uff0c\u8bf7\u8865\u5145\u91cd\u91cf\u548c\u6b21\u6570\u540e\u518d\u4fdd\u5b58\u3002");
+    warnings.push(
+      "\u6709\u52a8\u4f5c\u6ca1\u6709\u89e3\u6790\u51fa\u6709\u6548\u7ec4\uff0c\u8bf7\u8865\u5145\u91cd\u91cf\u548c\u6b21\u6570\u540e\u518d\u4fdd\u5b58\u3002",
+    );
   }
 
   if (unresolvedItems.some((item) => item.reason === "incomplete_sets")) {
@@ -308,7 +322,9 @@ function buildIncompleteSetMessage(input: {
   }
 
   const missingCopy = input.missing_fields
-    .map((field) => (field === "reps" ? "\u6bcf\u7ec4\u6b21\u6570" : "\u91cd\u91cf"))
+    .map((field) =>
+      field === "reps" ? "\u6bcf\u7ec4\u6b21\u6570" : "\u91cd\u91cf",
+    )
     .join("\u548c");
   const recognizedCopy =
     recognizedParts.length > 0

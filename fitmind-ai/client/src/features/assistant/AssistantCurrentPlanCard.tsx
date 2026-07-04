@@ -93,8 +93,10 @@ export function AssistantCurrentPlanCard(props: AssistantCurrentPlanCardProps) {
       </div>
 
       <p style={rangeStyle(theme)}>
-        {plan.startDate} ~ {plan.endDate} · 动作 {plan.adherence.trained_exercise_count}/
-        {plan.adherence.planned_exercise_count} 已练 · 组数依从 {setAdherencePct}%
+        {plan.startDate} ~ {plan.endDate} · 动作{" "}
+        {plan.adherence.trained_exercise_count}/
+        {plan.adherence.planned_exercise_count} 已练 · 组数依从{" "}
+        {setAdherencePct}%
       </p>
 
       <div style={progressTrackStyle(theme)}>
@@ -103,7 +105,10 @@ export function AssistantCurrentPlanCard(props: AssistantCurrentPlanCardProps) {
 
       <ul style={listStyle}>
         {plan.adherence.exercises.map((exercise, index) => (
-          <PlanAdherenceRow exercise={exercise} key={`${exercise.exercise_name}-${index}`} />
+          <PlanAdherenceRow
+            exercise={exercise}
+            key={`${exercise.exercise_name}-${index}`}
+          />
         ))}
       </ul>
 

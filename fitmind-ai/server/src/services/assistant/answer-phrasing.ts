@@ -52,7 +52,8 @@ export function applyFaithfulPhrasing(
   }
 
   const lengthBudget =
-    draft.summary.length * MAX_PHRASING_LENGTH_RATIO + MAX_PHRASING_LENGTH_SLACK;
+    draft.summary.length * MAX_PHRASING_LENGTH_RATIO +
+    MAX_PHRASING_LENGTH_SLACK;
   if (trimmed.length > lengthBudget) {
     return { answer: draft, phrasingApplied: false };
   }

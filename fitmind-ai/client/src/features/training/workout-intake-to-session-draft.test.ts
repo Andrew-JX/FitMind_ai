@@ -29,7 +29,9 @@ function createExercise(
   };
 }
 
-function createDraft(overrides: Partial<WorkoutIntakeDraft> = {}): WorkoutIntakeDraft {
+function createDraft(
+  overrides: Partial<WorkoutIntakeDraft> = {},
+): WorkoutIntakeDraft {
   return {
     date_label: null,
     date_source: "request_performed_at",
@@ -116,11 +118,13 @@ describe("mapWorkoutIntakeDraftToSessionInitialDraft", () => {
     );
 
     expect(result.exercises[0]?.sets).toEqual(
-      Array.from({ length: 3 }, () => expect.objectContaining({
-        completed: false,
-        reps: "",
-        weightKg: "100",
-      })),
+      Array.from({ length: 3 }, () =>
+        expect.objectContaining({
+          completed: false,
+          reps: "",
+          weightKg: "100",
+        }),
+      ),
     );
   });
 
@@ -287,7 +291,10 @@ describe("appendIntakeExercisesToDraft", () => {
     expect(result.mergedCount).toBe(1);
     expect(result.next).toHaveLength(1);
     expect(result.next[0]?.sets).toHaveLength(2);
-    expect(result.next[0]?.sets[1]).toMatchObject({ reps: "10", weightKg: "70" });
+    expect(result.next[0]?.sets[1]).toMatchObject({
+      reps: "10",
+      weightKg: "70",
+    });
     expect(result.next[0]?.isExpanded).toBe(true);
   });
 

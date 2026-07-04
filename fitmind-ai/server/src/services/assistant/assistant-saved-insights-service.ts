@@ -268,7 +268,8 @@ interface ParsedAssistantOutput {
 function parseStructuredOutput(value: unknown): ParsedAssistantOutput {
   const record = asRecord(value);
   const answer = asRecord(record?.answer);
-  const rawIntent = stringOrNull(record?.intent) ?? stringOrNull(answer?.intent);
+  const rawIntent =
+    stringOrNull(record?.intent) ?? stringOrNull(answer?.intent);
 
   if (!isAssistantSavedInsightType(rawIntent)) {
     throw new HttpError(
@@ -307,7 +308,8 @@ function mapSavedInsightRow(
     insight_type: row.insight_type,
     title: row.title,
     summary: row.summary,
-    structured_snapshot: row.structured_snapshot as AssistantSavedInsightSnapshot,
+    structured_snapshot:
+      row.structured_snapshot as AssistantSavedInsightSnapshot,
     share_text: row.share_text,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -351,7 +353,9 @@ function sourceArrayOrEmpty(value: unknown): Array<{
         category: stringOrNull(record?.category) ?? "",
       };
     })
-    .filter((item): item is { title: string; category: string } => item !== null);
+    .filter(
+      (item): item is { title: string; category: string } => item !== null,
+    );
 }
 
 function stringArrayOrEmpty(value: unknown): string[] {
@@ -383,4 +387,3 @@ function isAssistantSavedInsightType(
     value === "next_week_plan"
   );
 }
-

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { DictionaryExercise, DictionaryMuscleGroup } from "./dictionary-api";
+import type {
+  DictionaryExercise,
+  DictionaryMuscleGroup,
+} from "./dictionary-api";
 import {
   getEquipmentLabel,
   getExerciseCategory,
@@ -37,7 +40,9 @@ function createExercise(
 describe("exercise display helpers", () => {
   it("uses Chinese exercise names and does not fall back to English names", () => {
     expect(getExerciseDisplayName(createExercise())).toBe("哑铃推肩");
-    expect(getExerciseDisplayName(createExercise({ name_zh: "" }))).toBe("未知动作");
+    expect(getExerciseDisplayName(createExercise({ name_zh: "" }))).toBe(
+      "未知动作",
+    );
   });
 
   it("normalizes shoulder category from delt and deltoid codes", () => {

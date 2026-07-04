@@ -36,9 +36,13 @@ export function WorkoutCard(props: WorkoutCardProps) {
   const summaryLine = buildSummaryLine(props.workout);
   const notes = props.workout.notes?.trim();
   const groupedSets = useMemo(() => {
-    return props.detail ? groupWorkoutSets(props.detail.sets, props.exerciseNames) : [];
+    return props.detail
+      ? groupWorkoutSets(props.detail.sets, props.exerciseNames)
+      : [];
   }, [props.detail, props.exerciseNames]);
-  const [expandedExerciseId, setExpandedExerciseId] = useState<string | null>(null);
+  const [expandedExerciseId, setExpandedExerciseId] = useState<string | null>(
+    null,
+  );
 
   return (
     <article style={cardStyle(theme, props.isExpanded)}>
@@ -56,7 +60,9 @@ export function WorkoutCard(props: WorkoutCardProps) {
         tabIndex={0}
       >
         <div style={summaryBlockStyle}>
-          <p style={dateStyle(theme)}>{formatDateTime(props.workout.performed_at)}</p>
+          <p style={dateStyle(theme)}>
+            {formatDateTime(props.workout.performed_at)}
+          </p>
           <p style={summaryStyle(theme)}>
             {summaryLine}
             {notes ? ` · ${truncateNotes(notes)}` : ""}
@@ -123,17 +129,23 @@ export function WorkoutCard(props: WorkoutCardProps) {
               <div style={groupListStyle}>
                 {groupedSets.map((group) => {
                   const summary = summarizeWorkoutGroup(group);
-                  const isGroupExpanded = expandedExerciseId === group.exerciseId;
+                  const isGroupExpanded =
+                    expandedExerciseId === group.exerciseId;
 
                   return (
-                    <section key={group.exerciseId} style={groupCardStyle(theme, isGroupExpanded)}>
+                    <section
+                      key={group.exerciseId}
+                      style={groupCardStyle(theme, isGroupExpanded)}
+                    >
                       <button
                         onClick={() => toggleExerciseGroup(group.exerciseId)}
                         style={groupHeaderButtonStyle}
                         type="button"
                       >
                         <div style={groupTitleRowStyle}>
-                          <strong style={{ color: theme.colors.tx, fontSize: 14 }}>
+                          <strong
+                            style={{ color: theme.colors.tx, fontSize: 14 }}
+                          >
                             {group.exerciseName}
                           </strong>
                           <span style={groupToggleStyle(theme)}>
@@ -141,7 +153,8 @@ export function WorkoutCard(props: WorkoutCardProps) {
                           </span>
                         </div>
                         <p style={summaryTextStyle(theme)}>
-                          {summary.setCount} 组 · 总容量 {formatVolume(summary.totalVolumeKg)} 公斤
+                          {summary.setCount} 组 · 总容量{" "}
+                          {formatVolume(summary.totalVolumeKg)} 公斤
                         </p>
                       </button>
 
@@ -232,7 +245,9 @@ function groupWorkoutSets(
 
   return Array.from(grouped.values()).map((group) => ({
     ...group,
-    sets: [...group.sets].sort((left, right) => left.set_index - right.set_index),
+    sets: [...group.sets].sort(
+      (left, right) => left.set_index - right.set_index,
+    ),
   }));
 }
 
@@ -397,7 +412,9 @@ function cardStyle(
   isExpanded: boolean,
 ): React.CSSProperties {
   return {
-    backgroundColor: isExpanded ? withAlpha(theme.colors.ac, theme.isDark ? 0.08 : 0.06) : theme.colors.surf2,
+    backgroundColor: isExpanded
+      ? withAlpha(theme.colors.ac, theme.isDark ? 0.08 : 0.06)
+      : theme.colors.surf2,
     border: `1px solid ${isExpanded ? theme.colors.ac : theme.colors.bdr}`,
     borderRadius: theme.radius.card,
     padding: 14,
@@ -405,7 +422,9 @@ function cardStyle(
   };
 }
 
-function topRowStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function topRowStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     alignItems: "flex-start",
     borderRadius: theme.radius.control,
@@ -416,7 +435,9 @@ function topRowStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProp
   };
 }
 
-function dateStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function dateStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx,
     fontSize: 14,
@@ -425,7 +446,9 @@ function dateStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProper
   };
 }
 
-function summaryStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function summaryStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 12,
@@ -434,7 +457,9 @@ function summaryStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPro
   };
 }
 
-function detailBlockStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function detailBlockStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf,
     border: `1px solid ${theme.colors.bdr}`,
@@ -445,7 +470,9 @@ function detailBlockStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CS
   };
 }
 
-function noteBlockStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function noteBlockStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf,
     border: `1px solid ${theme.colors.bdr}`,
@@ -501,7 +528,9 @@ function groupCardStyle(
   };
 }
 
-function groupToggleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function groupToggleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.ac,
     flex: "0 0 auto",
@@ -510,7 +539,9 @@ function groupToggleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CS
   };
 }
 
-function summaryTextStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function summaryTextStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 12,
@@ -519,7 +550,9 @@ function summaryTextStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CS
   };
 }
 
-function setItemStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function setItemStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf2,
     border: `1px solid ${theme.colors.bdr}`,
@@ -528,7 +561,9 @@ function setItemStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPro
   };
 }
 
-function metaTextStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function metaTextStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 12,
@@ -537,7 +572,9 @@ function metaTextStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPr
   };
 }
 
-function deleteButtonStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function deleteButtonStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     background: "transparent",
     border: "none",

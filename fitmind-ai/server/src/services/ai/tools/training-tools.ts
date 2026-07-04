@@ -16,10 +16,7 @@ import {
   getUserWeeklyTrainingReport,
   type WeeklyTrainingReportResponseData,
 } from "../../training/weekly-training-report-service.js";
-import {
-  isValidDateOnly,
-  type AiToolDefinition,
-} from "./tool-types.js";
+import { isValidDateOnly, type AiToolDefinition } from "./tool-types.js";
 
 const dateRangeSchema = z
   .object({
@@ -55,7 +52,9 @@ const exerciseProgressArgsSchema = dateRangeSchema
   .strict();
 
 export type GetTrainingSummaryArgs = z.infer<typeof trainingSummaryArgsSchema>;
-export type GetExerciseProgressArgs = z.infer<typeof exerciseProgressArgsSchema>;
+export type GetExerciseProgressArgs = z.infer<
+  typeof exerciseProgressArgsSchema
+>;
 export type GetRecommendationContextArgs = z.infer<
   typeof recommendationContextArgsSchema
 >;

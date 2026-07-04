@@ -209,7 +209,10 @@ describe("assistant saved insights service", () => {
     );
 
     expect(dependencies.listInsights).toHaveBeenCalledWith("user-1");
-    expect(dependencies.findInsight).toHaveBeenCalledWith("insight-1", "user-1");
+    expect(dependencies.findInsight).toHaveBeenCalledWith(
+      "insight-1",
+      "user-1",
+    );
     expect(list).toHaveLength(1);
     expect(detail.id).toBe("insight-1");
   });

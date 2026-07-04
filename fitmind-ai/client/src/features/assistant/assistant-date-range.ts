@@ -5,7 +5,11 @@ export interface AssistantDateRange {
 
 export function createDefaultAssistantRange(): AssistantDateRange {
   const today = new Date();
-  const endDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const endDate = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  );
   const startDate = new Date(endDate);
   startDate.setDate(startDate.getDate() - 29);
 

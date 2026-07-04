@@ -106,29 +106,37 @@ const dictionary: ExerciseMatchingDictionaryItem[] = [
 
 describe("exercise-matching-service", () => {
   it("matches exact system aliases to canonical exercises", () => {
-    expect(matchExercise("\u6760\u94c3\u5367\u63a8", dictionary)).toMatchObject({
-      matched_exercise_id: "11111111-1111-4111-8111-111111111111",
-      matched_exercise_name: "\u6760\u94c3\u5367\u63a8",
-      match_status: "matched",
-    });
+    expect(matchExercise("\u6760\u94c3\u5367\u63a8", dictionary)).toMatchObject(
+      {
+        matched_exercise_id: "11111111-1111-4111-8111-111111111111",
+        matched_exercise_name: "\u6760\u94c3\u5367\u63a8",
+        match_status: "matched",
+      },
+    );
 
-    expect(matchExercise("\u9ad8\u4f4d\u4e0b\u62c9", dictionary)).toMatchObject({
-      matched_exercise_id: "33333333-3333-4333-8333-333333333333",
-      matched_exercise_name: "\u9ad8\u4f4d\u4e0b\u62c9",
-      match_status: "matched",
-    });
+    expect(matchExercise("\u9ad8\u4f4d\u4e0b\u62c9", dictionary)).toMatchObject(
+      {
+        matched_exercise_id: "33333333-3333-4333-8333-333333333333",
+        matched_exercise_name: "\u9ad8\u4f4d\u4e0b\u62c9",
+        match_status: "matched",
+      },
+    );
 
-    expect(matchExercise("\u5750\u59ff\u5212\u8239", dictionary)).toMatchObject({
-      matched_exercise_id: "44444444-4444-4444-8444-444444444444",
-      matched_exercise_name: "\u5750\u59ff\u5212\u8239",
-      match_status: "matched",
-    });
+    expect(matchExercise("\u5750\u59ff\u5212\u8239", dictionary)).toMatchObject(
+      {
+        matched_exercise_id: "44444444-4444-4444-8444-444444444444",
+        matched_exercise_name: "\u5750\u59ff\u5212\u8239",
+        match_status: "matched",
+      },
+    );
 
-    expect(matchExercise("\u54d1\u94c3\u63a8\u80a9", dictionary)).toMatchObject({
-      matched_exercise_id: "99999999-9999-4999-8999-999999999999",
-      matched_exercise_name: "\u54d1\u94c3\u63a8\u80a9",
-      match_status: "matched",
-    });
+    expect(matchExercise("\u54d1\u94c3\u63a8\u80a9", dictionary)).toMatchObject(
+      {
+        matched_exercise_id: "99999999-9999-4999-8999-999999999999",
+        matched_exercise_name: "\u54d1\u94c3\u63a8\u80a9",
+        match_status: "matched",
+      },
+    );
 
     expect(
       matchExercise("\u5750\u59ff\u54d1\u94c3\u63a8\u80a9", dictionary),
@@ -138,11 +146,13 @@ describe("exercise-matching-service", () => {
       match_status: "matched",
     });
 
-    expect(matchExercise("\u5f15\u4f53\u5411\u4e0a", dictionary)).toMatchObject({
-      matched_exercise_id: "99999999-9999-4999-8999-999999999996",
-      matched_exercise_name: "\u5f15\u4f53\u5411\u4e0a",
-      match_status: "matched",
-    });
+    expect(matchExercise("\u5f15\u4f53\u5411\u4e0a", dictionary)).toMatchObject(
+      {
+        matched_exercise_id: "99999999-9999-4999-8999-999999999996",
+        matched_exercise_name: "\u5f15\u4f53\u5411\u4e0a",
+        match_status: "matched",
+      },
+    );
   });
 
   it("keeps broad aliases ambiguous instead of selecting the first candidate", () => {

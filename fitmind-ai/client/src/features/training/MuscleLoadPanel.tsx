@@ -251,9 +251,7 @@ export function MuscleLoadPanel(props: MuscleLoadPanelProps) {
             </div>
 
             <details style={detailsStyle}>
-              <summary style={summaryStyle(theme)}>
-                查看计算规则
-              </summary>
+              <summary style={summaryStyle(theme)}>查看计算规则</summary>
               <ul style={rulesListStyle(theme)}>
                 {muscleLoad.evidence.calculation_rules.map((rule) => (
                   <li key={rule}>{rule}</li>

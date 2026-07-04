@@ -10,7 +10,9 @@ import {
   saveAthleteProfile,
 } from "./athlete-profile-service.js";
 
-function buildRow(overrides: Partial<AthleteProfileRow> = {}): AthleteProfileRow {
+function buildRow(
+  overrides: Partial<AthleteProfileRow> = {},
+): AthleteProfileRow {
   return {
     user_id: "u1",
     goal: "hypertrophy",

@@ -138,17 +138,18 @@ export async function getTrainingSummary(
       [filters.userId, filters.startDate, filters.endDate],
     );
 
-    const totalsRow = totalsResult.rows[0] as TrainingSummaryTotalsRow | undefined;
+    const totalsRow = totalsResult.rows[0] as
+      | TrainingSummaryTotalsRow
+      | undefined;
 
     return {
-      totals:
-        totalsRow ?? {
-          workout_count: 0,
-          set_count: 0,
-          total_reps: 0,
-          total_volume: 0,
-          workout_ids: [],
-        },
+      totals: totalsRow ?? {
+        workout_count: 0,
+        set_count: 0,
+        total_reps: 0,
+        total_volume: 0,
+        workout_ids: [],
+      },
       byExercise: byExerciseResult.rows as TrainingSummaryExerciseRow[],
     };
   } finally {

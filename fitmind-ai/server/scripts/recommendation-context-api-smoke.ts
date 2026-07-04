@@ -278,12 +278,16 @@ async function deleteWorkoutIfNeeded(
   }
 
   try {
-    await requestJson<DeleteResponseData>(baseUrl, `/api/workouts/${workoutId}`, {
-      method: "DELETE",
-      headers: {
-        authorization: `Bearer ${token}`,
+    await requestJson<DeleteResponseData>(
+      baseUrl,
+      `/api/workouts/${workoutId}`,
+      {
+        method: "DELETE",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
       },
-    });
+    );
   } catch {
     // Best-effort cleanup keeps the main smoke result actionable.
   }
@@ -336,10 +340,8 @@ async function main(): Promise<void> {
 
   const { server, baseUrl } = await startServer();
   const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const primaryEmail =
-    `recommendation-context-smoke-${uniqueSuffix}@example.com`;
-  const secondaryEmail =
-    `recommendation-context-smoke-other-${uniqueSuffix}@example.com`;
+  const primaryEmail = `recommendation-context-smoke-${uniqueSuffix}@example.com`;
+  const secondaryEmail = `recommendation-context-smoke-other-${uniqueSuffix}@example.com`;
   let primaryToken: string | null = null;
   let secondaryToken: string | null = null;
   let primaryWorkoutIdOne: string | null = null;
@@ -463,7 +465,10 @@ async function main(): Promise<void> {
       "GET /api/exercises?q=bench",
     );
     const benchExercise = benchSearchData.items[0];
-    assert(benchExercise !== undefined, "Bench search should return one exercise.");
+    assert(
+      benchExercise !== undefined,
+      "Bench search should return one exercise.",
+    );
 
     const squatSearchResponse = await requestJson<ExerciseSearchData>(
       baseUrl,
@@ -475,7 +480,10 @@ async function main(): Promise<void> {
       "GET /api/exercises?q=squat",
     );
     const squatExercise = squatSearchData.items[0];
-    assert(squatExercise !== undefined, "Squat search should return one exercise.");
+    assert(
+      squatExercise !== undefined,
+      "Squat search should return one exercise.",
+    );
     console.log("OK 200 exercise searches");
 
     const primaryWorkoutOneResponse = await requestJson<WorkoutDetailData>(
@@ -613,7 +621,9 @@ async function main(): Promise<void> {
       "POST /api/workouts secondary recommendation context workout",
     ).workout;
     secondaryWorkoutId = secondaryWorkout.id;
-    console.log("OK 201 POST /api/workouts secondary recommendation context workout");
+    console.log(
+      "OK 201 POST /api/workouts secondary recommendation context workout",
+    );
 
     const contextResponse = await requestJson<RecommendationContextData>(
       baseUrl,
@@ -723,17 +733,20 @@ async function main(): Promise<void> {
       context.evidence.calculation_rules.length > 0,
       "Evidence calculation_rules should be non-empty.",
     );
-    console.log("OK 200 populated recommendation context with expected sections");
-
-    const secondaryContextResponse = await requestJson<RecommendationContextData>(
-      baseUrl,
-      buildRecommendationContextPath("2026-04-29", "2026-04-30"),
-      {
-        headers: {
-          authorization: `Bearer ${secondaryToken}`,
-        },
-      },
+    console.log(
+      "OK 200 populated recommendation context with expected sections",
     );
+
+    const secondaryContextResponse =
+      await requestJson<RecommendationContextData>(
+        baseUrl,
+        buildRecommendationContextPath("2026-04-29", "2026-04-30"),
+        {
+          headers: {
+            authorization: `Bearer ${secondaryToken}`,
+          },
+        },
+      );
     const secondaryContext = expectSuccess(
       secondaryContextResponse,
       200,
@@ -798,15 +811,16 @@ async function main(): Promise<void> {
       "OK 200 DELETE /api/workouts/:id primary recommendation context workout two",
     );
 
-    const contextAfterDeleteResponse = await requestJson<RecommendationContextData>(
-      baseUrl,
-      buildRecommendationContextPath("2026-04-29", "2026-04-30"),
-      {
-        headers: {
-          authorization: `Bearer ${primaryToken}`,
+    const contextAfterDeleteResponse =
+      await requestJson<RecommendationContextData>(
+        baseUrl,
+        buildRecommendationContextPath("2026-04-29", "2026-04-30"),
+        {
+          headers: {
+            authorization: `Bearer ${primaryToken}`,
+          },
         },
-      },
-    );
+      );
     const contextAfterDelete = expectSuccess(
       contextAfterDeleteResponse,
       200,
@@ -833,9 +847,21 @@ async function main(): Promise<void> {
 
     console.log("Recommendation context API smoke passed.");
   } finally {
-    await deleteWorkoutIfNeeded(baseUrl, primaryToken ?? "", primaryWorkoutIdOne);
-    await deleteWorkoutIfNeeded(baseUrl, primaryToken ?? "", primaryWorkoutIdTwo);
-    await deleteWorkoutIfNeeded(baseUrl, secondaryToken ?? "", secondaryWorkoutId);
+    await deleteWorkoutIfNeeded(
+      baseUrl,
+      primaryToken ?? "",
+      primaryWorkoutIdOne,
+    );
+    await deleteWorkoutIfNeeded(
+      baseUrl,
+      primaryToken ?? "",
+      primaryWorkoutIdTwo,
+    );
+    await deleteWorkoutIfNeeded(
+      baseUrl,
+      secondaryToken ?? "",
+      secondaryWorkoutId,
+    );
     await stopServer(server);
   }
 }

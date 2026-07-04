@@ -32,11 +32,16 @@ export function mapWorkoutToSessionInitialDraft(
   workout: WorkoutDetailDto,
   exerciseDictionary: DictionaryExercise[],
 ): TrainingSessionInitialDraft {
-  const exerciseById = new Map(exerciseDictionary.map((exercise) => [exercise.id, exercise]));
+  const exerciseById = new Map(
+    exerciseDictionary.map((exercise) => [exercise.id, exercise]),
+  );
   const groupedSets = new Map<string, WorkoutDetailDto["sets"]>();
 
   for (const set of workout.sets) {
-    groupedSets.set(set.exercise_id, [...(groupedSets.get(set.exercise_id) ?? []), set]);
+    groupedSets.set(set.exercise_id, [
+      ...(groupedSets.get(set.exercise_id) ?? []),
+      set,
+    ]);
   }
 
   return {
@@ -47,7 +52,9 @@ export function mapWorkoutToSessionInitialDraft(
 
       return {
         candidateExercises: [],
-        categoryLabel: exercise ? getDisplayExerciseCategoryLabel(exercise) : "\u672a\u77e5",
+        categoryLabel: exercise
+          ? getDisplayExerciseCategoryLabel(exercise)
+          : "\u672a\u77e5",
         exercise,
         exerciseId: exercise?.id ?? exerciseId,
         id: `edit-exercise-${exerciseId}`,
@@ -55,7 +62,9 @@ export function mapWorkoutToSessionInitialDraft(
         isExpanded: false,
         loadType: exercise ? getExerciseLoadType(exercise) : "weighted",
         matchStatus: exercise ? "matched" : "unresolved",
-        name: exercise ? getExerciseDisplayName(exercise) : "\u672a\u77e5\u52a8\u4f5c",
+        name: exercise
+          ? getExerciseDisplayName(exercise)
+          : "\u672a\u77e5\u52a8\u4f5c",
         sets: [...sets]
           .sort((left, right) => left.set_index - right.set_index)
           .map((set) => mapWorkoutSetToDraftSet(set)),
@@ -75,7 +84,9 @@ export function buildWorkoutEditPlan(
   draft: TrainingSessionInitialDraft,
 ): WorkoutEditPlan {
   const workoutPatch = buildWorkoutPatch(originalWorkout, draft);
-  const originalSetById = new Map(originalWorkout.sets.map((set) => [set.id, set]));
+  const originalSetById = new Map(
+    originalWorkout.sets.map((set) => [set.id, set]),
+  );
   const currentPersistedSetIds = new Set<string>();
   const setAdds: AddWorkoutSetRequest[] = [];
   const setPatches: WorkoutEditPlan["setPatches"] = [];
@@ -91,9 +102,14 @@ export function buildWorkoutEditPlan(
         continue;
       }
 
-      const nextIndex = (setIndexByExerciseId.get(exercise.exerciseId) ?? 0) + 1;
+      const nextIndex =
+        (setIndexByExerciseId.get(exercise.exerciseId) ?? 0) + 1;
       setIndexByExerciseId.set(exercise.exerciseId, nextIndex);
-      const setPayload = buildSetPayload(exercise.exerciseId, setDraft, nextIndex);
+      const setPayload = buildSetPayload(
+        exercise.exerciseId,
+        setDraft,
+        nextIndex,
+      );
 
       if (!setDraft.persistedSetId) {
         setAdds.push(setPayload);

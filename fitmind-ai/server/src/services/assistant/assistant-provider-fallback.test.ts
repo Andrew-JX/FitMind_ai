@@ -42,14 +42,25 @@ describe("coerceMessageToEvidenceToolCall", () => {
     expect(result).toEqual({
       kind: "tool_call",
       tool_name: "get_exercise_progress",
-      tool_args: { exercise_id: "ex-1", start_date: "2026-05-19", end_date: "2026-06-17" },
+      tool_args: {
+        exercise_id: "ex-1",
+        start_date: "2026-05-19",
+        end_date: "2026-06-17",
+      },
     });
   });
 
   it("leaves the message untouched when a required arg (exercise_id) is missing", () => {
-    const response = { kind: "message" as const, message: "请先选择一个动作。" };
+    const response = {
+      kind: "message" as const,
+      message: "请先选择一个动作。",
+    };
 
-    const result = coerceMessageToEvidenceToolCall(response, exerciseTool, range);
+    const result = coerceMessageToEvidenceToolCall(
+      response,
+      exerciseTool,
+      range,
+    );
 
     expect(result).toBe(response);
   });
@@ -61,7 +72,11 @@ describe("coerceMessageToEvidenceToolCall", () => {
       tool_args: { start_date: "2026-05-19", end_date: "2026-06-17" },
     };
 
-    const result = coerceMessageToEvidenceToolCall(response, dateOnlyTool, range);
+    const result = coerceMessageToEvidenceToolCall(
+      response,
+      dateOnlyTool,
+      range,
+    );
 
     expect(result).toBe(response);
   });

@@ -33,7 +33,9 @@ const PLAN_STRATEGIES: readonly AssistantPlanStrategy[] = [
   "maintain",
 ];
 
-function normalizePlanStrategy(value: string | undefined): AssistantPlanStrategy {
+function normalizePlanStrategy(
+  value: string | undefined,
+): AssistantPlanStrategy {
   return PLAN_STRATEGIES.find((strategy) => strategy === value) ?? "maintain";
 }
 

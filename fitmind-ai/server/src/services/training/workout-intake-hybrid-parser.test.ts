@@ -117,7 +117,9 @@ describe("parseHybridWorkoutIntakeDraft", () => {
       { provider: "mock" },
     );
 
-    expect(result.evidence.source).toMatch(/^(rule_parser|llm_structured_fallback)$/u);
+    expect(result.evidence.source).toMatch(
+      /^(rule_parser|llm_structured_fallback)$/u,
+    );
     expect(result.draft.exercises).toHaveLength(1);
     expect(result.draft.exercises[0]).toMatchObject({
       input_name: "\u9ad8\u4f4d\u4e0b\u62c9",
@@ -191,7 +193,9 @@ describe("parseHybridWorkoutIntakeDraft", () => {
 
   it("does not guess missing reps in LLM fallback output", async () => {
     const result = await parseHybridWorkoutIntakeDraft(
-      createInput("\u9ad8\u4f4d\u4e0b\u62c9\u5341\u7ec4\u6bcf\u7ec470\u516c\u65a4"),
+      createInput(
+        "\u9ad8\u4f4d\u4e0b\u62c9\u5341\u7ec4\u6bcf\u7ec470\u516c\u65a4",
+      ),
       dictionary,
       { provider: "mock" },
     );
@@ -215,7 +219,9 @@ describe("parseHybridWorkoutIntakeDraft", () => {
 
   it("does not let an empty LLM fallback erase a conservative rule draft", async () => {
     const result = await parseHybridWorkoutIntakeDraft(
-      createInput("\u9ad8\u4f4d\u4e0b\u62c9\u5341\u7ec4\u6bcf\u7ec470\u516c\u65a4"),
+      createInput(
+        "\u9ad8\u4f4d\u4e0b\u62c9\u5341\u7ec4\u6bcf\u7ec470\u516c\u65a4",
+      ),
       dictionary,
       {
         llmParser: async () =>
@@ -246,7 +252,9 @@ describe("parseHybridWorkoutIntakeDraft", () => {
 
   it("returns Chinese warnings when fallback output still needs user correction", async () => {
     const result = await parseHybridWorkoutIntakeDraft(
-      createInput("\u9ad8\u4f4d\u4e0b\u62c9\u5341\u7ec4\u6bcf\u7ec470\u516c\u65a4"),
+      createInput(
+        "\u9ad8\u4f4d\u4e0b\u62c9\u5341\u7ec4\u6bcf\u7ec470\u516c\u65a4",
+      ),
       dictionary,
       { provider: "mock" },
     );

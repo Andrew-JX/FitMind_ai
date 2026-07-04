@@ -114,7 +114,8 @@ describe("product-feedback-service", () => {
       ),
     ).rejects.toMatchObject({
       code: "VALIDATION_ERROR",
-      message: "\u8bf7\u81f3\u5c11\u9009\u62e9\u661f\u7ea7\u6216\u586b\u5199\u53cd\u9988\u5185\u5bb9\u3002",
+      message:
+        "\u8bf7\u81f3\u5c11\u9009\u62e9\u661f\u7ea7\u6216\u586b\u5199\u53cd\u9988\u5185\u5bb9\u3002",
       statusCode: 400,
     });
     expect(dependencies.createFeedback).not.toHaveBeenCalled();

@@ -48,10 +48,7 @@ function unquoteEnvValue(value: string): string {
   const first = value[0];
   const last = value[value.length - 1];
 
-  if (
-    (first === '"' && last === '"') ||
-    (first === "'" && last === "'")
-  ) {
+  if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
     return value.slice(1, -1);
   }
 

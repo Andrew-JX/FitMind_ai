@@ -43,7 +43,9 @@ const DEFAULT_TAP_ACTION: FabAction = "library";
  * @param options - Action select callback
  * @returns Reactive speed-dial state plus pointer/click handlers for the button
  */
-export function useFabGesture(options: UseFabGestureOptions): UseFabGestureResult {
+export function useFabGesture(
+  options: UseFabGestureOptions,
+): UseFabGestureResult {
   const [isOpen, setIsOpen] = useState(false);
   const [activeAction, setActiveAction] = useState<FabAction | null>(null);
 
@@ -215,7 +217,10 @@ export function useFabGesture(options: UseFabGestureOptions): UseFabGestureResul
 }
 
 function vibrate(durationMs: number): void {
-  if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+  if (
+    typeof navigator !== "undefined" &&
+    typeof navigator.vibrate === "function"
+  ) {
     navigator.vibrate(durationMs);
   }
 }

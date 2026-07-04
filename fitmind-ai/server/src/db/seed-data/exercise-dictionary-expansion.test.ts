@@ -5,7 +5,9 @@ import { exerciseSeeds } from "./exercises.js";
 
 describe("exercise dictionary expansion seeds", () => {
   it("includes common intake exercises requested by Chinese workout logging", () => {
-    const codes = new Set<string>(exerciseSeeds.map((exercise) => exercise.code));
+    const codes = new Set<string>(
+      exerciseSeeds.map((exercise) => exercise.code),
+    );
 
     for (const code of [
       "shoulder_press_dumbbell",
@@ -22,7 +24,9 @@ describe("exercise dictionary expansion seeds", () => {
       "bulgarian_split_squat",
       "hammer_curl_dumbbell",
     ]) {
-      expect(codes.has(code), `${code} should exist in exercise seeds`).toBe(true);
+      expect(codes.has(code), `${code} should exist in exercise seeds`).toBe(
+        true,
+      );
     }
   });
 
@@ -46,9 +50,10 @@ describe("exercise dictionary expansion seeds", () => {
       "dumbbell_row:biceps",
       "dumbbell_row:rear_delts",
     ]) {
-      expect(mappingKeys.has(key), `${key} should exist in exercise-muscles`).toBe(
-        true,
-      );
+      expect(
+        mappingKeys.has(key),
+        `${key} should exist in exercise-muscles`,
+      ).toBe(true);
     }
   });
 

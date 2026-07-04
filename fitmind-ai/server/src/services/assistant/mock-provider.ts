@@ -27,9 +27,7 @@ function buildToolArgs(
   };
 
   if (toolName === "get_weekly_training_report") {
-    return request.assistant_context.exercise_id
-      ? exerciseIdArgs
-      : baseArgs;
+    return request.assistant_context.exercise_id ? exerciseIdArgs : baseArgs;
   }
 
   return exerciseIdArgs;

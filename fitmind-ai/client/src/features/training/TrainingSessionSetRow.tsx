@@ -22,7 +22,10 @@ export interface TrainingSessionSetRowProps {
   onDelete: () => void;
   onStartRestTimer?: (() => void) | undefined;
   onToggleCompleted: () => void;
-  onUpdate: <TField extends keyof DraftSet>(field: TField, value: DraftSet[TField]) => void;
+  onUpdate: <TField extends keyof DraftSet>(
+    field: TField,
+    value: DraftSet[TField],
+  ) => void;
   setDraft: DraftSet;
   showCompletion?: boolean | undefined;
 }
@@ -30,10 +33,14 @@ export interface TrainingSessionSetRowProps {
 export function TrainingSessionSetRow(props: TrainingSessionSetRowProps) {
   const { theme } = useTheme();
   const showCompletion = props.showCompletion ?? true;
-  const restLabel = props.setDraft.restSeconds ? formatRestLabel(props.setDraft.restSeconds) : null;
+  const restLabel = props.setDraft.restSeconds
+    ? formatRestLabel(props.setDraft.restSeconds)
+    : null;
 
   return (
-    <div style={rowStyle(theme, showCompletion ? props.setDraft.completed : true)}>
+    <div
+      style={rowStyle(theme, showCompletion ? props.setDraft.completed : true)}
+    >
       <div style={rowHeaderStyle}>
         <strong style={{ fontSize: 13 }}>第 {props.index + 1} 组</strong>
         <div style={rowActionStyle}>
@@ -47,7 +54,11 @@ export function TrainingSessionSetRow(props: TrainingSessionSetRowProps) {
               休息倒计时
             </button>
           ) : null}
-          <button onClick={props.onCopy} style={miniActionStyle(theme)} type="button">
+          <button
+            onClick={props.onCopy}
+            style={miniActionStyle(theme)}
+            type="button"
+          >
             复制本组
           </button>
           <button
@@ -105,7 +116,11 @@ export function TrainingSessionSetRow(props: TrainingSessionSetRowProps) {
 
       {showCompletion ? (
         <div style={completeRowStyle(Boolean(restLabel))}>
-          {restLabel ? <span style={restInfoStyle(theme)}>{restLabel}</span> : <span />}
+          {restLabel ? (
+            <span style={restInfoStyle(theme)}>{restLabel}</span>
+          ) : (
+            <span />
+          )}
           <Button
             disabled={!props.canComplete}
             onClick={props.onToggleCompleted}
@@ -140,7 +155,8 @@ function rowStyle(
     display: "grid",
     gap: 12,
     padding: 12,
-    transition: "border-color 150ms ease, transform 150ms ease, opacity 150ms ease",
+    transition:
+      "border-color 150ms ease, transform 150ms ease, opacity 150ms ease",
   };
 }
 
@@ -179,7 +195,9 @@ const metricGridStyle: React.CSSProperties = {
   gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
 };
 
-function labelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function labelStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     display: "grid",
@@ -188,7 +206,9 @@ function labelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPrope
   };
 }
 
-function labelCaptionStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function labelCaptionStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 12,
@@ -244,7 +264,9 @@ function completeRowStyle(hasRestLabel: boolean): React.CSSProperties {
   };
 }
 
-function restInfoStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function restInfoStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 12,

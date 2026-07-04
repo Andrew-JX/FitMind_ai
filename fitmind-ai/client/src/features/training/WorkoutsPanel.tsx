@@ -36,10 +36,12 @@ export interface WorkoutsPanelProps {
 export function WorkoutsPanel(props: WorkoutsPanelProps) {
   const { theme } = useTheme();
   const exerciseNames = useExerciseNames();
-  const [collapsedWorkoutId, setCollapsedWorkoutId] = useState<string | null>(null);
-  const [pendingDeleteWorkoutId, setPendingDeleteWorkoutId] = useState<string | null>(
+  const [collapsedWorkoutId, setCollapsedWorkoutId] = useState<string | null>(
     null,
   );
+  const [pendingDeleteWorkoutId, setPendingDeleteWorkoutId] = useState<
+    string | null
+  >(null);
 
   useEffect(() => {
     if (props.selectedWorkoutId !== collapsedWorkoutId) {
@@ -137,7 +139,9 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
         <p style={copyStyle(theme)}>正在加载训练记录...</p>
       ) : null}
 
-      {!props.isLoadingList && !props.listError && props.workouts.length === 0 ? (
+      {!props.isLoadingList &&
+      !props.listError &&
+      props.workouts.length === 0 ? (
         <div style={{ marginTop: 14 }}>
           <StateNotice
             description="先记录一次训练，这里会展示你的训练时间、动作和组数。"
@@ -198,7 +202,10 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
       return;
     }
 
-    if (props.selectedWorkoutId === workoutId && collapsedWorkoutId === workoutId) {
+    if (
+      props.selectedWorkoutId === workoutId &&
+      collapsedWorkoutId === workoutId
+    ) {
       setCollapsedWorkoutId(null);
       return;
     }
@@ -216,10 +223,22 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
 
 function translateError(message: string): string {
   return message
-    .replaceAll("Workout list is unavailable right now.", "训练记录加载失败，请稍后重试。")
-    .replaceAll("Workout detail is unavailable right now.", "训练详情加载失败，请稍后重试。")
-    .replaceAll("Workout deletion is unavailable right now.", "删除失败，请稍后重试。")
-    .replaceAll("You must be signed in to view workouts.", "请先登录后再查看训练记录。")
+    .replaceAll(
+      "Workout list is unavailable right now.",
+      "训练记录加载失败，请稍后重试。",
+    )
+    .replaceAll(
+      "Workout detail is unavailable right now.",
+      "训练详情加载失败，请稍后重试。",
+    )
+    .replaceAll(
+      "Workout deletion is unavailable right now.",
+      "删除失败，请稍后重试。",
+    )
+    .replaceAll(
+      "You must be signed in to view workouts.",
+      "请先登录后再查看训练记录。",
+    )
     .replaceAll(
       "You must be signed in to view workout details.",
       "请先登录后再查看训练详情。",
@@ -231,7 +250,9 @@ function translateError(message: string): string {
 }
 
 function useExerciseNames(): Map<string, string> {
-  const [exerciseNames, setExerciseNames] = useState<Map<string, string>>(new Map());
+  const [exerciseNames, setExerciseNames] = useState<Map<string, string>>(
+    new Map(),
+  );
 
   useEffect(() => {
     let isActive = true;
@@ -292,7 +313,9 @@ const titleStyle: React.CSSProperties = {
   margin: 0,
 };
 
-function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function copyStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 12,
@@ -301,7 +324,9 @@ function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProper
   };
 }
 
-function confirmCopyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function confirmCopyStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 13,

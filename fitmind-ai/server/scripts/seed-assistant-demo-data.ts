@@ -102,13 +102,15 @@ async function loadDemoExercises(userId: string): Promise<DemoExerciseMap> {
         FROM exercises
         WHERE code = ANY($1::text[])
       `,
-      [[
-        "bench_press_barbell",
-        "incline_bench_press_barbell",
-        "barbell_row",
-        "lat_pulldown_cable",
-        "barbell_back_squat",
-      ]],
+      [
+        [
+          "bench_press_barbell",
+          "incline_bench_press_barbell",
+          "barbell_row",
+          "lat_pulldown_cable",
+          "barbell_back_squat",
+        ],
+      ],
     );
 
     const byCode = new Map(result.rows.map((row) => [row.code, row]));
@@ -316,9 +318,7 @@ function buildDemoSavedInsights(): DemoSavedInsightInput[] {
         toolNames: ["get_weekly_training_report"],
       },
       sources: [],
-      limitations: [
-        "这是基于 demo 聚合训练数据生成的保存快照。",
-      ],
+      limitations: ["这是基于 demo 聚合训练数据生成的保存快照。"],
     },
     {
       insightType: "plateau_diagnosis",
@@ -340,9 +340,7 @@ function buildDemoSavedInsights(): DemoSavedInsightInput[] {
           category: "programming",
         },
       ],
-      limitations: [
-        "这是训练数据诊断，不是医疗建议或专业教练处方。",
-      ],
+      limitations: ["这是训练数据诊断，不是医疗建议或专业教练处方。"],
     },
     {
       insightType: "next_week_plan",

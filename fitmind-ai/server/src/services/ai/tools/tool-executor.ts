@@ -179,9 +179,7 @@ function summarizeWeeklyTrainingReportResult(result: unknown): unknown {
     status: sanitizeForToolLog(status),
     totals: sanitizeForToolLog(totals),
     frequency: sanitizeForToolLog(frequency),
-    top_exercise_count: Array.isArray(topExercises)
-      ? topExercises.length
-      : 0,
+    top_exercise_count: Array.isArray(topExercises) ? topExercises.length : 0,
     top_muscle_group_count: Array.isArray(topMuscleGroups)
       ? topMuscleGroups.length
       : 0,
@@ -317,7 +315,9 @@ export async function executeAiTool(
       durationMs: Math.max(0, Date.now() - startedAt),
       status: "error",
       errorMessage:
-        error instanceof Error ? error.message : "Unknown tool execution error.",
+        error instanceof Error
+          ? error.message
+          : "Unknown tool execution error.",
     });
 
     throw error;

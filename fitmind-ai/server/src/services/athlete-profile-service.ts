@@ -42,9 +42,9 @@ export const athleteProfileInputSchema = z
   .object({
     goal: z.enum(TRAINING_GOALS),
     weeklyDays: z.number().int().min(1).max(7),
-    availableEquipment: z.array(z.enum(AVAILABLE_EQUIPMENT)).max(
-      AVAILABLE_EQUIPMENT.length,
-    ),
+    availableEquipment: z
+      .array(z.enum(AVAILABLE_EQUIPMENT))
+      .max(AVAILABLE_EQUIPMENT.length),
     injuryConstraints: z
       .array(z.string().trim().min(1).max(MAX_INJURY_TAG_LENGTH))
       .max(MAX_INJURY_TAGS),

@@ -19,13 +19,17 @@ export interface RecommendationContextPanelProps {
   token: string | null;
 }
 
-export function RecommendationContextPanel(props: RecommendationContextPanelProps) {
+export function RecommendationContextPanel(
+  props: RecommendationContextPanelProps,
+) {
   const { refreshSignal, token } = props;
   const { theme } = useTheme();
   const [context, setContext] = useState<RecommendationContext | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [range] = useState<RecommendationContextRange>(() => createDefaultRange());
+  const [range] = useState<RecommendationContextRange>(() =>
+    createDefaultRange(),
+  );
 
   const refreshOnTokenChange = useEffectEvent(async () => {
     await refresh();
@@ -162,7 +166,9 @@ export function RecommendationContextPanel(props: RecommendationContextPanelProp
                     <li key={exercise.exercise_id} style={listItemStyle(theme)}>
                       <div style={itemHeaderStyle}>
                         <strong>{exercise.exercise_name}</strong>
-                        <Pill tone="accent">{exercise.total_volume.toLocaleString()} 公斤</Pill>
+                        <Pill tone="accent">
+                          {exercise.total_volume.toLocaleString()} 公斤
+                        </Pill>
                       </div>
                       <div style={itemMetaStyle(theme)}>
                         {exercise.workout_count.toLocaleString()} 次训练 ·{" "}
@@ -170,7 +176,8 @@ export function RecommendationContextPanel(props: RecommendationContextPanelProp
                         {exercise.total_reps.toLocaleString()} 次
                       </div>
                       <div style={itemMetaStyle(theme)}>
-                        最高 {formatMetric(exercise.max_weight_kg, "公斤")} · 估算最大重量{" "}
+                        最高 {formatMetric(exercise.max_weight_kg, "公斤")} ·
+                        估算最大重量{" "}
                         {formatMetric(exercise.estimated_1rm_kg, "公斤")}
                       </div>
                     </li>
@@ -191,8 +198,12 @@ export function RecommendationContextPanel(props: RecommendationContextPanelProp
                   {context.recent_workouts.map((workout) => (
                     <li key={workout.workout_id} style={listItemStyle(theme)}>
                       <div style={itemHeaderStyle}>
-                        <strong>{formatDisplayDateTime(workout.performed_at)}</strong>
-                        <Pill tone="info">{workout.total_volume.toLocaleString()} 公斤</Pill>
+                        <strong>
+                          {formatDisplayDateTime(workout.performed_at)}
+                        </strong>
+                        <Pill tone="info">
+                          {workout.total_volume.toLocaleString()} 公斤
+                        </Pill>
                       </div>
                       <div style={itemMetaStyle(theme)}>
                         {workout.set_count.toLocaleString()} 组
@@ -213,8 +224,14 @@ export function RecommendationContextPanel(props: RecommendationContextPanelProp
               <Pill tone="info">可追溯</Pill>
             </div>
             <div style={evidenceGridStyle}>
-              <EvidenceCell label="关联训练" value={`${context.evidence.workout_ids.length} 条`} />
-              <EvidenceCell label="关联组数" value={`${context.evidence.set_ids.length} 条`} />
+              <EvidenceCell
+                label="关联训练"
+                value={`${context.evidence.workout_ids.length} 条`}
+              />
+              <EvidenceCell
+                label="关联组数"
+                value={`${context.evidence.set_ids.length} 条`}
+              />
               <EvidenceCell
                 label="计算规则"
                 value={`${context.evidence.calculation_rules.length} 条`}
@@ -262,7 +279,11 @@ function getReadableErrorMessage(error: unknown): string {
 
 function createDefaultRange(): RecommendationContextRange {
   const today = new Date();
-  const endDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const endDate = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  );
   const startDate = new Date(endDate);
   startDate.setDate(startDate.getDate() - 29);
 
@@ -385,11 +406,15 @@ const detailsStyle: React.CSSProperties = {
   marginTop: 12,
 };
 
-function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function copyStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return { color: theme.colors.tx2, fontSize: 12, lineHeight: 1.6, margin: 0 };
 }
 
-function subtleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function subtleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx3,
     fontSize: 11,
@@ -409,7 +434,9 @@ function sectionCardStyle(
   };
 }
 
-function listItemStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function listItemStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf,
     border: `1px solid ${theme.colors.bdr}`,
@@ -418,15 +445,21 @@ function listItemStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPr
   };
 }
 
-function itemMetaStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function itemMetaStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return { color: theme.colors.tx2, fontSize: 12, lineHeight: 1.6 };
 }
 
-function summaryStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function summaryStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return { color: theme.colors.ac, fontSize: 12, fontWeight: 700 };
 }
 
-function rulesListStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function rulesListStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 12,

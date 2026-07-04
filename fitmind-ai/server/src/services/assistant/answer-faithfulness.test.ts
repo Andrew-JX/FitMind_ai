@@ -49,8 +49,7 @@ const weeklyToolOutput = {
 describe("verifyAnswerFaithfulness", () => {
   it("verifies when every number traces back to tool output", () => {
     const answer = buildAnswer({
-      summary:
-        "本周共记录 4 次训练，40 组，320 次，总训练量约 12000 kg。",
+      summary: "本周共记录 4 次训练，40 组，320 次，总训练量约 12000 kg。",
       bullets: ["近 7 天平均训练频率：约每周 4 次。"],
       conclusion: "训练量来自已记录 workout，不是模型猜测。",
       recommendation: "下周保持 4 次频率即可。",

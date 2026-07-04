@@ -57,7 +57,9 @@ export function StatCell(props: StatCellProps) {
           {props.value}
         </strong>
         {props.unit ? (
-          <span style={{ color: theme.colors.tx3, fontSize: 11 }}>{props.unit}</span>
+          <span style={{ color: theme.colors.tx3, fontSize: 11 }}>
+            {props.unit}
+          </span>
         ) : null}
       </div>
       <div style={{ color: theme.colors.tx3, fontSize: 11, marginTop: 2 }}>

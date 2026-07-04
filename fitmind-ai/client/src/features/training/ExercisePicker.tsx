@@ -35,19 +35,20 @@ export function ExercisePicker(props: ExercisePickerProps) {
     isLoadingExercises,
     isLoadingMuscleGroups,
     muscleGroups,
-  onSearch,
-  onSelectExercise,
-  searchError,
-  token,
+    onSearch,
+    onSelectExercise,
+    searchError,
+    token,
   } = props;
   const { theme } = useTheme();
   const [keyword, setKeyword] = useState("");
   const [selectedMuscle, setSelectedMuscle] = useState("");
-  const [selectedExercise, setSelectedExercise] = useState<DictionaryExercise | null>(
-    null,
-  );
+  const [selectedExercise, setSelectedExercise] =
+    useState<DictionaryExercise | null>(null);
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+  async function handleSubmit(
+    event: React.FormEvent<HTMLFormElement>,
+  ): Promise<void> {
     event.preventDefault();
     await onSearch({
       muscle: selectedMuscle,
@@ -86,7 +87,10 @@ export function ExercisePicker(props: ExercisePickerProps) {
           </select>
         </label>
 
-        <Button disabled={isLoadingExercises || isLoadingMuscleGroups} type="submit">
+        <Button
+          disabled={isLoadingExercises || isLoadingMuscleGroups}
+          type="submit"
+        >
           {isLoadingExercises ? "搜索中..." : "搜索动作"}
         </Button>
       </form>
@@ -177,7 +181,9 @@ function ExerciseResultContent(props: {
   exercise: DictionaryExercise;
   primaryMuscles: string[];
 }) {
-  const movementLabel = getMovementPatternLabel(props.exercise.movement_pattern);
+  const movementLabel = getMovementPatternLabel(
+    props.exercise.movement_pattern,
+  );
   const equipmentLabel = getEquipmentLabel(props.exercise.equipment);
 
   return (
@@ -228,7 +234,9 @@ const pillRowStyle: React.CSSProperties = {
   marginTop: 8,
 };
 
-function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function copyStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 12,
@@ -237,7 +245,9 @@ function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProper
   };
 }
 
-function labelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function labelStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     display: "grid",
@@ -246,7 +256,9 @@ function labelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPrope
   };
 }
 
-function selectStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function selectStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf2,
     border: `1px solid ${theme.colors.bdr}`,

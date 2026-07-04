@@ -79,7 +79,9 @@ function backdropStyle(
   };
 }
 
-function sheetStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function sheetStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf,
     border: `1px solid ${theme.colors.bdr2}`,
@@ -96,7 +98,9 @@ function sheetStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPrope
   };
 }
 
-function headerStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function headerStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     borderBottom: `1px solid ${theme.colors.bdr}`,
     flex: "0 0 auto",
@@ -137,7 +141,9 @@ const bodyStyle: React.CSSProperties = {
   WebkitOverflowScrolling: "touch",
 };
 
-function footerStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function footerStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf,
     borderTop: `1px solid ${theme.colors.bdr}`,

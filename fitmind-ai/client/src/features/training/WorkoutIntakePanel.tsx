@@ -154,7 +154,11 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
       return;
     }
 
-    chooseCandidate(searchingIndex, exercise.id, getExerciseDisplayName(exercise));
+    chooseCandidate(
+      searchingIndex,
+      exercise.id,
+      getExerciseDisplayName(exercise),
+    );
     setSearchingIndex(null);
   }
 
@@ -184,7 +188,9 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
     const exercises = pendingDraft.exercises
       .map((exercise, index) => ({ exercise, resolution: resolutions[index] }))
       .filter(
-        (entry): entry is {
+        (
+          entry,
+        ): entry is {
           exercise: (typeof pendingDraft.exercises)[number];
           resolution: Extract<ExerciseResolution, { type: "keep" }>;
         } => entry.resolution?.type === "keep",

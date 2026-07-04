@@ -96,7 +96,10 @@ export function parseWorkoutIntakeDraft(
     .map((segment) => {
       const inputName = extractExerciseName(segment, exerciseDictionary);
       const match = matchExercise(inputName, exerciseDictionary);
-      const parsedSets = parseSets(segment, isBodyweightMatch(match, exerciseDictionary));
+      const parsedSets = parseSets(
+        segment,
+        isBodyweightMatch(match, exerciseDictionary),
+      );
 
       return {
         input_name: inputName,
@@ -167,32 +170,34 @@ export function parseWorkoutIntakeDraft(
 function normalizeIntakeText(value: string): string {
   const decimalPlaceholder = "__FITMIND_DECIMAL__";
 
-  return value
-    .normalize("NFKC")
-    .replace(/(\d)\.(\d)/gu, `$1${decimalPlaceholder}$2`)
-    .replace(
-      /[\u96f6\u4e00\u4e8c\u4e24\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341]+(?=\s*(?:\u7ec4|\u4e2a|\u6b21|\u516c\u65a4|\u5343\u514b))/gu,
-      (match) => String(parseChineseNumber(match)),
-    )
-    .replace(/\u516c\u65a4|\u5343\u514b/giu, "kg")
-    .replace(/\u4e2a|\u6b21/giu, "reps")
-    .replace(/[\u00d7\uff0a*]/gu, "x")
-    .replace(/\u7136\u540e|\u63a5\u7740/giu, ";")
-    // List connectors join multiple exercises; treat them as segment breaks.
-    .replace(/\u8fd8\u6709|\u4ee5\u53ca|\u548c/gu, ";")
-    .replace(/[.\u3002;\uff1b\n\r]/gu, ";")
-    .replaceAll(decimalPlaceholder, ".")
-    // Convert pounds to kilograms (drafts store weight_kg).
-    .replace(
-      /(\d+(?:\.\d+)?)\s*(?:\u78c5|lbs?)/giu,
-      (_match, pounds: string) =>
-        `${(Number(pounds) * 0.45359237).toFixed(1)}kg`,
-    )
-    // Commas / pause marks separate exercises, so treat them as segment breaks.
-    // A name-only segment followed by its sets is re-merged in splitExerciseSegments.
-    .replace(/[,，、]/gu, ";")
-    .replace(/\s+/gu, " ")
-    .trim();
+  return (
+    value
+      .normalize("NFKC")
+      .replace(/(\d)\.(\d)/gu, `$1${decimalPlaceholder}$2`)
+      .replace(
+        /[\u96f6\u4e00\u4e8c\u4e24\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341]+(?=\s*(?:\u7ec4|\u4e2a|\u6b21|\u516c\u65a4|\u5343\u514b))/gu,
+        (match) => String(parseChineseNumber(match)),
+      )
+      .replace(/\u516c\u65a4|\u5343\u514b/giu, "kg")
+      .replace(/\u4e2a|\u6b21/giu, "reps")
+      .replace(/[\u00d7\uff0a*]/gu, "x")
+      .replace(/\u7136\u540e|\u63a5\u7740/giu, ";")
+      // List connectors join multiple exercises; treat them as segment breaks.
+      .replace(/\u8fd8\u6709|\u4ee5\u53ca|\u548c/gu, ";")
+      .replace(/[.\u3002;\uff1b\n\r]/gu, ";")
+      .replaceAll(decimalPlaceholder, ".")
+      // Convert pounds to kilograms (drafts store weight_kg).
+      .replace(
+        /(\d+(?:\.\d+)?)\s*(?:\u78c5|lbs?)/giu,
+        (_match, pounds: string) =>
+          `${(Number(pounds) * 0.45359237).toFixed(1)}kg`,
+      )
+      // Commas / pause marks separate exercises, so treat them as segment breaks.
+      // A name-only segment followed by its sets is re-merged in splitExerciseSegments.
+      .replace(/[,，、]/gu, ";")
+      .replace(/\s+/gu, " ")
+      .trim()
+  );
 }
 
 function parseChineseNumber(value: string): number {
@@ -242,7 +247,9 @@ function splitExerciseSegments(
     .split(";")
     .map((segment) => segment.trim())
     .filter((segment) => segment.length > 0)
-    .flatMap((segment) => splitRunOnExerciseSegment(segment, exerciseDictionary));
+    .flatMap((segment) =>
+      splitRunOnExerciseSegment(segment, exerciseDictionary),
+    );
   const segments: string[] = [];
 
   for (const segment of rawSegments) {
@@ -262,7 +269,8 @@ function splitExerciseSegments(
       segments.length > 0 &&
       containsSetContext(segment)
     ) {
-      segments[segments.length - 1] = `${segments[segments.length - 1]} ${segment}`;
+      segments[segments.length - 1] =
+        `${segments[segments.length - 1]} ${segment}`;
       continue;
     }
 
@@ -403,7 +411,10 @@ function splitRunOnExerciseSegment(
   return pieces;
 }
 
-function parseSets(segment: string, isBodyweightExercise: boolean): ParsedSegmentSets {
+function parseSets(
+  segment: string,
+  isBodyweightExercise: boolean,
+): ParsedSegmentSets {
   const repeatCount = parseRepeatCount(segment);
   const pairMatches = [...segment.matchAll(SET_PAIR_PATTERN)]
     .map((match) => {
@@ -522,11 +533,19 @@ function parseIncompleteSet(
     weight_kg: weight,
     reps,
     missing_fields: missingFields,
-    message: buildIncompleteSetMessage(repeatCount, weight, reps, missingFields),
+    message: buildIncompleteSetMessage(
+      repeatCount,
+      weight,
+      reps,
+      missingFields,
+    ),
   };
 }
 
-function parseFirstPositiveNumber(value: string, pattern: RegExp): number | null {
+function parseFirstPositiveNumber(
+  value: string,
+  pattern: RegExp,
+): number | null {
   const match = pattern.exec(value);
   pattern.lastIndex = 0;
   const parsed = Number(match?.[1] ?? "");
@@ -574,15 +593,21 @@ function buildWarnings(
   const warnings: string[] = [];
 
   if (unresolvedItems.some((item) => item.reason === "multiple_candidates")) {
-    warnings.push("\u90e8\u5206\u52a8\u4f5c\u6709\u591a\u4e2a\u5019\u9009\uff0c\u9700\u8981\u4f60\u786e\u8ba4\u540e\u518d\u4fdd\u5b58\u3002");
+    warnings.push(
+      "\u90e8\u5206\u52a8\u4f5c\u6709\u591a\u4e2a\u5019\u9009\uff0c\u9700\u8981\u4f60\u786e\u8ba4\u540e\u518d\u4fdd\u5b58\u3002",
+    );
   }
 
   if (unresolvedItems.some((item) => item.reason === "no_candidates")) {
-    warnings.push("\u6709\u52a8\u4f5c\u6ca1\u6709\u8bc6\u522b\u5230\u6807\u51c6\u52a8\u4f5c\uff0c\u8bf7\u9009\u62e9\u6807\u51c6\u52a8\u4f5c\u6216\u5220\u9664\u8be5\u884c\u3002");
+    warnings.push(
+      "\u6709\u52a8\u4f5c\u6ca1\u6709\u8bc6\u522b\u5230\u6807\u51c6\u52a8\u4f5c\uff0c\u8bf7\u9009\u62e9\u6807\u51c6\u52a8\u4f5c\u6216\u5220\u9664\u8be5\u884c\u3002",
+    );
   }
 
   if (unresolvedItems.some((item) => item.reason === "no_sets")) {
-    warnings.push("\u6709\u52a8\u4f5c\u6ca1\u6709\u89e3\u6790\u51fa\u6709\u6548\u7ec4\uff0c\u8bf7\u8865\u5145\u91cd\u91cf\u548c\u6b21\u6570\u540e\u518d\u4fdd\u5b58\u3002");
+    warnings.push(
+      "\u6709\u52a8\u4f5c\u6ca1\u6709\u89e3\u6790\u51fa\u6709\u6548\u7ec4\uff0c\u8bf7\u8865\u5145\u91cd\u91cf\u548c\u6b21\u6570\u540e\u518d\u4fdd\u5b58\u3002",
+    );
   }
 
   if (unresolvedItems.some((item) => item.reason === "incomplete_sets")) {
@@ -645,10 +670,14 @@ function buildIncompleteSetMessage(
   }
 
   const missingCopy = missingFields
-    .map((field) => (field === "reps" ? "\u6bcf\u7ec4\u6b21\u6570" : "\u91cd\u91cf"))
+    .map((field) =>
+      field === "reps" ? "\u6bcf\u7ec4\u6b21\u6570" : "\u91cd\u91cf",
+    )
     .join("\u548c");
   const recognizedCopy =
-    recognizedParts.length > 0 ? recognizedParts.join("\uff0c") : "\u90e8\u5206\u7ec4\u6570\u4fe1\u606f";
+    recognizedParts.length > 0
+      ? recognizedParts.join("\uff0c")
+      : "\u90e8\u5206\u7ec4\u6570\u4fe1\u606f";
 
   return `\u5df2\u8bc6\u522b ${recognizedCopy}\uff0c\u4f46\u7f3a\u5c11${missingCopy}\uff0c\u8bf7\u8865\u5145\u540e\u91cd\u65b0\u89e3\u6790\u3002`;
 }

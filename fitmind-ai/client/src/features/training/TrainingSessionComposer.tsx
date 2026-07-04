@@ -72,13 +72,15 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
   const [isRunning, setIsRunning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isTimeEditorOpen, setIsTimeEditorOpen] = useState(false);
-  const [pendingExerciseRemovalId, setPendingExerciseRemovalId] = useState<string | null>(
-    null,
-  );
-  const [pendingRestTimerRequest, setPendingRestTimerRequest] = useState<string | null>(null);
-  const [replacingDraftExerciseId, setReplacingDraftExerciseId] = useState<string | null>(
-    null,
-  );
+  const [pendingExerciseRemovalId, setPendingExerciseRemovalId] = useState<
+    string | null
+  >(null);
+  const [pendingRestTimerRequest, setPendingRestTimerRequest] = useState<
+    string | null
+  >(null);
+  const [replacingDraftExerciseId, setReplacingDraftExerciseId] = useState<
+    string | null
+  >(null);
   const [restTimer, setRestTimer] = useState<RestTimerState | null>(null);
   const [isVoiceSheetOpen, setIsVoiceSheetOpen] = useState(false);
   const [appendNotice, setAppendNotice] = useState<string | null>(null);
@@ -168,7 +170,12 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
       <div style={panelStyle(theme)}>
         <header style={headerStyle}>
           <div style={headerTopRowStyle}>
-            <Button disabled={isSubmitting} onClick={handleCancel} type="button" variant="secondary">
+            <Button
+              disabled={isSubmitting}
+              onClick={handleCancel}
+              type="button"
+              variant="secondary"
+            >
               取消
             </Button>
             <Button
@@ -219,7 +226,10 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
           </div>
         </header>
 
-        <main onClick={collapseExpandedExercises} style={bodyStyle(Boolean(restTimer))}>
+        <main
+          onClick={collapseExpandedExercises}
+          style={bodyStyle(Boolean(restTimer))}
+        >
           {duplicateNotice ? (
             <StateNotice
               description={duplicateNotice}
@@ -252,14 +262,20 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
                   key={draftExercise.id}
                   onAddSet={() => handleAddSet(draftExercise.id)}
                   onCopySet={(setId) => handleCopySet(draftExercise.id, setId)}
-                  onDeleteSet={(setId) => handleDeleteSet(draftExercise.id, setId)}
-                  onMoveDown={() => handleMoveExercise(draftExercise.id, "down")}
+                  onDeleteSet={(setId) =>
+                    handleDeleteSet(draftExercise.id, setId)
+                  }
+                  onMoveDown={() =>
+                    handleMoveExercise(draftExercise.id, "down")
+                  }
                   onMoveUp={() => handleMoveExercise(draftExercise.id, "up")}
                   onRemove={() => handleRemoveExercise(draftExercise.id)}
                   onReplace={() => handleStartReplaceExercise(draftExercise.id)}
                   onResolveCandidate={handleResolveCandidate}
                   onStartRestTimer={handleOpenRestTimer}
-                  onToggleExpanded={() => handleToggleExpanded(draftExercise.id)}
+                  onToggleExpanded={() =>
+                    handleToggleExpanded(draftExercise.id)
+                  }
                   onToggleSetCompleted={(setId) =>
                     handleToggleSetCompleted(draftExercise.id, setId)
                   }
@@ -271,7 +287,10 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
             </div>
           )}
 
-          <label onClick={(event) => event.stopPropagation()} style={noteEditorStyle(theme)}>
+          <label
+            onClick={(event) => event.stopPropagation()}
+            style={noteEditorStyle(theme)}
+          >
             {"\u5907\u6ce8"}
             <textarea
               onChange={(event) => setDraftNote(event.target.value)}
@@ -371,7 +390,9 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
           <div style={confirmBackdropStyle(theme)}>
             <section style={confirmCardStyle(theme)}>
               <strong style={confirmTitleStyle(theme)}>移除这个动作？</strong>
-              <p style={confirmCopyStyle(theme)}>该动作下的训练组也会一起移除。</p>
+              <p style={confirmCopyStyle(theme)}>
+                该动作下的训练组也会一起移除。
+              </p>
               <div style={confirmActionRowStyle}>
                 <Button
                   onClick={() => setPendingExerciseRemovalId(null)}
@@ -381,7 +402,9 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
                   取消
                 </Button>
                 <Button
-                  onClick={() => confirmRemoveExercise(pendingExerciseRemovalId)}
+                  onClick={() =>
+                    confirmRemoveExercise(pendingExerciseRemovalId)
+                  }
                   style={dangerConfirmButtonStyle(theme)}
                   type="button"
                   variant="secondary"
@@ -490,7 +513,10 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
       draft,
       props.exerciseLibraryProps.exercises,
     );
-    const result = appendIntakeExercisesToDraft(draftExercises, mapped.exercises);
+    const result = appendIntakeExercisesToDraft(
+      draftExercises,
+      mapped.exercises,
+    );
     const appendedCount = result.addedCount + result.mergedCount;
 
     setDraftExercises(result.next);
@@ -506,7 +532,10 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
     setDraftExercises((currentValue) => {
       if (replacingDraftExerciseId) {
         const alreadyExists = currentValue.some((item) => {
-          return item.id !== replacingDraftExerciseId && item.exerciseId === exercise.id;
+          return (
+            item.id !== replacingDraftExerciseId &&
+            item.exerciseId === exercise.id
+          );
         });
 
         if (alreadyExists) {
@@ -532,7 +561,9 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
         });
       }
 
-      const alreadyExists = currentValue.some((item) => item.exerciseId === exercise.id);
+      const alreadyExists = currentValue.some(
+        (item) => item.exerciseId === exercise.id,
+      );
 
       if (alreadyExists) {
         setDuplicateNotice("这个动作已经在本次训练中");
@@ -540,7 +571,13 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
       }
 
       setDuplicateNotice(null);
-      return [...currentValue, createDraftExercise(exercise, getDisplayExerciseCategoryLabel(exercise))];
+      return [
+        ...currentValue,
+        createDraftExercise(
+          exercise,
+          getDisplayExerciseCategoryLabel(exercise),
+        ),
+      ];
     });
     setIsLibraryOpen(false);
     setReplacingDraftExerciseId(null);
@@ -593,7 +630,10 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
     setIsLibraryOpen(true);
   }
 
-  function handleMoveExercise(exerciseId: string, direction: "up" | "down"): void {
+  function handleMoveExercise(
+    exerciseId: string,
+    direction: "up" | "down",
+  ): void {
     setDraftExercises((currentValue) => {
       const sourceIndex = currentValue.findIndex((draftExercise) => {
         return draftExercise.id === exerciseId;
@@ -603,7 +643,8 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
         return currentValue;
       }
 
-      const targetIndex = direction === "up" ? sourceIndex - 1 : sourceIndex + 1;
+      const targetIndex =
+        direction === "up" ? sourceIndex - 1 : sourceIndex + 1;
 
       if (targetIndex < 0 || targetIndex >= currentValue.length) {
         return currentValue;
@@ -636,13 +677,17 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
     }
 
     setDraftExercises((currentValue) => {
-      return currentValue.filter((draftExercise) => draftExercise.id !== exerciseId);
+      return currentValue.filter(
+        (draftExercise) => draftExercise.id !== exerciseId,
+      );
     });
   }
 
   function confirmRemoveExercise(exerciseId: string): void {
     setDraftExercises((currentValue) => {
-      return currentValue.filter((draftExercise) => draftExercise.id !== exerciseId);
+      return currentValue.filter(
+        (draftExercise) => draftExercise.id !== exerciseId,
+      );
     });
     setPendingExerciseRemovalId(null);
   }
@@ -657,7 +702,10 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
         return {
           ...draftExercise,
           isExpanded: true,
-          sets: [...draftExercise.sets, createDraftSet(draftExercise.sets.at(-1))],
+          sets: [
+            ...draftExercise.sets,
+            createDraftSet(draftExercise.sets.at(-1)),
+          ],
         };
       });
     });
@@ -670,7 +718,9 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
           return draftExercise;
         }
 
-        const sourceSet = draftExercise.sets.find((setDraft) => setDraft.id === setId);
+        const sourceSet = draftExercise.sets.find(
+          (setDraft) => setDraft.id === setId,
+        );
 
         if (!sourceSet) {
           return draftExercise;
@@ -725,9 +775,13 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
             return {
               ...setDraft,
               completed:
-                field === "weightKg" || field === "reps" ? false : setDraft.completed,
+                field === "weightKg" || field === "reps"
+                  ? false
+                  : setDraft.completed,
               restSeconds:
-                field === "weightKg" || field === "reps" ? null : setDraft.restSeconds,
+                field === "weightKg" || field === "reps"
+                  ? null
+                  : setDraft.restSeconds,
               [field]: value,
             };
           }),
@@ -886,7 +940,9 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
     });
 
     if (!payload) {
-      setErrorMessage("Please fix the highlighted workout fields and try again.");
+      setErrorMessage(
+        "Please fix the highlighted workout fields and try again.",
+      );
       return;
     }
 
@@ -907,7 +963,9 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
 
   async function handleCompleteEdit(): Promise<void> {
     if (!props.token || !props.initialDraft?.originalWorkout) {
-      setErrorMessage("Please fix the highlighted workout fields and try again.");
+      setErrorMessage(
+        "Please fix the highlighted workout fields and try again.",
+      );
       return;
     }
 
@@ -920,7 +978,10 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
       performedAt: draftPerformedAt ?? props.initialDraft.performedAt,
       startedAt: draftStartedAt,
     };
-    const plan = buildWorkoutEditPlan(props.initialDraft.originalWorkout, editDraft);
+    const plan = buildWorkoutEditPlan(
+      props.initialDraft.originalWorkout,
+      editDraft,
+    );
 
     setDuplicateNotice(null);
     setErrorMessage(null);
@@ -928,7 +989,11 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
 
     try {
       if (plan.workoutPatch) {
-        await updateWorkout(props.token, props.initialDraft.originalWorkout.id, plan.workoutPatch);
+        await updateWorkout(
+          props.token,
+          props.initialDraft.originalWorkout.id,
+          plan.workoutPatch,
+        );
       }
 
       for (const setId of plan.setDeletes) {
@@ -940,7 +1005,11 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
       }
 
       for (const add of plan.setAdds) {
-        await addWorkoutSet(props.token, props.initialDraft.originalWorkout.id, add);
+        await addWorkoutSet(
+          props.token,
+          props.initialDraft.originalWorkout.id,
+          add,
+        );
       }
 
       resetComposerState();
@@ -958,7 +1027,9 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
     );
 
     if (!exercise) {
-      setDuplicateNotice("\u8bf7\u6253\u5f00\u52a8\u4f5c\u5e93\u91cd\u65b0\u9009\u62e9\u8be5\u52a8\u4f5c\u3002");
+      setDuplicateNotice(
+        "\u8bf7\u6253\u5f00\u52a8\u4f5c\u5e93\u91cd\u65b0\u9009\u62e9\u8be5\u52a8\u4f5c\u3002",
+      );
       return;
     }
 
@@ -1027,7 +1098,10 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
   }
 }
 
-function canCompleteSet(setDraft: DraftSet, draftExercise: DraftExercise): boolean {
+function canCompleteSet(
+  setDraft: DraftSet,
+  draftExercise: DraftExercise,
+): boolean {
   return isDraftSetValid(setDraft, draftExercise);
 }
 
@@ -1046,7 +1120,9 @@ function TrainingTimeEditor(props: {
   const [startValue, setStartValue] = useState(
     formatDateTimeLocalValue(props.startedAt ?? props.performedAt),
   );
-  const [endValue, setEndValue] = useState(formatDateTimeLocalValue(props.endedAt));
+  const [endValue, setEndValue] = useState(
+    formatDateTimeLocalValue(props.endedAt),
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const durationMin = getDurationMinutesFromLocalValues(startValue, endValue);
 
@@ -1072,43 +1148,41 @@ function TrainingTimeEditor(props: {
       open
       title="训练时间"
     >
+      <label style={timeEditorLabelStyle(theme)}>
+        {"\u5f00\u59cb\u65f6\u95f4"}
+        <input
+          onChange={(event) => {
+            setStartValue(event.target.value);
+            setErrorMessage(null);
+          }}
+          style={timeEditorInputStyle(theme)}
+          type="datetime-local"
+          value={startValue}
+        />
+      </label>
 
-        <label style={timeEditorLabelStyle(theme)}>
-          {"\u5f00\u59cb\u65f6\u95f4"}
-          <input
-            onChange={(event) => {
-              setStartValue(event.target.value);
-              setErrorMessage(null);
-            }}
-            style={timeEditorInputStyle(theme)}
-            type="datetime-local"
-            value={startValue}
-          />
-        </label>
+      <label style={timeEditorLabelStyle(theme)}>
+        {"\u7ed3\u675f\u65f6\u95f4"}
+        <input
+          onChange={(event) => {
+            setEndValue(event.target.value);
+            setErrorMessage(null);
+          }}
+          style={timeEditorInputStyle(theme)}
+          type="datetime-local"
+          value={endValue}
+        />
+      </label>
 
-        <label style={timeEditorLabelStyle(theme)}>
-          {"\u7ed3\u675f\u65f6\u95f4"}
-          <input
-            onChange={(event) => {
-              setEndValue(event.target.value);
-              setErrorMessage(null);
-            }}
-            style={timeEditorInputStyle(theme)}
-            type="datetime-local"
-            value={endValue}
-          />
-        </label>
+      <p style={timeEditorSummaryStyle(theme)}>
+        {durationMin === null
+          ? "\u8bad\u7ec3\u65f6\u957f\uff1a\u672a\u8bbe\u7f6e"
+          : `\u8bad\u7ec3\u65f6\u957f\uff1a${durationMin} \u5206\u949f`}
+      </p>
 
-        <p style={timeEditorSummaryStyle(theme)}>
-          {durationMin === null
-            ? "\u8bad\u7ec3\u65f6\u957f\uff1a\u672a\u8bbe\u7f6e"
-            : `\u8bad\u7ec3\u65f6\u957f\uff1a${durationMin} \u5206\u949f`}
-        </p>
-
-        {errorMessage ? (
-          <p style={timeEditorErrorStyle(theme)}>{errorMessage}</p>
-        ) : null}
-
+      {errorMessage ? (
+        <p style={timeEditorErrorStyle(theme)}>{errorMessage}</p>
+      ) : null}
     </ActionSheet>
   );
 
@@ -1123,7 +1197,9 @@ function TrainingTimeEditor(props: {
     }
 
     if (!startValue || !endValue) {
-      setErrorMessage("\u8bf7\u540c\u65f6\u586b\u5199\u5f00\u59cb\u548c\u7ed3\u675f\u65f6\u95f4\u3002");
+      setErrorMessage(
+        "\u8bf7\u540c\u65f6\u586b\u5199\u5f00\u59cb\u548c\u7ed3\u675f\u65f6\u95f4\u3002",
+      );
       return;
     }
 
@@ -1131,7 +1207,9 @@ function TrainingTimeEditor(props: {
     const endedAt = parseDateTimeLocalValue(endValue);
 
     if (!startedAt || !endedAt) {
-      setErrorMessage("\u8bf7\u586b\u5199\u6709\u6548\u7684\u8bad\u7ec3\u65f6\u95f4\u3002");
+      setErrorMessage(
+        "\u8bf7\u586b\u5199\u6709\u6548\u7684\u8bad\u7ec3\u65f6\u95f4\u3002",
+      );
       return;
     }
 
@@ -1139,7 +1217,9 @@ function TrainingTimeEditor(props: {
     const endedAtMs = new Date(endedAt).getTime();
 
     if (startedAtMs >= endedAtMs) {
-      setErrorMessage("\u7ed3\u675f\u65f6\u95f4\u5fc5\u987b\u665a\u4e8e\u5f00\u59cb\u65f6\u95f4\u3002");
+      setErrorMessage(
+        "\u7ed3\u675f\u65f6\u95f4\u5fc5\u987b\u665a\u4e8e\u5f00\u59cb\u65f6\u95f4\u3002",
+      );
       return;
     }
 
@@ -1250,7 +1330,8 @@ function getDurationMinutesFromLocalValues(
     return null;
   }
 
-  const durationMs = new Date(endedAt).getTime() - new Date(startedAt).getTime();
+  const durationMs =
+    new Date(endedAt).getTime() - new Date(startedAt).getTime();
 
   return durationMs > 0 ? Math.max(1, Math.round(durationMs / 60000)) : null;
 }
@@ -1266,21 +1347,25 @@ const composerStyle: React.CSSProperties = {
   zIndex: 400,
 };
 
-function backdropStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function backdropStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
-    background:
-      theme.isDark ? "rgba(9, 11, 18, 0.88)" : "rgba(245, 247, 251, 0.92)",
+    background: theme.isDark
+      ? "rgba(9, 11, 18, 0.88)"
+      : "rgba(245, 247, 251, 0.92)",
     inset: 0,
     position: "absolute",
   };
 }
 
-function panelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function panelStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
-    background:
-      theme.isDark
-        ? "linear-gradient(180deg, rgba(17,21,34,0.98) 0%, rgba(10,13,22,0.98) 100%)"
-        : "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(244,247,252,0.98) 100%)",
+    background: theme.isDark
+      ? "linear-gradient(180deg, rgba(17,21,34,0.98) 0%, rgba(10,13,22,0.98) 100%)"
+      : "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(244,247,252,0.98) 100%)",
     color: theme.colors.tx,
     display: "flex",
     flexDirection: "column",
@@ -1313,7 +1398,9 @@ const headerBodyStyle: React.CSSProperties = {
   gridTemplateColumns: "minmax(0, 1fr) auto",
 };
 
-function intakeTimeButtonStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function intakeTimeButtonStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     background: "transparent",
     border: "none",
@@ -1326,7 +1413,9 @@ function intakeTimeButtonStyle(theme: ReturnType<typeof useTheme>["theme"]): Rea
   };
 }
 
-function noteEditorStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function noteEditorStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     display: "grid",
@@ -1336,7 +1425,9 @@ function noteEditorStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSS
   };
 }
 
-function noteTextareaStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function noteTextareaStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf2,
     border: `1px solid ${theme.colors.bdr}`,
@@ -1349,7 +1440,9 @@ function noteTextareaStyle(theme: ReturnType<typeof useTheme>["theme"]): React.C
   };
 }
 
-function timeEditorLabelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function timeEditorLabelStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     display: "grid",
@@ -1359,7 +1452,9 @@ function timeEditorLabelStyle(theme: ReturnType<typeof useTheme>["theme"]): Reac
   };
 }
 
-function timeEditorInputStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function timeEditorInputStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf2,
     border: `1px solid ${theme.colors.bdr}`,
@@ -1369,7 +1464,9 @@ function timeEditorInputStyle(theme: ReturnType<typeof useTheme>["theme"]): Reac
   };
 }
 
-function timeEditorSummaryStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function timeEditorSummaryStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 12,
@@ -1378,7 +1475,9 @@ function timeEditorSummaryStyle(theme: ReturnType<typeof useTheme>["theme"]): Re
   };
 }
 
-function timeEditorErrorStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function timeEditorErrorStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.red,
     fontSize: 12,
@@ -1416,7 +1515,9 @@ const statusWrapStyle: React.CSSProperties = {
   justifyItems: "end",
 };
 
-function statusPillStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function statusPillStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     alignItems: "center",
     backgroundColor: theme.colors.surf2,
@@ -1431,7 +1532,9 @@ function statusPillStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSS
   };
 }
 
-function statusCopyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function statusCopyStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx3,
     fontSize: 12,
@@ -1556,7 +1659,9 @@ function fabPulseStyle(
   };
 }
 
-function confirmBackdropStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function confirmBackdropStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     alignItems: "end",
     backgroundColor: theme.isDark ? "rgba(0,0,0,0.42)" : "rgba(0,0,0,0.24)",
@@ -1568,7 +1673,9 @@ function confirmBackdropStyle(theme: ReturnType<typeof useTheme>["theme"]): Reac
   };
 }
 
-function confirmCardStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function confirmCardStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf,
     border: `1px solid ${theme.colors.bdr2}`,
@@ -1581,14 +1688,18 @@ function confirmCardStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CS
   };
 }
 
-function confirmTitleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function confirmTitleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx,
     fontSize: 15,
   };
 }
 
-function confirmCopyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function confirmCopyStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 12,

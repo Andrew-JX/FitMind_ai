@@ -600,7 +600,9 @@ describe("workout-intake-parser oral guardrails", () => {
     );
 
     expect(result.draft.exercises).toHaveLength(1);
-    expect(result.draft.exercises[0]?.input_name).toBe("\u6760\u94c3\u5367\u63a8");
+    expect(result.draft.exercises[0]?.input_name).toBe(
+      "\u6760\u94c3\u5367\u63a8",
+    );
     expect(result.draft.exercises[0]?.sets).toHaveLength(10);
     expect(result.unresolved_items).toEqual([]);
     expectNoFakeZeroSets(result);

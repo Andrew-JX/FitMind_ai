@@ -1,10 +1,7 @@
 export type ExerciseAliasMap = Record<string, readonly string[]>;
 
 export const SYSTEM_EXERCISE_ALIASES = {
-  bench_press_barbell: [
-    "\u6760\u94c3\u5367\u63a8",
-    "\u5e73\u677f\u5367\u63a8",
-  ],
+  bench_press_barbell: ["\u6760\u94c3\u5367\u63a8", "\u5e73\u677f\u5367\u63a8"],
   bench_press_dumbbell: [
     "\u54d1\u94c3\u5367\u63a8",
     "\u54d1\u94c3\u63a8\u80f8",
@@ -16,18 +13,19 @@ export const SYSTEM_EXERCISE_ALIASES = {
   face_pull_cable: ["\u9762\u62c9", "\u7ef3\u7d22\u9762\u62c9"],
   hammer_curl_dumbbell: ["\u9524\u5f0f\u5f2f\u4e3e"],
   hip_thrust_barbell: ["\u81c0\u63a8"],
-  lat_pulldown_cable: [
-    "\u9ad8\u4f4d\u4e0b\u62c9",
+  lat_pulldown_cable: ["\u9ad8\u4f4d\u4e0b\u62c9"],
+  lateral_raise_dumbbell: [
+    "\u4fa7\u5e73\u4e3e",
+    "\u54d1\u94c3\u4fa7\u5e73\u4e3e",
   ],
-  lateral_raise_dumbbell: ["\u4fa7\u5e73\u4e3e", "\u54d1\u94c3\u4fa7\u5e73\u4e3e"],
   leg_curl_machine: ["\u817f\u5f2f\u4e3e"],
   leg_extension_machine: ["\u817f\u5c48\u4f38"],
-  seated_cable_row: [
-    "\u5750\u59ff\u5212\u8239",
-    "\u7ef3\u7d22\u5212\u8239",
-  ],
+  seated_cable_row: ["\u5750\u59ff\u5212\u8239", "\u7ef3\u7d22\u5212\u8239"],
   seated_dumbbell_shoulder_press: ["\u5750\u59ff\u54d1\u94c3\u63a8\u80a9"],
-  shoulder_press_barbell: ["\u6760\u94c3\u63a8\u80a9", "\u7ad9\u59ff\u63a8\u4e3e"],
+  shoulder_press_barbell: [
+    "\u6760\u94c3\u63a8\u80a9",
+    "\u7ad9\u59ff\u63a8\u4e3e",
+  ],
   shoulder_press_dumbbell: ["\u54d1\u94c3\u63a8\u80a9"],
   leg_press_machine: ["\u817f\u4e3e", "\u5012\u8e6c"],
   pull_up_bodyweight: ["\u5f15\u4f53\u5411\u4e0a"],

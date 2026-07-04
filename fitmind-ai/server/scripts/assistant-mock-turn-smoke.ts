@@ -225,17 +225,21 @@ async function registerUser(
   email: string,
   displayName: string,
 ): Promise<AuthSuccessData> {
-  const response = await requestJson<AuthSuccessData>(baseUrl, "/api/auth/register", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
+  const response = await requestJson<AuthSuccessData>(
+    baseUrl,
+    "/api/auth/register",
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        email,
+        password: "Passw0rd!",
+        display_name: displayName,
+      }),
     },
-    body: JSON.stringify({
-      email,
-      password: "Passw0rd!",
-      display_name: displayName,
-    }),
-  });
+  );
 
   return expectSuccess(response, 201, "POST /api/auth/register");
 }
@@ -258,11 +262,15 @@ async function createWorkout(
     }>;
   },
 ): Promise<WorkoutDetailData["workout"]> {
-  const response = await requestJson<WorkoutDetailData>(baseUrl, "/api/workouts", {
-    method: "POST",
-    headers: createAuthHeaders(token),
-    body: JSON.stringify(input),
-  });
+  const response = await requestJson<WorkoutDetailData>(
+    baseUrl,
+    "/api/workouts",
+    {
+      method: "POST",
+      headers: createAuthHeaders(token),
+      body: JSON.stringify(input),
+    },
+  );
 
   return expectSuccess(response, 201, "POST /api/workouts").workout;
 }
@@ -277,12 +285,16 @@ async function deleteWorkoutIfNeeded(
   }
 
   try {
-    await requestJson<DeleteResponseData>(baseUrl, `/api/workouts/${workoutId}`, {
-      method: "DELETE",
-      headers: {
-        authorization: `Bearer ${token}`,
+    await requestJson<DeleteResponseData>(
+      baseUrl,
+      `/api/workouts/${workoutId}`,
+      {
+        method: "DELETE",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
       },
-    });
+    );
   } catch {
     // Best-effort cleanup.
   }
@@ -379,7 +391,10 @@ async function main(): Promise<void> {
     );
     const benchExercise = benchSearch.items[0];
     const squatExercise = squatSearch.items[0];
-    assert(benchExercise && squatExercise, "Expected bench and squat exercises.");
+    assert(
+      benchExercise && squatExercise,
+      "Expected bench and squat exercises.",
+    );
 
     const primaryWorkoutOne = await createWorkout(baseUrl, primaryToken, {
       performed_at: "2026-04-29T09:00:00Z",
@@ -462,16 +477,20 @@ async function main(): Promise<void> {
     secondaryWorkoutId = secondaryWorkout.id;
 
     const missingExerciseIdTurn = expectSuccess(
-      await requestJson<AssistantMockTurnData>(baseUrl, "/api/assistant/mock-turn", {
-        method: "POST",
-        headers: createAuthHeaders(primaryToken),
-        body: JSON.stringify({
-          mode: "exercise_progress",
-          message: "当前动作进展",
-          start_date: "2026-04-29",
-          end_date: "2026-04-30",
-        }),
-      }),
+      await requestJson<AssistantMockTurnData>(
+        baseUrl,
+        "/api/assistant/mock-turn",
+        {
+          method: "POST",
+          headers: createAuthHeaders(primaryToken),
+          body: JSON.stringify({
+            mode: "exercise_progress",
+            message: "当前动作进展",
+            start_date: "2026-04-29",
+            end_date: "2026-04-30",
+          }),
+        },
+      ),
       200,
       "POST /api/assistant/mock-turn missing exercise",
     );
@@ -480,49 +499,69 @@ async function main(): Promise<void> {
       "Missing exercise progress prompt should not execute a tool.",
     );
     assert(
-      missingExerciseIdTurn.answer.summary.includes("请先去“分析”页选中对应动作"),
+      missingExerciseIdTurn.answer.summary.includes(
+        "请先去“分析”页选中对应动作",
+      ),
       "Missing exercise progress prompt should ask the user to select an exercise.",
     );
 
     const trainingOverview = expectSuccess(
-      await requestJson<AssistantMockTurnData>(baseUrl, "/api/assistant/mock-turn", {
-        method: "POST",
-        headers: createAuthHeaders(primaryToken),
-        body: JSON.stringify({
-          mode: "training_overview",
-          message: "最近训练总览",
-          start_date: "2026-04-29",
-          end_date: "2026-04-30",
-        }),
-      }),
+      await requestJson<AssistantMockTurnData>(
+        baseUrl,
+        "/api/assistant/mock-turn",
+        {
+          method: "POST",
+          headers: createAuthHeaders(primaryToken),
+          body: JSON.stringify({
+            mode: "training_overview",
+            message: "最近训练总览",
+            start_date: "2026-04-29",
+            end_date: "2026-04-30",
+          }),
+        },
+      ),
       200,
       "POST /api/assistant/mock-turn training_overview",
     );
     const sessionId = trainingOverview.session_id;
-    expectToolCall(trainingOverview, "get_training_summary", "training_overview");
+    expectToolCall(
+      trainingOverview,
+      "get_training_summary",
+      "training_overview",
+    );
     assert(
       trainingOverview.answer.summary.includes("根据你最近这段时间的训练记录"),
       "Training overview should use product-facing Chinese copy.",
     );
     assert(
-      trainingOverview.answer.evidence.workout_ids.includes(primaryWorkoutIdOne) &&
-        trainingOverview.answer.evidence.workout_ids.includes(primaryWorkoutIdTwo) &&
-        !trainingOverview.answer.evidence.workout_ids.includes(secondaryWorkoutId),
+      trainingOverview.answer.evidence.workout_ids.includes(
+        primaryWorkoutIdOne,
+      ) &&
+        trainingOverview.answer.evidence.workout_ids.includes(
+          primaryWorkoutIdTwo,
+        ) &&
+        !trainingOverview.answer.evidence.workout_ids.includes(
+          secondaryWorkoutId,
+        ),
       "Training overview should only expose primary-user workout ids.",
     );
 
     const nextTrainingFocus = expectSuccess(
-      await requestJson<AssistantMockTurnData>(baseUrl, "/api/assistant/mock-turn", {
-        method: "POST",
-        headers: createAuthHeaders(primaryToken),
-        body: JSON.stringify({
-          mode: "next_training_focus",
-          session_id: sessionId,
-          message: "我今天应该练什么？",
-          start_date: "2026-04-29",
-          end_date: "2026-04-30",
-        }),
-      }),
+      await requestJson<AssistantMockTurnData>(
+        baseUrl,
+        "/api/assistant/mock-turn",
+        {
+          method: "POST",
+          headers: createAuthHeaders(primaryToken),
+          body: JSON.stringify({
+            mode: "next_training_focus",
+            session_id: sessionId,
+            message: "我今天应该练什么？",
+            start_date: "2026-04-29",
+            end_date: "2026-04-30",
+          }),
+        },
+      ),
       200,
       "POST /api/assistant/mock-turn next_training_focus",
     );
@@ -537,21 +576,29 @@ async function main(): Promise<void> {
     );
 
     const muscleBalance = expectSuccess(
-      await requestJson<AssistantMockTurnData>(baseUrl, "/api/assistant/mock-turn", {
-        method: "POST",
-        headers: createAuthHeaders(primaryToken),
-        body: JSON.stringify({
-          mode: "muscle_balance",
-          session_id: sessionId,
-          message: "我胸练得够吗？",
-          start_date: "2026-04-29",
-          end_date: "2026-04-30",
-        }),
-      }),
+      await requestJson<AssistantMockTurnData>(
+        baseUrl,
+        "/api/assistant/mock-turn",
+        {
+          method: "POST",
+          headers: createAuthHeaders(primaryToken),
+          body: JSON.stringify({
+            mode: "muscle_balance",
+            session_id: sessionId,
+            message: "我胸练得够吗？",
+            start_date: "2026-04-29",
+            end_date: "2026-04-30",
+          }),
+        },
+      ),
       200,
       "POST /api/assistant/mock-turn muscle_balance",
     );
-    expectToolCall(muscleBalance, "get_recommendation_context", "muscle_balance");
+    expectToolCall(
+      muscleBalance,
+      "get_recommendation_context",
+      "muscle_balance",
+    );
     assert(
       muscleBalance.answer.summary.includes("训练量") ||
         muscleBalance.answer.summary.includes("训练"),
@@ -559,17 +606,21 @@ async function main(): Promise<void> {
     );
 
     const trainingImbalance = expectSuccess(
-      await requestJson<AssistantMockTurnData>(baseUrl, "/api/assistant/mock-turn", {
-        method: "POST",
-        headers: createAuthHeaders(primaryToken),
-        body: JSON.stringify({
-          mode: "training_imbalance",
-          session_id: sessionId,
-          message: "我是不是训练偏科？",
-          start_date: "2026-04-29",
-          end_date: "2026-04-30",
-        }),
-      }),
+      await requestJson<AssistantMockTurnData>(
+        baseUrl,
+        "/api/assistant/mock-turn",
+        {
+          method: "POST",
+          headers: createAuthHeaders(primaryToken),
+          body: JSON.stringify({
+            mode: "training_imbalance",
+            session_id: sessionId,
+            message: "我是不是训练偏科？",
+            start_date: "2026-04-29",
+            end_date: "2026-04-30",
+          }),
+        },
+      ),
       200,
       "POST /api/assistant/mock-turn training_imbalance",
     );
@@ -585,18 +636,22 @@ async function main(): Promise<void> {
     );
 
     const exerciseProgress = expectSuccess(
-      await requestJson<AssistantMockTurnData>(baseUrl, "/api/assistant/mock-turn", {
-        method: "POST",
-        headers: createAuthHeaders(primaryToken),
-        body: JSON.stringify({
-          mode: "exercise_progress",
-          session_id: sessionId,
-          message: "预估我现在的卧推极限",
-          start_date: "2026-04-29",
-          end_date: "2026-04-30",
-          exercise_id: benchExercise.id,
-        }),
-      }),
+      await requestJson<AssistantMockTurnData>(
+        baseUrl,
+        "/api/assistant/mock-turn",
+        {
+          method: "POST",
+          headers: createAuthHeaders(primaryToken),
+          body: JSON.stringify({
+            mode: "exercise_progress",
+            session_id: sessionId,
+            message: "预估我现在的卧推极限",
+            start_date: "2026-04-29",
+            end_date: "2026-04-30",
+            exercise_id: benchExercise.id,
+          }),
+        },
+      ),
       200,
       "POST /api/assistant/mock-turn exercise_progress",
     );
@@ -605,7 +660,10 @@ async function main(): Promise<void> {
       "get_exercise_progress",
       "exercise_progress",
     );
-    const expectedBenchSetIds = [...primaryBenchSetIds, primaryWorkoutTwoSetId].sort();
+    const expectedBenchSetIds = [
+      ...primaryBenchSetIds,
+      primaryWorkoutTwoSetId,
+    ].sort();
     assert(
       JSON.stringify([...exerciseProgress.answer.evidence.set_ids].sort()) ===
         JSON.stringify(expectedBenchSetIds),
@@ -623,18 +681,22 @@ async function main(): Promise<void> {
     );
 
     const routedExerciseIntent = expectSuccess(
-      await requestJson<AssistantMockTurnData>(baseUrl, "/api/assistant/mock-turn", {
-        method: "POST",
-        headers: createAuthHeaders(primaryToken),
-        body: JSON.stringify({
-          mode: "training_overview",
-          session_id: sessionId,
-          message: "预估我现在的卧推极限",
-          start_date: "2026-04-29",
-          end_date: "2026-04-30",
-          exercise_id: benchExercise.id,
-        }),
-      }),
+      await requestJson<AssistantMockTurnData>(
+        baseUrl,
+        "/api/assistant/mock-turn",
+        {
+          method: "POST",
+          headers: createAuthHeaders(primaryToken),
+          body: JSON.stringify({
+            mode: "training_overview",
+            session_id: sessionId,
+            message: "预估我现在的卧推极限",
+            start_date: "2026-04-29",
+            end_date: "2026-04-30",
+            exercise_id: benchExercise.id,
+          }),
+        },
+      ),
       200,
       "POST /api/assistant/mock-turn routed exercise intent",
     );
@@ -651,17 +713,21 @@ async function main(): Promise<void> {
     );
 
     const evidenceExplain = expectSuccess(
-      await requestJson<AssistantMockTurnData>(baseUrl, "/api/assistant/mock-turn", {
-        method: "POST",
-        headers: createAuthHeaders(primaryToken),
-        body: JSON.stringify({
-          mode: "evidence_explain",
-          session_id: sessionId,
-          message: "你根据什么判断？",
-          start_date: "2026-04-29",
-          end_date: "2026-04-30",
-        }),
-      }),
+      await requestJson<AssistantMockTurnData>(
+        baseUrl,
+        "/api/assistant/mock-turn",
+        {
+          method: "POST",
+          headers: createAuthHeaders(primaryToken),
+          body: JSON.stringify({
+            mode: "evidence_explain",
+            session_id: sessionId,
+            message: "你根据什么判断？",
+            start_date: "2026-04-29",
+            end_date: "2026-04-30",
+          }),
+        },
+      ),
       200,
       "POST /api/assistant/mock-turn evidence_explain",
     );
@@ -676,17 +742,21 @@ async function main(): Promise<void> {
     );
 
     const unsupportedTurn = expectSuccess(
-      await requestJson<AssistantMockTurnData>(baseUrl, "/api/assistant/mock-turn", {
-        method: "POST",
-        headers: createAuthHeaders(primaryToken),
-        body: JSON.stringify({
-          mode: "unsupported",
-          session_id: sessionId,
-          message: "今天天气怎么样，顺便讲个笑话",
-          start_date: "2026-04-29",
-          end_date: "2026-04-30",
-        }),
-      }),
+      await requestJson<AssistantMockTurnData>(
+        baseUrl,
+        "/api/assistant/mock-turn",
+        {
+          method: "POST",
+          headers: createAuthHeaders(primaryToken),
+          body: JSON.stringify({
+            mode: "unsupported",
+            session_id: sessionId,
+            message: "今天天气怎么样，顺便讲个笑话",
+            start_date: "2026-04-29",
+            end_date: "2026-04-30",
+          }),
+        },
+      ),
       200,
       "POST /api/assistant/mock-turn unsupported",
     );
@@ -735,7 +805,10 @@ async function main(): Promise<void> {
       sessions.some((session) => session.id === sessionId),
       "The first assistant turn should persist a chat session.",
     );
-    const persistedMessages = await listMessagesForSession(sessionId, primaryAuth.user.id);
+    const persistedMessages = await listMessagesForSession(
+      sessionId,
+      primaryAuth.user.id,
+    );
     assert(
       persistedMessages.length >= 2,
       "Assistant turns should persist user and assistant messages.",
@@ -768,16 +841,20 @@ async function main(): Promise<void> {
     primaryWorkoutIdTwo = null;
 
     const emptyStateTurn = expectSuccess(
-      await requestJson<AssistantMockTurnData>(baseUrl, "/api/assistant/mock-turn", {
-        method: "POST",
-        headers: createAuthHeaders(primaryToken),
-        body: JSON.stringify({
-          mode: "training_overview",
-          message: "最近训练总览",
-          start_date: "2026-04-29",
-          end_date: "2026-04-30",
-        }),
-      }),
+      await requestJson<AssistantMockTurnData>(
+        baseUrl,
+        "/api/assistant/mock-turn",
+        {
+          method: "POST",
+          headers: createAuthHeaders(primaryToken),
+          body: JSON.stringify({
+            mode: "training_overview",
+            message: "最近训练总览",
+            start_date: "2026-04-29",
+            end_date: "2026-04-30",
+          }),
+        },
+      ),
       200,
       "POST /api/assistant/mock-turn empty-state",
     );
@@ -790,9 +867,21 @@ async function main(): Promise<void> {
 
     console.log("Assistant mock-turn smoke passed.");
   } finally {
-    await deleteWorkoutIfNeeded(baseUrl, primaryToken ?? "", primaryWorkoutIdOne);
-    await deleteWorkoutIfNeeded(baseUrl, primaryToken ?? "", primaryWorkoutIdTwo);
-    await deleteWorkoutIfNeeded(baseUrl, secondaryToken ?? "", secondaryWorkoutId);
+    await deleteWorkoutIfNeeded(
+      baseUrl,
+      primaryToken ?? "",
+      primaryWorkoutIdOne,
+    );
+    await deleteWorkoutIfNeeded(
+      baseUrl,
+      primaryToken ?? "",
+      primaryWorkoutIdTwo,
+    );
+    await deleteWorkoutIfNeeded(
+      baseUrl,
+      secondaryToken ?? "",
+      secondaryWorkoutId,
+    );
     await stopServer(server);
   }
 }

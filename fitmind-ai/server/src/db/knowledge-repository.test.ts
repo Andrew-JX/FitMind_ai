@@ -130,11 +130,7 @@ describe("embedding backfill repository helpers", () => {
     });
 
     expect(calls[0]?.sql).toContain("embedding = $2::vector");
-    expect(calls[0]?.params).toEqual([
-      "chunk-1",
-      "[0.1,0.2]",
-      "voyage-4-lite",
-    ]);
+    expect(calls[0]?.params).toEqual(["chunk-1", "[0.1,0.2]", "voyage-4-lite"]);
   });
 });
 

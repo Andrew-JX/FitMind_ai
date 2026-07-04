@@ -70,9 +70,7 @@ export function AssistantSavedInsightsPanel(
         <div style={headingRowStyle}>
           <div>
             <h3 style={{ margin: 0 }}>已保存洞察</h3>
-            <p style={copyStyle(theme)}>
-              回看周报、平台期诊断和下周训练草案。
-            </p>
+            <p style={copyStyle(theme)}>回看周报、平台期诊断和下周训练草案。</p>
           </div>
         </div>
 

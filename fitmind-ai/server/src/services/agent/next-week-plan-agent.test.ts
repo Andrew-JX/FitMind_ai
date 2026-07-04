@@ -36,7 +36,9 @@ function createWeeklyResult(overrides: Record<string, unknown> = {}): unknown {
       },
     ],
     top_muscle_groups: [{ muscle_group_name: "胸", contribution_ratio: 0.4 }],
-    low_volume_muscle_groups: [{ muscle_group_name: "腿", contribution_ratio: 0.05 }],
+    low_volume_muscle_groups: [
+      { muscle_group_name: "腿", contribution_ratio: 0.05 },
+    ],
     evidence: {
       workout_ids: ["w1", "w2"],
       set_ids: ["s1"],
@@ -54,7 +56,9 @@ function createRecommendationResult(): unknown {
       set_count: 60,
       total_reps: 480,
       total_volume: 18000,
-      by_exercise: [{ exercise_name: "Barbell Bench Press", total_volume: 5000 }],
+      by_exercise: [
+        { exercise_name: "Barbell Bench Press", total_volume: 5000 },
+      ],
     },
     focus_exercises: [],
     recent_workouts: [],
@@ -100,9 +104,10 @@ function createSource(id: string, title: string): RetrievedKnowledgeChunk {
   };
 }
 
-function createDeps(
-  overrides: Partial<NextWeekPlanAgentDeps> = {},
-): { deps: NextWeekPlanAgentDeps; events: AgentStepEvent[] } {
+function createDeps(overrides: Partial<NextWeekPlanAgentDeps> = {}): {
+  deps: NextWeekPlanAgentDeps;
+  events: AgentStepEvent[];
+} {
   const events: AgentStepEvent[] = [];
   let tick = 0;
 
@@ -122,7 +127,10 @@ function createDeps(
 
       return {};
     },
-    retrieve: async () => [createSource("k1", "渐进超负荷"), createSource("k2", "训练容量")],
+    retrieve: async () => [
+      createSource("k1", "渐进超负荷"),
+      createSource("k2", "训练容量"),
+    ],
     onStep: (event) => {
       events.push(event);
     },
@@ -156,7 +164,10 @@ describe("runNextWeekPlanAgent", () => {
       expect.arrayContaining(["w1", "w2", "w3"]),
     );
     expect(output.answer.evidence.workout_ids).toHaveLength(3);
-    expect(output.answer.sources.map((source) => source.id)).toEqual(["k1", "k2"]);
+    expect(output.answer.sources.map((source) => source.id)).toEqual([
+      "k1",
+      "k2",
+    ]);
     expect(output.answer.bullets.length).toBeGreaterThan(0);
 
     const started = events.filter((event) => event.phase === "started");
@@ -196,7 +207,8 @@ describe("runNextWeekPlanAgent", () => {
 
   it("stops early with a no-data answer when there are no workouts", async () => {
     const { deps, events } = createDeps({
-      runTool: async () => createWeeklyResult({ status: "empty", totals: { workout_count: 0 } }),
+      runTool: async () =>
+        createWeeklyResult({ status: "empty", totals: { workout_count: 0 } }),
     });
 
     const output = await runNextWeekPlanAgent(baseInput, deps);
@@ -205,7 +217,9 @@ describe("runNextWeekPlanAgent", () => {
     expect(output.trace.steps).toHaveLength(1);
     expect(output.answer.summary).toContain("还没有足够的训练记录");
     expect(events.filter((event) => event.phase === "started")).toHaveLength(1);
-    expect(events.filter((event) => event.phase === "finished")).toHaveLength(1);
+    expect(events.filter((event) => event.phase === "finished")).toHaveLength(
+      1,
+    );
   });
 
   it("continues to synthesis when a secondary tool fails", async () => {

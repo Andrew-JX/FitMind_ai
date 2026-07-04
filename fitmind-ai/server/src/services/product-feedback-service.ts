@@ -54,7 +54,9 @@ export async function submitProductFeedback(
   return mapFeedbackRow(row);
 }
 
-function normalizeOptionalText(value: string | null | undefined): string | null {
+function normalizeOptionalText(
+  value: string | null | undefined,
+): string | null {
   if (value === null || value === undefined) {
     return null;
   }

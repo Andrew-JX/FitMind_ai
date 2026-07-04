@@ -269,12 +269,16 @@ async function deleteWorkoutIfNeeded(
   }
 
   try {
-    await requestJson<DeleteResponseData>(baseUrl, `/api/workouts/${workoutId}`, {
-      method: "DELETE",
-      headers: {
-        authorization: `Bearer ${token}`,
+    await requestJson<DeleteResponseData>(
+      baseUrl,
+      `/api/workouts/${workoutId}`,
+      {
+        method: "DELETE",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
       },
-    });
+    );
   } catch {
     // Best-effort cleanup keeps the main smoke result actionable.
   }
@@ -294,7 +298,11 @@ function buildExerciseProgressPath(
   return `/api/training/exercise-progress?${searchParams.toString()}`;
 }
 
-function expectApproxEqual(actual: number | null, expected: number, label: string): void {
+function expectApproxEqual(
+  actual: number | null,
+  expected: number,
+  label: string,
+): void {
   assert(actual !== null, `${label} should not be null.`);
   assert(
     Math.abs(actual - expected) < 0.000001,
@@ -326,8 +334,7 @@ async function main(): Promise<void> {
   const { server, baseUrl } = await startServer();
   const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const primaryEmail = `exercise-progress-smoke-${uniqueSuffix}@example.com`;
-  const secondaryEmail =
-    `exercise-progress-smoke-other-${uniqueSuffix}@example.com`;
+  const secondaryEmail = `exercise-progress-smoke-other-${uniqueSuffix}@example.com`;
   let primaryToken: string | null = null;
   let secondaryToken: string | null = null;
   let primaryWorkoutIdOne: string | null = null;
@@ -554,7 +561,9 @@ async function main(): Promise<void> {
       workoutOneBenchSets.length === 2 && workoutOneSquatSets.length === 1,
       "Primary workout one should contain two bench sets and one squat set.",
     );
-    console.log("OK 201 POST /api/workouts primary exercise progress workout one");
+    console.log(
+      "OK 201 POST /api/workouts primary exercise progress workout one",
+    );
 
     const primaryWorkoutTwoResponse = await requestJson<WorkoutDetailData>(
       baseUrl,
@@ -591,7 +600,9 @@ async function main(): Promise<void> {
       workoutTwoBenchSet !== undefined,
       "Primary workout two should contain one bench set.",
     );
-    console.log("OK 201 POST /api/workouts primary exercise progress workout two");
+    console.log(
+      "OK 201 POST /api/workouts primary exercise progress workout two",
+    );
 
     const secondaryAuth = await registerUser(
       baseUrl,
@@ -631,7 +642,9 @@ async function main(): Promise<void> {
       "POST /api/workouts secondary exercise progress workout",
     ).workout;
     secondaryWorkoutId = secondaryWorkout.id;
-    console.log("OK 201 POST /api/workouts secondary exercise progress workout");
+    console.log(
+      "OK 201 POST /api/workouts secondary exercise progress workout",
+    );
 
     const progressResponse = await requestJson<ExerciseProgressData>(
       baseUrl,
@@ -793,7 +806,9 @@ async function main(): Promise<void> {
       "DELETE /api/workouts/:id primary exercise progress workout one",
     );
     primaryWorkoutIdOne = null;
-    console.log("OK 200 DELETE /api/workouts/:id primary exercise progress workout one");
+    console.log(
+      "OK 200 DELETE /api/workouts/:id primary exercise progress workout one",
+    );
 
     const progressAfterDeleteResponse = await requestJson<ExerciseProgressData>(
       baseUrl,
@@ -841,9 +856,21 @@ async function main(): Promise<void> {
 
     console.log("Exercise progress API smoke passed.");
   } finally {
-    await deleteWorkoutIfNeeded(baseUrl, primaryToken ?? "", primaryWorkoutIdOne);
-    await deleteWorkoutIfNeeded(baseUrl, primaryToken ?? "", primaryWorkoutIdTwo);
-    await deleteWorkoutIfNeeded(baseUrl, secondaryToken ?? "", secondaryWorkoutId);
+    await deleteWorkoutIfNeeded(
+      baseUrl,
+      primaryToken ?? "",
+      primaryWorkoutIdOne,
+    );
+    await deleteWorkoutIfNeeded(
+      baseUrl,
+      primaryToken ?? "",
+      primaryWorkoutIdTwo,
+    );
+    await deleteWorkoutIfNeeded(
+      baseUrl,
+      secondaryToken ?? "",
+      secondaryWorkoutId,
+    );
     await stopServer(server);
   }
 }

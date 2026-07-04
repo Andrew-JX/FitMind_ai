@@ -69,7 +69,9 @@ export function TrainingSummaryPanel(props: TrainingSummaryPanelProps) {
         />
       ) : null}
 
-      {isLoading && !summary ? <p style={copyStyle(theme)}>正在加载分析数据...</p> : null}
+      {isLoading && !summary ? (
+        <p style={copyStyle(theme)}>正在加载分析数据...</p>
+      ) : null}
 
       {hasEmptyState ? (
         <StateNotice
@@ -86,7 +88,9 @@ export function TrainingSummaryPanel(props: TrainingSummaryPanelProps) {
           <div style={exerciseSectionStyle(theme)}>
             <div style={sectionIntroStyle}>
               <h3 style={subheadingStyle}>重点动作</h3>
-              <p style={sectionCopyStyle(theme)}>按总容量排序，点击动作可查看进展。</p>
+              <p style={sectionCopyStyle(theme)}>
+                按总容量排序，点击动作可查看进展。
+              </p>
             </div>
 
             {topExercises.length === 0 ? (
@@ -99,7 +103,10 @@ export function TrainingSummaryPanel(props: TrainingSummaryPanelProps) {
                     isSelected={selectedExerciseId === exercise.exercise_id}
                     key={exercise.exercise_id}
                     onSelect={() =>
-                      onExerciseSelect?.(exercise.exercise_id, exercise.exercise_name)
+                      onExerciseSelect?.(
+                        exercise.exercise_id,
+                        exercise.exercise_name,
+                      )
                     }
                   />
                 ))}
@@ -169,11 +176,15 @@ const exerciseListStyle: React.CSSProperties = {
   marginTop: 12,
 };
 
-function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function copyStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return { color: theme.colors.tx2, fontSize: 12, lineHeight: 1.6, margin: 0 };
 }
 
-function subtleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function subtleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx3,
     fontSize: 11,

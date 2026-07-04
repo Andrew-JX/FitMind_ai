@@ -461,7 +461,9 @@ function mapStructuredAgentTrace(
   };
 }
 
-function normalizeAgentStepKind(value: string | undefined): AssistantAgentStepKind {
+function normalizeAgentStepKind(
+  value: string | undefined,
+): AssistantAgentStepKind {
   if (value === "tool" || value === "retrieval" || value === "synthesis") {
     return value;
   }

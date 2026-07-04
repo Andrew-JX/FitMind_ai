@@ -48,7 +48,14 @@ export function AppShell(props: AppShellProps) {
             justifyContent: "space-between",
           }}
         >
-          <div style={{ alignItems: "center", display: "flex", gap: 10, minWidth: 0 }}>
+          <div
+            style={{
+              alignItems: "center",
+              display: "flex",
+              gap: 10,
+              minWidth: 0,
+            }}
+          >
             <div
               style={{
                 alignItems: "center",
@@ -113,21 +120,21 @@ export function AppShell(props: AppShellProps) {
           <div style={{ alignItems: "center", display: "flex", gap: 8 }}>
             {props.secondaryAction}
             <button
-            onClick={props.onClearAuth}
-            style={{
-              backgroundColor: theme.colors.surf2,
-              border: `1px solid ${theme.colors.bdr}`,
-              borderRadius: theme.radius.pill,
-              color: theme.colors.tx2,
-              cursor: "pointer",
-              flex: "0 0 auto",
-              fontSize: 11,
-              fontWeight: 700,
-              padding: "7px 12px",
-            }}
-            type="button"
-          >
-            退出登录
+              onClick={props.onClearAuth}
+              style={{
+                backgroundColor: theme.colors.surf2,
+                border: `1px solid ${theme.colors.bdr}`,
+                borderRadius: theme.radius.pill,
+                color: theme.colors.tx2,
+                cursor: "pointer",
+                flex: "0 0 auto",
+                fontSize: 11,
+                fontWeight: 700,
+                padding: "7px 12px",
+              }}
+              type="button"
+            >
+              退出登录
             </button>
           </div>
         </div>
@@ -205,7 +212,9 @@ function TabButton(props: TabButtonProps) {
   );
 }
 
-function navStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function navStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf,
     border: `1px solid ${theme.colors.bdr}`,

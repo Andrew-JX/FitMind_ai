@@ -247,12 +247,16 @@ async function deleteWorkoutIfNeeded(
   }
 
   try {
-    await requestJson<DeleteResponseData>(baseUrl, `/api/workouts/${workoutId}`, {
-      method: "DELETE",
-      headers: {
-        authorization: `Bearer ${token}`,
+    await requestJson<DeleteResponseData>(
+      baseUrl,
+      `/api/workouts/${workoutId}`,
+      {
+        method: "DELETE",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
       },
-    });
+    );
   } catch {
     // Best-effort cleanup keeps the main smoke result actionable.
   }
@@ -311,11 +315,15 @@ async function createWorkout(
   },
   label: string,
 ): Promise<WorkoutDetailData["workout"]> {
-  const response = await requestJson<WorkoutDetailData>(baseUrl, "/api/workouts", {
-    method: "POST",
-    headers: createAuthHeaders(token),
-    body: JSON.stringify(input),
-  });
+  const response = await requestJson<WorkoutDetailData>(
+    baseUrl,
+    "/api/workouts",
+    {
+      method: "POST",
+      headers: createAuthHeaders(token),
+      body: JSON.stringify(input),
+    },
+  );
 
   return expectSuccess(response, 201, label).workout;
 }
@@ -349,10 +357,8 @@ async function main(): Promise<void> {
   );
 
   const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const primaryEmail =
-    `assistant-provider-adapter-smoke-${uniqueSuffix}@example.com`;
-  const secondaryEmail =
-    `assistant-provider-adapter-smoke-other-${uniqueSuffix}@example.com`;
+  const primaryEmail = `assistant-provider-adapter-smoke-${uniqueSuffix}@example.com`;
+  const secondaryEmail = `assistant-provider-adapter-smoke-other-${uniqueSuffix}@example.com`;
 
   let primaryToken: string | null = null;
   let secondaryToken: string | null = null;
@@ -381,7 +387,10 @@ async function main(): Promise<void> {
       "GET /api/exercises?q=bench",
     );
     const benchExercise = benchSearchData.items[0];
-    assert(benchExercise !== undefined, "Bench search should return one exercise.");
+    assert(
+      benchExercise !== undefined,
+      "Bench search should return one exercise.",
+    );
 
     const squatSearchResponse = await requestJson<ExerciseSearchData>(
       baseUrl,
@@ -393,7 +402,10 @@ async function main(): Promise<void> {
       "GET /api/exercises?q=squat",
     );
     const squatExercise = squatSearchData.items[0];
-    assert(squatExercise !== undefined, "Squat search should return one exercise.");
+    assert(
+      squatExercise !== undefined,
+      "Squat search should return one exercise.",
+    );
     console.log("OK 200 exercise searches");
 
     const primaryWorkoutOne = await createWorkout(
@@ -513,7 +525,8 @@ async function main(): Promise<void> {
       "Normal provider path should preserve mode.",
     );
     assert(
-      typeof normalTurn.session_id === "string" && normalTurn.session_id.length > 0,
+      typeof normalTurn.session_id === "string" &&
+        normalTurn.session_id.length > 0,
       "Normal provider path should return a session_id.",
     );
     assert(
@@ -750,18 +763,35 @@ async function main(): Promise<void> {
     );
     assert(
       secondaryOverview.answer.evidence.workout_ids.length === 1 &&
-        secondaryOverview.answer.evidence.workout_ids[0] === secondaryWorkoutId &&
-        !secondaryOverview.answer.evidence.workout_ids.includes(primaryWorkoutIdOne) &&
-        !secondaryOverview.answer.evidence.workout_ids.includes(primaryWorkoutIdTwo),
+        secondaryOverview.answer.evidence.workout_ids[0] ===
+          secondaryWorkoutId &&
+        !secondaryOverview.answer.evidence.workout_ids.includes(
+          primaryWorkoutIdOne,
+        ) &&
+        !secondaryOverview.answer.evidence.workout_ids.includes(
+          primaryWorkoutIdTwo,
+        ),
       "Secondary user should only see secondary-user workout context.",
     );
     console.log("OK provider path user isolation");
 
     console.log("Assistant provider adapter smoke passed.");
   } finally {
-    await deleteWorkoutIfNeeded(baseUrl, primaryToken ?? "", primaryWorkoutIdOne);
-    await deleteWorkoutIfNeeded(baseUrl, primaryToken ?? "", primaryWorkoutIdTwo);
-    await deleteWorkoutIfNeeded(baseUrl, secondaryToken ?? "", secondaryWorkoutId);
+    await deleteWorkoutIfNeeded(
+      baseUrl,
+      primaryToken ?? "",
+      primaryWorkoutIdOne,
+    );
+    await deleteWorkoutIfNeeded(
+      baseUrl,
+      primaryToken ?? "",
+      primaryWorkoutIdTwo,
+    );
+    await deleteWorkoutIfNeeded(
+      baseUrl,
+      secondaryToken ?? "",
+      secondaryWorkoutId,
+    );
     await stopServer(server);
   }
 }

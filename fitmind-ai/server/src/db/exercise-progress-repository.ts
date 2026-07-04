@@ -139,12 +139,7 @@ export async function getExerciseProgress(
         FROM exercises e
         WHERE e.id = $2
       `,
-      [
-        filters.userId,
-        filters.exerciseId,
-        filters.startDate,
-        filters.endDate,
-      ],
+      [filters.userId, filters.exerciseId, filters.startDate, filters.endDate],
     );
 
     const sessionsResult = await activePool.query(
@@ -176,30 +171,26 @@ export async function getExerciseProgress(
         GROUP BY w.id, w.performed_at
         ORDER BY w.performed_at ASC, w.id ASC
       `,
-      [
-        filters.userId,
-        filters.exerciseId,
-        filters.startDate,
-        filters.endDate,
-      ],
+      [filters.userId, filters.exerciseId, filters.startDate, filters.endDate],
     );
 
-    const totalsRow = totalsResult.rows[0] as ExerciseProgressTotalsRow | undefined;
+    const totalsRow = totalsResult.rows[0] as
+      | ExerciseProgressTotalsRow
+      | undefined;
 
     return {
-      totals:
-        totalsRow ?? {
-          exercise_name: null,
-          workout_count: 0,
-          set_count: 0,
-          total_reps: 0,
-          total_volume: 0,
-          max_weight_kg: null,
-          max_reps: null,
-          estimated_1rm_kg: null,
-          workout_ids: [],
-          set_ids: [],
-        },
+      totals: totalsRow ?? {
+        exercise_name: null,
+        workout_count: 0,
+        set_count: 0,
+        total_reps: 0,
+        total_volume: 0,
+        max_weight_kg: null,
+        max_reps: null,
+        estimated_1rm_kg: null,
+        workout_ids: [],
+        set_ids: [],
+      },
       sessions: sessionsResult.rows as ExerciseProgressSessionRow[],
     };
   } finally {

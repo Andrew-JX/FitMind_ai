@@ -46,7 +46,8 @@ export interface SearchExercisesFilters {
  * @returns The supported muscle groups list
  */
 export async function listMuscleGroups(): Promise<DictionaryMuscleGroup[]> {
-  const response = await requestJson<ListMuscleGroupsResponseData>("/api/muscle-groups");
+  const response =
+    await requestJson<ListMuscleGroupsResponseData>("/api/muscle-groups");
 
   return response.items;
 }
@@ -70,7 +71,8 @@ export async function searchExercises(
     query.set("muscle", filters.muscle.trim());
   }
 
-  const path = query.size > 0 ? `/api/exercises?${query.toString()}` : "/api/exercises";
+  const path =
+    query.size > 0 ? `/api/exercises?${query.toString()}` : "/api/exercises";
   const response = await requestJson<SearchExercisesResponseData>(path);
 
   return response.items;

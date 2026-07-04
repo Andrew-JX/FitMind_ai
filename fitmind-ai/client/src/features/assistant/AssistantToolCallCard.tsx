@@ -25,14 +25,20 @@ export function AssistantToolCallCard(props: AssistantToolCallCardProps) {
 
   return (
     <Card padding="14px">
-      <div style={metaStyle(theme)}>{isRunning ? "正在读取训练数据" : "训练数据已读取"}</div>
-      <div style={toolNameStyle(theme)}>{getReadableToolName(props.toolCall.toolName)}</div>
+      <div style={metaStyle(theme)}>
+        {isRunning ? "正在读取训练数据" : "训练数据已读取"}
+      </div>
+      <div style={toolNameStyle(theme)}>
+        {getReadableToolName(props.toolCall.toolName)}
+      </div>
       <div style={summaryRowStyle}>
         <span style={statusLabelStyle(theme)}>
           状态：{formatToolStatus(props.toolCall.status)}
         </span>
         {props.toolCall.durationMs !== undefined ? (
-          <span style={durationStyle(theme)}>{props.toolCall.durationMs} 毫秒</span>
+          <span style={durationStyle(theme)}>
+            {props.toolCall.durationMs} 毫秒
+          </span>
         ) : null}
       </div>
       <p style={copyStyle(theme)}>{getToolCopy(props.toolCall)}</p>
@@ -72,7 +78,9 @@ function getToolCopy(toolCall: AssistantActiveToolCall): string {
   return "训练数据读取失败，可以稍后重试或换个问题。";
 }
 
-function metaStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function metaStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx3,
     fontSize: 11,
@@ -80,7 +88,9 @@ function metaStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProper
   };
 }
 
-function headlineStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function headlineStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx,
     fontSize: 14,
@@ -88,7 +98,9 @@ function headlineStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPr
   };
 }
 
-function toolNameStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function toolNameStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.blue,
     fontSize: 15,
@@ -103,14 +115,18 @@ const summaryRowStyle: React.CSSProperties = {
   marginTop: 8,
 };
 
-function statusLabelStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function statusLabelStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 12,
   };
 }
 
-function durationStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function durationStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx3,
     fontFamily: theme.fonts.mono,
@@ -118,7 +134,9 @@ function durationStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPr
   };
 }
 
-function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function copyStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 12,

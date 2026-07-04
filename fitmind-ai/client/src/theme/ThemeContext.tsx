@@ -39,7 +39,11 @@ export function ThemeProvider(props: ThemeProviderProps) {
     };
   }, [isDark, theme]);
 
-  return <ThemeContext.Provider value={value}>{props.children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={value}>
+      {props.children}
+    </ThemeContext.Provider>
+  );
 }
 
 /**

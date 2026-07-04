@@ -38,8 +38,10 @@ const CHINESE_NUMERALS = new Map<string, number>([
 export function parseWorkoutDateHint(
   text: string,
   reference: string | Date,
-  sourceWhenNoHint: Exclude<WorkoutIntakeDateSource, "explicit_text"> =
-    "request_performed_at",
+  sourceWhenNoHint: Exclude<
+    WorkoutIntakeDateSource,
+    "explicit_text"
+  > = "request_performed_at",
 ): WorkoutIntakeDateResult {
   const referenceParts = parseReferenceDate(reference);
   const normalizedText = text.normalize("NFKC");

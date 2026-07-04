@@ -21,7 +21,8 @@ export interface ExerciseProgressPanelProps {
 }
 
 export function ExerciseProgressPanel(props: ExerciseProgressPanelProps) {
-  const { refreshSignal, selectedExerciseId, selectedExerciseName, token } = props;
+  const { refreshSignal, selectedExerciseId, selectedExerciseName, token } =
+    props;
   const { theme } = useTheme();
   const [progress, setProgress] = useState<ExerciseProgress | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -73,7 +74,13 @@ export function ExerciseProgressPanel(props: ExerciseProgressPanelProps) {
     return () => {
       isActive = false;
     };
-  }, [range.end_date, range.start_date, refreshSignal, selectedExerciseId, token]);
+  }, [
+    range.end_date,
+    range.start_date,
+    refreshSignal,
+    selectedExerciseId,
+    token,
+  ]);
 
   if (!selectedExerciseId) {
     return (
@@ -125,7 +132,9 @@ export function ExerciseProgressPanel(props: ExerciseProgressPanelProps) {
         />
       ) : null}
 
-      {isLoading && !progress ? <p style={copyStyle(theme)}>正在加载分析数据...</p> : null}
+      {isLoading && !progress ? (
+        <p style={copyStyle(theme)}>正在加载分析数据...</p>
+      ) : null}
 
       {hasEmptyState ? (
         <StateNotice
@@ -182,8 +191,9 @@ export function ExerciseProgressPanel(props: ExerciseProgressPanelProps) {
                       {displayExerciseName} · {session.set_count} 组
                     </p>
                     <div style={sessionMetaStyle(theme)}>
-                      最高 {formatMetricValue(session.max_weight_kg)} 公斤 · 估算最大重量{" "}
-                      {formatMetricValue(session.estimated_1rm_kg)} 公斤
+                      最高 {formatMetricValue(session.max_weight_kg)} 公斤 ·
+                      估算最大重量 {formatMetricValue(session.estimated_1rm_kg)}{" "}
+                      公斤
                     </div>
                     <div style={sessionMetaStyle(theme)}>
                       {session.total_reps.toLocaleString()} 次 · 容量{" "}
@@ -230,7 +240,11 @@ function getReadableErrorMessage(error: unknown): string {
 
 function createDefaultRange(): ExerciseProgressRange {
   const today = new Date();
-  const endDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const endDate = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  );
   const startDate = new Date(endDate);
   startDate.setDate(startDate.getDate() - 29);
 
@@ -334,11 +348,15 @@ const sectionHeaderStyle: React.CSSProperties = {
   justifyContent: "space-between",
 };
 
-function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function copyStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return { color: theme.colors.tx2, fontSize: 12, lineHeight: 1.6, margin: 0 };
 }
 
-function subtleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function subtleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return { color: theme.colors.tx3, fontSize: 11, margin: "0.35rem 0 0" };
 }
 
@@ -363,7 +381,9 @@ function sessionItemStyle(
   };
 }
 
-function sessionTitleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function sessionTitleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx3,
     fontSize: 11,
@@ -378,7 +398,9 @@ function sessionMetaStyle(
   return { color: theme.colors.tx2, fontSize: 12, lineHeight: 1.6 };
 }
 
-function evidenceDetailsStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function evidenceDetailsStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf2,
     borderRadius: theme.radius.control,
@@ -387,7 +409,9 @@ function evidenceDetailsStyle(theme: ReturnType<typeof useTheme>["theme"]): Reac
   };
 }
 
-function summaryStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function summaryStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.purple,
     fontSize: 12,

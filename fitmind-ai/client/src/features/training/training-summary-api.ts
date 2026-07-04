@@ -53,7 +53,10 @@ export async function getTrainingSummary(
     start_date: query.startDate,
   });
 
-  return requestJson<TrainingSummary>(`/api/training/summary?${searchParams.toString()}`, {
-    token,
-  });
+  return requestJson<TrainingSummary>(
+    `/api/training/summary?${searchParams.toString()}`,
+    {
+      token,
+    },
+  );
 }

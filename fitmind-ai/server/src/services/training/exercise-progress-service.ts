@@ -72,9 +72,13 @@ const totalsSchema = z.object({
   set_count: z.number().int().nonnegative(),
   total_reps: z.number().int().nonnegative(),
   total_volume: z.preprocess(normalizeNumericValue, z.number().nonnegative()),
-  max_weight_kg: z.preprocess(normalizeNumericValue, z.number().nonnegative()).nullable(),
+  max_weight_kg: z
+    .preprocess(normalizeNumericValue, z.number().nonnegative())
+    .nullable(),
   max_reps: z.number().int().nonnegative().nullable(),
-  estimated_1rm_kg: z.preprocess(normalizeNumericValue, z.number().nonnegative()).nullable(),
+  estimated_1rm_kg: z
+    .preprocess(normalizeNumericValue, z.number().nonnegative())
+    .nullable(),
   workout_ids: z.array(z.string().uuid()),
   set_ids: z.array(z.string().uuid()),
 });
@@ -85,9 +89,13 @@ const sessionSchema = z.object({
   set_count: z.number().int().nonnegative(),
   total_reps: z.number().int().nonnegative(),
   total_volume: z.preprocess(normalizeNumericValue, z.number().nonnegative()),
-  max_weight_kg: z.preprocess(normalizeNumericValue, z.number().nonnegative()).nullable(),
+  max_weight_kg: z
+    .preprocess(normalizeNumericValue, z.number().nonnegative())
+    .nullable(),
   max_reps: z.number().int().nonnegative().nullable(),
-  estimated_1rm_kg: z.preprocess(normalizeNumericValue, z.number().nonnegative()).nullable(),
+  estimated_1rm_kg: z
+    .preprocess(normalizeNumericValue, z.number().nonnegative())
+    .nullable(),
   set_ids: z.array(z.string().uuid()),
 });
 

@@ -171,7 +171,8 @@ function createNetworkError(error: unknown): HttpClientError {
 
   return new HttpClientError({
     code: "NETWORK_ERROR",
-    message: "Unable to reach the server. Check that the FitMind API is running.",
+    message:
+      "Unable to reach the server. Check that the FitMind API is running.",
   });
 }
 

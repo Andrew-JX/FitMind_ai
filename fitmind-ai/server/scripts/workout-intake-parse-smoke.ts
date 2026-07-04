@@ -241,11 +241,15 @@ async function listWorkoutCount(
   baseUrl: string,
   token: string,
 ): Promise<number> {
-  const response = await requestJson<WorkoutListData>(baseUrl, "/api/workouts", {
-    headers: {
-      authorization: `Bearer ${token}`,
+  const response = await requestJson<WorkoutListData>(
+    baseUrl,
+    "/api/workouts",
+    {
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
     },
-  });
+  );
   const data = expectSuccess(response, 200, "GET /api/workouts");
 
   return data.items.length;
@@ -463,17 +467,18 @@ async function main(): Promise<void> {
       "Yesterday oral input should set draft performed_at to 2026-05-29.",
     );
 
-    const shoulderPressParseResponse = await requestJson<WorkoutIntakeParseData>(
-      baseUrl,
-      "/api/training/workout-intake/parse",
-      {
-        method: "POST",
-        headers: createAuthHeaders(auth.token),
-        body: JSON.stringify({
-          text: "\u54d1\u94c3\u63a8\u80a9\u4e09\u7ec420\u516c\u65a410\u6b21",
-        }),
-      },
-    );
+    const shoulderPressParseResponse =
+      await requestJson<WorkoutIntakeParseData>(
+        baseUrl,
+        "/api/training/workout-intake/parse",
+        {
+          method: "POST",
+          headers: createAuthHeaders(auth.token),
+          body: JSON.stringify({
+            text: "\u54d1\u94c3\u63a8\u80a9\u4e09\u7ec420\u516c\u65a410\u6b21",
+          }),
+        },
+      );
     const shoulderPressParsed = expectSuccess(
       shoulderPressParseResponse,
       200,

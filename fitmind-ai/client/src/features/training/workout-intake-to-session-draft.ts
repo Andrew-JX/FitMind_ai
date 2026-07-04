@@ -24,7 +24,11 @@ export function mapWorkoutIntakeDraftToSessionInitialDraft(
   return {
     durationMin: draft.duration_min,
     exercises: draft.exercises.map((exercise, index) =>
-      mapWorkoutIntakeExerciseToDraftExercise(exercise, exerciseDictionary, index),
+      mapWorkoutIntakeExerciseToDraftExercise(
+        exercise,
+        exerciseDictionary,
+        index,
+      ),
     ),
     note: draft.note,
     performedAt: draft.performed_at,
@@ -110,22 +114,27 @@ function mapWorkoutIntakeExerciseToDraftExercise(
 ): DraftExercise {
   const matchedExercise =
     exercise.match_status === "matched" && exercise.matched_exercise_id
-      ? (exerciseDictionary.find((item) => item.id === exercise.matched_exercise_id) ??
-        null)
+      ? (exerciseDictionary.find(
+          (item) => item.id === exercise.matched_exercise_id,
+        ) ?? null)
       : null;
   const matchStatus = matchedExercise ? "matched" : exercise.match_status;
   const displayName =
     (matchedExercise ? getExerciseDisplayName(matchedExercise) : null) ??
     exercise.matched_exercise_name ??
     exercise.input_name;
-  const loadType = matchedExercise ? getExerciseLoadType(matchedExercise) : "weighted";
+  const loadType = matchedExercise
+    ? getExerciseLoadType(matchedExercise)
+    : "weighted";
 
   return {
     candidateExercises: exercise.candidate_exercises.map((candidate) => ({
       exerciseId: candidate.exercise_id,
       exerciseName: candidate.exercise_name,
     })),
-    categoryLabel: matchedExercise ? getDisplayExerciseCategoryLabel(matchedExercise) : "\u9700\u8981\u786e\u8ba4",
+    categoryLabel: matchedExercise
+      ? getDisplayExerciseCategoryLabel(matchedExercise)
+      : "\u9700\u8981\u786e\u8ba4",
     exercise: matchedExercise,
     exerciseId: matchedExercise?.id ?? null,
     id: `intake-exercise-${index}-${exercise.input_name}`,

@@ -13,13 +13,7 @@ interface BuildAssistantInsightSnapshotInput {
   summary: TrainingSummary;
 }
 
-type FocusArea =
-  | "back"
-  | "chest"
-  | "legs"
-  | "mixed"
-  | "shoulders"
-  | "unknown";
+type FocusArea = "back" | "chest" | "legs" | "mixed" | "shoulders" | "unknown";
 
 export function buildAssistantInsightSnapshot(
   input: BuildAssistantInsightSnapshotInput,

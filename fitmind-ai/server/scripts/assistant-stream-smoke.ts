@@ -179,17 +179,21 @@ async function registerUser(
   email: string,
   displayName: string,
 ): Promise<AuthSuccessData> {
-  const response = await requestJson<AuthSuccessData>(baseUrl, "/api/auth/register", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
+  const response = await requestJson<AuthSuccessData>(
+    baseUrl,
+    "/api/auth/register",
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        email,
+        password: "Passw0rd!",
+        display_name: displayName,
+      }),
     },
-    body: JSON.stringify({
-      email,
-      password: "Passw0rd!",
-      display_name: displayName,
-    }),
-  });
+  );
 
   return expectSuccess(response, 201, "POST /api/auth/register");
 }
@@ -219,11 +223,15 @@ async function createWorkout(
     }>;
   },
 ): Promise<string> {
-  const response = await requestJson<WorkoutDetailData>(baseUrl, "/api/workouts", {
-    method: "POST",
-    headers: createAuthHeaders(token),
-    body: JSON.stringify(input),
-  });
+  const response = await requestJson<WorkoutDetailData>(
+    baseUrl,
+    "/api/workouts",
+    {
+      method: "POST",
+      headers: createAuthHeaders(token),
+      body: JSON.stringify(input),
+    },
+  );
 
   return expectSuccess(response, 201, "POST /api/workouts").workout.id;
 }
@@ -238,12 +246,16 @@ async function deleteWorkoutIfNeeded(
   }
 
   try {
-    await requestJson<DeleteResponseData>(baseUrl, `/api/workouts/${workoutId}`, {
-      method: "DELETE",
-      headers: {
-        authorization: `Bearer ${token}`,
+    await requestJson<DeleteResponseData>(
+      baseUrl,
+      `/api/workouts/${workoutId}`,
+      {
+        method: "DELETE",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
       },
-    });
+    );
   } catch {
     // Best-effort cleanup.
   }
@@ -329,7 +341,11 @@ async function main(): Promise<void> {
   let secondaryWorkoutId: string | null = null;
 
   try {
-    const primaryAuth = await registerUser(baseUrl, primaryEmail, "Assistant Stream Smoke");
+    const primaryAuth = await registerUser(
+      baseUrl,
+      primaryEmail,
+      "Assistant Stream Smoke",
+    );
     primaryToken = primaryAuth.token;
     const secondaryAuth = await registerUser(
       baseUrl,
@@ -380,16 +396,20 @@ async function main(): Promise<void> {
       ],
     });
 
-    const normalStream = await requestSse(baseUrl, "/api/assistant/stream-turn", {
-      method: "POST",
-      headers: createAuthHeaders(primaryToken),
-      body: JSON.stringify({
-        mode: "training_overview",
-        message: "最近训练总览",
-        start_date: "2026-05-01",
-        end_date: "2026-05-02",
-      }),
-    });
+    const normalStream = await requestSse(
+      baseUrl,
+      "/api/assistant/stream-turn",
+      {
+        method: "POST",
+        headers: createAuthHeaders(primaryToken),
+        body: JSON.stringify({
+          mode: "training_overview",
+          message: "最近训练总览",
+          start_date: "2026-05-01",
+          end_date: "2026-05-02",
+        }),
+      },
+    );
     assert(normalStream.status === 200, "Normal stream should return 200.");
     assert(
       normalStream.contentType?.includes("text/event-stream") ?? false,
@@ -443,21 +463,30 @@ async function main(): Promise<void> {
       "[mock:text] stream should not start a tool call.",
     );
 
-    const errorStream = await requestSse(baseUrl, "/api/assistant/stream-turn", {
-      method: "POST",
-      headers: createAuthHeaders(primaryToken),
-      body: JSON.stringify({
-        mode: "training_overview",
-        session_id: normalSession.session_id,
-        message: "[mock:error] provider failed",
-        start_date: "2026-05-01",
-        end_date: "2026-05-02",
-      }),
-    });
+    const errorStream = await requestSse(
+      baseUrl,
+      "/api/assistant/stream-turn",
+      {
+        method: "POST",
+        headers: createAuthHeaders(primaryToken),
+        body: JSON.stringify({
+          mode: "training_overview",
+          session_id: normalSession.session_id,
+          message: "[mock:error] provider failed",
+          start_date: "2026-05-01",
+          end_date: "2026-05-02",
+        }),
+      },
+    );
     assert(errorStream.status === 200, "Error stream should return 200.");
     assert(
       JSON.stringify(collectEventTypes(errorStream.events)) ===
-        JSON.stringify(["state:thinking", "session", "provider_selected", "error"]),
+        JSON.stringify([
+          "state:thinking",
+          "session",
+          "provider_selected",
+          "error",
+        ]),
       "Error stream should preserve the SSE error sequence.",
     );
     const providerErrorEvent = errorStream.events.find(
@@ -473,18 +502,25 @@ async function main(): Promise<void> {
       "[mock:error] stream should preserve the provider error message.",
     );
 
-    const crossUserStream = await requestSse(baseUrl, "/api/assistant/stream-turn", {
-      method: "POST",
-      headers: createAuthHeaders(secondaryToken),
-      body: JSON.stringify({
-        mode: "training_overview",
-        session_id: normalSession.session_id,
-        message: "最近训练总览",
-        start_date: "2026-05-01",
-        end_date: "2026-05-02",
-      }),
-    });
-    assert(crossUserStream.status === 200, "Cross-user stream should return 200.");
+    const crossUserStream = await requestSse(
+      baseUrl,
+      "/api/assistant/stream-turn",
+      {
+        method: "POST",
+        headers: createAuthHeaders(secondaryToken),
+        body: JSON.stringify({
+          mode: "training_overview",
+          session_id: normalSession.session_id,
+          message: "最近训练总览",
+          start_date: "2026-05-01",
+          end_date: "2026-05-02",
+        }),
+      },
+    );
+    assert(
+      crossUserStream.status === 200,
+      "Cross-user stream should return 200.",
+    );
     assert(
       JSON.stringify(collectEventTypes(crossUserStream.events)) ===
         JSON.stringify(["state:thinking", "error"]),
@@ -493,7 +529,9 @@ async function main(): Promise<void> {
 
     const primarySessions = await listChatSessionsForUser(primaryAuth.user.id);
     assert(
-      primarySessions.some((session) => session.id === normalSession.session_id),
+      primarySessions.some(
+        (session) => session.id === normalSession.session_id,
+      ),
       "Normal stream should persist a chat session.",
     );
     const persistedMessages = await listMessagesForSession(
@@ -508,7 +546,11 @@ async function main(): Promise<void> {
     console.log("Assistant stream smoke passed.");
   } finally {
     await deleteWorkoutIfNeeded(baseUrl, primaryToken ?? "", primaryWorkoutId);
-    await deleteWorkoutIfNeeded(baseUrl, secondaryToken ?? "", secondaryWorkoutId);
+    await deleteWorkoutIfNeeded(
+      baseUrl,
+      secondaryToken ?? "",
+      secondaryWorkoutId,
+    );
     await stopServer(server);
   }
 }

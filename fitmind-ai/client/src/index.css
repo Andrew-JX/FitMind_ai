@@ -34,7 +34,10 @@ textarea {
 button {
   appearance: none;
   touch-action: manipulation;
-  transition: opacity 150ms ease, transform 150ms ease, border-color 150ms ease;
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease,
+    border-color 150ms ease;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
@@ -51,7 +54,9 @@ textarea,
 select {
   font-size: 16px !important;
   min-width: 0;
-  transition: border-color 150ms ease, opacity 150ms ease;
+  transition:
+    border-color 150ms ease,
+    opacity 150ms ease;
 }
 
 input::placeholder,

@@ -136,9 +136,7 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
     }
 
     const planKey = assistantMessage.id;
-    setAcceptingPlanIds((currentValues) =>
-      new Set(currentValues).add(planKey),
-    );
+    setAcceptingPlanIds((currentValues) => new Set(currentValues).add(planKey));
     setInsightStatusText(null);
 
     try {

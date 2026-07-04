@@ -77,7 +77,9 @@ export function ExerciseDetailSheet(props: ExerciseDetailSheetProps) {
   }
 
   const primaryMuscles = exercise.muscles.filter((muscle) => muscle.is_primary);
-  const secondaryMuscles = exercise.muscles.filter((muscle) => !muscle.is_primary);
+  const secondaryMuscles = exercise.muscles.filter(
+    (muscle) => !muscle.is_primary,
+  );
   const movementLabel = getMovementPatternLabel(exercise.movement_pattern);
   const equipmentLabel = getEquipmentLabel(exercise.equipment);
 
@@ -119,7 +121,9 @@ export function ExerciseDetailSheet(props: ExerciseDetailSheetProps) {
         />
         <InfoBlock
           title="辅助肌群"
-          value={formatMuscleList(secondaryMuscles.map((muscle) => muscle.code))}
+          value={formatMuscleList(
+            secondaryMuscles.map((muscle) => muscle.code),
+          )}
         />
         <InfoBlock
           title="器械说明"
@@ -134,7 +138,9 @@ export function ExerciseDetailSheet(props: ExerciseDetailSheetProps) {
         <h3 style={sectionTitleStyle(theme)}>最近训练记录</h3>
         <ExerciseHistorySummary
           isLoading={isLoadingProgress}
-          progress={progress?.exercise.exercise_id === exercise.id ? progress : null}
+          progress={
+            progress?.exercise.exercise_id === exercise.id ? progress : null
+          }
           progressError={progressError}
           token={props.token}
         />
@@ -231,7 +237,11 @@ function ExerciseHistorySummary(props: {
       <div style={metricGridStyle}>
         <MetricCell
           label="最近一次"
-          value={latestSession ? formatDisplayDate(latestSession.performed_at) : "暂无"}
+          value={
+            latestSession
+              ? formatDisplayDate(latestSession.performed_at)
+              : "暂无"
+          }
         />
         <MetricCell
           label="最高重量"
@@ -271,7 +281,11 @@ function MetricCell(props: { label: string; value: string }) {
 
 function createDefaultRange(): { end_date: string; start_date: string } {
   const today = new Date();
-  const endDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const endDate = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  );
   const startDate = new Date(endDate);
   startDate.setDate(startDate.getDate() - 29);
 
@@ -346,7 +360,9 @@ const infoBlockStyle: React.CSSProperties = {
   gap: 8,
 };
 
-function sectionTitleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function sectionTitleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx,
     fontSize: 13,
@@ -361,7 +377,9 @@ const detailListStyle: React.CSSProperties = {
   paddingLeft: 18,
 };
 
-function detailItemStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function detailItemStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 12,
@@ -369,7 +387,9 @@ function detailItemStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSS
   };
 }
 
-function copyStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function copyStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 12,
@@ -389,7 +409,9 @@ const metricGridStyle: React.CSSProperties = {
   gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
 };
 
-function metricCellStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function metricCellStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf2,
     border: `1px solid ${theme.colors.bdr}`,
@@ -409,7 +431,9 @@ const sessionListStyle: React.CSSProperties = {
   padding: 0,
 };
 
-function sessionItemStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function sessionItemStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf2,
     border: `1px solid ${theme.colors.bdr}`,

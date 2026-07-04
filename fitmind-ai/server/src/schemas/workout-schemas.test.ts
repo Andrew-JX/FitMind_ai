@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  createWorkoutSchema,
-  updateWorkoutSchema,
-} from "./workout-schemas.js";
+import { createWorkoutSchema, updateWorkoutSchema } from "./workout-schemas.js";
 
 describe("workout schemas", () => {
   it("accepts optional workout start and end time", () => {

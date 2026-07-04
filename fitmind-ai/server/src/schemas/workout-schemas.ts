@@ -18,17 +18,19 @@ const setInputSchema = z.object({
   notes: optionalTrimmedStringSchema,
 });
 
-export const createWorkoutSchema = z.object({
-  performed_at: isoDatetimeSchema,
-  started_at: isoDatetimeSchema.nullable().optional(),
-  ended_at: isoDatetimeSchema.nullable().optional(),
-  duration_minutes: positiveIntegerSchema.optional(),
-  notes: optionalTrimmedStringSchema,
-  sets: z.array(setInputSchema).min(1),
-}).refine(hasValidTimeRange, {
-  message: "started_at must be before ended_at",
-  path: ["ended_at"],
-});
+export const createWorkoutSchema = z
+  .object({
+    performed_at: isoDatetimeSchema,
+    started_at: isoDatetimeSchema.nullable().optional(),
+    ended_at: isoDatetimeSchema.nullable().optional(),
+    duration_minutes: positiveIntegerSchema.optional(),
+    notes: optionalTrimmedStringSchema,
+    sets: z.array(setInputSchema).min(1),
+  })
+  .refine(hasValidTimeRange, {
+    message: "started_at must be before ended_at",
+    path: ["ended_at"],
+  });
 
 export const updateWorkoutSchema = z
   .object({
@@ -83,5 +85,7 @@ function hasValidTimeRange(value: {
     return true;
   }
 
-  return new Date(value.started_at).getTime() < new Date(value.ended_at).getTime();
+  return (
+    new Date(value.started_at).getTime() < new Date(value.ended_at).getTime()
+  );
 }

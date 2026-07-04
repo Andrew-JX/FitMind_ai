@@ -1,6 +1,9 @@
 import { useState } from "react";
 
-import type { LoginRequest, RegisterRequest } from "../../../../shared/src/auth";
+import type {
+  LoginRequest,
+  RegisterRequest,
+} from "../../../../shared/src/auth";
 
 import { StateNotice } from "../../components/StateNotice";
 import { useTheme } from "../../theme/ThemeContext";
@@ -175,7 +178,9 @@ export function AuthScreen(props: AuthScreenProps) {
           <label style={labelStyle(theme)}>
             密码
             <input
-              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              autoComplete={
+                mode === "login" ? "current-password" : "new-password"
+              }
               disabled={isSubmitting}
               minLength={8}
               onChange={(event) => setPassword(event.target.value)}
@@ -269,7 +274,8 @@ export function AuthScreen(props: AuthScreenProps) {
             marginTop: 14,
           }}
         >
-          登录状态保存在安全的 HttpOnly 会话 cookie 中，刷新页面后会自动保持登录。
+          登录状态保存在安全的 HttpOnly 会话 cookie
+          中，刷新页面后会自动保持登录。
         </p>
       </section>
     </main>

@@ -55,7 +55,9 @@ function normalizeCompactMessage(message: string): string {
 export function isOutOfScopeMessage(message: string): boolean {
   const normalizedMessage = message.trim();
 
-  return normalizedMessage === "" || UNSUPPORTED_PATTERN.test(normalizedMessage);
+  return (
+    normalizedMessage === "" || UNSUPPORTED_PATTERN.test(normalizedMessage)
+  );
 }
 
 export function classifyAssistantIntent(

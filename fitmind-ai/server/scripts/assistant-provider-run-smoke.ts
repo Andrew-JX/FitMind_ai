@@ -241,12 +241,16 @@ async function deleteWorkoutIfNeeded(
   }
 
   try {
-    await requestJson<DeleteResponseData>(baseUrl, `/api/workouts/${workoutId}`, {
-      method: "DELETE",
-      headers: {
-        authorization: `Bearer ${token}`,
+    await requestJson<DeleteResponseData>(
+      baseUrl,
+      `/api/workouts/${workoutId}`,
+      {
+        method: "DELETE",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
       },
-    });
+    );
   } catch {
     // Best-effort cleanup keeps the main smoke result actionable.
   }
@@ -305,11 +309,15 @@ async function createWorkout(
   },
   label: string,
 ): Promise<WorkoutDetailData["workout"]> {
-  const response = await requestJson<WorkoutDetailData>(baseUrl, "/api/workouts", {
-    method: "POST",
-    headers: createAuthHeaders(token),
-    body: JSON.stringify(input),
-  });
+  const response = await requestJson<WorkoutDetailData>(
+    baseUrl,
+    "/api/workouts",
+    {
+      method: "POST",
+      headers: createAuthHeaders(token),
+      body: JSON.stringify(input),
+    },
+  );
 
   return expectSuccess(response, 201, label).workout;
 }
@@ -349,7 +357,10 @@ async function createFixtureUsersAndWorkouts(baseUrl: string): Promise<{
     "GET /api/exercises?q=bench",
   );
   const benchExercise = benchSearchData.items[0];
-  assert(benchExercise !== undefined, "Bench search should return one exercise.");
+  assert(
+    benchExercise !== undefined,
+    "Bench search should return one exercise.",
+  );
 
   const squatSearchResponse = await requestJson<ExerciseSearchData>(
     baseUrl,
@@ -361,7 +372,10 @@ async function createFixtureUsersAndWorkouts(baseUrl: string): Promise<{
     "GET /api/exercises?q=squat",
   );
   const squatExercise = squatSearchData.items[0];
-  assert(squatExercise !== undefined, "Squat search should return one exercise.");
+  assert(
+    squatExercise !== undefined,
+    "Squat search should return one exercise.",
+  );
   console.log("OK 200 exercise searches");
 
   const primaryWorkoutOne = await createWorkout(
@@ -506,14 +520,22 @@ async function runMockProviderTrack(
     "Mock provider path should expose deterministic tool evidence.",
   );
   assert(
-    normalTurn.answer.evidence.workout_ids.includes(fixture.primaryWorkoutIdOne) &&
-      normalTurn.answer.evidence.workout_ids.includes(fixture.primaryWorkoutIdTwo) &&
-      !normalTurn.answer.evidence.workout_ids.includes(fixture.secondaryWorkoutId),
+    normalTurn.answer.evidence.workout_ids.includes(
+      fixture.primaryWorkoutIdOne,
+    ) &&
+      normalTurn.answer.evidence.workout_ids.includes(
+        fixture.primaryWorkoutIdTwo,
+      ) &&
+      !normalTurn.answer.evidence.workout_ids.includes(
+        fixture.secondaryWorkoutId,
+      ),
     "Mock provider path should only expose primary-user workout evidence.",
   );
   console.log("OK mock provider normal tool path");
 
-  const sessionsAfterNormal = await loadChatSessions(fixture.primaryAuth.user.id);
+  const sessionsAfterNormal = await loadChatSessions(
+    fixture.primaryAuth.user.id,
+  );
   assert(
     sessionsAfterNormal.length === 1 &&
       sessionsAfterNormal[0]?.id === normalTurn.session_id,
@@ -671,7 +693,8 @@ async function runRealProviderTrack(
       body: JSON.stringify({
         mode: "training_overview",
         session_id: existingSessionId,
-        message: "Summarize my recent training using the available backend tool if needed.",
+        message:
+          "Summarize my recent training using the available backend tool if needed.",
         start_date: "2026-05-01",
         end_date: "2026-05-02",
       }),
@@ -707,11 +730,15 @@ async function runRealProviderTrack(
       "Tool-backed real provider path should expose deterministic tool evidence.",
     );
     assert(
-      realTurn.answer.evidence.workout_ids.includes(fixture.primaryWorkoutIdOne) &&
+      realTurn.answer.evidence.workout_ids.includes(
+        fixture.primaryWorkoutIdOne,
+      ) &&
         realTurn.answer.evidence.workout_ids.includes(
           fixture.primaryWorkoutIdTwo,
         ) &&
-        !realTurn.answer.evidence.workout_ids.includes(fixture.secondaryWorkoutId),
+        !realTurn.answer.evidence.workout_ids.includes(
+          fixture.secondaryWorkoutId,
+        ),
       "Tool-backed real provider path should only expose primary-user workout evidence.",
     );
   } else {
@@ -730,7 +757,8 @@ async function runRealProviderTrack(
     messagesAfterReal.length >= 6,
     "Successful real provider path should append one more user and assistant message pair.",
   );
-  const latestAssistantMessage = messagesAfterReal[messagesAfterReal.length - 1];
+  const latestAssistantMessage =
+    messagesAfterReal[messagesAfterReal.length - 1];
   assertNoSecretsInPersistedMessage(
     JSON.stringify(latestAssistantMessage),
     fixture.primaryAuth.token,
@@ -746,7 +774,8 @@ async function runRealProviderTrack(
       headers: createAuthHeaders(fixture.secondaryAuth.token),
       body: JSON.stringify({
         mode: "training_overview",
-        message: "Summarize my recent training using the available backend tool if needed.",
+        message:
+          "Summarize my recent training using the available backend tool if needed.",
         start_date: "2026-05-01",
         end_date: "2026-05-02",
       }),
@@ -757,7 +786,9 @@ async function runRealProviderTrack(
     200,
     "POST /api/assistant/mock-turn anthropic secondary user isolation",
   );
-  if (secondaryOverview.answer.evidence.source === "deterministic_tool_executor") {
+  if (
+    secondaryOverview.answer.evidence.source === "deterministic_tool_executor"
+  ) {
     assert(
       secondaryOverview.answer.evidence.workout_ids.length === 1 &&
         secondaryOverview.answer.evidence.workout_ids[0] ===
@@ -811,9 +842,21 @@ async function main(): Promise<void> {
     console.log("Assistant provider run smoke passed.");
   } finally {
     process.env.ASSISTANT_PROVIDER = "mock";
-    await deleteWorkoutIfNeeded(baseUrl, primaryToken ?? "", primaryWorkoutIdOne);
-    await deleteWorkoutIfNeeded(baseUrl, primaryToken ?? "", primaryWorkoutIdTwo);
-    await deleteWorkoutIfNeeded(baseUrl, secondaryToken ?? "", secondaryWorkoutId);
+    await deleteWorkoutIfNeeded(
+      baseUrl,
+      primaryToken ?? "",
+      primaryWorkoutIdOne,
+    );
+    await deleteWorkoutIfNeeded(
+      baseUrl,
+      primaryToken ?? "",
+      primaryWorkoutIdTwo,
+    );
+    await deleteWorkoutIfNeeded(
+      baseUrl,
+      secondaryToken ?? "",
+      secondaryWorkoutId,
+    );
     await stopServer(server);
   }
 }

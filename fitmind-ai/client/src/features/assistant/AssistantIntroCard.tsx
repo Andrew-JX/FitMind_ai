@@ -31,7 +31,9 @@ const headerStyle: React.CSSProperties = {
   justifyContent: "space-between",
 };
 
-function eyebrowStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function eyebrowStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx3,
     fontSize: 11,
@@ -47,7 +49,9 @@ const titleStyle: React.CSSProperties = {
   margin: "6px 0 0",
 };
 
-function subtitleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function subtitleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     fontSize: 13,

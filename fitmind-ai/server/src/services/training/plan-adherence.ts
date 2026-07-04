@@ -58,29 +58,31 @@ export function computePlanAdherence(input: {
   let completedSetTotal = 0;
   let trainedExerciseCount = 0;
 
-  const exercises: ExerciseAdherence[] = input.plannedExercises.map((planned) => {
-    const key = normalizeName(planned.exerciseName);
-    matchedKeys.add(key);
+  const exercises: ExerciseAdherence[] = input.plannedExercises.map(
+    (planned) => {
+      const key = normalizeName(planned.exerciseName);
+      matchedKeys.add(key);
 
-    const plannedSets = Math.max(0, planned.sets);
-    const performedSets = performedByName.get(key) ?? 0;
-    const completedSets = Math.min(performedSets, plannedSets);
+      const plannedSets = Math.max(0, planned.sets);
+      const performedSets = performedByName.get(key) ?? 0;
+      const completedSets = Math.min(performedSets, plannedSets);
 
-    plannedSetTotal += plannedSets;
-    completedSetTotal += completedSets;
+      plannedSetTotal += plannedSets;
+      completedSetTotal += completedSets;
 
-    if (performedSets > 0) {
-      trainedExerciseCount += 1;
-    }
+      if (performedSets > 0) {
+        trainedExerciseCount += 1;
+      }
 
-    return {
-      exercise_name: planned.exerciseName,
-      planned_sets: plannedSets,
-      performed_sets: performedSets,
-      status: resolveStatus(performedSets, plannedSets),
-      set_completion_ratio: ratio(completedSets, plannedSets),
-    };
-  });
+      return {
+        exercise_name: planned.exerciseName,
+        planned_sets: plannedSets,
+        performed_sets: performedSets,
+        status: resolveStatus(performedSets, plannedSets),
+        set_completion_ratio: ratio(completedSets, plannedSets),
+      };
+    },
+  );
 
   const extraExerciseCount = [...performedByName.keys()].filter(
     (key) => !matchedKeys.has(key),

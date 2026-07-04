@@ -29,7 +29,10 @@ export function TrainingSessionRestTimer(props: TrainingSessionRestTimerProps) {
   const [customRestSeconds, setCustomRestSeconds] = useState("150");
   const progress =
     props.timer.totalSeconds > 0
-      ? Math.max(0, Math.min(1, props.timer.remainingSeconds / props.timer.totalSeconds))
+      ? Math.max(
+          0,
+          Math.min(1, props.timer.remainingSeconds / props.timer.totalSeconds),
+        )
       : 0;
 
   return (
@@ -77,7 +80,11 @@ export function TrainingSessionRestTimer(props: TrainingSessionRestTimerProps) {
               />
               <Button
                 disabled={!isValidRestSeconds(customRestSeconds)}
-                onClick={() => props.onConfirmDuration(Number.parseInt(customRestSeconds, 10))}
+                onClick={() =>
+                  props.onConfirmDuration(
+                    Number.parseInt(customRestSeconds, 10),
+                  )
+                }
                 type="button"
                 variant="secondary"
               >
@@ -89,7 +96,10 @@ export function TrainingSessionRestTimer(props: TrainingSessionRestTimerProps) {
           <>
             <header style={headerStyle}>
               <div style={titleWrapStyle}>
-                <Icon name={props.timer.status === "finished" ? "check" : "clock"} size={18} />
+                <Icon
+                  name={props.timer.status === "finished" ? "check" : "clock"}
+                  size={18}
+                />
                 <strong style={titleStyle(theme)}>
                   {props.timer.status === "finished"
                     ? "休息结束，可以开始下一组了"
@@ -119,7 +129,11 @@ export function TrainingSessionRestTimer(props: TrainingSessionRestTimerProps) {
 
             <div style={actionRowStyle}>
               {props.timer.status !== "finished" ? (
-                <Button onClick={props.onToggleRunning} type="button" variant="secondary">
+                <Button
+                  onClick={props.onToggleRunning}
+                  type="button"
+                  variant="secondary"
+                >
                   {props.timer.status === "paused" ? "继续" : "暂停"}
                 </Button>
               ) : null}
@@ -148,10 +162,14 @@ function formatRestTime(totalSeconds: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-function backdropStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function backdropStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     alignItems: "center",
-    backgroundColor: theme.isDark ? "rgba(0, 0, 0, 0.52)" : "rgba(0, 0, 0, 0.28)",
+    backgroundColor: theme.isDark
+      ? "rgba(0, 0, 0, 0.52)"
+      : "rgba(0, 0, 0, 0.28)",
     display: "flex",
     inset: 0,
     justifyContent: "center",
@@ -161,7 +179,9 @@ function backdropStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPr
   };
 }
 
-function cardStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function cardStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf,
     border: `1px solid ${theme.colors.bdr2}`,
@@ -188,7 +208,9 @@ const titleWrapStyle: React.CSSProperties = {
   gap: 10,
 };
 
-function titleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function titleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx,
     fontSize: 15,
@@ -196,7 +218,9 @@ function titleStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSPrope
   };
 }
 
-function closeButtonStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function closeButtonStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     background: "transparent",
     border: "none",
@@ -214,7 +238,9 @@ const optionGridStyle: React.CSSProperties = {
   gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
 };
 
-function optionButtonStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function optionButtonStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf2,
     border: `1px solid ${theme.colors.bdr}`,
@@ -238,7 +264,9 @@ const countdownWrapStyle: React.CSSProperties = {
   gap: 12,
 };
 
-function countdownStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function countdownStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     color: theme.colors.tx,
     fontSize: 36,
@@ -247,7 +275,9 @@ function countdownStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSP
   };
 }
 
-function progressTrackStyle(theme: ReturnType<typeof useTheme>["theme"]): React.CSSProperties {
+function progressTrackStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf2,
     borderRadius: 999,

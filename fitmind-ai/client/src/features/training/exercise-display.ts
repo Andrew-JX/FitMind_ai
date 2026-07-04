@@ -88,7 +88,9 @@ export function getMuscleCodeLabel(code: string): string {
   return MUSCLE_LABELS[normalizedCode] ?? inferMuscleLabel(normalizedCode);
 }
 
-export function getEquipmentLabel(equipment: string | null | undefined): string | null {
+export function getEquipmentLabel(
+  equipment: string | null | undefined,
+): string | null {
   if (!equipment?.trim()) {
     return null;
   }
@@ -110,7 +112,9 @@ export function getMovementPatternLabel(
   return MOVEMENT_PATTERN_LABELS[normalizedPattern] ?? "未标注类型";
 }
 
-export function getExerciseCategory(exercise: DictionaryExercise): ExerciseCategory {
+export function getExerciseCategory(
+  exercise: DictionaryExercise,
+): ExerciseCategory {
   const allCodes = exercise.muscles.map((muscle) => muscle.code.toLowerCase());
   const movementPattern = exercise.movement_pattern?.toLowerCase() ?? "";
   const searchable = getExerciseSearchText(exercise);

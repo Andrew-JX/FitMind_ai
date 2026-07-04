@@ -39,12 +39,17 @@ export function AssistantPlanCard(props: AssistantPlanCardProps) {
       <summary style={summaryStyle(theme)}>
         <Icon name="zap" size={13} />
         <span>下周训练草案 · {plan.exercises.length} 个动作</span>
-        <span style={strategyChipStyle(theme)}>{STRATEGY_LABEL[plan.strategy]}</span>
+        <span style={strategyChipStyle(theme)}>
+          {STRATEGY_LABEL[plan.strategy]}
+        </span>
       </summary>
 
       <ol style={listStyle}>
         {plan.exercises.map((exercise, index) => (
-          <PlanExerciseRow exercise={exercise} key={`${exercise.exerciseName}-${index}`} />
+          <PlanExerciseRow
+            exercise={exercise}
+            key={`${exercise.exerciseName}-${index}`}
+          />
         ))}
       </ol>
 
@@ -82,7 +87,9 @@ function PlanExerciseRow(props: { exercise: AssistantPlannedExercise }) {
     <li style={rowStyle(theme)}>
       <div style={rowHeaderStyle}>
         <span style={exerciseNameStyle(theme)}>{exercise.exerciseName}</span>
-        <span style={targetWeightStyle(theme, exercise.targetWeightKg !== null)}>
+        <span
+          style={targetWeightStyle(theme, exercise.targetWeightKg !== null)}
+        >
           {exercise.targetWeightKg !== null
             ? `目标 ${exercise.targetWeightKg} kg`
             : "沿用上次重量"}
@@ -93,7 +100,9 @@ function PlanExerciseRow(props: { exercise: AssistantPlannedExercise }) {
           {exercise.sets} 组 × {exercise.repMin}~{exercise.repMax} 次
         </span>
       </div>
-      {exercise.basis ? <p style={basisStyle(theme)}>{exercise.basis}</p> : null}
+      {exercise.basis ? (
+        <p style={basisStyle(theme)}>{exercise.basis}</p>
+      ) : null}
     </li>
   );
 }

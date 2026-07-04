@@ -1,9 +1,7 @@
 import type { WorkoutIntakeParseRequest } from "../../schemas/workout-intake-schemas.js";
 import { searchDictionaryExercises } from "./dictionary-service.js";
 import { parseHybridWorkoutIntakeDraft } from "./workout-intake-hybrid-parser.js";
-import {
-  type WorkoutIntakeExerciseDictionaryItem,
-} from "./workout-intake-parser.js";
+import { type WorkoutIntakeExerciseDictionaryItem } from "./workout-intake-parser.js";
 
 /**
  * Parse natural-language workout text into a draft for the authenticated user.

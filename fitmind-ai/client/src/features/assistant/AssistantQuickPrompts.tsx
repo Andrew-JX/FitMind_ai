@@ -111,7 +111,8 @@ function buildPromptDefinitions(input: {
       title: "本周训练报告",
     },
     {
-      description: "结合训练 Evidence 和知识 Sources，保守诊断动作是否进入平台期。",
+      description:
+        "结合训练 Evidence 和知识 Sources，保守诊断动作是否进入平台期。",
       disabled: !input.selectedExerciseId,
       helper: "请先在分析页选择一个重点动作。",
       prompt: {

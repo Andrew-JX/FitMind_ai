@@ -207,7 +207,9 @@ describe("buildAssistantInsightSnapshot", () => {
     recommendationContext.recent_workouts = [
       {
         workout_id: "workout-1",
-        performed_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        performed_at: new Date(
+          Date.now() - 2 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
         notes: "recent chest day",
         set_count: 3,
         total_volume: 1400,

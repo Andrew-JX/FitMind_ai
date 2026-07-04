@@ -47,7 +47,9 @@ interface WorkoutSetMutationResponseData {
  * @param token - In-memory auth token
  * @returns Workout list summaries
  */
-export async function listWorkouts(token: string): Promise<WorkoutSummaryDto[]> {
+export async function listWorkouts(
+  token: string,
+): Promise<WorkoutSummaryDto[]> {
   const response = await requestJson<WorkoutListResponseData>("/api/workouts", {
     token,
   });

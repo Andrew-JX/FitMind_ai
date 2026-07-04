@@ -43,7 +43,10 @@ async function loadEnvFile(filePath: string): Promise<void> {
     const key = line.slice(0, separatorIndex).trim();
     const value = line.slice(separatorIndex + 1).trim();
 
-    if (/^[A-Za-z_][A-Za-z0-9_]*$/u.test(key) && process.env[key] === undefined) {
+    if (
+      /^[A-Za-z_][A-Za-z0-9_]*$/u.test(key) &&
+      process.env[key] === undefined
+    ) {
       process.env[key] = unquoteEnvValue(value);
     }
   }
@@ -92,7 +95,9 @@ async function listFixtureFiles(inputPath: string): Promise<string[]> {
     .sort();
 }
 
-async function readDocuments(inputPath: string): Promise<KnowledgeFixtureDocument[]> {
+async function readDocuments(
+  inputPath: string,
+): Promise<KnowledgeFixtureDocument[]> {
   const files = await listFixtureFiles(inputPath);
   const documents: KnowledgeFixtureDocument[] = [];
 
@@ -103,7 +108,9 @@ async function readDocuments(inputPath: string): Promise<KnowledgeFixtureDocumen
       continue;
     }
 
-    documents.push(...parseKnowledgeFixture(await readFile(filePath, "utf8"), format));
+    documents.push(
+      ...parseKnowledgeFixture(await readFile(filePath, "utf8"), format),
+    );
   }
 
   return documents;
@@ -111,10 +118,14 @@ async function readDocuments(inputPath: string): Promise<KnowledgeFixtureDocumen
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
-  const envFileArg = args[0]?.includes(".env") === true ? args.shift() : undefined;
+  const envFileArg =
+    args[0]?.includes(".env") === true ? args.shift() : undefined;
   const fixtureArg = args[0];
 
-  assert(fixtureArg !== undefined, "Knowledge fixture file or directory is required.");
+  assert(
+    fixtureArg !== undefined,
+    "Knowledge fixture file or directory is required.",
+  );
 
   if (envFileArg !== undefined) {
     await loadEnvFile(resolve(process.cwd(), envFileArg));
@@ -162,7 +173,9 @@ async function main(): Promise<void> {
       chunkCount += 1;
 
       if (embeddingProvider !== null) {
-        const [embedding] = await embeddingProvider.embedDocuments([searchText]);
+        const [embedding] = await embeddingProvider.embedDocuments([
+          searchText,
+        ]);
 
         await updateKnowledgeChunkEmbedding({
           id: chunkRow.id,
