@@ -20,6 +20,7 @@ vi.mock("./services/product-feedback-service.js", () => ({
 }));
 
 import { createApp } from "./app.js";
+import { createAiRateLimiter } from "./services/assistant/ai-rate-limiter.js";
 import { verifyJwt } from "./services/auth/jwt.js";
 import { submitProductFeedback } from "./services/product-feedback-service.js";
 import { HttpError } from "./utils/http-error.js";
@@ -28,7 +29,13 @@ const mockedVerifyJwt = vi.mocked(verifyJwt);
 const mockedSubmitProductFeedback = vi.mocked(submitProductFeedback);
 
 describe("createApp", () => {
-  const app = createApp();
+  const app = createApp({
+    authRateLimiter: createAiRateLimiter({
+      perMinute: 1_000,
+      perDay: 100_000,
+      now: () => 0,
+    }),
+  });
   const server = app.listen(0);
 
   beforeEach(() => {
@@ -51,10 +58,7 @@ describe("createApp", () => {
 
   it("serves the health endpoint", async () => {
     const response = await request("/api/health");
-    const payload = (await response.json()) as {
-      ok: boolean;
-      data: { status: string };
-    };
+    const payload = await response.json();
 
     expect(response.status).toBe(200);
     expect(payload).toEqual({
@@ -65,12 +69,13 @@ describe("createApp", () => {
     });
   });
 
+  it("trusts one proxy hop for Vercel client IP resolution", () => {
+    expect(app.get("trust proxy")).toBe(1);
+  });
+
   it("rejects unauthenticated access to /api/auth/me", async () => {
     const response = await request("/api/auth/me");
-    const payload = (await response.json()) as {
-      ok: boolean;
-      error: { code: string; message: string };
-    };
+    const payload = await response.json();
 
     expect(response.status).toBe(401);
     expect(payload).toEqual({
@@ -88,10 +93,7 @@ describe("createApp", () => {
         authorization: "Token invalid-token",
       },
     });
-    const payload = (await response.json()) as {
-      ok: boolean;
-      error: { code: string; message: string };
-    };
+    const payload = await response.json();
 
     expect(response.status).toBe(401);
     expect(payload).toEqual({
@@ -113,10 +115,7 @@ describe("createApp", () => {
         authorization: "Bearer invalid-token",
       },
     });
-    const payload = (await response.json()) as {
-      ok: boolean;
-      error: { code: string; message: string };
-    };
+    const payload = await response.json();
 
     expect(response.status).toBe(401);
     expect(payload).toEqual({
@@ -130,10 +129,7 @@ describe("createApp", () => {
 
   it("keeps unauthenticated workout access guarded at the app boundary", async () => {
     const response = await request("/api/workouts");
-    const payload = (await response.json()) as {
-      ok: boolean;
-      error: { code: string; message: string };
-    };
+    const payload = await response.json();
 
     expect(response.status).toBe(401);
     expect(payload).toEqual({
@@ -158,5 +154,51 @@ describe("createApp", () => {
 
     expect(response.status).toBe(401);
     expect(mockedSubmitProductFeedback).not.toHaveBeenCalled();
+  });
+
+  it("applies auth rate limits before the login controller", async () => {
+    const limitedApp = createApp({
+      authRateLimiter: createAiRateLimiter({
+        perMinute: 1,
+        perDay: 100,
+        now: () => 0,
+      }),
+    });
+    const limitedServer = limitedApp.listen(0);
+
+    try {
+      const address = limitedServer.address();
+
+      if (address === null || typeof address === "string") {
+        throw new Error("Expected the test server to bind to a TCP port");
+      }
+
+      const url = `http://127.0.0.1:${address.port}/api/auth/login`;
+      const requestInit = {
+        body: JSON.stringify({}),
+        headers: {
+          "content-type": "application/json",
+        },
+        method: "POST",
+      };
+
+      await fetch(url, requestInit);
+      const response = await fetch(url, requestInit);
+      const payload = await response.json();
+
+      expect(response.status).toBe(429);
+      expect(payload).toEqual({
+        ok: false,
+        error: {
+          code: "RATE_LIMITED",
+          message: "Rate limited.",
+          details: {
+            retry_after_seconds: 60,
+          },
+        },
+      });
+    } finally {
+      limitedServer.close();
+    }
   });
 });

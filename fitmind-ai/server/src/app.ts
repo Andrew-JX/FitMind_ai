@@ -3,22 +3,37 @@ import { ZodError } from "zod";
 
 import { assistantRouter } from "./routes/assistant.js";
 import { athleteProfileRouter } from "./routes/athlete-profile.js";
-import { authRouter } from "./routes/auth.js";
+import { createAuthRouter } from "./routes/auth.js";
 import { feedbackRouter } from "./routes/feedback.js";
 import { healthRouter } from "./routes/health.js";
 import { apiRouter } from "./routes/api.js";
 import { plannedWorkoutsRouter } from "./routes/planned-workouts.js";
 import { weeklyReportDigestRouter } from "./routes/weekly-report-digests.js";
 import { workoutsRouter } from "./routes/workouts.js";
+import type { AiRateLimiter } from "./services/assistant/ai-rate-limiter.js";
 import { createErrorResponse } from "./utils/api-response.js";
 import { HttpError, isHttpError } from "./utils/http-error.js";
 
-export function createApp() {
+export interface CreateAppOptions {
+  authRateLimiter?: AiRateLimiter;
+}
+
+/**
+ * Creates the Express app and wires production middleware and routers.
+ *
+ * @param options - Optional injectable auth limiter for isolated tests
+ * @returns Configured Express application
+ */
+export function createApp(options?: CreateAppOptions) {
   const app = express();
 
+  app.set("trust proxy", 1);
   app.use(express.json());
 
-  app.use("/api/auth", authRouter);
+  app.use(
+    "/api/auth",
+    createAuthRouter({ authRateLimiter: options?.authRateLimiter }),
+  );
   app.use("/api/health", healthRouter);
   app.use("/api", apiRouter);
   app.use("/api", assistantRouter);

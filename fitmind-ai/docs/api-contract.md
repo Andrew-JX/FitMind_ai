@@ -104,6 +104,29 @@ GET /api/workouts?cursor=<id>&limit=20
 
 **Response 200**：返回同 register（同样 `Set-Cookie` 写入会话 cookie）。
 
+### Auth rate-limit responses
+
+`POST /api/auth/register` and `POST /api/auth/login` are rate-limited before their controllers run:
+
+- register: `5` requests per minute per client IP.
+- login: `10` requests per minute per client IP.
+- `POST /api/auth/logout` and `GET /api/auth/me` are not covered by this auth endpoint limiter.
+
+When exceeded, both endpoints return:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "RATE_LIMITED",
+    "message": "Rate limited.",
+    "details": {
+      "retry_after_seconds": 60
+    }
+  }
+}
+```
+
 ### GET /api/auth/me
 
 获取当前用户信息（鉴权）。
@@ -609,13 +632,16 @@ export const TOOL_DEFINITIONS = [
 | 端点                | 限制                  |
 | ------------------- | --------------------- |
 | 全局所有 API        | 60 req / IP / 分钟    |
-| `/api/auth/login`   | 10 req / IP / 15 分钟 |
+| `/api/auth/register` | 5 req / IP / minute |
+| `/api/auth/login`   | 10 req / IP / minute |
 | `/api/chat`         | 20 req / 用户 / 分钟  |
 | `/api/chat`（每日） | 50 req / 用户 / 天    |
 
 超限返回 `429` + `Retry-After` header。
 
-**已实现（roadmap §8 Slice 6）**：AI turn 端点 `POST /api/assistant/mock-turn` 与 `POST /api/assistant/stream-turn` 已挂 per-user 限流中间件——每用户 20 次/分钟超限返回 `RATE_LIMITED`、50 次/天超限返回 `AI_QUOTA_EXCEEDED`，均为 `429`，`error.details.retry_after_seconds` 给出重试秒数。当前为单进程内存计数（多实例/Serverless 各自计数；分布式需 Redis/DB，接口 seam 不变）。全局 60/IP/分钟与登录限流尚未实现。
+**已实现（roadmap §8 Slice 6）**：AI turn 端点 `POST /api/assistant/mock-turn` 与 `POST /api/assistant/stream-turn` 已挂 per-user 限流中间件——每用户 20 次/分钟超限返回 `RATE_LIMITED`、50 次/天超限返回 `AI_QUOTA_EXCEEDED`，均为 `429`，`error.details.retry_after_seconds` 给出重试秒数。当前为单进程内存计数（多实例/Serverless 各自计数；分布式需 Redis/DB，接口 seam 不变）。全局 60/IP/分钟尚未实现；auth register/login endpoint 限流见 hardening-1 T3。
+
+**Implemented in hardening-1 T3**: auth register/login endpoint limits now return `429 RATE_LIMITED` with `error.details.retry_after_seconds`. They are in-memory per server instance and keyed by Express `req.ip` plus the auth route.
 
 ------
 

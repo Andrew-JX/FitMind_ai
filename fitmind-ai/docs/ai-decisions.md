@@ -1125,3 +1125,28 @@ Decision:
 
 Out of scope:
 - Provider-specific timeout tuning, user-visible copy changes, retry-policy changes, `vercel.json` changes, and new telemetry fields.
+
+## [D47] hardening-1 T3 auth endpoint rate limiting
+
+- **Date**: 2026-07-05
+- **Status**: Accepted / implemented
+
+Background: register and login were public write endpoints without endpoint-specific throttling. They needed deterministic, zero-network protection before controller execution while preserving existing logout/me behavior.
+
+Decision:
+- Add auth route middleware built on the existing fixed-window `createAiRateLimiter` string-key seam. The auth key is `req.ip` plus a fixed route key, so register and login buckets are independent.
+- Limits are `POST /api/auth/login = 10/min/IP` and `POST /api/auth/register = 5/min/IP`.
+- Blocked requests throw the existing API error shape: `429 RATE_LIMITED` with `error.details.retry_after_seconds`.
+- Mount only on `POST /api/auth/register` and `POST /api/auth/login`, before auth controllers. `POST /api/auth/logout` and `GET /api/auth/me` remain unaffected.
+- `createApp()` sets `trust proxy` to `1`. On Vercel this trusts the single platform proxy hop so Express derives `req.ip` from the real client-facing forwarded address, without trusting the full leftmost `X-Forwarded-For` chain.
+- Tests inject limiter state and clock. App characterization tests use an injected wide limiter so module-level default limiter state cannot accumulate across test cases.
+
+Known boundaries:
+- Cloudflare Worker -> Vercel proxy paths can collapse users that traverse the Worker into the Worker egress IP bucket. That is acceptable at the current scale, but it is a documented risk.
+- The limiter is in-memory and per serverless instance, so it is partial protection in distributed/serverless deployments. A distributed DB/Redis-backed limiter is a roadmap follow-up.
+
+Review note:
+- `trust proxy = 1` is intentionally narrower than trusting all forwarded hops. It accepts the nearest trusted Vercel proxy hop and reduces spoofing exposure from arbitrary leftmost XFF values, but it still depends on Vercel being the direct public ingress. If another proxy tier becomes authoritative, this setting must be revisited with that topology.
+
+Out of scope:
+- Global 60/min/IP limiting, Redis/DB counters, Cloudflare edge rate limiting, CAPTCHA, account lockout, and user-visible copy localization.

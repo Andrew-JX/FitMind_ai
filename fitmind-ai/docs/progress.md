@@ -4843,3 +4843,11 @@ API docs now state the workouts list cursor error contract. These are intentiona
 Added a shared 20s timeout to the OpenAI-compatible chat client used by both Assistant provider calls and workout-intake LLM parsing. Timeout/abort failures now normalize to the existing provider failure shape (`attempted:true`, `ok:false`, `status:0`) with provider/model preserved and a sanitized timeout message; ordinary network errors keep their original messages.
 
 Decision D46 records why chat completion uses 20s instead of the RAG rerank 2s timeout, how intake parser retries interact with timeout (`status:0` does not trigger the 429 retry; real 429 worst case is about 22s), and why `vercel.json` maxDuration is intentionally unchanged in this batch.
+
+## 2026-07-05 hardening-1 T3: auth endpoint rate limiting
+
+Added endpoint-specific in-memory rate limiting for `POST /api/auth/register` and `POST /api/auth/login` before their controllers run. Register is capped at 5 requests/min/IP; login is capped at 10 requests/min/IP. Both return the existing error envelope with `429 RATE_LIMITED` and `error.details.retry_after_seconds` when exceeded. Logout and `/api/auth/me` are intentionally unaffected.
+
+`createApp()` now sets `trust proxy` to `1` for the Vercel single-proxy deployment shape. The review-relevant tradeoff is documented in D47: this trusts the nearest Vercel proxy hop for client IP derivation without trusting arbitrary leftmost forwarded values, but Cloudflare Worker -> Vercel traffic may still share a Worker egress IP bucket. The limiter remains per-instance memory state; distributed DB/Redis-backed limiting is a future roadmap item.
+
+Verification coverage added: middleware tests cover allow, reject, and one-minute window reset with an injected clock; app tests inject a wide limiter for existing characterization routes and a narrow limiter to prove login is blocked before controller validation.

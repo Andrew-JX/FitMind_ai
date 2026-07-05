@@ -282,3 +282,5 @@ saved-insight 分享链接、知识管理后台、离线编辑 / 同步。优先
 
 > 接手提示：每片开工先读 `AGENTS.md`，再读该片涉及的领域文档（Slice 1/2 主要是 `ai-decisions.md` + `assistant-*`/`agent` 代码；Slice 3-5 涉及 `db-schema.md` / `api-contract.md` / `UI_SPEC.md`）。每片完成更新 `progress.md` 并把本节对应 Slice 标进度。
 **2026-07-01 update**: Slice 8 Tier 1 is implemented as scheduled in-app weekly report digests only. Tier 2 remains backlog: per-user opt-in/preferences, notification settings UI, VAPID/Web Push, push subscription storage, service-worker push/notificationclick handlers, permission UX, iOS installed-PWA caveat, unsubscribe/dead-subscription cleanup, and OS-level opt-out.
+
+**2026-07-05 hardening update**: T3 auth endpoint rate limiting is implemented for register/login (`5/min/IP` and `10/min/IP`) using the existing in-memory limiter seam. Follow-up backlog: replace per-instance memory counters with a distributed DB/Redis-backed limiter when traffic or abuse patterns require cross-instance enforcement.
