@@ -32,6 +32,21 @@ function mockFetchThrows(): void {
   );
 }
 
+function mockFetchNeverResolves(): ReturnType<typeof vi.fn> {
+  const fetchSpy = vi.fn(
+    (_url: string, init?: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          const error = new Error("This operation was aborted");
+          error.name = "AbortError";
+          reject(error);
+        });
+      }),
+  );
+  vi.stubGlobal("fetch", fetchSpy);
+  return fetchSpy;
+}
+
 const baseRequest = {
   messages: [{ role: "user" as const, content: "hi" }],
   maxTokens: 64,
@@ -46,6 +61,11 @@ const byoConfig: OpenAiCompatibleProviderConfig = {
 };
 
 describe("runOpenAiCompatibleChatCompletion", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
   it("posts to baseUrl/chat/completions with bearer auth and returns provider/model", async () => {
     const fetchSpy = mockFetchOnce(200, {
       choices: [{ message: { content: "hello" } }],
@@ -88,6 +108,50 @@ describe("runOpenAiCompatibleChatCompletion", () => {
       completion_tokens: 2,
       total_tokens: 7,
     });
+  });
+
+  it("passes an abort signal and clears the timeout after a successful response", async () => {
+    vi.useFakeTimers();
+    const fetchSpy = mockFetchOnce(200, {
+      choices: [{ message: { content: "hello" } }],
+    });
+
+    const result = await runOpenAiCompatibleChatCompletion(
+      baseRequest,
+      byoConfig,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(fetchSpy.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("returns a timeout failure when the provider does not respond", async () => {
+    vi.useFakeTimers();
+    const fetchSpy = mockFetchNeverResolves();
+
+    const resultPromise = runOpenAiCompatibleChatCompletion(
+      baseRequest,
+      byoConfig,
+      { timeoutMs: 25 },
+    );
+
+    await vi.advanceTimersByTimeAsync(25);
+    const result = await resultPromise;
+
+    expect(fetchSpy.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
+    expect(result).toMatchObject({
+      attempted: true,
+      ok: false,
+      provider: "openai_compatible",
+      model: "deepseek-chat",
+      status: 0,
+      content: null,
+      toolCall: null,
+    });
+    expect(result.errorMessage).toMatch(/timeout|timed out/u);
+    expect(result.errorMessage).not.toMatch(/aborted/u);
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it("keeps ok with usage undefined when the usage shape is invalid", async () => {
@@ -158,6 +222,7 @@ describe("runOpenAiCompatibleChatCompletion", () => {
     expect(result.ok).toBe(false);
     expect(result.status).toBe(0);
     expect(result.attempted).toBe(true);
+    expect(result.errorMessage).toBe("network down");
   });
 });
 

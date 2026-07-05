@@ -1106,3 +1106,21 @@ Decision:
 
 Out of scope:
 - Python/FastAPI reranker microservice, LangSmith, embedding/ingestion changes, corpus edits, public DTO changes, and live Voyage eval as a regression gate.
+
+## [D46] hardening-1 T2 LLM chat completion timeout
+
+- **Date**: 2026-07-05
+- **Status**: Accepted / implemented
+
+Background: the shared OpenAI-compatible chat client had no abort signal, so a hung provider could consume the full serverless execution window. This client is used by both assistant calls and workout-intake LLM parsing.
+
+Decision:
+- Add `CHAT_COMPLETION_TIMEOUT_MS = 20_000` in the shared base client and apply it as the default inside `runOpenAiCompatibleChatCompletion(request, config, options = {})`. The timeout is not only in the assistant wrapper, so direct intake-parser calls inherit the same protection.
+- Use `AbortController.signal` for every fetch and clear the timer in `finally` for success, HTTP failure, unexpected response shape, body parse fallback, and thrown fetch paths.
+- Timeout/abort returns the existing normalized failure shape: `attempted:true`, `ok:false`, `status:0`, actual `provider/model`, and a sanitized message containing `timeout`. Non-timeout network errors preserve their original `error.message`.
+- Chat completion uses 20s, not the RAG rerank 2s timeout, because full chat generation and tool-selection requests commonly take seconds to tens of seconds, while Voyage rerank is a small ranking request with a narrow latency budget.
+- Workout-intake retry interaction: timeout returns `status:0`, so it fails fast and does not trigger the existing `status === 429` retry. Only a real 429 quick response waits 2s and retries once; the worst expected intake hang is about `429 fast response + 2s wait + 20s second attempt ~= 22s`.
+- `vercel.json` currently has no `functions.maxDuration`. The platform function timeout may still beat the app-level 20s timeout. Raising maxDuration is a future explicit deployment-config batch, not part of T2.
+
+Out of scope:
+- Provider-specific timeout tuning, user-visible copy changes, retry-policy changes, `vercel.json` changes, and new telemetry fields.

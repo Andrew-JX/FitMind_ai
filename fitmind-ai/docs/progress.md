@@ -4837,3 +4837,9 @@ Roadmap item E is now complete. From T1 onward, `pnpm format:check` is a normal 
 Closed two user-input paths that could surface as server errors. Malformed auth cookies now behave like missing credentials, returning `401 UNAUTHORIZED` without attempting JWT verification. Malformed workout pagination cursors are prevalidated in the service layer via the repository cursor decoder and return `400 VALIDATION_ERROR` before any workout repository query runs.
 
 API docs now state the workouts list cursor error contract. These are intentional boundary hardening changes: malformed cookie `500 -> 401`; malformed cursor repository-failure path `-> 400` before DB access.
+
+## 2026-07-05 hardening-1 T2: OpenAI-compatible LLM timeout
+
+Added a shared 20s timeout to the OpenAI-compatible chat client used by both Assistant provider calls and workout-intake LLM parsing. Timeout/abort failures now normalize to the existing provider failure shape (`attempted:true`, `ok:false`, `status:0`) with provider/model preserved and a sanitized timeout message; ordinary network errors keep their original messages.
+
+Decision D46 records why chat completion uses 20s instead of the RAG rerank 2s timeout, how intake parser retries interact with timeout (`status:0` does not trigger the 429 retry; real 429 worst case is about 22s), and why `vercel.json` maxDuration is intentionally unchanged in this batch.

@@ -12,6 +12,7 @@ import type {
 } from "./provider-types.js";
 
 export const OPENAI_COMPATIBLE_CHAT_COMPLETIONS_PATH = "/chat/completions";
+export const CHAT_COMPLETION_TIMEOUT_MS = 20_000;
 
 /** One OpenAI-style tool definition passed to a compatible chat endpoint. */
 export interface OpenAiCompatibleChatTool {
@@ -61,6 +62,10 @@ export interface OpenAiCompatibleChatResult {
   toolCall: OpenAiCompatibleChatToolCall | null;
   usage?: AssistantProviderUsage | undefined;
   errorMessage?: string | undefined;
+}
+
+export interface OpenAiCompatibleChatCompletionOptions {
+  timeoutMs?: number | undefined;
 }
 
 const openAiCompatibleToolCallSchema = z.object({
@@ -148,6 +153,10 @@ function configUnavailableResult(
   };
 }
 
+function isAbortError(error: unknown): boolean {
+  return getObjectProperty(error, "name") === "AbortError";
+}
+
 /**
  * Resolve the OpenAI-compatible config for the assistant seam.
  *
@@ -202,8 +211,14 @@ export async function runConfiguredAssistantOpenAiCompatibleChatCompletion(
 export async function runOpenAiCompatibleChatCompletion(
   request: OpenAiCompatibleChatRequest,
   config: OpenAiCompatibleProviderConfig,
+  options: OpenAiCompatibleChatCompletionOptions = {},
 ): Promise<OpenAiCompatibleChatResult> {
   const model = config.model;
+  const timeoutMs = options.timeoutMs ?? CHAT_COMPLETION_TIMEOUT_MS;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
   let response: Response;
   try {
     response = await fetch(buildChatCompletionsUrl(config.baseUrl), {
@@ -225,8 +240,22 @@ export async function runOpenAiCompatibleChatCompletion(
           : {}),
         messages: request.messages,
       }),
+      signal: controller.signal,
     });
   } catch (error) {
+    if (isAbortError(error)) {
+      return {
+        attempted: true,
+        provider: config.provider,
+        model,
+        ok: false,
+        status: 0,
+        content: null,
+        toolCall: null,
+        errorMessage: `${providerLabel(config.provider)} request timed out after ${timeoutMs}ms.`,
+      };
+    }
+
     return {
       attempted: true,
       provider: config.provider,
@@ -240,6 +269,8 @@ export async function runOpenAiCompatibleChatCompletion(
           ? error.message
           : `${providerLabel(config.provider)} request failed.`,
     };
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   let payload: unknown;
