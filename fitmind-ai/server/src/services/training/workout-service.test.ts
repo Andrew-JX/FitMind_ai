@@ -131,6 +131,21 @@ describe("workout-service", () => {
     expect(mockedListWorkoutsByUser).not.toHaveBeenCalled();
   });
 
+  it("rejects cursors that fail JSON parsing before querying workouts", async () => {
+    mockedDecodeWorkoutCursor.mockImplementationOnce(() => {
+      throw new SyntaxError("Unexpected token");
+    });
+
+    await expect(
+      listUserWorkouts(userId, { cursor: "bad-cursor" }),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      code: "VALIDATION_ERROR",
+    });
+    expect(mockedDecodeWorkoutCursor).toHaveBeenCalledWith("bad-cursor");
+    expect(mockedListWorkoutsByUser).not.toHaveBeenCalled();
+  });
+
   it("returns one user-owned workout detail", async () => {
     mockedFindWorkoutByIdForUser.mockResolvedValueOnce(workoutDetailRow);
 
