@@ -37,9 +37,7 @@ function mockFetchNeverResolves(): ReturnType<typeof vi.fn> {
     (_url: string, init?: RequestInit) =>
       new Promise((_resolve, reject) => {
         init?.signal?.addEventListener("abort", () => {
-          const error = new Error("This operation was aborted");
-          error.name = "AbortError";
-          reject(error);
+          reject(new DOMException("This operation was aborted", "AbortError"));
         });
       }),
   );

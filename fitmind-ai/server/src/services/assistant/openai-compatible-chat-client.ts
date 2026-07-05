@@ -154,7 +154,12 @@ function configUnavailableResult(
 }
 
 function isAbortError(error: unknown): boolean {
-  return getObjectProperty(error, "name") === "AbortError";
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    error.name === "AbortError"
+  );
 }
 
 /**

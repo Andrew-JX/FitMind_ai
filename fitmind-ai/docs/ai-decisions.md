@@ -1121,6 +1121,7 @@ Decision:
 - Chat completion uses 20s, not the RAG rerank 2s timeout, because full chat generation and tool-selection requests commonly take seconds to tens of seconds, while Voyage rerank is a small ranking request with a narrow latency budget.
 - Workout-intake retry interaction: timeout returns `status:0`, so it fails fast and does not trigger the existing `status === 429` retry. Only a real 429 quick response waits 2s and retries once; the worst expected intake hang is about `429 fast response + 2s wait + 20s second attempt ~= 22s`.
 - `vercel.json` currently has no `functions.maxDuration`. The platform function timeout may still beat the app-level 20s timeout. Raising maxDuration is a future explicit deployment-config batch, not part of T2.
+- Boundary: the timeout budget covers the fetch connection, request, and response headers. These calls are non-streaming, so the body normally follows immediately, but the response-body read phase is not separately covered by this fetch-level timeout.
 
 Out of scope:
 - Provider-specific timeout tuning, user-visible copy changes, retry-policy changes, `vercel.json` changes, and new telemetry fields.
