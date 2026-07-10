@@ -253,6 +253,142 @@ describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", ()
     });
   });
 
+  it.each([
+    {
+      name: "key/config missing",
+      provider: "openai_compatible" as const,
+      providerErrorCode: "OPENAI_COMPATIBLE_PROVIDER_ERROR",
+      providerMessage:
+        "OpenAI-compatible config unavailable: OPENAI_COMPAT_API_KEY is required.",
+      telemetry: {
+        attempted: false,
+        errored: false,
+        provider: "openai_compatible" as const,
+        model: null,
+      },
+      expectedLlm: undefined,
+    },
+    {
+      name: "HTTP error",
+      provider: "groq" as const,
+      providerErrorCode: "GROQ_PROVIDER_ERROR",
+      providerMessage: "Groq request failed (500): boom",
+      telemetry: {
+        attempted: true,
+        errored: true,
+        provider: "groq" as const,
+        model: "llama-3.3-70b-versatile",
+        usage: { prompt_tokens: 42, completion_tokens: 0, total_tokens: 42 },
+      },
+      expectedLlm: {
+        attemptCount: 1,
+        usageReportCount: 1,
+        errorCount: 1,
+        promptTokens: 42,
+        completionTokens: 0,
+        totalTokens: 42,
+        provider: "groq" as const,
+        model: "llama-3.3-70b-versatile",
+      },
+    },
+    {
+      name: "timeout status 0",
+      provider: "openai_compatible" as const,
+      providerErrorCode: "OPENAI_COMPATIBLE_PROVIDER_ERROR",
+      providerMessage: "OpenAI-compatible request timed out after 20000ms.",
+      telemetry: {
+        attempted: true,
+        errored: true,
+        provider: "openai_compatible" as const,
+        model: "deepseek-chat",
+      },
+      expectedLlm: {
+        attemptCount: 1,
+        usageReportCount: 0,
+        errorCount: 1,
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        provider: "openai_compatible" as const,
+        model: "deepseek-chat",
+      },
+    },
+    {
+      name: "malformed response",
+      provider: "openai_compatible" as const,
+      providerErrorCode: "OPENAI_COMPATIBLE_PROVIDER_ERROR",
+      providerMessage:
+        "OpenAI-compatible provider returned neither text nor a tool call.",
+      telemetry: {
+        attempted: true,
+        errored: true,
+        provider: "openai_compatible" as const,
+        model: "deepseek-chat",
+        usage: { prompt_tokens: 17, completion_tokens: 0, total_tokens: 17 },
+      },
+      expectedLlm: {
+        attemptCount: 1,
+        usageReportCount: 1,
+        errorCount: 1,
+        promptTokens: 17,
+        completionTokens: 0,
+        totalTokens: 17,
+        provider: "openai_compatible" as const,
+        model: "deepseek-chat",
+      },
+    },
+  ])(
+    "pins current provider error behavior for $name (AR-0a)",
+    async ({
+      provider,
+      providerErrorCode,
+      providerMessage,
+      telemetry,
+      expectedLlm,
+    }) => {
+      mockedGetConfiguredAssistantProvider.mockReturnValue(provider);
+      mockedRunAssistantProvider.mockResolvedValueOnce({
+        kind: "error",
+        error_code: providerErrorCode,
+        message: providerMessage,
+        telemetry,
+      });
+      const events: string[] = [];
+
+      const turn = runMockAssistantTurn(
+        "user-1",
+        {
+          mode: "weekly_report",
+          message: "weekly report",
+          start_date: "2026-05-19",
+          end_date: "2026-06-17",
+        },
+        {
+          onEvent: (event) => {
+            events.push(event.type);
+          },
+        },
+      );
+
+      await expect(turn).rejects.toMatchObject({
+        statusCode: 502,
+        code: "AI_PROVIDER_ERROR",
+        message: providerMessage,
+        details: { provider_error_code: providerErrorCode },
+      });
+      await turn.catch((error: unknown) => {
+        if (!(error instanceof AssistantTurnError)) {
+          throw error;
+        }
+        expect(error.turnTelemetry.llm).toEqual(expectedLlm);
+      });
+      expect(mockedExecuteAiTool).not.toHaveBeenCalled();
+      expect(events).toContain("provider_selected");
+      expect(events).toContain("error");
+      expect(events).not.toContain("done");
+    },
+  );
+
   it("keeps plan-adherence context off by default for next-week plans", async () => {
     const { response } = await runMockAssistantTurn("user-1", {
       mode: "next_week_plan",
