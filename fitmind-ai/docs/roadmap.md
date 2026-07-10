@@ -284,3 +284,54 @@ saved-insight 分享链接、知识管理后台、离线编辑 / 同步。优先
 **2026-07-01 update**: Slice 8 Tier 1 is implemented as scheduled in-app weekly report digests only. Tier 2 remains backlog: per-user opt-in/preferences, notification settings UI, VAPID/Web Push, push subscription storage, service-worker push/notificationclick handlers, permission UX, iOS installed-PWA caveat, unsubscribe/dead-subscription cleanup, and OS-level opt-out.
 
 **2026-07-05 hardening update**: T3 auth endpoint rate limiting is implemented for register/login (`5/min/IP` and `10/min/IP`) using the existing in-memory limiter seam. Follow-up backlog: replace per-instance memory counters with a distributed DB/Redis-backed limiter when traffic or abuse patterns require cross-instance enforcement.
+
+## 9. AR arc - make the AI genuinely live (2026-07-05)
+
+The next arc moves the public demo from "deterministic by default, real provider
+available by config" toward "real DeepSeek by default" through the existing
+OpenAI-compatible provider. The deployment constraint is strict: AR-2 must not
+flip the public default until AR-0 fallback hardening and AR-1 cost/abuse
+guardrails are implemented, reviewed, and merged. A public default means every
+visitor can create paid calls, so wallet protection ships before the default
+changes.
+
+Detailed AR-0/AR-1 implementation design lives in `docs/ar-arc-plan.md`. It is a
+pre-decision plan for later D48/D49 work and does not consume a formal decision
+number by itself.
+
+Batch order:
+
+1. **AR-0 - provider fallback hardening**: first characterize the current
+   provider-error behavior (`502 AI_PROVIDER_ERROR`), then change key-missing,
+   HTTP-error, timeout, and malformed-response paths to fall back through the
+   deterministic mock/default-tool path. Fallback must be observable in
+   telemetry and SSE must finish with `done`, not `error`.
+2. **AR-1 - cost and abuse guardrails**: add per-instance daily call/cost
+   budgets, a fail-safe real-provider kill-switch, and anonymous/per-IP AI call
+   hard limits. Existing per-user AI limits remain. Per-IP or budget block means
+   deterministic mock fallback before any real provider request.
+3. **AR-2 - public default switch**: after AR-0 and AR-1 are reviewed, switch the
+   public demo to `ASSISTANT_PROVIDER=openai_compatible` plus DeepSeek
+   `OPENAI_COMPAT_*` env. Codex provides local live validation and a production
+   checklist; the user performs the Vercel environment change and deployment.
+4. **AR-3 - real end-to-end streaming**: start by splitting the orchestrator
+   boundary so streaming can be reasoned about and tested incrementally, then
+   wire true real-provider streaming end to end. Do not combine orchestrator
+   extraction and streaming behavior changes into one batch.
+5. **AR-4 - real-link eval**: add a reviewed live DeepSeek smoke/eval path after
+   local real conversations are stable. The committed gate remains deterministic
+   and zero-network unless a later review explicitly promotes a live-provider
+   check.
+
+AR-2 readiness checklist:
+
+- AR-0 telemetry can distinguish real DeepSeek success from provider-error mock
+  fallback, so a broken production key is monitorable instead of silently hidden.
+- AR-0 provider-error fallback returns a real deterministic answer from tools and
+  faithfulness, not an error wrapper.
+- AR-1 budget config fails closed: missing or malformed values keep limits
+  enabled rather than allowing unlimited spend.
+- Call-count budget remains active even when model pricing is unknown and
+  `estimated_cost_usd` is `null`.
+- A local DeepSeek run has completed a full conversation plus approved eval smoke
+  before the user changes Vercel production env.
