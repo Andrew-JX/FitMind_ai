@@ -1,5 +1,7 @@
 import type {
+  AssistantProviderErrorResponse,
   AssistantProviderResponse,
+  AssistantProviderToolCallResponse,
   AssistantProviderToolDefinition,
 } from "./provider-types.js";
 
@@ -13,6 +15,104 @@ export interface EvidenceToolArgSource {
   start_date: string;
   end_date: string;
   exercise_id?: string | undefined;
+}
+
+export interface ProviderErrorFallbackTelemetry {
+  provider_error_fallback: true;
+  provider_error_code: string;
+  provider_error_message_sanitized: string;
+  provider_error_status: number | null;
+  fallback_provider: "mock";
+  fallback_reason: "provider_error";
+}
+
+export type ProviderErrorFallbackDecision =
+  | {
+      kind: "tool_call";
+      response: AssistantProviderToolCallResponse;
+      telemetry: ProviderErrorFallbackTelemetry;
+    }
+  | {
+      kind: "missing_required_args";
+      missing_input_fields: string[];
+      telemetry: ProviderErrorFallbackTelemetry;
+    };
+
+function resolveToolArg(
+  field: string,
+  argSource: EvidenceToolArgSource,
+): string | undefined {
+  return field === "start_date"
+    ? argSource.start_date
+    : field === "end_date"
+      ? argSource.end_date
+      : field === "exercise_id"
+        ? argSource.exercise_id
+        : undefined;
+}
+
+function inferProviderErrorStatus(message: string): number | null {
+  if (/\btimeout\b|\btimed out\b/iu.test(message)) {
+    return 0;
+  }
+
+  const match = /\bHTTP\s+(\d{3})\b|\((\d{3})\)/iu.exec(message);
+  const rawStatus = match?.[1] ?? match?.[2];
+  if (rawStatus === undefined) {
+    return null;
+  }
+
+  const status = Number.parseInt(rawStatus, 10);
+
+  return Number.isInteger(status) ? status : null;
+}
+
+function buildProviderErrorFallbackTelemetry(
+  response: AssistantProviderErrorResponse,
+): ProviderErrorFallbackTelemetry {
+  return {
+    provider_error_fallback: true,
+    provider_error_code: response.error_code,
+    provider_error_message_sanitized: response.message,
+    provider_error_status: inferProviderErrorStatus(response.message),
+    fallback_provider: "mock",
+    fallback_reason: "provider_error",
+  };
+}
+
+export function decideProviderErrorFallback(
+  response: AssistantProviderErrorResponse,
+  tool: AssistantProviderToolDefinition,
+  argSource: EvidenceToolArgSource,
+): ProviderErrorFallbackDecision {
+  const telemetry = buildProviderErrorFallbackTelemetry(response);
+  const args: Record<string, string> = {};
+  const missingInputFields: string[] = [];
+
+  for (const field of tool.input_fields) {
+    const value = resolveToolArg(field, argSource);
+
+    if (value === undefined) {
+      missingInputFields.push(field);
+      continue;
+    }
+
+    args[field] = value;
+  }
+
+  if (missingInputFields.length > 0) {
+    return {
+      kind: "missing_required_args",
+      missing_input_fields: missingInputFields,
+      telemetry,
+    };
+  }
+
+  return {
+    kind: "tool_call",
+    response: { kind: "tool_call", tool_name: tool.name, tool_args: args },
+    telemetry,
+  };
 }
 
 /**
