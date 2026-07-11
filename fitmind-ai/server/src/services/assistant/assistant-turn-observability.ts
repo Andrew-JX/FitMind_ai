@@ -4,6 +4,7 @@ import type {
   AssistantSafetyReason,
 } from "./assistant-safety.js";
 import type { AssistantProviderCallTelemetry } from "./provider-types.js";
+import type { ProviderErrorFallbackTelemetry } from "./assistant-provider-fallback.js";
 
 /** Faithfulness outcome bucket for telemetry (`unchecked` = no tool data this turn). */
 type FaithfulnessStatus = "verified" | "flagged" | "unchecked";
@@ -58,6 +59,7 @@ export interface AssistantTurnLogInput {
     | undefined;
   hasPlan?: boolean | undefined;
   llm?: AssistantTurnLlmSummary | null | undefined;
+  providerErrorFallback?: ProviderErrorFallbackTelemetry | null | undefined;
   safety?:
     | { boundary: "medical_boundary"; reason: AssistantSafetyReason }
     | null
@@ -78,7 +80,16 @@ interface LlmEventFields {
   estimated_cost_usd: number | null;
 }
 
-export interface AssistantTurnLogEvent extends LlmEventFields {
+interface ProviderErrorFallbackEventFields {
+  provider_error_fallback: boolean;
+  provider_error_code: string | null;
+  provider_error_message_sanitized: string | null;
+  fallback_provider: "mock" | null;
+  fallback_reason: "provider_error" | null;
+}
+
+export interface AssistantTurnLogEvent
+  extends LlmEventFields, ProviderErrorFallbackEventFields {
   event: "assistant_turn";
   status: "ok";
   intent: AssistantRoutedIntent;
@@ -182,7 +193,23 @@ export function buildAssistantTurnLogEvent(
     has_plan: input.hasPlan ?? false,
     safety_boundary: input.safety?.boundary ?? "none",
     safety_reason: input.safety?.reason ?? null,
+    ...buildProviderErrorFallbackEventFields(
+      input.providerErrorFallback ?? null,
+    ),
     ...buildLlmEventFields(input.llm ?? null),
+  };
+}
+
+function buildProviderErrorFallbackEventFields(
+  fallback: ProviderErrorFallbackTelemetry | null,
+): ProviderErrorFallbackEventFields {
+  return {
+    provider_error_fallback: fallback?.provider_error_fallback ?? false,
+    provider_error_code: fallback?.provider_error_code ?? null,
+    provider_error_message_sanitized:
+      fallback?.provider_error_message_sanitized ?? null,
+    fallback_provider: fallback?.fallback_provider ?? null,
+    fallback_reason: fallback?.fallback_reason ?? null,
   };
 }
 

@@ -34,6 +34,11 @@ describe("buildAssistantTurnLogEvent", () => {
       has_plan: false,
       safety_boundary: "none",
       safety_reason: null,
+      provider_error_fallback: false,
+      provider_error_code: null,
+      provider_error_message_sanitized: null,
+      fallback_provider: null,
+      fallback_reason: null,
       llm_attempt_count: 0,
       llm_usage_report_count: 0,
       llm_error_count: 0,
@@ -87,6 +92,44 @@ describe("buildAssistantTurnLogEvent", () => {
     expect(event.llm_attempt_count).toBe(0);
     expect(event.llm_usage_report_count).toBe(0);
     expect(event.llm_error_count).toBe(0);
+    expect(event.provider_error_fallback).toBe(false);
+  });
+
+  it("distinguishes provider-error fallback from normal mock-mode traffic", () => {
+    const normalMockEvent = buildAssistantTurnLogEvent({
+      intent: "weekly_report",
+      durationMs: 25,
+      toolCalls: [{ status: "success", duration_ms: 4 }],
+    });
+    const fallbackEvent = buildAssistantTurnLogEvent({
+      intent: "weekly_report",
+      durationMs: 30,
+      toolCalls: [{ status: "success", duration_ms: 5 }],
+      providerErrorFallback: {
+        provider_error_fallback: true,
+        provider_error_code: "GROQ_PROVIDER_ERROR",
+        provider_error_message_sanitized:
+          "Groq request failed (503): unavailable",
+        fallback_provider: "mock",
+        fallback_reason: "provider_error",
+      },
+    });
+
+    expect(normalMockEvent).toMatchObject({
+      provider_error_fallback: false,
+      provider_error_code: null,
+      provider_error_message_sanitized: null,
+      fallback_provider: null,
+      fallback_reason: null,
+    });
+    expect(fallbackEvent).toMatchObject({
+      provider_error_fallback: true,
+      provider_error_code: "GROQ_PROVIDER_ERROR",
+      provider_error_message_sanitized:
+        "Groq request failed (503): unavailable",
+      fallback_provider: "mock",
+      fallback_reason: "provider_error",
+    });
   });
 
   it("reports the distinct LLM counts and a list-price cost for a known model", () => {

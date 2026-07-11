@@ -78,22 +78,29 @@ vi.mock("../planned-workout-service.js", () => ({
   getPlanAdherenceContextForPlanner: vi.fn(async () => null),
 }));
 
-import {
-  AssistantTurnError,
-  runMockAssistantTurn,
-} from "./assistant-orchestrator-service.js";
+import { runMockAssistantTurn } from "./assistant-orchestrator-service.js";
 import { executeAiTool } from "../ai/tools/tool-executor.js";
 import { getPlanAdherenceContextForPlanner } from "../planned-workout-service.js";
-import { runAssistantProvider } from "./provider-adapter.js";
-import { getConfiguredAssistantProvider } from "./provider-config.js";
+import {
+  runAssistantAnswerPhrasing,
+  runAssistantProvider,
+} from "./provider-adapter.js";
+import {
+  getConfiguredAssistantProvider,
+  isAssistantAnswerPhrasingEnabled,
+} from "./provider-config.js";
 
 const mockedExecuteAiTool = vi.mocked(executeAiTool);
 const mockedGetPlanAdherenceContext = vi.mocked(
   getPlanAdherenceContextForPlanner,
 );
 const mockedRunAssistantProvider = vi.mocked(runAssistantProvider);
+const mockedRunAssistantAnswerPhrasing = vi.mocked(runAssistantAnswerPhrasing);
 const mockedGetConfiguredAssistantProvider = vi.mocked(
   getConfiguredAssistantProvider,
+);
+const mockedIsAssistantAnswerPhrasingEnabled = vi.mocked(
+  isAssistantAnswerPhrasingEnabled,
 );
 
 describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", () => {
@@ -106,6 +113,7 @@ describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", ()
     mockedExecuteAiTool.mockResolvedValue(CANNED_REPORT);
     mockedGetPlanAdherenceContext.mockResolvedValue(null);
     mockedGetConfiguredAssistantProvider.mockReturnValue("mock");
+    mockedIsAssistantAnswerPhrasingEnabled.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -213,8 +221,9 @@ describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", ()
     expect(telemetry.llm).toBeUndefined();
   });
 
-  it("throws AssistantTurnError carrying llm telemetry when the groq routing call fails (P1)", async () => {
+  it("completes a non-stream turn with deterministic fallback and llm telemetry when provider routing fails", async () => {
     mockedGetConfiguredAssistantProvider.mockReturnValue("groq");
+    mockedIsAssistantAnswerPhrasingEnabled.mockReturnValue(true);
     mockedRunAssistantProvider.mockResolvedValueOnce({
       kind: "error",
       error_code: "GROQ_PROVIDER_ERROR",
@@ -228,28 +237,38 @@ describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", ()
       },
     });
 
-    const turn = runMockAssistantTurn("user-1", {
+    const { response, telemetry } = await runMockAssistantTurn("user-1", {
       mode: "auto",
       message: "周报",
       start_date: "2026-05-19",
       end_date: "2026-06-17",
     });
 
-    await expect(turn).rejects.toBeInstanceOf(AssistantTurnError);
-    await turn.catch((error: unknown) => {
-      if (!(error instanceof AssistantTurnError)) {
-        throw error;
-      }
-      expect(error.turnTelemetry.llm).toEqual({
-        attemptCount: 1,
-        usageReportCount: 1,
-        errorCount: 1,
-        promptTokens: 42,
-        completionTokens: 0,
-        totalTokens: 42,
-        provider: "groq",
-        model: "llama-3.3-70b-versatile",
-      });
+    expect(response.tool_calls).toEqual([
+      expect.objectContaining({
+        tool_name: "get_weekly_training_report",
+        status: "success",
+      }),
+    ]);
+    expect(response.faithfulness?.status).toBe("verified");
+    expect(response.message_id).toBe("message-1");
+    expect(mockedRunAssistantAnswerPhrasing).not.toHaveBeenCalled();
+    expect(telemetry.llm).toEqual({
+      attemptCount: 1,
+      usageReportCount: 1,
+      errorCount: 1,
+      promptTokens: 42,
+      completionTokens: 0,
+      totalTokens: 42,
+      provider: "groq",
+      model: "llama-3.3-70b-versatile",
+    });
+    expect(telemetry.providerErrorFallback).toEqual({
+      provider_error_fallback: true,
+      provider_error_code: "GROQ_PROVIDER_ERROR",
+      provider_error_message_sanitized: "Groq request failed (500): boom",
+      fallback_provider: "mock",
+      fallback_reason: "provider_error",
     });
   });
 
@@ -338,7 +357,7 @@ describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", ()
       },
     },
   ])(
-    "pins current provider error behavior for $name (AR-0a)",
+    "falls back through the deterministic stream path for $name (AR-0c)",
     async ({
       provider,
       providerErrorCode,
@@ -370,24 +389,82 @@ describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", ()
         },
       );
 
-      await expect(turn).rejects.toMatchObject({
-        statusCode: 502,
-        code: "AI_PROVIDER_ERROR",
-        message: providerMessage,
-        details: { provider_error_code: providerErrorCode },
+      const { response, telemetry: turnTelemetry } = await turn;
+
+      expect(response.tool_calls).toEqual([
+        expect.objectContaining({
+          tool_name: "get_weekly_training_report",
+          status: "success",
+        }),
+      ]);
+      expect(response.faithfulness?.status).toBe("verified");
+      expect(response.message_id).toBe("message-1");
+      expect(turnTelemetry.llm).toEqual(expectedLlm);
+      expect(turnTelemetry.providerErrorFallback).toEqual({
+        provider_error_fallback: true,
+        provider_error_code: providerErrorCode,
+        provider_error_message_sanitized: providerMessage,
+        fallback_provider: "mock",
+        fallback_reason: "provider_error",
       });
-      await turn.catch((error: unknown) => {
-        if (!(error instanceof AssistantTurnError)) {
-          throw error;
-        }
-        expect(error.turnTelemetry.llm).toEqual(expectedLlm);
-      });
-      expect(mockedExecuteAiTool).not.toHaveBeenCalled();
+      expect(mockedExecuteAiTool).toHaveBeenCalledWith(
+        { userId: "user-1" },
+        "get_weekly_training_report",
+        { start_date: "2026-05-19", end_date: "2026-06-17" },
+      );
       expect(events).toContain("provider_selected");
-      expect(events).toContain("error");
-      expect(events).not.toContain("done");
+      expect(events).toContain("done");
+      expect(events).not.toContain("error");
     },
   );
+
+  it("completes provider-error fallback with guidance and done when required tool args are missing", async () => {
+    mockedGetConfiguredAssistantProvider.mockReturnValue("groq");
+    mockedRunAssistantProvider.mockResolvedValueOnce({
+      kind: "error",
+      error_code: "GROQ_PROVIDER_ERROR",
+      message: "Groq request failed (503): unavailable",
+      telemetry: {
+        attempted: true,
+        errored: true,
+        provider: "groq",
+        model: "llama-3.3-70b-versatile",
+      },
+    });
+    const events: string[] = [];
+
+    const { response, telemetry } = await runMockAssistantTurn(
+      "user-1",
+      {
+        mode: "exercise_progress",
+        message: "分析这个动作的进展",
+        start_date: "2026-05-19",
+        end_date: "2026-06-17",
+      },
+      {
+        onEvent: (event) => {
+          events.push(event.type);
+        },
+      },
+    );
+
+    expect(response.tool_calls).toEqual([]);
+    expect(response.answer.summary).toContain("请先指定要分析的动作");
+    expect(response.faithfulness).toBeUndefined();
+    expect(response.message_id).toBe("message-1");
+    expect(telemetry.providerErrorFallback).toEqual({
+      provider_error_fallback: true,
+      provider_error_code: "GROQ_PROVIDER_ERROR",
+      provider_error_message_sanitized:
+        "Groq request failed (503): unavailable",
+      fallback_provider: "mock",
+      fallback_reason: "provider_error",
+    });
+    expect(mockedExecuteAiTool).not.toHaveBeenCalled();
+    expect(events).toContain("structured_output");
+    expect(events).toContain("done");
+    expect(events).not.toContain("error");
+  });
 
   it("keeps plan-adherence context off by default for next-week plans", async () => {
     const { response } = await runMockAssistantTurn("user-1", {

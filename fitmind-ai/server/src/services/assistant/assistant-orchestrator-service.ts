@@ -31,7 +31,12 @@ import {
   runAssistantAnswerPhrasing,
   runAssistantProvider,
 } from "./provider-adapter.js";
-import { coerceMessageToEvidenceToolCall } from "./assistant-provider-fallback.js";
+import {
+  coerceMessageToEvidenceToolCall,
+  decideProviderErrorFallback,
+  type NonErrorProviderResponse,
+  type ProviderErrorFallbackTelemetry,
+} from "./assistant-provider-fallback.js";
 import { applyFaithfulPhrasing } from "./answer-phrasing.js";
 import { getToolDefinitionForMode } from "./assistant-tool-routing.js";
 import {
@@ -280,6 +285,8 @@ export interface MockAssistantTurnResponseData {
 export interface AssistantTurnTelemetry {
   /** Aggregated LLM call/token telemetry (Groq); undefined on deterministic/mock paths. */
   llm?: AssistantTurnLlmSummary | undefined;
+  /** Server-only marker for a provider error completed via deterministic fallback. */
+  providerErrorFallback?: ProviderErrorFallbackTelemetry | undefined;
   /** Server-only safety marker for pre-routing medical boundary hits. */
   safety?:
     | { boundary: "medical_boundary"; reason: AssistantSafetyReason }
@@ -752,6 +759,22 @@ function buildProviderMessageAnswer(message: string): AssistantAnswerCore {
   };
 }
 
+function buildProviderErrorFallbackGuidance(
+  missingInputFields: string[],
+): string {
+  const fieldLabels = missingInputFields.map((field) =>
+    field === "exercise_id"
+      ? "要分析的动作"
+      : field === "start_date"
+        ? "开始日期"
+        : field === "end_date"
+          ? "结束日期"
+          : field,
+  );
+
+  return `暂时无法完成这次训练数据查询。请先指定${fieldLabels.join("、")}，再重新提问。`;
+}
+
 function createValidationHttpError(error: AiToolValidationError): HttpError {
   return new HttpError(400, error.code, error.message, {
     issues: error.issues,
@@ -1137,8 +1160,17 @@ function buildToolAnswer(
  */
 function buildTurnTelemetry(
   records: AssistantLlmCallRecord[],
+  providerErrorFallback?: ProviderErrorFallbackTelemetry,
 ): AssistantTurnTelemetry {
-  return { llm: summarizeTurnLlmCalls(records) };
+  const telemetry: AssistantTurnTelemetry = {
+    llm: summarizeTurnLlmCalls(records),
+  };
+
+  if (providerErrorFallback !== undefined) {
+    telemetry.providerErrorFallback = providerErrorFallback;
+  }
+
+  return telemetry;
 }
 
 export async function runMockAssistantTurn(
@@ -1381,36 +1413,40 @@ export async function runMockAssistantTurn(
   const routingRecord: AssistantLlmCallRecord =
     rawProviderResponse.telemetry ?? NO_LLM_CALL;
 
+  const defaultTool = getToolDefinitionForMode(executionMode);
+  const fallbackArgSource = {
+    start_date: input.start_date,
+    end_date: input.end_date,
+    exercise_id: input.exercise_id,
+  };
+  let providerResponse: NonErrorProviderResponse;
+  let providerErrorFallback: ProviderErrorFallbackTelemetry | undefined;
+
   if (rawProviderResponse.kind === "error") {
-    const error = new AssistantTurnError(
-      502,
-      "AI_PROVIDER_ERROR",
-      rawProviderResponse.message,
-      { provider_error_code: rawProviderResponse.error_code },
-      buildTurnTelemetry([routerRecord, routingRecord]),
+    const fallback = decideProviderErrorFallback(
+      rawProviderResponse,
+      defaultTool,
+      fallbackArgSource,
     );
-
-    await emitEvent(options, {
-      type: "error",
-      code: error.code,
-      message: error.message,
-    });
-
-    throw error;
+    providerErrorFallback = fallback.telemetry;
+    providerResponse =
+      fallback.kind === "tool_call"
+        ? fallback.response
+        : {
+            kind: "message",
+            message: buildProviderErrorFallbackGuidance(
+              fallback.missing_input_fields,
+            ),
+          };
+  } else {
+    // Slice 11.2a safety net: provider-path intents are all data questions, so if
+    // the provider answered in prose (no tool), run the mode's default tool.
+    providerResponse = coerceMessageToEvidenceToolCall(
+      rawProviderResponse,
+      defaultTool,
+      fallbackArgSource,
+    );
   }
-
-  // Slice 11.2a safety net: provider-path intents are all data questions, so if
-  // the provider answered in prose (no tool), run the mode's default tool instead
-  // of degrading to a generic non-answer (fixes routing issue ①, provider-agnostic).
-  const providerResponse = coerceMessageToEvidenceToolCall(
-    rawProviderResponse,
-    getToolDefinitionForMode(executionMode),
-    {
-      start_date: input.start_date,
-      end_date: input.end_date,
-      exercise_id: input.exercise_id,
-    },
-  );
 
   let phrasingRecord: AssistantLlmCallRecord | undefined;
 
@@ -1544,7 +1580,10 @@ export async function runMockAssistantTurn(
     // and the runtime faithfulness check. The model only re-words `answer.summary`;
     // a rewrite that introduces an unverified number is rejected and we keep the
     // deterministic draft (numbers/conclusions stay deterministic + evidence-bound).
-    if (isAssistantAnswerPhrasingEnabled()) {
+    if (
+      providerErrorFallback === undefined &&
+      isAssistantAnswerPhrasingEnabled()
+    ) {
       const phrasing = await runAssistantAnswerPhrasing({
         draftSummary: answer.summary,
         supportingFacts: answer.bullets,
@@ -1600,6 +1639,7 @@ export async function runMockAssistantTurn(
       phrasingRecord === undefined
         ? [routerRecord, routingRecord]
         : [routerRecord, routingRecord, phrasingRecord],
+      providerErrorFallback,
     ),
   };
 }

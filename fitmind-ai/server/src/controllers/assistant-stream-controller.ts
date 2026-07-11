@@ -31,6 +31,7 @@ function logTurnTelemetry(
     faithfulness: response.faithfulness ?? null,
     hasPlan: response.plan !== undefined,
     llm: telemetry.llm ?? null,
+    providerErrorFallback: telemetry.providerErrorFallback ?? null,
     safety: telemetry.safety ?? null,
   });
 }
