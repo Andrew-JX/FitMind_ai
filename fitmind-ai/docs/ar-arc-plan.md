@@ -1,9 +1,10 @@
 # AR arc pre-implementation plan
 
 - **Date**: 2026-07-05
-- **Status**: Proposed design / docs-only
-- **Scope**: AR-0 and AR-1 implementation plan for review before D48/D49. This
-  document does not consume a formal decision number.
+- **Status**: AR-0 implemented; AR-1 remains proposed
+- **Scope**: AR-0 completion record and AR-1 implementation plan. AR-0's
+  accepted contract is recorded in D48; this plan does not consume a formal
+  decision number.
 
 The AR arc goal is to make the public demo feel like a real AI product while
 preserving FitMind's core promise: deterministic tools, evidence-bound answers,
@@ -33,14 +34,15 @@ and the DeepSeek `OPENAI_COMPAT_*` values after local live validation.
 
 ## AR-0: provider fallback hardening
 
-### Current behavior
+**Status: Complete (AR-0a through AR-0d).** The accepted shipped contract is
+recorded in [D48](./ai-decisions.md#d48-ar-0-provider-error-deterministic-fallback).
 
-`assistant-provider-fallback.ts` currently covers one narrow success-shape
-fallback: when a provider returns a plain `message` instead of a tool call and
-the default tool has enough arguments, `coerceMessageToEvidenceToolCall` creates
-the deterministic default evidence tool call. It preserves provider `tool_call`
-responses and leaves required-argument gaps alone, such as an exercise-specific
-tool without `exercise_id`.
+### Implemented behavior
+
+`assistant-provider-fallback.ts` retains the success-shape fallback for provider
+plain-text messages and now also converts normalized provider errors into a
+deterministic fallback decision. It preserves provider `tool_call` responses
+and never invents required arguments such as an `exercise_id`.
 
 The OpenAI-compatible client/provider already normalizes several DeepSeek-style
 failure classes into provider errors:
@@ -50,15 +52,13 @@ failure classes into provider errors:
 - timeout/abort as `status:0` after the shared 20s timeout;
 - malformed or unexpected response shape as a provider error.
 
-The gap is orchestration. When `runAssistantProvider` returns
-`rawProviderResponse.kind === "error"`, the orchestrator currently throws
-`AssistantTurnError(502, "AI_PROVIDER_ERROR", ...)`, emits/propagates the error
-path, and never reaches `coerceMessageToEvidenceToolCall`. Existing tests such
-as the weekly-report provider failure characterization assert this thrown-error
-behavior and telemetry preservation. AR-0 must first pin that current behavior,
-then intentionally change it.
+The orchestrator now resolves `rawProviderResponse.kind === "error"` before
+answer assembly. If all default-tool arguments exist, it executes that real
+tool and retains faithfulness validation. If required arguments are absent, it
+returns deterministic guidance requesting the missing input. Both branches
+persist structured output and complete SSE with `done`, not `error`.
 
-### Target behavior
+### Implemented contract
 
 Key missing, HTTP error, timeout, and malformed provider response all degrade to
 the same user-visible shape: a successful deterministic answer produced through
@@ -96,47 +96,48 @@ not an error wrapper with friendly copy.
    path, keeps persistence and telemetry in one place, and allows a single test
    seam to cover mock-turn and stream-turn.
 
-### Proposed implementation slices
+### Completed implementation slices
 
-- **AR-0a characterization tests**: pin current provider error behavior for key
+- **AR-0a characterization tests** pinned the former provider error behavior for key
   missing/config failure, HTTP error, timeout, and malformed response. Also pin
-  that current SSE emits `error`/throws `AI_PROVIDER_ERROR`. Code files expected:
-  provider/client tests plus one orchestrator or stream test.
-- **AR-0b fallback seam**: extend the provider fallback boundary so a provider
-  error can be represented as "use deterministic fallback tool" while preserving
-  `provider_error_code` and safe failure metadata. Keep it a pure function where
-  possible.
-- **AR-0c orchestrator wiring**: route provider errors through deterministic
+  that the pre-AR-0 SSE path emitted `error`/threw `AI_PROVIDER_ERROR`.
+- **AR-0b fallback seam** extended the provider fallback boundary so a provider
+  error is represented as either "use deterministic fallback tool" or
+  "request missing input", while preserving `provider_error_code` and safe
+  failure metadata in a pure decision seam.
+- **AR-0c orchestrator wiring** routes provider errors through deterministic
   default tool execution, answer assembly, persistence, and faithfulness. Both
-  mock-turn and stream-turn must share the same behavior. SSE fallback ends in
+  mock-turn and stream-turn share the same behavior. SSE fallback ends in
   `done`, not `error`.
-- **AR-0d documentation**: record D48 after implementation with the exact
-  telemetry markers, SSE semantics, and any remaining provider-specific
-  boundaries.
+- **AR-0d documentation** records D48 with the exact telemetry markers, SSE
+  semantics, phrasing bypass, unchanged public DTO, and remaining boundaries.
 
-Each slice remains under five code files. If an implementation slice threatens
-that limit, split tests from wiring instead of widening the batch.
+Each implementation slice stayed under five code files; tests and wiring were
+kept in separately reviewable batches where needed.
 
-### Test strategy
+### Verification coverage
 
-- Use injected provider/fetch/clock seams. Do not call DeepSeek in unit tests.
-- Cover the four failure classes: missing key/config, HTTP error, timeout, and
+- Tests use injected provider/fetch/clock seams and do not call DeepSeek.
+- Coverage includes the four failure classes: missing key/config, HTTP error, timeout, and
   malformed response.
-- Assert user-visible success: HTTP/SSE completes, structured output exists,
+- User-visible success assertions confirm HTTP/SSE completes, structured output exists,
   faithfulness is present, and no `AI_PROVIDER_ERROR` reaches the public
   response.
-- Assert observability: telemetry contains `provider_error_fallback:true`,
+- Observability assertions confirm telemetry contains `provider_error_fallback:true`,
   original `provider_error_code`, and `fallback_provider:"mock"` or equivalent
   monitorable fields.
-- Assert SSE contract: fallback streams normal answer events and `done`, never
+- SSE contract assertions confirm fallback streams normal answer events and `done`, never
   the `error` event for provider-error fallback.
-- Preserve existing safety/refusal behavior. Safety-gate failures are not
+- Existing safety/refusal behavior remains preserved. Safety-gate failures are not
   provider failures and must not be turned into mock answers.
 
 ### Known boundaries
 
 - This is a fallback, not proof that DeepSeek is healthy. AR-2 still needs a live
-  local DeepSeek conversation and live eval smoke before production env changes.
+  local DeepSeek conversation and live validation before production env changes.
+- Numeric `provider_error_status` is not independently carried in structured
+  telemetry. Add it only in a separately reviewed pass-through change if
+  operations need status-based aggregation (AR-0b review backlog).
 - Provider outages may increase latency up to the provider timeout before
   fallback. Timeout tuning remains a separate deployment/runtime decision.
 - Fallback answers are deterministic and safe, but may be less conversational

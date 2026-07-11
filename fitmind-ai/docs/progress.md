@@ -4851,3 +4851,9 @@ Added endpoint-specific in-memory rate limiting for `POST /api/auth/register` an
 `createApp()` now sets `trust proxy` to `1` for the Vercel single-proxy deployment shape. The review-relevant tradeoff is documented in D47: this trusts the nearest Vercel proxy hop for client IP derivation without trusting arbitrary leftmost forwarded values, but Cloudflare Worker -> Vercel traffic may still share a Worker egress IP bucket. The limiter remains per-instance memory state; distributed DB/Redis-backed limiting is a future roadmap item.
 
 Verification coverage added: middleware tests cover allow, reject, and one-minute window reset with an injected clock; app tests inject a wide limiter for existing characterization routes and a narrow limiter to prove login is blocked before controller validation.
+
+## 2026-07-05 AR-0 closeout: provider-error deterministic fallback
+
+AR-0a through AR-0d are complete. AR-0a characterized the four provider failure classes and the former error behavior; AR-0b added the deterministic fallback seam with sanitized telemetry; AR-0c wired provider errors through the real default-tool or missing-argument guidance path, with normal structured output and SSE `done` instead of `error`; AR-0d records the shipped contract in ai-decisions D48 and closes the stale implementation wording in the AR arc plan.
+
+The completed fallback is observable through `provider_error_fallback`, `provider_error_code`, `provider_error_message_sanitized`, `fallback_provider`, and `fallback_reason`; normal traffic explicitly records `provider_error_fallback:false`. Public DTOs remain unchanged, and fallback turns skip optional LLM phrasing. This closeout is documentation-only; DeepSeek still requires local live validation before AR-2, and numeric `provider_error_status` structured pass-through remains a separately reviewed backlog item.

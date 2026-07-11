@@ -1150,3 +1150,22 @@ Review note:
 
 Out of scope:
 - Global 60/min/IP limiting, Redis/DB counters, Cloudflare edge rate limiting, CAPTCHA, account lockout, and user-visible copy localization.
+
+## [D48] AR-0 provider-error deterministic fallback
+
+- **Date**: 2026-07-05
+- **Status**: Accepted / implemented
+
+Background: the OpenAI-compatible assistant provider already normalized provider failures, but the orchestrator still turned them into `502 AI_PROVIDER_ERROR` turns. That made a missing key or provider outage user-visible and caused SSE to terminate with `error`, even though the same intent had a deterministic default-tool path available.
+
+Decision:
+- Treat four normalized failure classes as provider errors at the fallback boundary: missing or unusable provider configuration; provider HTTP errors; timeout/abort failures normalized with `status:0`; and malformed or unexpected provider response shapes.
+- Use one of two deterministic completion paths. When all required default-tool arguments are available, synthesize the default tool call, execute the real FitMind tool, assemble the evidence-bound answer, and run faithfulness validation. When a required argument is missing, do not invent it or call the tool; return the deterministic guidance message that asks for the missing input. Both paths persist a normal structured response and emit SSE `done`, never `error` merely because the provider failed.
+- Preserve an explicit server-side telemetry marker set on every provider-error fallback: `provider_error_fallback:true`, the original `provider_error_code`, the adapter-sanitized `provider_error_message_sanitized`, `fallback_provider:"mock"`, and `fallback_reason:"provider_error"`. Normal traffic logs `provider_error_fallback:false` and the other four fields as `null`, so provider fallback rate is independently monitorable and cannot be confused with ordinary mock-mode traffic.
+- Skip optional LLM answer phrasing whenever provider-error fallback is active. A failed routing provider must not trigger another provider call; the fallback answer remains deterministic.
+- Keep the public DTO unchanged. Fallback details stay in the internal turn telemetry / `assistant_turn` log and are not added to `MockAssistantTurnResponseData`, `structured_output`, or other client contracts.
+
+Remaining boundaries:
+- This is a safety net, not evidence that DeepSeek is healthy. Before AR-2 changes production provider settings, run a local live DeepSeek conversation and live validation against the real provider; deterministic unit/eval coverage alone is insufficient.
+- `provider_error_status` is not yet carried as an independent numeric structured telemetry field. If operations need status-based aggregation distinct from the sanitized message and provider error code, add that explicit numeric pass-through in a separately reviewed change; this remains the AR-0b review backlog.
+- Provider outages can still consume the configured provider timeout before fallback completes. Timeout tuning remains a separate deployment/runtime decision.
