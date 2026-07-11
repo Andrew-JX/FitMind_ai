@@ -20,8 +20,8 @@ export interface EvidenceToolArgSource {
 export interface ProviderErrorFallbackTelemetry {
   provider_error_fallback: true;
   provider_error_code: string;
+  /** Pass-through of the provider adapter's already-sanitized error message. */
   provider_error_message_sanitized: string;
-  provider_error_status: number | null;
   fallback_provider: "mock";
   fallback_reason: "provider_error";
 }
@@ -51,22 +51,6 @@ function resolveToolArg(
         : undefined;
 }
 
-function inferProviderErrorStatus(message: string): number | null {
-  if (/\btimeout\b|\btimed out\b/iu.test(message)) {
-    return 0;
-  }
-
-  const match = /\bHTTP\s+(\d{3})\b|\((\d{3})\)/iu.exec(message);
-  const rawStatus = match?.[1] ?? match?.[2];
-  if (rawStatus === undefined) {
-    return null;
-  }
-
-  const status = Number.parseInt(rawStatus, 10);
-
-  return Number.isInteger(status) ? status : null;
-}
-
 function buildProviderErrorFallbackTelemetry(
   response: AssistantProviderErrorResponse,
 ): ProviderErrorFallbackTelemetry {
@@ -74,7 +58,6 @@ function buildProviderErrorFallbackTelemetry(
     provider_error_fallback: true,
     provider_error_code: response.error_code,
     provider_error_message_sanitized: response.message,
-    provider_error_status: inferProviderErrorStatus(response.message),
     fallback_provider: "mock",
     fallback_reason: "provider_error",
   };

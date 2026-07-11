@@ -109,7 +109,6 @@ describe("decideProviderErrorFallback", () => {
         provider_error_code: "GROQ_PROVIDER_ERROR",
         provider_error_message_sanitized:
           "Groq request failed (429): rate limited",
-        provider_error_status: 429,
         fallback_provider: "mock",
         fallback_reason: "provider_error",
       },
@@ -135,7 +134,6 @@ describe("decideProviderErrorFallback", () => {
         provider_error_code: "OPENAI_COMPATIBLE_PROVIDER_ERROR",
         provider_error_message_sanitized:
           "OpenAI-compatible request timed out after 20000ms.",
-        provider_error_status: 0,
         fallback_provider: "mock",
         fallback_reason: "provider_error",
       },
@@ -169,14 +167,13 @@ describe("decideProviderErrorFallback", () => {
         provider_error_code: "OPENAI_COMPATIBLE_PROVIDER_ERROR",
         provider_error_message_sanitized:
           "OpenAI-compatible returned an unexpected response shape.",
-        provider_error_status: null,
         fallback_provider: "mock",
         fallback_reason: "provider_error",
       },
     });
   });
 
-  it("preserves safe config-failure metadata without inventing a status", () => {
+  it("preserves safe config-failure metadata", () => {
     const result = decideProviderErrorFallback(
       {
         kind: "error",
@@ -193,7 +190,6 @@ describe("decideProviderErrorFallback", () => {
       provider_error_code: "OPENAI_COMPATIBLE_PROVIDER_ERROR",
       provider_error_message_sanitized:
         "OpenAI-compatible config unavailable: OPENAI_COMPAT_API_KEY is required.",
-      provider_error_status: null,
       fallback_provider: "mock",
       fallback_reason: "provider_error",
     });
