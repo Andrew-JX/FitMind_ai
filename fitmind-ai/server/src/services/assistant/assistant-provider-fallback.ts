@@ -38,6 +38,16 @@ export type ProviderErrorFallbackDecision =
       telemetry: ProviderErrorFallbackTelemetry;
     };
 
+export type DeterministicProviderFallbackDecision =
+  | {
+      kind: "tool_call";
+      response: AssistantProviderToolCallResponse;
+    }
+  | {
+      kind: "missing_required_args";
+      missing_input_fields: string[];
+    };
+
 function resolveToolArg(
   field: string,
   argSource: EvidenceToolArgSource,
@@ -69,6 +79,24 @@ export function decideProviderErrorFallback(
   argSource: EvidenceToolArgSource,
 ): ProviderErrorFallbackDecision {
   const telemetry = buildProviderErrorFallbackTelemetry(response);
+  const fallback = decideDeterministicProviderFallback(tool, argSource);
+
+  return { ...fallback, telemetry };
+}
+
+/**
+ * Resolve the existing deterministic default-tool fallback without attaching a
+ * provider-specific cause. Provider errors and budget denials both use this
+ * core so they cannot drift into different user-visible fallback paths.
+ *
+ * @param tool - Default evidence tool for the resolved execution mode.
+ * @param argSource - Request-derived values available for tool arguments.
+ * @returns A default tool call, or the required fields that are still missing.
+ */
+export function decideDeterministicProviderFallback(
+  tool: AssistantProviderToolDefinition,
+  argSource: EvidenceToolArgSource,
+): DeterministicProviderFallbackDecision {
   const args: Record<string, string> = {};
   const missingInputFields: string[] = [];
 
@@ -87,14 +115,12 @@ export function decideProviderErrorFallback(
     return {
       kind: "missing_required_args",
       missing_input_fields: missingInputFields,
-      telemetry,
     };
   }
 
   return {
     kind: "tool_call",
     response: { kind: "tool_call", tool_name: tool.name, tool_args: args },
-    telemetry,
   };
 }
 

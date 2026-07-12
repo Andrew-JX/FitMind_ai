@@ -89,6 +89,11 @@ import {
   getConfiguredAssistantProvider,
   isAssistantAnswerPhrasingEnabled,
 } from "./provider-config.js";
+import type {
+  AssistantProviderGuard,
+  AssistantProviderGuardDecision,
+} from "./assistant-provider-guard.js";
+import type { AssistantIpGuardDecision } from "../../middleware/assistant-ip-rate-limit-middleware.js";
 
 const mockedExecuteAiTool = vi.mocked(executeAiTool);
 const mockedGetPlanAdherenceContext = vi.mocked(
@@ -537,5 +542,331 @@ describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", ()
     expect(response.intent).toBe("next_week_plan");
     expect(response.plan?.strategy).toBe("add_frequency");
     expect(mockedGetPlanAdherenceContext).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("runMockAssistantTurn provider budget gate (AR-1d commit 1)", () => {
+  const input = {
+    mode: "weekly_report" as const,
+    message: "weekly report",
+    start_date: "2026-05-19",
+    end_date: "2026-06-17",
+  };
+  const allowDecision: AssistantProviderGuardDecision = {
+    kind: "allow",
+    telemetry: {
+      budget_fallback: false,
+      budget_reason: null,
+      budget_scope: "instance",
+      budget_current_calls: 1,
+      budget_call_limit: 500,
+      budget_current_cost_usd: 0,
+      budget_cost_limit_usd: 1,
+    },
+  };
+  const fallbackDecision: AssistantProviderGuardDecision = {
+    kind: "fallback",
+    fallback_provider: "mock",
+    telemetry: {
+      budget_fallback: true,
+      budget_reason: "daily_call_budget_exceeded",
+      budget_scope: "instance",
+      budget_current_calls: 500,
+      budget_call_limit: 500,
+      budget_current_cost_usd: 0,
+      budget_cost_limit_usd: 1,
+    },
+  };
+  const ipFallbackDecision: AssistantIpGuardDecision = {
+    kind: "fallback",
+    fallback_provider: "mock",
+    telemetry: {
+      budget_fallback: true,
+      budget_reason: "per_ip_daily_limit_exceeded",
+      budget_scope: "ip",
+      budget_ip_minute_count: 1,
+      budget_ip_minute_limit: 10,
+      budget_ip_day_count: 30,
+      budget_ip_day_limit: 30,
+      budget_retry_after_seconds: 60,
+    },
+  };
+
+  function createGuard(decisions: AssistantProviderGuardDecision[]) {
+    const guardRealProviderAttempt = vi.fn<
+      AssistantProviderGuard["guardRealProviderAttempt"]
+    >(() => decisions.shift() ?? allowDecision);
+    const recordCost = vi.fn<AssistantProviderGuard["recordCost"]>();
+
+    return {
+      guardRealProviderAttempt,
+      recordCost,
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedExecuteAiTool.mockResolvedValue(CANNED_REPORT);
+    mockedGetPlanAdherenceContext.mockResolvedValue(null);
+    mockedGetConfiguredAssistantProvider.mockReturnValue("groq");
+    mockedIsAssistantAnswerPhrasingEnabled.mockReturnValue(false);
+    mockedRunAssistantProvider.mockResolvedValue({
+      kind: "message",
+      message: "provider prose",
+      telemetry: {
+        attempted: true,
+        errored: false,
+        provider: "groq",
+        model: "llama-3.3-70b-versatile",
+        usage: { prompt_tokens: 50, completion_tokens: 10, total_tokens: 60 },
+      },
+    });
+  });
+
+  it("keeps safety ahead of the instance gate and every provider call", async () => {
+    const originalSafetyGate = process.env.ASSISTANT_SAFETY_GATE;
+    process.env.ASSISTANT_SAFETY_GATE = "on";
+    const guard = createGuard([allowDecision]);
+
+    try {
+      await runMockAssistantTurn(
+        "user-1",
+        { ...input, mode: "auto", message: "I have chest pain right now" },
+        { providerGuard: guard },
+      );
+    } finally {
+      if (originalSafetyGate === undefined) {
+        delete process.env.ASSISTANT_SAFETY_GATE;
+      } else {
+        process.env.ASSISTANT_SAFETY_GATE = originalSafetyGate;
+      }
+    }
+
+    expect(guard.guardRealProviderAttempt).not.toHaveBeenCalled();
+    expect(guard.recordCost).not.toHaveBeenCalled();
+    expect(mockedGetConfiguredAssistantProvider).not.toHaveBeenCalled();
+    expect(mockedRunAssistantProvider).not.toHaveBeenCalled();
+    expect(mockedRunAssistantAnswerPhrasing).not.toHaveBeenCalled();
+  });
+
+  it("bypasses both budget layers completely in mock mode", async () => {
+    mockedGetConfiguredAssistantProvider.mockReturnValue("mock");
+    const guard = createGuard([fallbackDecision]);
+
+    await runMockAssistantTurn("user-1", input, {
+      providerGuard: guard,
+      assistantIpGuardDecision: ipFallbackDecision,
+    });
+
+    expect(guard.guardRealProviderAttempt).not.toHaveBeenCalled();
+    expect(guard.recordCost).not.toHaveBeenCalled();
+    expect(mockedRunAssistantProvider).toHaveBeenCalledTimes(1);
+  });
+
+  it("locks the whole turn on per-IP fallback without touching the instance guard", async () => {
+    mockedIsAssistantAnswerPhrasingEnabled.mockReturnValue(true);
+    const guard = createGuard([allowDecision]);
+
+    const { response, telemetry } = await runMockAssistantTurn(
+      "user-1",
+      input,
+      {
+        providerGuard: guard,
+        assistantIpGuardDecision: ipFallbackDecision,
+      },
+    );
+
+    expect(guard.guardRealProviderAttempt).not.toHaveBeenCalled();
+    expect(guard.recordCost).not.toHaveBeenCalled();
+    expect(mockedRunAssistantProvider).not.toHaveBeenCalled();
+    expect(mockedRunAssistantAnswerPhrasing).not.toHaveBeenCalled();
+    expect(mockedExecuteAiTool).toHaveBeenCalledTimes(1);
+    expect(response.message_id).toBe("message-1");
+    expect(telemetry.budgetFallback).toEqual(ipFallbackDecision.telemetry);
+    expect(telemetry.providerErrorFallback).toBeUndefined();
+  });
+
+  it("stops after the first instance denial without rechecking later calls", async () => {
+    mockedIsAssistantAnswerPhrasingEnabled.mockReturnValue(true);
+    const guard = createGuard([fallbackDecision]);
+
+    const { telemetry } = await runMockAssistantTurn("user-1", input, {
+      providerGuard: guard,
+    });
+
+    expect(guard.guardRealProviderAttempt).toHaveBeenCalledTimes(1);
+    expect(guard.recordCost).not.toHaveBeenCalled();
+    expect(mockedRunAssistantProvider).not.toHaveBeenCalled();
+    expect(mockedRunAssistantAnswerPhrasing).not.toHaveBeenCalled();
+    expect(mockedExecuteAiTool).toHaveBeenCalledTimes(1);
+    expect(telemetry.budgetFallback).toEqual(fallbackDecision.telemetry);
+  });
+
+  it("reuses AR-0 missing-argument guidance and emits one done on budget denial", async () => {
+    const guard = createGuard([fallbackDecision]);
+    const events: string[] = [];
+
+    const { response } = await runMockAssistantTurn(
+      "user-1",
+      {
+        ...input,
+        mode: "exercise_progress",
+        message: "show exercise progress",
+      },
+      {
+        providerGuard: guard,
+        onEvent: (event) => {
+          events.push(event.type);
+        },
+      },
+    );
+
+    expect(mockedRunAssistantProvider).not.toHaveBeenCalled();
+    expect(mockedExecuteAiTool).not.toHaveBeenCalled();
+    expect(response.tool_calls).toEqual([]);
+    expect(response.answer.summary).not.toBe("");
+    expect(events.filter((event) => event === "done")).toHaveLength(1);
+    expect(events).not.toContain("error");
+  });
+
+  it("guards routing first, records its cost, then locks on tool-selection denial", async () => {
+    const guard = createGuard([allowDecision, fallbackDecision]);
+    const classify = vi.fn(async () => ({
+      intent: "weekly_report" as const,
+      call: {
+        attempted: true,
+        errored: false,
+        provider: "groq" as const,
+        model: "llama-3.3-70b-versatile",
+        usage: {
+          prompt_tokens: 100,
+          completion_tokens: 20,
+          total_tokens: 120,
+        },
+      },
+    }));
+
+    await runMockAssistantTurn(
+      "user-1",
+      { ...input, mode: "auto", message: "alpha beta gamma" },
+      { providerGuard: guard, intentRouter: { classify } },
+    );
+
+    expect(classify).toHaveBeenCalledTimes(1);
+    expect(guard.guardRealProviderAttempt).toHaveBeenCalledTimes(2);
+    expect(guard.recordCost).toHaveBeenCalledTimes(1);
+    expect(guard.recordCost).toHaveBeenCalledWith(0.000075);
+    expect(mockedRunAssistantProvider).not.toHaveBeenCalled();
+    expect(mockedExecuteAiTool).toHaveBeenCalledTimes(1);
+  });
+
+  it("guards all three real call sites and records each returned call once", async () => {
+    mockedIsAssistantAnswerPhrasingEnabled.mockReturnValue(true);
+    const guard = createGuard([allowDecision, allowDecision, allowDecision]);
+    const classify = vi.fn(async () => ({
+      intent: "weekly_report" as const,
+      call: {
+        attempted: true,
+        errored: false,
+        provider: "groq" as const,
+        model: "llama-3.3-70b-versatile",
+        usage: {
+          prompt_tokens: 100,
+          completion_tokens: 20,
+          total_tokens: 120,
+        },
+      },
+    }));
+    mockedRunAssistantAnswerPhrasing.mockImplementationOnce(async (value) => ({
+      summary: value.draftSummary,
+      call: {
+        attempted: true,
+        errored: false,
+        provider: "groq",
+        model: "llama-3.3-70b-versatile",
+        usage: { prompt_tokens: 20, completion_tokens: 5, total_tokens: 25 },
+      },
+    }));
+
+    await runMockAssistantTurn(
+      "user-1",
+      { ...input, mode: "auto", message: "alpha beta gamma" },
+      { providerGuard: guard, intentRouter: { classify } },
+    );
+
+    expect(guard.guardRealProviderAttempt).toHaveBeenCalledTimes(3);
+    expect(guard.recordCost).toHaveBeenCalledTimes(3);
+    expect(guard.recordCost).toHaveBeenNthCalledWith(1, 0.000075);
+    expect(guard.recordCost).toHaveBeenNthCalledWith(2, 0.000037);
+    expect(guard.recordCost).toHaveBeenNthCalledWith(3, 0.000016);
+    expect(mockedRunAssistantProvider).toHaveBeenCalledTimes(1);
+    expect(mockedRunAssistantAnswerPhrasing).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the deterministic draft when the phrasing call is denied", async () => {
+    mockedIsAssistantAnswerPhrasingEnabled.mockReturnValue(true);
+    const guard = createGuard([allowDecision, fallbackDecision]);
+
+    const { response, telemetry } = await runMockAssistantTurn(
+      "user-1",
+      input,
+      { providerGuard: guard },
+    );
+
+    expect(guard.guardRealProviderAttempt).toHaveBeenCalledTimes(2);
+    expect(guard.recordCost).toHaveBeenCalledTimes(1);
+    expect(mockedRunAssistantAnswerPhrasing).not.toHaveBeenCalled();
+    expect(response.answer.summary).not.toBe("");
+    expect(telemetry.budgetFallback).toEqual(fallbackDecision.telemetry);
+  });
+
+  it("records returned provider-error usage without changing AR-0 fallback telemetry", async () => {
+    const guard = createGuard([allowDecision]);
+    mockedRunAssistantProvider.mockResolvedValueOnce({
+      kind: "error",
+      error_code: "GROQ_PROVIDER_ERROR",
+      message: "Groq request failed (500): boom",
+      telemetry: {
+        attempted: true,
+        errored: true,
+        provider: "groq",
+        model: "llama-3.3-70b-versatile",
+        usage: { prompt_tokens: 42, completion_tokens: 0, total_tokens: 42 },
+      },
+    });
+
+    const { telemetry } = await runMockAssistantTurn("user-1", input, {
+      providerGuard: guard,
+    });
+
+    expect(guard.recordCost).toHaveBeenCalledTimes(1);
+    expect(guard.recordCost).toHaveBeenCalledWith(0.000025);
+    expect(telemetry.providerErrorFallback).toEqual({
+      provider_error_fallback: true,
+      provider_error_code: "GROQ_PROVIDER_ERROR",
+      provider_error_message_sanitized: "Groq request failed (500): boom",
+      fallback_provider: "mock",
+      fallback_reason: "provider_error",
+    });
+  });
+
+  it("records null cost for an unknown model while preserving call-count gating", async () => {
+    const guard = createGuard([allowDecision]);
+    mockedRunAssistantProvider.mockResolvedValueOnce({
+      kind: "message",
+      message: "provider prose",
+      telemetry: {
+        attempted: true,
+        errored: false,
+        provider: "openai_compatible",
+        model: "deepseek-chat",
+        usage: { prompt_tokens: 30, completion_tokens: 5, total_tokens: 35 },
+      },
+    });
+
+    await runMockAssistantTurn("user-1", input, { providerGuard: guard });
+
+    expect(guard.guardRealProviderAttempt).toHaveBeenCalledTimes(1);
+    expect(guard.recordCost).toHaveBeenCalledWith(null);
   });
 });

@@ -33,6 +33,7 @@ import {
 } from "./provider-adapter.js";
 import {
   coerceMessageToEvidenceToolCall,
+  decideDeterministicProviderFallback,
   decideProviderErrorFallback,
   type NonErrorProviderResponse,
   type ProviderErrorFallbackTelemetry,
@@ -46,10 +47,20 @@ import {
   type AssistantSafetyReason,
 } from "./assistant-safety.js";
 import {
+  estimateAssistantProviderCallCostUsd,
   summarizeTurnLlmCalls,
   type AssistantLlmCallRecord,
   type AssistantTurnLlmSummary,
 } from "./assistant-turn-observability.js";
+import {
+  getDefaultAssistantProviderGuard,
+  type AssistantProviderBudgetFallbackTelemetry,
+  type AssistantProviderGuard,
+} from "./assistant-provider-guard.js";
+import type {
+  AssistantIpBudgetFallbackTelemetry,
+  AssistantIpGuardDecision,
+} from "../../middleware/assistant-ip-rate-limit-middleware.js";
 import {
   createOpenAiCompatibleIntentRouter,
   type LlmIntentRouter,
@@ -57,6 +68,7 @@ import {
 import {
   getConfiguredAssistantProvider,
   isAssistantAnswerPhrasingEnabled,
+  type AssistantProviderName,
 } from "./provider-config.js";
 import {
   composeKnowledgeAnswer,
@@ -287,10 +299,23 @@ export interface AssistantTurnTelemetry {
   llm?: AssistantTurnLlmSummary | undefined;
   /** Server-only marker for a provider error completed via deterministic fallback. */
   providerErrorFallback?: ProviderErrorFallbackTelemetry | undefined;
+  /** Server-only marker for a turn completed after an IP/instance budget denial. */
+  budgetFallback?: AssistantBudgetFallbackTelemetry | undefined;
   /** Server-only safety marker for pre-routing medical boundary hits. */
   safety?:
     | { boundary: "medical_boundary"; reason: AssistantSafetyReason }
     | undefined;
+}
+
+export type AssistantBudgetFallbackTelemetry =
+  | AssistantProviderBudgetFallbackTelemetry
+  | AssistantIpBudgetFallbackTelemetry;
+
+export interface AssistantOrchestratorOptions extends AssistantStreamOptions {
+  /** Request-scoped AR-1c decision; Commit 2 will pass it from HTTP locals. */
+  assistantIpGuardDecision?: AssistantIpGuardDecision | undefined;
+  /** Injectable AR-1b guard for deterministic orchestration tests. */
+  providerGuard?: AssistantProviderGuard | undefined;
 }
 
 /** Internal envelope: the public response plus server-only telemetry. */
@@ -1161,6 +1186,7 @@ function buildToolAnswer(
 function buildTurnTelemetry(
   records: AssistantLlmCallRecord[],
   providerErrorFallback?: ProviderErrorFallbackTelemetry,
+  budgetFallback?: AssistantBudgetFallbackTelemetry,
 ): AssistantTurnTelemetry {
   const telemetry: AssistantTurnTelemetry = {
     llm: summarizeTurnLlmCalls(records),
@@ -1170,13 +1196,90 @@ function buildTurnTelemetry(
     telemetry.providerErrorFallback = providerErrorFallback;
   }
 
+  if (budgetFallback !== undefined) {
+    telemetry.budgetFallback = budgetFallback;
+  }
+
   return telemetry;
+}
+
+type ProviderAttemptGateDecision = { kind: "allow" } | { kind: "fallback" };
+
+interface TurnProviderGate {
+  guardRealProviderAttempt(): ProviderAttemptGateDecision;
+  recordCompletedCall(call: AssistantLlmCallRecord): void;
+  getBudgetFallback(): AssistantBudgetFallbackTelemetry | undefined;
+}
+
+function createTurnProviderGate(args: {
+  configuredProvider: AssistantProviderName;
+  ipDecision: AssistantIpGuardDecision | undefined;
+  providerGuard: AssistantProviderGuard;
+}): TurnProviderGate {
+  const isMock = args.configuredProvider === "mock";
+  let budgetFallback: AssistantBudgetFallbackTelemetry | undefined =
+    !isMock && args.ipDecision?.kind === "fallback"
+      ? args.ipDecision.telemetry
+      : undefined;
+
+  return {
+    guardRealProviderAttempt(): ProviderAttemptGateDecision {
+      if (isMock) {
+        return { kind: "allow" };
+      }
+
+      if (budgetFallback !== undefined) {
+        return { kind: "fallback" };
+      }
+
+      const decision = args.providerGuard.guardRealProviderAttempt();
+      if (decision.kind === "fallback") {
+        budgetFallback = decision.telemetry;
+        return { kind: "fallback" };
+      }
+
+      return { kind: "allow" };
+    },
+
+    recordCompletedCall(call: AssistantLlmCallRecord): void {
+      if (!isMock) {
+        args.providerGuard.recordCost(
+          estimateAssistantProviderCallCostUsd(call),
+        );
+      }
+    },
+
+    getBudgetFallback(): AssistantBudgetFallbackTelemetry | undefined {
+      return budgetFallback;
+    },
+  };
+}
+
+function guardIntentRouter(
+  router: LlmIntentRouter | null,
+  providerGate: TurnProviderGate,
+): LlmIntentRouter | null {
+  if (router === null) {
+    return null;
+  }
+
+  return {
+    async classify(message) {
+      if (providerGate.guardRealProviderAttempt().kind === "fallback") {
+        return { intent: null, call: NO_LLM_CALL };
+      }
+
+      const classification = await router.classify(message);
+      providerGate.recordCompletedCall(classification.call);
+      return classification;
+    },
+  };
 }
 
 export async function runMockAssistantTurn(
   userId: string,
   rawInput: unknown,
-  options?: AssistantStreamOptions,
+  options?: AssistantOrchestratorOptions,
 ): Promise<AssistantTurnExecutionResult> {
   await emitEvent(options, {
     type: "state",
@@ -1234,6 +1337,11 @@ export async function runMockAssistantTurn(
       return {
         response,
         telemetry: {
+          ...(options?.assistantIpGuardDecision?.kind !== "fallback"
+            ? {}
+            : {
+                budgetFallback: options.assistantIpGuardDecision.telemetry,
+              }),
           safety: {
             boundary: "medical_boundary",
             reason: safetyClassification.reason,
@@ -1243,14 +1351,27 @@ export async function runMockAssistantTurn(
     }
   }
 
+  // Safety is intentionally evaluated before the call-level provider budget
+  // gate. The per-IP decision is already request-scoped at this boundary, but
+  // no instance guard may run for a safety-short-circuited turn.
+  const configuredProvider = getConfiguredAssistantProvider();
+  const providerGate = createTurnProviderGate({
+    configuredProvider,
+    ipDecision: options?.assistantIpGuardDecision,
+    providerGuard: options?.providerGuard ?? getDefaultAssistantProviderGuard(),
+  });
+
   const intentRouter =
     options?.intentRouter !== undefined
       ? options.intentRouter
-      : getConfiguredAssistantProvider() === "groq" ||
-          getConfiguredAssistantProvider() === "openai_compatible"
+      : configuredProvider === "groq" ||
+          configuredProvider === "openai_compatible"
         ? createOpenAiCompatibleIntentRouter()
         : null;
-  const routed = await resolveRoutedIntent(input, intentRouter);
+  const routed = await resolveRoutedIntent(
+    input,
+    guardIntentRouter(intentRouter, providerGate),
+  );
   const intent = routed.intent;
   // Router rescue call is billed; its record must be counted on every path below.
   const routerRecord = routed.routerCall;
@@ -1320,7 +1441,11 @@ export async function runMockAssistantTurn(
 
     return {
       response,
-      telemetry: buildTurnTelemetry([routerRecord]),
+      telemetry: buildTurnTelemetry(
+        [routerRecord],
+        undefined,
+        providerGate.getBudgetFallback(),
+      ),
     };
   }
 
@@ -1377,7 +1502,11 @@ export async function runMockAssistantTurn(
 
     return {
       response,
-      telemetry: buildTurnTelemetry([routerRecord]),
+      telemetry: buildTurnTelemetry(
+        [routerRecord],
+        undefined,
+        providerGate.getBudgetFallback(),
+      ),
     };
   }
 
@@ -1394,24 +1523,36 @@ export async function runMockAssistantTurn(
 
     return {
       response: planResponse,
-      telemetry: buildTurnTelemetry([routerRecord]),
+      telemetry: buildTurnTelemetry(
+        [routerRecord],
+        undefined,
+        providerGate.getBudgetFallback(),
+      ),
     };
   }
 
   const providerRequest = buildProviderRequest(input, executionMode);
+  const toolSelectionGate = providerGate.guardRealProviderAttempt();
 
   await emitEvent(options, {
     type: "provider_selected",
-    provider: getConfiguredAssistantProvider(),
+    provider:
+      toolSelectionGate.kind === "fallback" ? "mock" : configuredProvider,
   });
 
-  const rawProviderResponse = await runAssistantProvider(providerRequest);
+  const rawProviderResponse =
+    toolSelectionGate.kind === "fallback"
+      ? null
+      : await runAssistantProvider(providerRequest);
 
   // C1 token/cost observability: the routing tool-selection call's telemetry comes
   // straight from the provider response (present even on error → failed turns are
   // still countable); mock makes no billed call → NO_LLM_CALL.
   const routingRecord: AssistantLlmCallRecord =
-    rawProviderResponse.telemetry ?? NO_LLM_CALL;
+    rawProviderResponse?.telemetry ?? NO_LLM_CALL;
+  if (rawProviderResponse !== null) {
+    providerGate.recordCompletedCall(routingRecord);
+  }
 
   const defaultTool = getToolDefinitionForMode(executionMode);
   const fallbackArgSource = {
@@ -1422,7 +1563,21 @@ export async function runMockAssistantTurn(
   let providerResponse: NonErrorProviderResponse;
   let providerErrorFallback: ProviderErrorFallbackTelemetry | undefined;
 
-  if (rawProviderResponse.kind === "error") {
+  if (rawProviderResponse === null) {
+    const fallback = decideDeterministicProviderFallback(
+      defaultTool,
+      fallbackArgSource,
+    );
+    providerResponse =
+      fallback.kind === "tool_call"
+        ? fallback.response
+        : {
+            kind: "message",
+            message: buildProviderErrorFallbackGuidance(
+              fallback.missing_input_fields,
+            ),
+          };
+  } else if (rawProviderResponse.kind === "error") {
     const fallback = decideProviderErrorFallback(
       rawProviderResponse,
       defaultTool,
@@ -1584,14 +1739,18 @@ export async function runMockAssistantTurn(
       providerErrorFallback === undefined &&
       isAssistantAnswerPhrasingEnabled()
     ) {
-      const phrasing = await runAssistantAnswerPhrasing({
-        draftSummary: answer.summary,
-        supportingFacts: answer.bullets,
-      });
-      phrasingRecord = phrasing.call;
-      answer = applyFaithfulPhrasing(answer, phrasing.summary, (candidate) =>
-        verifyAnswerFaithfulness(candidate, toolOutputs),
-      ).answer;
+      const phrasingGate = providerGate.guardRealProviderAttempt();
+      if (phrasingGate.kind === "allow") {
+        const phrasing = await runAssistantAnswerPhrasing({
+          draftSummary: answer.summary,
+          supportingFacts: answer.bullets,
+        });
+        phrasingRecord = phrasing.call;
+        providerGate.recordCompletedCall(phrasing.call);
+        answer = applyFaithfulPhrasing(answer, phrasing.summary, (candidate) =>
+          verifyAnswerFaithfulness(candidate, toolOutputs),
+        ).answer;
+      }
     }
 
     await emitAnswerEvents(answer, options);
@@ -1640,6 +1799,7 @@ export async function runMockAssistantTurn(
         ? [routerRecord, routingRecord]
         : [routerRecord, routingRecord, phrasingRecord],
       providerErrorFallback,
+      providerGate.getBudgetFallback(),
     ),
   };
 }

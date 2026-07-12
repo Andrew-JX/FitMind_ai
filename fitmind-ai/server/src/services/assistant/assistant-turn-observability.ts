@@ -273,6 +273,28 @@ function estimateCostUsd(
 }
 
 /**
+ * Estimate one completed provider call's list-price cost for budget accounting.
+ * Unknown models and calls without reported usage remain unpriced; the separate
+ * call-count budget still applies to them.
+ *
+ * @param call - Telemetry returned by the provider call site.
+ * @returns Estimated USD, or `null` when this call cannot be priced.
+ */
+export function estimateAssistantProviderCallCostUsd(
+  call: AssistantProviderCallTelemetry,
+): number | null {
+  if (!call.attempted || call.usage === undefined) {
+    return null;
+  }
+
+  return estimateCostUsd(
+    call.model,
+    Math.max(0, call.usage.prompt_tokens),
+    Math.max(0, call.usage.completion_tokens),
+  );
+}
+
+/**
  * Logs the per-turn telemetry event as a single structured JSON line.
  *
  * @param input - Telemetry input for the turn.

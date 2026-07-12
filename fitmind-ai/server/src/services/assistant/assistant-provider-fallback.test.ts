@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   coerceMessageToEvidenceToolCall,
+  decideDeterministicProviderFallback,
   decideProviderErrorFallback,
 } from "./assistant-provider-fallback.js";
 import type { AssistantProviderToolDefinition } from "./provider-types.js";
@@ -192,6 +193,26 @@ describe("decideProviderErrorFallback", () => {
         "OpenAI-compatible config unavailable: OPENAI_COMPAT_API_KEY is required.",
       fallback_provider: "mock",
       fallback_reason: "provider_error",
+    });
+  });
+});
+
+describe("decideDeterministicProviderFallback", () => {
+  it("uses the same default tool decision without provider-error telemetry", () => {
+    expect(decideDeterministicProviderFallback(dateOnlyTool, range)).toEqual({
+      kind: "tool_call",
+      response: {
+        kind: "tool_call",
+        tool_name: "get_recommendation_context",
+        tool_args: { start_date: "2026-05-19", end_date: "2026-06-17" },
+      },
+    });
+  });
+
+  it("uses the same missing-argument decision without inventing an error", () => {
+    expect(decideDeterministicProviderFallback(exerciseTool, range)).toEqual({
+      kind: "missing_required_args",
+      missing_input_fields: ["exercise_id"],
     });
   });
 });
