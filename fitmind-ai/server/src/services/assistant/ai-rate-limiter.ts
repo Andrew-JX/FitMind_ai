@@ -13,6 +13,10 @@ export interface AiRateLimitDecision {
   allowed: boolean;
   code?: AiRateLimitCode;
   retryAfterSeconds?: number;
+  minuteCount: number;
+  minuteLimit: number;
+  dayCount: number;
+  dayLimit: number;
 }
 
 export interface AiRateLimiter {
@@ -67,6 +71,10 @@ export function createAiRateLimiter(options?: {
             state.dayWindowStart + DAY_WINDOW_MS,
             now,
           ),
+          minuteCount: state.minuteCount,
+          minuteLimit: perMinute,
+          dayCount: state.dayCount,
+          dayLimit: perDay,
         };
       }
 
@@ -78,13 +86,23 @@ export function createAiRateLimiter(options?: {
             state.minuteWindowStart + MINUTE_WINDOW_MS,
             now,
           ),
+          minuteCount: state.minuteCount,
+          minuteLimit: perMinute,
+          dayCount: state.dayCount,
+          dayLimit: perDay,
         };
       }
 
       state.minuteCount += 1;
       state.dayCount += 1;
 
-      return { allowed: true };
+      return {
+        allowed: true,
+        minuteCount: state.minuteCount,
+        minuteLimit: perMinute,
+        dayCount: state.dayCount,
+        dayLimit: perDay,
+      };
     },
   };
 }

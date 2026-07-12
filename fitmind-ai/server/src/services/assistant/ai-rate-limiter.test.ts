@@ -103,4 +103,42 @@ describe("createAiRateLimiter", () => {
       true,
     );
   });
+
+  it("returns additive minute and day counter telemetry", () => {
+    let now = 0;
+    const limiter = createAiRateLimiter({
+      perMinute: 1,
+      perDay: 2,
+      now: () => now,
+    });
+
+    expect(limiter.consume("u1")).toEqual({
+      allowed: true,
+      minuteCount: 1,
+      minuteLimit: 1,
+      dayCount: 1,
+      dayLimit: 2,
+    });
+    expect(limiter.consume("u1")).toMatchObject({
+      allowed: false,
+      code: "RATE_LIMITED",
+      minuteCount: 1,
+      minuteLimit: 1,
+      dayCount: 1,
+      dayLimit: 2,
+    });
+
+    now += 60_000;
+    expect(limiter.consume("u1")).toMatchObject({
+      allowed: true,
+      minuteCount: 1,
+      dayCount: 2,
+    });
+    expect(limiter.consume("u1")).toMatchObject({
+      allowed: false,
+      code: "AI_QUOTA_EXCEEDED",
+      minuteCount: 1,
+      dayCount: 2,
+    });
+  });
 });

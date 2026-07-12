@@ -4886,3 +4886,18 @@ warm process lifetime, while a factory permits isolated counter injection in
 tests. D49 records that policy environment values are also parsed once: changing
 the kill-switch or budget thresholds requires a process restart (a Vercel
 redeploy), rather than acting as a no-redeploy real-time stop.
+
+## 2026-07-12 AR-1c: per-IP AI limiter seam
+
+Added an unmounted, injectable HTTP middleware seam for real-provider-eligible
+assistant requests. It reuses the process-level string-key limiter style with
+`ai:ip:<ip>:assistant`, enforcing `10/min` and `30/UTC day`, and records an
+allow or deterministic-mock fallback decision in response locals without
+returning a public 429. Existing per-user and auth limiter response contracts
+remain unchanged; route mounting and orchestration consumption stay in AR-1d.
+
+The middleware reads provider eligibility through
+`getConfiguredAssistantProvider()` and does not consume quota in mock mode. D49
+records that 30/day becomes the effective daily ceiling for a single-IP user and
+that users behind a shared NAT intentionally share the same conservative public
+demo allowance.

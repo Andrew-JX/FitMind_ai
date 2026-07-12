@@ -1173,7 +1173,7 @@ Remaining boundaries:
 ## [D49] AR-1 cost and abuse guardrail policy
 
 - **Date**: 2026-07-11
-- **Status**: Accepted policy; AR-1a and AR-1b implemented, AR-1c through AR-1d pending
+- **Status**: Accepted policy; AR-1a and AR-1b implemented; AR-1c implemented on its review branch; AR-1d pending
 
 Background: the existing per-user AI limiter does not bound real-provider spend
 for a whole server instance, and cheap account creation can bypass a user-only
@@ -1216,9 +1216,23 @@ Decision:
 Remaining boundaries:
 
 - AR-1b provides the provider guard seam but does not call it from a runtime
-  path. Per-IP `10/min` plus `30/day`, provider preflight, orchestration
-  fallback, and final telemetry wiring remain the reviewed AR-1c and AR-1d
-  slices.
+  path. AR-1c provides an unmounted per-IP HTTP middleware seam with `10/min`
+  plus `30/UTC day`; provider preflight, route mounting, orchestration fallback,
+  and final telemetry logging remain AR-1d.
+- The per-IP middleware uses `getConfiguredAssistantProvider()` and consumes
+  quota only for real-provider-eligible requests. It records an allow/fallback
+  decision in response locals and never returns a public 429; AR-1d will turn a
+  fallback decision into a deterministic mock answer before provider execution.
+  It remains unmounted in AR-1c so a deploy cannot consume quota without also
+  enforcing the fallback.
+- The `30/day` per-IP cap is the effective daily ceiling for a user whose
+  requests come from one IP, even though the existing per-user quota remains
+  `50/day`. Multiple users behind the same NAT share that 30-request allowance;
+  this conservative aggregation is an intentional public-demo tradeoff and a
+  known boundary, not exact per-person accounting. Current assistant endpoints
+  authenticate before AI limiting, so unauthenticated requests return 401 and
+  do not consume the IP allowance; the IP layer prevents account churn from
+  multiplying paid-call eligibility behind one address.
 - AR-1b creates one default guard and counter when its module loads. All future
   request and provider call sites must reuse that process-level singleton;
   rebuilding it per request would reset accounting and defeat the guard. A

@@ -1,8 +1,8 @@
 # AR arc pre-implementation plan
 
 - **Date**: 2026-07-05
-- **Status**: AR-0 and AR-1a implemented; AR-1b implemented on its review
-  branch; AR-1c through AR-1d remain proposed
+- **Status**: AR-0 through AR-1b implemented; AR-1c implemented on its review
+  branch; AR-1d remains proposed
 - **Scope**: AR-0 completion record and AR-1 implementation plan. AR-0's
   accepted contract is recorded in D48; this plan does not consume a formal
   decision number.
@@ -256,9 +256,11 @@ characterization tests cannot flake from module-level counter state.
   transport-agnostic seam returns allow/fallback decisions plus telemetry and
   holds one process-level counter through a default singleton guard. It remains
   injectable for tests and is not wired to provider/orchestration paths yet.
-- **AR-1c per-IP AI limiter**: attach anonymous/per-IP hard caps to assistant
-  real-provider paths while preserving existing per-user limiter. Tests should
-  prove either limit blocks before any provider fetch.
+- **AR-1c per-IP AI limiter**: implemented as an unmounted HTTP middleware seam
+  with a process-level `10/min` plus `30/UTC day` limiter keyed by client IP.
+  It uses the configured-provider getter, leaves mock traffic uncounted, writes
+  allow/fallback telemetry to response locals, and never emits a public 429.
+  Route mounting and deterministic fallback consumption remain AR-1d.
 - **AR-1d orchestration telemetry and docs**: wire fallback markers into turn
   telemetry/logging, record D49, and update API/ops docs if the public error
   contract changes. Prefer no public error change: budget fallback should look
