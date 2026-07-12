@@ -1,7 +1,8 @@
 # AR arc pre-implementation plan
 
 - **Date**: 2026-07-05
-- **Status**: AR-0 implemented; AR-1 remains proposed
+- **Status**: AR-0 implemented; AR-1a implemented on its review branch;
+  AR-1b through AR-1d remain proposed
 - **Scope**: AR-0 completion record and AR-1 implementation plan. AR-0's
   accepted contract is recorded in D48; this plan does not consume a formal
   decision number.
@@ -173,10 +174,13 @@ Budget protection is wallet protection. Missing or malformed budget config must
 keep limits enabled with conservative defaults; it must never be interpreted as
 unlimited spend.
 
-The kill-switch is also fail-safe. The proposed flag is an explicit
-`ASSISTANT_REAL_PROVIDER_KILL_SWITCH`; only recognized false values keep live
-provider calls eligible. Recognized true values, malformed values, or parser
-uncertainty force deterministic mock fallback.
+The kill-switch has a different fail-safe direction because it is an emergency
+stop, not the wallet's always-on limit. For
+`ASSISTANT_REAL_PROVIDER_KILL_SWITCH`, unset means live-provider calls remain
+eligible; recognized true values and malformed values force deterministic mock
+fallback, while recognized false values keep calls eligible. This lets AR-2 turn
+on the reviewed provider with `ASSISTANT_PROVIDER=openai_compatible` without a
+second enable flag. Budget config remains fail-safe limited independently.
 
 Call-count budget is the always-available floor because it does not depend on
 model pricing. Cost budget is an enhancement when a model has a known price. If a
@@ -243,9 +247,11 @@ characterization tests cannot flake from module-level counter state.
 
 ### Proposed implementation slices
 
-- **AR-1a budget policy module**: pure parser and in-memory budget counter with
-  injected clock. Cover missing/malformed env, day reset, priced vs unknown-cost
-  model, kill-switch true/malformed, and exceeded budgets.
+- **AR-1a budget policy module**: implemented on its review branch. The pure
+  parser and in-memory budget counter use an injected clock and the existing
+  string-key limiter seam. Coverage pins missing/malformed env, UTC day reset,
+  priced vs unknown-cost model, kill-switch unset/true/malformed, and exceeded
+  budgets. D49 records the policy contract; provider wiring remains AR-1b.
 - **AR-1b provider guard seam**: add a single guard call before real-provider
   attempts. It returns allow/fallback decisions plus telemetry, without knowing
   SSE or HTTP details.

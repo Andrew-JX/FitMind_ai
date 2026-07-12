@@ -46,16 +46,18 @@ export function createAiRateLimiter(options?: {
   perMinute?: number;
   perDay?: number;
   now?: () => number;
+  dayWindow?: "elapsed_24h" | "utc_calendar_day";
 }): AiRateLimiter {
   const perMinute = options?.perMinute ?? AI_REQUESTS_PER_MINUTE;
   const perDay = options?.perDay ?? AI_REQUESTS_PER_DAY;
   const clock = options?.now ?? Date.now;
+  const dayWindow = options?.dayWindow ?? "elapsed_24h";
   const states = new Map<string, UserWindowState>();
 
   return {
     consume(userId: string): AiRateLimitDecision {
       const now = clock();
-      const state = resolveState(states, userId, now);
+      const state = resolveState(states, userId, now, dayWindow);
 
       if (state.dayCount >= perDay) {
         return {
@@ -91,6 +93,7 @@ function resolveState(
   states: Map<string, UserWindowState>,
   userId: string,
   now: number,
+  dayWindow: "elapsed_24h" | "utc_calendar_day",
 ): UserWindowState {
   const existing = states.get(userId);
 
@@ -98,7 +101,8 @@ function resolveState(
     const fresh: UserWindowState = {
       minuteWindowStart: now,
       minuteCount: 0,
-      dayWindowStart: now,
+      dayWindowStart:
+        dayWindow === "utc_calendar_day" ? startOfUtcDay(now) : now,
       dayCount: 0,
     };
     states.set(userId, fresh);
@@ -111,12 +115,23 @@ function resolveState(
     existing.minuteCount = 0;
   }
 
-  if (now - existing.dayWindowStart >= DAY_WINDOW_MS) {
-    existing.dayWindowStart = now;
+  const expectedDayWindowStart =
+    dayWindow === "utc_calendar_day" ? startOfUtcDay(now) : now;
+  const shouldResetDay =
+    dayWindow === "utc_calendar_day"
+      ? expectedDayWindowStart !== existing.dayWindowStart
+      : now - existing.dayWindowStart >= DAY_WINDOW_MS;
+
+  if (shouldResetDay) {
+    existing.dayWindowStart = expectedDayWindowStart;
     existing.dayCount = 0;
   }
 
   return existing;
+}
+
+function startOfUtcDay(timestampMs: number): number {
+  return Math.floor(timestampMs / DAY_WINDOW_MS) * DAY_WINDOW_MS;
 }
 
 function secondsUntil(boundaryMs: number, now: number): number {

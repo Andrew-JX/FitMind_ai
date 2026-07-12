@@ -4857,3 +4857,18 @@ Verification coverage added: middleware tests cover allow, reject, and one-minut
 AR-0a through AR-0d are complete. AR-0a characterized the four provider failure classes and the former error behavior; AR-0b added the deterministic fallback seam with sanitized telemetry; AR-0c wired provider errors through the real default-tool or missing-argument guidance path, with normal structured output and SSE `done` instead of `error`; AR-0d records the shipped contract in ai-decisions D48 and closes the stale implementation wording in the AR arc plan.
 
 The completed fallback is observable through `provider_error_fallback`, `provider_error_code`, `provider_error_message_sanitized`, `fallback_provider`, and `fallback_reason`; normal traffic explicitly records `provider_error_fallback:false`. Public DTOs remain unchanged, and fallback turns skip optional LLM phrasing. This closeout is documentation-only; DeepSeek still requires local live validation before AR-2, and numeric `provider_error_status` structured pass-through remains a separately reviewed backlog item.
+
+## 2026-07-11 AR-1a: per-instance budget policy
+
+Added the pure AR-1 budget parser and an injected-clock, in-memory per-instance
+counter. The call budget reuses the existing string-key AI limiter seam and
+resets with the cost counter at UTC midnight. Defaults remain `500` real-provider
+calls and `$1.00` known estimated cost per instance per day; missing or malformed
+budget values keep those conservative limits enabled.
+
+D49 pins the distinct fail-safe directions: an unset emergency kill-switch means
+live eligibility, while explicit true or malformed values engage it; budget
+configuration is fail-safe limited. Unknown/BYO model cost (`null`) does not
+advance cost, but the call-count floor remains active. This slice does not yet
+wire the provider guard or change runtime traffic; AR-1b through AR-1d remain
+required before AR-2.

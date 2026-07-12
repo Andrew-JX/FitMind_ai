@@ -1169,3 +1169,58 @@ Remaining boundaries:
 - This is a safety net, not evidence that DeepSeek is healthy. Before AR-2 changes production provider settings, run a local live DeepSeek conversation and live validation against the real provider; deterministic unit/eval coverage alone is insufficient.
 - `provider_error_status` is not yet carried as an independent numeric structured telemetry field. If operations need status-based aggregation distinct from the sanitized message and provider error code, add that explicit numeric pass-through in a separately reviewed change; this remains the AR-0b review backlog.
 - Provider outages can still consume the configured provider timeout before fallback completes. Timeout tuning remains a separate deployment/runtime decision.
+
+## [D49] AR-1 cost and abuse guardrail policy
+
+- **Date**: 2026-07-11
+- **Status**: Accepted policy; AR-1a implemented, AR-1b through AR-1d pending
+
+Background: the existing per-user AI limiter does not bound real-provider spend
+for a whole server instance, and cheap account creation can bypass a user-only
+abuse boundary. AR-1 adds an always-on wallet policy before AR-2 can make an
+OpenAI-compatible provider the public default.
+
+Decision:
+
+- The emergency flag is `ASSISTANT_REAL_PROVIDER_KILL_SWITCH`. **Unset means
+  live-provider calls remain eligible.** Explicit true tokens (`1`, `true`,
+  `on`, `yes`, case-insensitive) engage the switch. Explicit false tokens (`0`,
+  `false`, `off`, `no`) leave calls eligible. Blank, malformed, or otherwise
+  uncertain values engage the switch and force deterministic mock fallback.
+  This is intentionally different from budget parsing: the kill-switch is a
+  normally-unset emergency stop, so AR-2 only needs
+  `ASSISTANT_PROVIDER=openai_compatible` plus valid provider configuration to go
+  live.
+- Wallet budgets are always enabled. Missing or malformed
+  `ASSISTANT_REAL_PROVIDER_DAILY_CALL_BUDGET` and
+  `ASSISTANT_REAL_PROVIDER_DAILY_COST_BUDGET_USD` fall back to `500` calls and
+  `$1.00` respectively; invalid values never mean unlimited spend.
+- Per-instance call and cost counters reset at UTC midnight. The implementation
+  remains in-memory and per-process for the AR-1 MVP. The call counter reuses
+  the existing `createAiRateLimiter` string-key seam with
+  `ai:instance:real-provider:calls`; no Redis or DB counter is introduced.
+- Call count is the pricing-independent hard floor. Every allowed real-provider
+  attempt consumes one call before provider execution. Known estimated cost is
+  recorded after usage is available and blocks the next attempt once accrued
+  daily cost reaches the limit. `estimated_cost_usd:null` does not advance the
+  cost counter, but it never disables the call budget or the later per-IP cap.
+- Every routing, tool-selection, and phrasing provider attempt must pass the
+  guard independently. A later call cannot reuse an earlier allow decision or
+  bypass budget already consumed by the same turn.
+- AR-1b through AR-1d must keep budget and safety independent, check all guards
+  before provider fetch, and convert any denial into deterministic mock fallback
+  with server-only telemetry (`budget_fallback:true`, `budget_reason`,
+  `budget_scope`, and counter/limit values). No public billing error or public
+  DTO field is introduced.
+
+Remaining boundaries:
+
+- AR-1a provides the parser and per-instance counter only. Provider preflight,
+  per-IP `10/min` plus `30/day`, orchestration fallback, and final telemetry
+  wiring remain the reviewed AR-1b through AR-1d slices.
+- A priced call can take accrued spend slightly above the limit because actual
+  usage-based estimated cost is known only after the call completes. The next
+  real-provider attempt is blocked. Call-count and per-IP caps remain the
+  pre-request hard bounds.
+- Serverless instances each maintain their own counters. Distributed exact
+  accounting, edge limiting, CAPTCHA, and reputation remain backlog items.

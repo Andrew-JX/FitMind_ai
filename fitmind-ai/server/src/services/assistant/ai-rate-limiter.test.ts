@@ -81,4 +81,26 @@ describe("createAiRateLimiter", () => {
     expect(limiter.consume("u2").allowed).toBe(true);
     expect(limiter.consume("u1").allowed).toBe(false);
   });
+
+  it("can reset the daily window at UTC midnight", () => {
+    let now = Date.UTC(2026, 6, 11, 23, 59, 59);
+    const limiter = createAiRateLimiter({
+      perMinute: 100,
+      perDay: 1,
+      now: () => now,
+      dayWindow: "utc_calendar_day",
+    });
+
+    expect(limiter.consume("ai:instance:real-provider:calls").allowed).toBe(
+      true,
+    );
+    expect(limiter.consume("ai:instance:real-provider:calls").allowed).toBe(
+      false,
+    );
+
+    now = Date.UTC(2026, 6, 12, 0, 0, 0);
+    expect(limiter.consume("ai:instance:real-provider:calls").allowed).toBe(
+      true,
+    );
+  });
 });
