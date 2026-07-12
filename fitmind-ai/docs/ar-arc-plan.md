@@ -1,8 +1,8 @@
 # AR arc pre-implementation plan
 
 - **Date**: 2026-07-05
-- **Status**: AR-0 implemented; AR-1a implemented on its review branch;
-  AR-1b through AR-1d remain proposed
+- **Status**: AR-0 and AR-1a implemented; AR-1b implemented on its review
+  branch; AR-1c through AR-1d remain proposed
 - **Scope**: AR-0 completion record and AR-1 implementation plan. AR-0's
   accepted contract is recorded in D48; this plan does not consume a formal
   decision number.
@@ -252,9 +252,10 @@ characterization tests cannot flake from module-level counter state.
   string-key limiter seam. Coverage pins missing/malformed env, UTC day reset,
   priced vs unknown-cost model, kill-switch unset/true/malformed, and exceeded
   budgets. D49 records the policy contract; provider wiring remains AR-1b.
-- **AR-1b provider guard seam**: add a single guard call before real-provider
-  attempts. It returns allow/fallback decisions plus telemetry, without knowing
-  SSE or HTTP details.
+- **AR-1b provider guard seam**: implemented on its review branch. The
+  transport-agnostic seam returns allow/fallback decisions plus telemetry and
+  holds one process-level counter through a default singleton guard. It remains
+  injectable for tests and is not wired to provider/orchestration paths yet.
 - **AR-1c per-IP AI limiter**: attach anonymous/per-IP hard caps to assistant
   real-provider paths while preserving existing per-user limiter. Tests should
   prove either limit blocks before any provider fetch.

@@ -1173,7 +1173,7 @@ Remaining boundaries:
 ## [D49] AR-1 cost and abuse guardrail policy
 
 - **Date**: 2026-07-11
-- **Status**: Accepted policy; AR-1a implemented, AR-1b through AR-1d pending
+- **Status**: Accepted policy; AR-1a and AR-1b implemented, AR-1c through AR-1d pending
 
 Background: the existing per-user AI limiter does not bound real-provider spend
 for a whole server instance, and cheap account creation can bypass a user-only
@@ -1207,7 +1207,7 @@ Decision:
 - Every routing, tool-selection, and phrasing provider attempt must pass the
   guard independently. A later call cannot reuse an earlier allow decision or
   bypass budget already consumed by the same turn.
-- AR-1b through AR-1d must keep budget and safety independent, check all guards
+- AR-1c through AR-1d must keep budget and safety independent, check all guards
   before provider fetch, and convert any denial into deterministic mock fallback
   with server-only telemetry (`budget_fallback:true`, `budget_reason`,
   `budget_scope`, and counter/limit values). No public billing error or public
@@ -1215,9 +1215,19 @@ Decision:
 
 Remaining boundaries:
 
-- AR-1a provides the parser and per-instance counter only. Provider preflight,
-  per-IP `10/min` plus `30/day`, orchestration fallback, and final telemetry
-  wiring remain the reviewed AR-1b through AR-1d slices.
+- AR-1b provides the provider guard seam but does not call it from a runtime
+  path. Per-IP `10/min` plus `30/day`, provider preflight, orchestration
+  fallback, and final telemetry wiring remain the reviewed AR-1c and AR-1d
+  slices.
+- AR-1b creates one default guard and counter when its module loads. All future
+  request and provider call sites must reuse that process-level singleton;
+  rebuilding it per request would reset accounting and defeat the guard. A
+  factory remains available only for isolated test injection.
+- Because the default policy is parsed from `process.env` once at module load,
+  kill-switch and budget threshold changes require a process restart to take
+  effect. On Vercel that means an environment change followed by redeployment;
+  the kill-switch is not a no-redeploy, real-time stop for already-running
+  instances. This is an accepted constraint of the per-instance MVP.
 - A priced call can take accrued spend slightly above the limit because actual
   usage-based estimated cost is known only after the call completes. The next
   real-provider attempt is blocked. Call-count and per-IP caps remain the

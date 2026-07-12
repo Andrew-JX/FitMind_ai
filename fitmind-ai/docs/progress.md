@@ -4872,3 +4872,17 @@ configuration is fail-safe limited. Unknown/BYO model cost (`null`) does not
 advance cost, but the call-count floor remains active. This slice does not yet
 wire the provider guard or change runtime traffic; AR-1b through AR-1d remain
 required before AR-2.
+
+## 2026-07-11 AR-1b: provider budget guard seam
+
+Added a transport-agnostic provider guard that maps one budget-counter consume
+into an allow or deterministic-mock fallback decision with server telemetry.
+The seam forwards known or null post-call cost to the AR-1a counter and has no
+HTTP, SSE, controller, provider, or orchestrator dependency; runtime wiring
+remains AR-1d.
+
+The default guard and counter are created once at module load and shared for the
+warm process lifetime, while a factory permits isolated counter injection in
+tests. D49 records that policy environment values are also parsed once: changing
+the kill-switch or budget thresholds requires a process restart (a Vercel
+redeploy), rather than acting as a no-redeploy real-time stop.
