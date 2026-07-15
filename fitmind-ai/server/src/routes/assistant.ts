@@ -11,9 +11,12 @@ import {
   postMockAssistantTurnController,
 } from "../controllers/assistant-stream-controller.js";
 import { aiRateLimitMiddleware } from "../middleware/ai-rate-limit-middleware.js";
+import { getDefaultAssistantIpRateLimitMiddleware } from "../middleware/assistant-ip-rate-limit-middleware.js";
 import { authMiddleware } from "../middleware/auth-middleware.js";
 
 export const assistantRouter = Router();
+const assistantIpRateLimitMiddleware =
+  getDefaultAssistantIpRateLimitMiddleware();
 
 assistantRouter.use(authMiddleware);
 
@@ -36,10 +39,12 @@ assistantRouter.delete(
 assistantRouter.post(
   "/assistant/mock-turn",
   aiRateLimitMiddleware,
+  assistantIpRateLimitMiddleware,
   postMockAssistantTurnController,
 );
 assistantRouter.post(
   "/assistant/stream-turn",
   aiRateLimitMiddleware,
+  assistantIpRateLimitMiddleware,
   postAssistantStreamTurnController,
 );

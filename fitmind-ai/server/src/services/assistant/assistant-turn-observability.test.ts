@@ -39,6 +39,18 @@ describe("buildAssistantTurnLogEvent", () => {
       provider_error_message_sanitized: null,
       fallback_provider: null,
       fallback_reason: null,
+      budget_fallback: false,
+      budget_reason: null,
+      budget_scope: null,
+      budget_current_calls: null,
+      budget_call_limit: null,
+      budget_current_cost_usd: null,
+      budget_cost_limit_usd: null,
+      budget_ip_minute_count: null,
+      budget_ip_minute_limit: null,
+      budget_ip_day_count: null,
+      budget_ip_day_limit: null,
+      budget_retry_after_seconds: null,
       llm_attempt_count: 0,
       llm_usage_report_count: 0,
       llm_error_count: 0,
@@ -121,6 +133,9 @@ describe("buildAssistantTurnLogEvent", () => {
       provider_error_message_sanitized: null,
       fallback_provider: null,
       fallback_reason: null,
+      budget_fallback: false,
+      budget_reason: null,
+      budget_scope: null,
     });
     expect(fallbackEvent).toMatchObject({
       provider_error_fallback: true,
@@ -129,6 +144,82 @@ describe("buildAssistantTurnLogEvent", () => {
         "Groq request failed (503): unavailable",
       fallback_provider: "mock",
       fallback_reason: "provider_error",
+    });
+  });
+
+  it("flattens instance budget fallback with IP counters left null", () => {
+    const event = buildAssistantTurnLogEvent({
+      intent: "weekly_report",
+      durationMs: 30,
+      toolCalls: [{ status: "success", duration_ms: 5 }],
+      budgetFallback: {
+        budget_fallback: true,
+        budget_reason: "daily_cost_budget_exceeded",
+        budget_scope: "instance",
+        budget_current_calls: 12,
+        budget_call_limit: 500,
+        budget_current_cost_usd: 1,
+        budget_cost_limit_usd: 1,
+      },
+    });
+
+    expect(event).toMatchObject({
+      budget_fallback: true,
+      budget_reason: "daily_cost_budget_exceeded",
+      budget_scope: "instance",
+      budget_current_calls: 12,
+      budget_call_limit: 500,
+      budget_current_cost_usd: 1,
+      budget_cost_limit_usd: 1,
+      budget_ip_minute_count: null,
+      budget_ip_minute_limit: null,
+      budget_ip_day_count: null,
+      budget_ip_day_limit: null,
+      budget_retry_after_seconds: null,
+    });
+  });
+
+  it("keeps IP budget and provider-error fallback fields independent", () => {
+    const event = buildAssistantTurnLogEvent({
+      intent: "weekly_report",
+      durationMs: 30,
+      toolCalls: [{ status: "success", duration_ms: 5 }],
+      providerErrorFallback: {
+        provider_error_fallback: true,
+        provider_error_code: "GROQ_PROVIDER_ERROR",
+        provider_error_message_sanitized: "sanitized provider failure",
+        fallback_provider: "mock",
+        fallback_reason: "provider_error",
+      },
+      budgetFallback: {
+        budget_fallback: true,
+        budget_reason: "per_ip_daily_limit_exceeded",
+        budget_scope: "ip",
+        budget_ip_minute_count: 3,
+        budget_ip_minute_limit: 10,
+        budget_ip_day_count: 30,
+        budget_ip_day_limit: 30,
+        budget_retry_after_seconds: 60,
+      },
+    });
+
+    expect(event).toMatchObject({
+      provider_error_fallback: true,
+      provider_error_code: "GROQ_PROVIDER_ERROR",
+      fallback_provider: "mock",
+      fallback_reason: "provider_error",
+      budget_fallback: true,
+      budget_reason: "per_ip_daily_limit_exceeded",
+      budget_scope: "ip",
+      budget_current_calls: null,
+      budget_call_limit: null,
+      budget_current_cost_usd: null,
+      budget_cost_limit_usd: null,
+      budget_ip_minute_count: 3,
+      budget_ip_minute_limit: 10,
+      budget_ip_day_count: 30,
+      budget_ip_day_limit: 30,
+      budget_retry_after_seconds: 60,
     });
   });
 

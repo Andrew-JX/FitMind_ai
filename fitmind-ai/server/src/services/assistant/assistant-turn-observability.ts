@@ -5,6 +5,12 @@ import type {
 } from "./assistant-safety.js";
 import type { AssistantProviderCallTelemetry } from "./provider-types.js";
 import type { ProviderErrorFallbackTelemetry } from "./assistant-provider-fallback.js";
+import type { AssistantProviderBudgetFallbackTelemetry } from "./assistant-provider-guard.js";
+import type { AssistantIpBudgetFallbackTelemetry } from "../../middleware/assistant-ip-rate-limit-middleware.js";
+
+type AssistantBudgetFallbackTelemetry =
+  | AssistantProviderBudgetFallbackTelemetry
+  | AssistantIpBudgetFallbackTelemetry;
 
 /** Faithfulness outcome bucket for telemetry (`unchecked` = no tool data this turn). */
 type FaithfulnessStatus = "verified" | "flagged" | "unchecked";
@@ -60,6 +66,7 @@ export interface AssistantTurnLogInput {
   hasPlan?: boolean | undefined;
   llm?: AssistantTurnLlmSummary | null | undefined;
   providerErrorFallback?: ProviderErrorFallbackTelemetry | null | undefined;
+  budgetFallback?: AssistantBudgetFallbackTelemetry | null | undefined;
   safety?:
     | { boundary: "medical_boundary"; reason: AssistantSafetyReason }
     | null
@@ -88,8 +95,26 @@ interface ProviderErrorFallbackEventFields {
   fallback_reason: "provider_error" | null;
 }
 
+interface BudgetFallbackEventFields {
+  budget_fallback: boolean;
+  budget_reason: AssistantBudgetFallbackTelemetry["budget_reason"] | null;
+  budget_scope: AssistantBudgetFallbackTelemetry["budget_scope"] | null;
+  budget_current_calls: number | null;
+  budget_call_limit: number | null;
+  budget_current_cost_usd: number | null;
+  budget_cost_limit_usd: number | null;
+  budget_ip_minute_count: number | null;
+  budget_ip_minute_limit: number | null;
+  budget_ip_day_count: number | null;
+  budget_ip_day_limit: number | null;
+  budget_retry_after_seconds: number | null;
+}
+
 export interface AssistantTurnLogEvent
-  extends LlmEventFields, ProviderErrorFallbackEventFields {
+  extends
+    LlmEventFields,
+    ProviderErrorFallbackEventFields,
+    BudgetFallbackEventFields {
   event: "assistant_turn";
   status: "ok";
   intent: AssistantRoutedIntent;
@@ -196,7 +221,30 @@ export function buildAssistantTurnLogEvent(
     ...buildProviderErrorFallbackEventFields(
       input.providerErrorFallback ?? null,
     ),
+    ...buildBudgetFallbackEventFields(input.budgetFallback ?? null),
     ...buildLlmEventFields(input.llm ?? null),
+  };
+}
+
+function buildBudgetFallbackEventFields(
+  fallback: AssistantBudgetFallbackTelemetry | null,
+): BudgetFallbackEventFields {
+  const instance = fallback?.budget_scope === "instance" ? fallback : null;
+  const ip = fallback?.budget_scope === "ip" ? fallback : null;
+
+  return {
+    budget_fallback: fallback?.budget_fallback ?? false,
+    budget_reason: fallback?.budget_reason ?? null,
+    budget_scope: fallback?.budget_scope ?? null,
+    budget_current_calls: instance?.budget_current_calls ?? null,
+    budget_call_limit: instance?.budget_call_limit ?? null,
+    budget_current_cost_usd: instance?.budget_current_cost_usd ?? null,
+    budget_cost_limit_usd: instance?.budget_cost_limit_usd ?? null,
+    budget_ip_minute_count: ip?.budget_ip_minute_count ?? null,
+    budget_ip_minute_limit: ip?.budget_ip_minute_limit ?? null,
+    budget_ip_day_count: ip?.budget_ip_day_count ?? null,
+    budget_ip_day_limit: ip?.budget_ip_day_limit ?? null,
+    budget_retry_after_seconds: ip?.budget_retry_after_seconds ?? null,
   };
 }
 

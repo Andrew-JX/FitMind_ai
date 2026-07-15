@@ -6,16 +6,13 @@ import {
 } from "../services/assistant/assistant-orchestrator-service.js";
 import type { AssistantTurnExecutionResult } from "../services/assistant/assistant-orchestrator-service.js";
 import type { AssistantStreamEvent } from "../services/assistant/assistant-stream-types.js";
+import type { AssistantIpRateLimitLocals } from "../middleware/assistant-ip-rate-limit-middleware.js";
 import {
   logAssistantTurnEvent,
   logFailedAssistantTurnEvent,
 } from "../services/assistant/assistant-turn-observability.js";
 import { createSuccessResponse } from "../utils/api-response.js";
 import { isHttpError } from "../utils/http-error.js";
-
-type AuthLocals = {
-  userId: string;
-};
 
 function logTurnTelemetry(
   result: AssistantTurnExecutionResult,
@@ -32,12 +29,13 @@ function logTurnTelemetry(
     hasPlan: response.plan !== undefined,
     llm: telemetry.llm ?? null,
     providerErrorFallback: telemetry.providerErrorFallback ?? null,
+    budgetFallback: telemetry.budgetFallback ?? null,
     safety: telemetry.safety ?? null,
   });
 }
 
 function writeSseEvent(
-  res: Response<unknown, AuthLocals>,
+  res: Response<unknown, AssistantIpRateLimitLocals>,
   event: AssistantStreamEvent,
 ): void {
   if (res.writableEnded || res.destroyed) {
@@ -89,11 +87,13 @@ function normalizeStreamError(error: unknown): {
  */
 export async function postMockAssistantTurnController(
   req: Request,
-  res: Response<unknown, AuthLocals>,
+  res: Response<unknown, AssistantIpRateLimitLocals>,
 ) {
   const startedAt = Date.now();
   try {
-    const result = await runMockAssistantTurn(res.locals.userId, req.body);
+    const result = await runMockAssistantTurn(res.locals.userId, req.body, {
+      assistantIpGuardDecision: res.locals.assistantIpGuardDecision,
+    });
     logTurnTelemetry(result, Date.now() - startedAt);
 
     return res.status(200).json(createSuccessResponse(result.response));
@@ -112,7 +112,7 @@ export async function postMockAssistantTurnController(
  */
 export async function postAssistantStreamTurnController(
   req: Request,
-  res: Response<unknown, AuthLocals>,
+  res: Response<unknown, AssistantIpRateLimitLocals>,
 ) {
   res.status(200);
   res.setHeader("Content-Type", "text/event-stream");
@@ -125,6 +125,7 @@ export async function postAssistantStreamTurnController(
 
   try {
     const result = await runMockAssistantTurn(res.locals.userId, req.body, {
+      assistantIpGuardDecision: res.locals.assistantIpGuardDecision,
       onEvent: async (event) => {
         if (event.type === "error") {
           errorEventSent = true;
