@@ -80,6 +80,7 @@ vi.mock("../planned-workout-service.js", () => ({
 
 import { runMockAssistantTurn } from "./assistant-orchestrator-service.js";
 import { executeAiTool } from "../ai/tools/tool-executor.js";
+import { AiToolValidationError } from "../ai/tools/tool-types.js";
 import { getPlanAdherenceContextForPlanner } from "../planned-workout-service.js";
 import {
   runAssistantAnswerPhrasing,
@@ -432,26 +433,15 @@ describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", ()
     },
   );
 
-  it("completes provider-error fallback with guidance and done when required tool args are missing", async () => {
+  it("short-circuits missing default-tool request args before the provider and emits done", async () => {
     mockedGetConfiguredAssistantProvider.mockReturnValue("groq");
-    mockedRunAssistantProvider.mockResolvedValueOnce({
-      kind: "error",
-      error_code: "GROQ_PROVIDER_ERROR",
-      message: "Groq request failed (503): unavailable",
-      telemetry: {
-        attempted: true,
-        errored: true,
-        provider: "groq",
-        model: "llama-3.3-70b-versatile",
-      },
-    });
     const events: string[] = [];
 
     const { response, telemetry } = await runMockAssistantTurn(
       "user-1",
       {
-        mode: "exercise_progress",
-        message: "分析这个动作的进展",
+        mode: "auto",
+        message: "这个动作最近有进步吗",
         start_date: "2026-05-19",
         end_date: "2026-06-17",
       },
@@ -466,17 +456,89 @@ describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", ()
     expect(response.answer.summary).toContain("请先指定要分析的动作");
     expect(response.faithfulness).toBeUndefined();
     expect(response.message_id).toBe("message-1");
-    expect(telemetry.providerErrorFallback).toEqual({
-      provider_error_fallback: true,
-      provider_error_code: "GROQ_PROVIDER_ERROR",
-      provider_error_message_sanitized:
-        "Groq request failed (503): unavailable",
-      fallback_provider: "mock",
-      fallback_reason: "provider_error",
+    expect(telemetry.toolArgumentFallback).toEqual({
+      tool_argument_fallback: true,
+      fallback_reason: "missing_required_request_args",
+      tool_name: "get_exercise_progress",
+      argument_fields: ["exercise_id"],
+      validation_error_code: null,
     });
+    expect(telemetry.providerErrorFallback).toBeUndefined();
+    expect(mockedRunAssistantProvider).not.toHaveBeenCalled();
     expect(mockedExecuteAiTool).not.toHaveBeenCalled();
     expect(events).toContain("structured_output");
     expect(events).toContain("done");
+    expect(events).not.toContain("error");
+  });
+
+  it("degrades a successful provider's invalid tool call to guidance and done", async () => {
+    mockedGetConfiguredAssistantProvider.mockReturnValue("groq");
+    mockedRunAssistantProvider.mockResolvedValueOnce({
+      kind: "tool_call",
+      tool_name: "get_exercise_progress",
+      tool_args: {
+        start_date: "2026-05-19",
+        end_date: "2026-06-17",
+      },
+      telemetry: {
+        attempted: true,
+        errored: false,
+        provider: "groq",
+        model: "llama-3.3-70b-versatile",
+      },
+    });
+    mockedExecuteAiTool.mockRejectedValueOnce(
+      new AiToolValidationError([
+        { path: "exercise_id", message: "Invalid input" },
+      ]),
+    );
+    const events: string[] = [];
+
+    const { response, telemetry } = await runMockAssistantTurn(
+      "user-1",
+      {
+        mode: "auto",
+        message: "这个动作最近有进步吗",
+        start_date: "2026-05-19",
+        end_date: "2026-06-17",
+        exercise_id: "33333333-3333-4333-8333-333333333333",
+      },
+      {
+        onEvent: (event) => {
+          events.push(event.type);
+        },
+      },
+    );
+
+    expect(mockedRunAssistantProvider).toHaveBeenCalledTimes(1);
+    expect(mockedExecuteAiTool).toHaveBeenCalledWith(
+      { userId: "user-1" },
+      "get_exercise_progress",
+      {
+        start_date: "2026-05-19",
+        end_date: "2026-06-17",
+      },
+    );
+    expect(response.tool_calls).toEqual([
+      expect.objectContaining({
+        tool_name: "get_exercise_progress",
+        status: "error",
+      }),
+    ]);
+    expect(response.answer.summary).toContain("请先指定要分析的动作");
+    expect(JSON.stringify(response)).not.toContain(
+      "Tool argument validation failed",
+    );
+    expect(JSON.stringify(response)).not.toContain("Invalid input");
+    expect(telemetry.toolArgumentFallback).toEqual({
+      tool_argument_fallback: true,
+      fallback_reason: "tool_validation_error",
+      tool_name: "get_exercise_progress",
+      argument_fields: ["exercise_id"],
+      validation_error_code: "VALIDATION_ERROR",
+    });
+    expect(events).toContain("structured_output");
+    expect(events.filter((event) => event === "done")).toHaveLength(1);
     expect(events).not.toContain("error");
   });
 

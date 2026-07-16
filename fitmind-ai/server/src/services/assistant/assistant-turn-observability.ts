@@ -12,6 +12,14 @@ type AssistantBudgetFallbackTelemetry =
   | AssistantProviderBudgetFallbackTelemetry
   | AssistantIpBudgetFallbackTelemetry;
 
+export interface ToolArgumentFallbackTelemetry {
+  tool_argument_fallback: true;
+  fallback_reason: "missing_required_request_args" | "tool_validation_error";
+  tool_name: string;
+  argument_fields: string[];
+  validation_error_code: "VALIDATION_ERROR" | null;
+}
+
 /** Faithfulness outcome bucket for telemetry (`unchecked` = no tool data this turn). */
 type FaithfulnessStatus = "verified" | "flagged" | "unchecked";
 
@@ -67,6 +75,7 @@ export interface AssistantTurnLogInput {
   llm?: AssistantTurnLlmSummary | null | undefined;
   providerErrorFallback?: ProviderErrorFallbackTelemetry | null | undefined;
   budgetFallback?: AssistantBudgetFallbackTelemetry | null | undefined;
+  toolArgumentFallback?: ToolArgumentFallbackTelemetry | null | undefined;
   safety?:
     | { boundary: "medical_boundary"; reason: AssistantSafetyReason }
     | null
@@ -110,11 +119,22 @@ interface BudgetFallbackEventFields {
   budget_retry_after_seconds: number | null;
 }
 
+interface ToolArgumentFallbackEventFields {
+  tool_argument_fallback: boolean;
+  tool_argument_fallback_reason:
+    | ToolArgumentFallbackTelemetry["fallback_reason"]
+    | null;
+  tool_argument_fallback_tool: string | null;
+  tool_argument_fields: string[];
+  tool_argument_validation_error_code: "VALIDATION_ERROR" | null;
+}
+
 export interface AssistantTurnLogEvent
   extends
     LlmEventFields,
     ProviderErrorFallbackEventFields,
-    BudgetFallbackEventFields {
+    BudgetFallbackEventFields,
+    ToolArgumentFallbackEventFields {
   event: "assistant_turn";
   status: "ok";
   intent: AssistantRoutedIntent;
@@ -222,7 +242,21 @@ export function buildAssistantTurnLogEvent(
       input.providerErrorFallback ?? null,
     ),
     ...buildBudgetFallbackEventFields(input.budgetFallback ?? null),
+    ...buildToolArgumentFallbackEventFields(input.toolArgumentFallback ?? null),
     ...buildLlmEventFields(input.llm ?? null),
+  };
+}
+
+function buildToolArgumentFallbackEventFields(
+  fallback: ToolArgumentFallbackTelemetry | null,
+): ToolArgumentFallbackEventFields {
+  return {
+    tool_argument_fallback: fallback?.tool_argument_fallback ?? false,
+    tool_argument_fallback_reason: fallback?.fallback_reason ?? null,
+    tool_argument_fallback_tool: fallback?.tool_name ?? null,
+    tool_argument_fields: fallback?.argument_fields ?? [],
+    tool_argument_validation_error_code:
+      fallback?.validation_error_code ?? null,
   };
 }
 

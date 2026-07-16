@@ -51,6 +51,7 @@ import {
   summarizeTurnLlmCalls,
   type AssistantLlmCallRecord,
   type AssistantTurnLlmSummary,
+  type ToolArgumentFallbackTelemetry,
 } from "./assistant-turn-observability.js";
 import {
   getDefaultAssistantProviderGuard,
@@ -301,6 +302,8 @@ export interface AssistantTurnTelemetry {
   providerErrorFallback?: ProviderErrorFallbackTelemetry | undefined;
   /** Server-only marker for a turn completed after an IP/instance budget denial. */
   budgetFallback?: AssistantBudgetFallbackTelemetry | undefined;
+  /** Server-only marker for request/provider tool arguments completed via guidance. */
+  toolArgumentFallback?: ToolArgumentFallbackTelemetry | undefined;
   /** Server-only safety marker for pre-routing medical boundary hits. */
   safety?:
     | { boundary: "medical_boundary"; reason: AssistantSafetyReason }
@@ -800,6 +803,23 @@ function buildProviderErrorFallbackGuidance(
   return `暂时无法完成这次训练数据查询。请先指定${fieldLabels.join("、")}，再重新提问。`;
 }
 
+function resolveInvalidToolArgumentFields(
+  error: AiToolValidationError,
+  defaultTool: AssistantProviderToolDefinition,
+): string[] {
+  const inputFields = new Set(defaultTool.input_fields);
+  const invalidFields = error.issues
+    .map((issue) => issue.path.split(".")[0])
+    .filter(
+      (field): field is string =>
+        field !== undefined && field.length > 0 && inputFields.has(field),
+    );
+
+  return invalidFields.length > 0
+    ? [...new Set(invalidFields)]
+    : [...defaultTool.input_fields];
+}
+
 function createValidationHttpError(error: AiToolValidationError): HttpError {
   return new HttpError(400, error.code, error.message, {
     issues: error.issues,
@@ -937,7 +957,7 @@ function resolveExecutionModeForIntent(
     case "exercise_history":
       return "training_overview";
     case "progress":
-      return input.exercise_id ? "exercise_progress" : "next_training_focus";
+      return "exercise_progress";
     case "imbalance":
       return "training_imbalance";
     case "recommendation":
@@ -1187,6 +1207,7 @@ function buildTurnTelemetry(
   records: AssistantLlmCallRecord[],
   providerErrorFallback?: ProviderErrorFallbackTelemetry,
   budgetFallback?: AssistantBudgetFallbackTelemetry,
+  toolArgumentFallback?: ToolArgumentFallbackTelemetry,
 ): AssistantTurnTelemetry {
   const telemetry: AssistantTurnTelemetry = {
     llm: summarizeTurnLlmCalls(records),
@@ -1198,6 +1219,10 @@ function buildTurnTelemetry(
 
   if (budgetFallback !== undefined) {
     telemetry.budgetFallback = budgetFallback;
+  }
+
+  if (toolArgumentFallback !== undefined) {
+    telemetry.toolArgumentFallback = toolArgumentFallback;
   }
 
   return telemetry;
@@ -1531,8 +1556,32 @@ export async function runMockAssistantTurn(
     };
   }
 
+  const defaultTool = getToolDefinitionForMode(executionMode);
+  const fallbackArgSource = {
+    start_date: input.start_date,
+    end_date: input.end_date,
+    exercise_id: input.exercise_id,
+  };
+  const requestArgFallback = decideDeterministicProviderFallback(
+    defaultTool,
+    fallbackArgSource,
+  );
+  let toolArgumentFallback: ToolArgumentFallbackTelemetry | undefined =
+    requestArgFallback.kind === "missing_required_args"
+      ? {
+          tool_argument_fallback: true,
+          fallback_reason: "missing_required_request_args",
+          tool_name: defaultTool.name,
+          argument_fields: requestArgFallback.missing_input_fields,
+          validation_error_code: null,
+        }
+      : undefined;
+
   const providerRequest = buildProviderRequest(input, executionMode);
-  const toolSelectionGate = providerGate.guardRealProviderAttempt();
+  const toolSelectionGate =
+    requestArgFallback.kind === "missing_required_args"
+      ? ({ kind: "fallback" } as const)
+      : providerGate.guardRealProviderAttempt();
 
   await emitEvent(options, {
     type: "provider_selected",
@@ -1554,12 +1603,6 @@ export async function runMockAssistantTurn(
     providerGate.recordCompletedCall(routingRecord);
   }
 
-  const defaultTool = getToolDefinitionForMode(executionMode);
-  const fallbackArgSource = {
-    start_date: input.start_date,
-    end_date: input.end_date,
-    exercise_id: input.exercise_id,
-  };
   let providerResponse: NonErrorProviderResponse;
   let providerErrorFallback: ProviderErrorFallbackTelemetry | undefined;
 
@@ -1628,6 +1671,7 @@ export async function runMockAssistantTurn(
 
     const startedAt = Date.now();
     let result: unknown;
+    let validationGuidance: string | undefined;
 
     try {
       result = await executeAiTool(
@@ -1664,13 +1708,29 @@ export async function runMockAssistantTurn(
       });
 
       if (error instanceof AiToolValidationError) {
-        throw createValidationHttpError(error);
+        const invalidFields = resolveInvalidToolArgumentFields(
+          error,
+          defaultTool,
+        );
+        toolArgumentFallback = {
+          tool_argument_fallback: true,
+          fallback_reason: "tool_validation_error",
+          tool_name: providerResponse.tool_name,
+          argument_fields: invalidFields,
+          validation_error_code: error.code,
+        };
+        validationGuidance = buildProviderErrorFallbackGuidance(invalidFields);
+      } else {
+        throw error;
       }
-
-      throw error;
     }
 
-    if (intent === "mixed_tool_rag") {
+    if (validationGuidance !== undefined) {
+      answer = normalizeStructuredAnswer(
+        buildProviderMessageAnswer(validationGuidance),
+        intent,
+      );
+    } else if (intent === "mixed_tool_rag") {
       await emitEvent(options, {
         type: "state",
         state: "retrieving",
@@ -1736,6 +1796,7 @@ export async function runMockAssistantTurn(
     // a rewrite that introduces an unverified number is rejected and we keep the
     // deterministic draft (numbers/conclusions stay deterministic + evidence-bound).
     if (
+      validationGuidance === undefined &&
       providerErrorFallback === undefined &&
       isAssistantAnswerPhrasingEnabled()
     ) {
@@ -1800,6 +1861,7 @@ export async function runMockAssistantTurn(
         : [routerRecord, routingRecord, phrasingRecord],
       providerErrorFallback,
       providerGate.getBudgetFallback(),
+      toolArgumentFallback,
     ),
   };
 }

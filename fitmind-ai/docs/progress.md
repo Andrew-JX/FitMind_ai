@@ -4966,3 +4966,29 @@ This independent bug-fix batch does not change the client's default 30-day
 range or add assistant-side date parsing. Interpreting an explicit “this week”
 request as a natural-week query is recorded separately in the roadmap for
 timezone and precedence design. No AR status or D-number is consumed.
+
+## 2026-07-16 missing tool-argument 400 regression
+
+Fixed the live-provider regression where “这个动作最近有进步吗” without an
+`exercise_id` could reach `get_exercise_progress`, fail tool Zod validation,
+and expose the English `Tool argument validation failed.` message through HTTP
+400 / SSE `error`.
+
+After execution-mode resolution, the orchestrator now checks the default
+tool's request-supplied required arguments. Missing values reuse the AR-0
+Chinese guidance path before provider selection, so the paid provider and tool
+executor both receive zero calls and the turn persists normally with
+`structured_output` + `done`. A successful provider that still returns a
+missing/invalid tool call is caught at the `AiToolValidationError` boundary and
+degrades to the same guidance without leaking provider/Zod text.
+
+Server-only `assistant_turn` telemetry now distinguishes
+`missing_required_request_args` from `tool_validation_error` under the
+`tool_argument_fallback*` fields. Public DTOs and SSE event types are unchanged;
+top-level request-schema validation remains a normal 400 boundary. Regression
+coverage pins provider zero-call preflight, successful-provider invalid tool
+calls, Chinese-only guidance, one `done`, no `error`, and unchanged normal
+requests with `exercise_id` through the existing suite.
+
+Verification: targeted assistant tests 38/38, full unit suite 463/463, lint,
+and workspace type-check all passed before final `pnpm verify`.

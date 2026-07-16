@@ -30,6 +30,7 @@ function logTurnTelemetry(
     llm: telemetry.llm ?? null,
     providerErrorFallback: telemetry.providerErrorFallback ?? null,
     budgetFallback: telemetry.budgetFallback ?? null,
+    toolArgumentFallback: telemetry.toolArgumentFallback ?? null,
     safety: telemetry.safety ?? null,
   });
 }

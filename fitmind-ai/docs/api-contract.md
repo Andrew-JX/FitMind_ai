@@ -455,6 +455,8 @@ data: {"intent":"next_week_plan","answer":{...},"agent_trace":{...},"plan":{"str
 - `structured_output` 可选带 `faithfulness`：`{ status: "verified" | "flagged", checkedNumbers, unverifiedClaims[] }`（运行时确定性 faithfulness 校验结果，见 `ai-decisions.md` D21）。常规工具路径与 `next_week_plan` agent 路径会带；knowledge/unsupported 等无工具数据的路径不带。仅标注、不改答案文案。前端可据此渲染"数据已核对"徽章（后续 Slice）。
 - **Token/成本是服务端运维 telemetry，不进响应**：每轮 LLM token 用量（路由 + 可选 11.3b 措辞）只进后端 `assistant_turn` 日志行，**不**出现在 `structured_output` / 响应 DTO（见 `ai-decisions.md` D40 / C1）。客户端不依赖 Groq/OpenAI 的 usage 结构。
 - **Safety 是服务端 telemetry，不进响应**：Slice 10 急性/模糊疼痛、红旗症状、诊断/治疗/用药请求会在路由前短路到确定性安全模板；公开响应仍是 `intent: "unsupported"`，不新增 `safety` DTO 字段。服务端 `assistant_turn` 日志带 `safety_boundary` / `safety_reason`（见 `ai-decisions.md` D41）。Phase 1 前端不区分普通 unsupported 与安全拒答。
+- **缺少默认工具必填参时不调用 provider**：执行模式解析后，如果请求侧没有默认工具必需的值（例如动作进展缺 `exercise_id`），后端直接返回既有中文补参引导并正常发 `structured_output` + `done`。真实 provider 已返回、但其 tool call 缺参或参数非法时也降级到同一引导并以 `done` 完成，不把 Zod/provider 英文错误或 HTTP 400 暴露给客户端。这里不改变请求 DTO 自身的 schema 校验：客户端提交非法顶层请求仍可返回 `400 VALIDATION_ERROR`。
+- **Tool 参数降级是服务端 telemetry，不进响应**：`assistant_turn` 日志用 `tool_argument_fallback`、`tool_argument_fallback_reason`、`tool_argument_fallback_tool`、`tool_argument_fields`、`tool_argument_validation_error_code` 区分请求前置短路与 provider tool-call 校验兜底；公开 DTO 与 SSE 事件集合不新增字段（见 `ai-decisions.md` D50）。
 - 前端对未知事件类型必须**忽略**（向前兼容），不能当成错误处理。
 - 客户端可通过 `AbortController` 中断；后端要妥善处理 connection close
 

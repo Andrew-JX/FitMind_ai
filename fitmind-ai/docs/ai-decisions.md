@@ -1280,3 +1280,41 @@ Remaining boundaries:
   proxy egress can also aggregate unrelated users into one IP bucket.
   Distributed exact accounting, edge limiting, CAPTCHA, and reputation remain
   backlog items.
+
+## [D50] Request-aware tool-argument fallback before and after provider selection
+
+- **Date**: 2026-07-16
+- **Status**: Accepted / implemented
+
+Background: after the real OpenAI-compatible provider was enabled, a progress
+question without `exercise_id` could still produce a successful
+`get_exercise_progress` tool call with missing or invalid arguments. The tool
+executor correctly rejected it with `AiToolValidationError`, but the
+orchestrator converted that internal provider-output defect into public
+`400 VALIDATION_ERROR` and SSE `error`. AR-0 only covered normalized provider
+errors and budget denial, so this successful-provider/invalid-tool-call branch
+was outside its fallback boundary.
+
+Decision:
+
+- Preserve progress intent as `exercise_progress` even when the request has no
+  `exercise_id`. Immediately after resolving the execution mode, compare the
+  mode's deterministic default tool requirements with request-derived values.
+  If a required value is absent, do not consume the per-instance provider gate
+  and do not call the provider. Reuse the existing AR-0 missing-input guidance,
+  persist the normal response, and complete SSE with `done`.
+- Keep the request-with-`exercise_id` path unchanged: provider selection and the
+  real tool executor run as before. If a successful provider nevertheless emits
+  a tool call whose arguments fail Zod validation, catch
+  `AiToolValidationError`, return the same deterministic Chinese guidance, and
+  complete normally. Provider/Zod error messages and issue text never enter the
+  public response.
+- Record both outcomes in server-only turn telemetry. The flat
+  `assistant_turn` event exposes `tool_argument_fallback`,
+  `tool_argument_fallback_reason` (`missing_required_request_args` or
+  `tool_validation_error`), `tool_argument_fallback_tool`,
+  `tool_argument_fields`, and `tool_argument_validation_error_code`. These
+  fields do not change public DTOs or SSE event types.
+- Top-level client request validation remains distinct and may still return
+  `400 VALIDATION_ERROR`. This decision only prevents invalid provider-produced
+  tool arguments from becoming a user-visible 400.

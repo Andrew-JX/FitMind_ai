@@ -51,6 +51,11 @@ describe("buildAssistantTurnLogEvent", () => {
       budget_ip_day_count: null,
       budget_ip_day_limit: null,
       budget_retry_after_seconds: null,
+      tool_argument_fallback: false,
+      tool_argument_fallback_reason: null,
+      tool_argument_fallback_tool: null,
+      tool_argument_fields: [],
+      tool_argument_validation_error_code: null,
       llm_attempt_count: 0,
       llm_usage_report_count: 0,
       llm_error_count: 0,
@@ -144,6 +149,30 @@ describe("buildAssistantTurnLogEvent", () => {
         "Groq request failed (503): unavailable",
       fallback_provider: "mock",
       fallback_reason: "provider_error",
+    });
+  });
+
+  it("flattens tool-validation guidance fallback for monitoring", () => {
+    const event = buildAssistantTurnLogEvent({
+      intent: "progress",
+      durationMs: 30,
+      toolCalls: [{ status: "error", duration_ms: 5 }],
+      toolArgumentFallback: {
+        tool_argument_fallback: true,
+        fallback_reason: "tool_validation_error",
+        tool_name: "get_exercise_progress",
+        argument_fields: ["exercise_id"],
+        validation_error_code: "VALIDATION_ERROR",
+      },
+    });
+
+    expect(event).toMatchObject({
+      status: "ok",
+      tool_argument_fallback: true,
+      tool_argument_fallback_reason: "tool_validation_error",
+      tool_argument_fallback_tool: "get_exercise_progress",
+      tool_argument_fields: ["exercise_id"],
+      tool_argument_validation_error_code: "VALIDATION_ERROR",
     });
   });
 
