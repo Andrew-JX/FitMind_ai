@@ -1,8 +1,8 @@
 # AR arc implementation record and AR-2 handoff
 
 - **Date**: 2026-07-05
-- **Status**: AR-0 complete; AR-1a through AR-1d complete and reviewed; AR-1
-  sealed
+- **Status**: AR-0 complete; AR-1 sealed; AR-2 operator checklist ready and
+  awaiting user-run local live validation plus the user-operated Vercel flip
 - **Scope**: AR-0 and AR-1 implementation record plus the ready AR-2 handoff.
   Accepted contracts are recorded in [D48](./ai-decisions.md#d48-ar-0-provider-error-deterministic-fallback)
   and [D49](./ai-decisions.md#d49-ar-1-cost-and-abuse-guardrail-policy).
@@ -300,10 +300,15 @@ default to mock unless all required guardrails are in place and reviewed.
 
 ## AR-2 handoff checklist
 
-**Status: Ready.** AR-0 fallback hardening and the complete AR-1 cost/abuse
-guardrail stack have passed review, so AR-2's engineering prerequisites are
-satisfied. Before the user changes production Vercel env, AR-2 must still run
-local live validation with DeepSeek:
+**Status: Checklist ready; awaiting user execution.** AR-0 fallback hardening
+and the complete AR-1 cost/abuse guardrail stack have passed review, so AR-2's
+engineering prerequisites are satisfied. The database-target gate, disposable
+local verifier, paid-call warning, Vercel environment checklist, online smoke,
+and rollback steps are now collected in
+[the AR-2 flip checklist](./ar-2-flip-checklist.md).
+
+Before the user changes production Vercel env, the user must still run local
+live validation with DeepSeek:
 
 - set `ASSISTANT_PROVIDER=openai_compatible`,
   `OPENAI_COMPAT_BASE_URL=https://api.deepseek.com`,
@@ -316,3 +321,7 @@ local live validation with DeepSeek:
 - confirm fallback telemetry is visible when the key is intentionally broken;
 - provide the user a production env checklist. The user performs the Vercel env
   change and deployment action.
+
+This documentation handoff does not mean that DeepSeek live validation passed
+or that production was changed. Codex has not changed Vercel environment values,
+run the online smoke, or flipped the public default.

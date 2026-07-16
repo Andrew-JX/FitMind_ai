@@ -4934,3 +4934,21 @@ Mock mode consumes neither IP nor instance budget, so the shipped default keeps
 zero runtime behavior change. AR-1 is now sealed and the AR-2 engineering
 prerequisites are ready; D49 records the accepted semantics and serverless
 per-instance limitations.
+
+## 2026-07-16 AR-2 plan batch: flip checklist ready, awaiting user execution
+
+Added the operator-owned AR-2 checklist for local DeepSeek live validation and
+the later manual Vercel flip. The disposable verifier is documented inline and
+must be materialized only as an untracked `.tmp.ts` file, then deleted. Its
+database gate fails closed for remote `DATABASE_URL` values unless the operator
+explicitly selects a scratch target or accepts possible Neon residue. The live
+flow creates a disposable user, workouts, chat rows, and tool logs; cleanup is
+best-effort, and the real live/budget-call scenarios incur small paid DeepSeek
+calls.
+
+The checklist pins provider-error fallback (`done`, not `error`), instance and
+injected-IP budget fallback telemetry, kill-switch behavior, placeholder-only
+Vercel secrets, post-flip log evidence, and both redeploy-based rollback paths.
+No application code, `.env`, Vercel setting, or online environment changed.
+This deployment runbook adds no new architecture decision, so it does not take
+D50; D48 and D49 remain the governing contracts.
