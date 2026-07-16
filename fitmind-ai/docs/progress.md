@@ -4901,3 +4901,36 @@ The middleware reads provider eligibility through
 records that 30/day becomes the effective daily ceiling for a single-IP user and
 that users behind a shared NAT intentionally share the same conservative public
 demo allowance.
+
+## 2026-07-11 AR-1d: orchestration wiring and AR-1 closeout
+
+Completed the runtime wiring for the AR-1 guardrail stack. Assistant turn routes
+now run auth, the existing per-user limiter, and the per-IP limiter before their
+controller; saved-insight routes remain outside the provider/IP budget path.
+Both JSON and SSE controllers pass the request-scoped IP decision into the
+orchestrator.
+
+The turn-scoped IP decision locks all real-provider calls when denied. After an
+IP allow, routing, tool-selection, and optional phrasing each pass the shared
+per-instance guard immediately before calling the provider. A first denial
+locks the remaining turn without repeated guard consumption or duplicate
+fallback. Both budget scopes reuse AR-0's deterministic default-tool or
+missing-argument guidance path and complete normally with structured output and
+SSE `done`.
+
+Each returned provider call now records known estimated cost or `null` through
+the AR-1b `recordCost` seam. Turn logs flatten independent instance/IP budget
+scope and counter fields while preserving the separate
+`provider_error_fallback` markers. Normal traffic records
+`budget_fallback:false`; provider-error and budget telemetry cannot overwrite
+one another.
+
+Per-IP accounting deliberately consumes once at entry for every
+real-provider-eligible turn, including turns that ultimately finish through a
+purely deterministic, safety, or early-return path. Consequently
+`budget_scope:"ip"` fallback telemetry means that the IP was already over its
+turn allowance at entry, not that the system proved it prevented a paid call.
+Mock mode consumes neither IP nor instance budget, so the shipped default keeps
+zero runtime behavior change. AR-1 is now sealed and the AR-2 engineering
+prerequisites are ready; D49 records the accepted semantics and serverless
+per-instance limitations.

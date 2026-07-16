@@ -1,11 +1,11 @@
-# AR arc pre-implementation plan
+# AR arc implementation record and AR-2 handoff
 
 - **Date**: 2026-07-05
-- **Status**: AR-0 through AR-1b implemented; AR-1c implemented on its review
-  branch; AR-1d remains proposed
-- **Scope**: AR-0 completion record and AR-1 implementation plan. AR-0's
-  accepted contract is recorded in D48; this plan does not consume a formal
-  decision number.
+- **Status**: AR-0 complete; AR-1a through AR-1d complete and reviewed; AR-1
+  sealed
+- **Scope**: AR-0 and AR-1 implementation record plus the ready AR-2 handoff.
+  Accepted contracts are recorded in [D48](./ai-decisions.md#d48-ar-0-provider-error-deterministic-fallback)
+  and [D49](./ai-decisions.md#d49-ar-1-cost-and-abuse-guardrail-policy).
 
 The AR arc goal is to make the public demo feel like a real AI product while
 preserving FitMind's core promise: deterministic tools, evidence-bound answers,
@@ -146,18 +146,18 @@ kept in separately reviewable batches where needed.
 
 ## AR-1: cost and abuse guardrails
 
-### Current behavior
+**Status: Complete (AR-1a through AR-1d).** The shipped policy and wiring
+contract are recorded in [D49](./ai-decisions.md#d49-ar-1-cost-and-abuse-guardrail-policy).
 
-The current AI limiter is per user and uses the existing in-memory
-`createAiRateLimiter` seam with string keys. It protects authenticated usage, but
-registration is cheap. A script can create many accounts and turn a public
-DeepSeek default into many paid real-provider calls. Token/cost telemetry exists
-for known model pricing; BYO or unknown models may report
-`estimated_cost_usd: null`.
+### Completed behavior
 
-### Target behavior
+The original per-user limiter remains unchanged and is now complemented by the
+per-IP turn gate plus per-instance call and known-cost budgets. Budget denials
+reuse AR-0's deterministic completion path and remain server-only telemetry.
 
-AR-1 adds three layers that must all run before any real provider request:
+### Shipped guard layers
+
+AR-1 ships three layers that constrain real-provider traffic:
 
 - per-instance daily call budget;
 - per-instance daily cost budget when model pricing is known;
@@ -188,7 +188,7 @@ BYO/unknown model reports `estimated_cost_usd: null`, the cost counter does not
 advance, but the call-count budget and per-IP cap still apply. Unknown pricing
 must not disable the whole guardrail.
 
-### Proposed defaults
+### Shipped defaults
 
 These defaults are intentionally conservative for a public demo and can be tuned
 by reviewed config-only deployment changes later:
@@ -245,26 +245,28 @@ characterization tests cannot flake from module-level counter state.
 - Safety-gate semantics stay separate. Safety protection remains fail-safe on;
   budget protection remains fail-safe limited. Neither one disables the other.
 
-### Proposed implementation slices
+### Completed implementation slices
 
-- **AR-1a budget policy module**: implemented on its review branch. The pure
+- **AR-1a budget policy module**: complete. The pure
   parser and in-memory budget counter use an injected clock and the existing
   string-key limiter seam. Coverage pins missing/malformed env, UTC day reset,
   priced vs unknown-cost model, kill-switch unset/true/malformed, and exceeded
-  budgets. D49 records the policy contract; provider wiring remains AR-1b.
-- **AR-1b provider guard seam**: implemented on its review branch. The
+  budgets. D49 records the policy contract consumed by the later wiring slices.
+- **AR-1b provider guard seam**: complete. The
   transport-agnostic seam returns allow/fallback decisions plus telemetry and
   holds one process-level counter through a default singleton guard. It remains
-  injectable for tests and is not wired to provider/orchestration paths yet.
-- **AR-1c per-IP AI limiter**: implemented as an unmounted HTTP middleware seam
-  with a process-level `10/min` plus `30/UTC day` limiter keyed by client IP.
+  injectable for tests and is wired through the orchestrator's real call sites.
+- **AR-1c per-IP AI limiter**: complete. The HTTP middleware seam uses a
+  process-level `10/min` plus `30/UTC day` limiter keyed by client IP.
   It uses the configured-provider getter, leaves mock traffic uncounted, writes
   allow/fallback telemetry to response locals, and never emits a public 429.
-  Route mounting and deterministic fallback consumption remain AR-1d.
-- **AR-1d orchestration telemetry and docs**: wire fallback markers into turn
-  telemetry/logging, record D49, and update API/ops docs if the public error
-  contract changes. Prefer no public error change: budget fallback should look
-  like a successful deterministic answer.
+- **AR-1d orchestration, HTTP, and telemetry wiring**: complete. The two turn
+  routes mount auth, per-user, and per-IP guards in order; both controllers pass
+  the request-scoped decision into a turn gate; routing, tool-selection, and
+  phrasing each use the instance guard; returned call cost is recorded; and
+  scope-specific budget log fields coexist with provider-error fallback fields.
+  Budget fallback remains a successful deterministic answer with no public
+  billing error or DTO change.
 
 Each implementation batch must stay deployable. A mid-AR-1 `main` should still
 default to mock unless all required guardrails are in place and reviewed.
@@ -298,9 +300,10 @@ default to mock unless all required guardrails are in place and reviewed.
 
 ## AR-2 handoff checklist
 
-AR-2 does not start until AR-0 and AR-1 are merged and reviewed. Before the user
-changes production Vercel env, Codex should run local live validation with
-DeepSeek:
+**Status: Ready.** AR-0 fallback hardening and the complete AR-1 cost/abuse
+guardrail stack have passed review, so AR-2's engineering prerequisites are
+satisfied. Before the user changes production Vercel env, AR-2 must still run
+local live validation with DeepSeek:
 
 - set `ASSISTANT_PROVIDER=openai_compatible`,
   `OPENAI_COMPAT_BASE_URL=https://api.deepseek.com`,

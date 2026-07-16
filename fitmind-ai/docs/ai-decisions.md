@@ -1173,7 +1173,7 @@ Remaining boundaries:
 ## [D49] AR-1 cost and abuse guardrail policy
 
 - **Date**: 2026-07-11
-- **Status**: Accepted policy; AR-1a and AR-1b implemented; AR-1c implemented on its review branch; AR-1d pending
+- **Status**: Accepted / implemented; AR-1a through AR-1d complete
 
 Background: the existing per-user AI limiter does not bound real-provider spend
 for a whole server instance, and cheap account creation can bypass a user-only
@@ -1207,24 +1207,53 @@ Decision:
 - Every routing, tool-selection, and phrasing provider attempt must pass the
   guard independently. A later call cannot reuse an earlier allow decision or
   bypass budget already consumed by the same turn.
-- AR-1c through AR-1d must keep budget and safety independent, check all guards
-  before provider fetch, and convert any denial into deterministic mock fallback
-  with server-only telemetry (`budget_fallback:true`, `budget_reason`,
-  `budget_scope`, and counter/limit values). No public billing error or public
-  DTO field is introduced.
+- AR-1d mounts the assistant turn routes in the fixed order
+  `auth -> per-user limiter -> per-IP limiter -> controller`. Saved-insight and
+  other assistant routes that do not call a provider do not consume the per-IP
+  allowance. The per-IP guard is turn-scoped: a fallback decision locks the
+  whole turn before any real routing, tool-selection, or phrasing call and does
+  not consult or consume the per-instance guard.
+- The per-IP limiter consumes once at HTTP entry for every request that is
+  eligible for a real configured provider. This intentionally includes turns
+  that later finish through a purely deterministic path, the safety short
+  circuit, or another early return. Therefore
+  `budget_fallback:true, budget_scope:"ip"` means **the IP was over its
+  allowance when that turn reached the entry guard**; it does not claim that a
+  specific paid provider call would otherwise have occurred or was blocked.
+  This conservative turn-level accounting is the deliberate public-demo abuse
+  boundary.
+- After an IP allow, the per-instance guard is call-scoped and runs separately
+  immediately before each real routing, tool-selection, and phrasing call. The
+  first instance denial locks the remaining turn, so later call sites neither
+  re-check/re-consume the instance counter nor create a second user-visible
+  fallback. This separates one IP count per eligible turn from one instance
+  count per allowed real-provider call.
+- Both guard layers reuse D48/AR-0's deterministic default-tool or
+  missing-argument guidance core. Budget fallback does not fabricate a provider
+  error, persists the normal success-shaped response, and completes SSE with
+  `done` rather than a billing `429` or `error`.
+- After each provider call returns, AR-1d prices that call from its actual
+  model/usage telemetry and passes the known estimate or `null` to
+  `recordCost`. Provider failures that return usage are still recorded; unknown
+  pricing leaves the cost counter unchanged while the already-consumed call
+  count remains effective.
+- Turn telemetry and the structured `assistant_turn` log expose independent
+  budget fields (`budget_fallback`, `budget_reason`,
+  `budget_scope:"instance"|"ip"`, plus nullable scope-specific counters).
+  They coexist with D48's `provider_error_fallback` fields without overwriting
+  them. Normal traffic records `budget_fallback:false` with all other budget
+  fields `null`. No public DTO field is introduced.
+- With `ASSISTANT_PROVIDER=mock`, the IP middleware consumes nothing and the
+  orchestrator bypasses the instance guard and cost recorder. AR-1d therefore
+  changes no default production behavior; the guards become active when AR-2
+  selects a reviewed real provider.
 
 Remaining boundaries:
 
-- AR-1b provides the provider guard seam but does not call it from a runtime
-  path. AR-1c provides an unmounted per-IP HTTP middleware seam with `10/min`
-  plus `30/UTC day`; provider preflight, route mounting, orchestration fallback,
-  and final telemetry logging remain AR-1d.
-- The per-IP middleware uses `getConfiguredAssistantProvider()` and consumes
-  quota only for real-provider-eligible requests. It records an allow/fallback
-  decision in response locals and never returns a public 429; AR-1d will turn a
-  fallback decision into a deterministic mock answer before provider execution.
-  It remains unmounted in AR-1c so a deploy cannot consume quota without also
-  enforcing the fallback.
+- The per-IP middleware uses `getConfiguredAssistantProvider()`, consumes quota
+  only for real-provider-eligible turns, records its allow/fallback decision in
+  response locals, and never returns a public 429. Both JSON and SSE controllers
+  pass that same request-scoped decision into the orchestrator.
 - The `30/day` per-IP cap is the effective daily ceiling for a user whose
   requests come from one IP, even though the existing per-user quota remains
   `50/day`. Multiple users behind the same NAT share that 30-request allowance;
@@ -1246,5 +1275,8 @@ Remaining boundaries:
   usage-based estimated cost is known only after the call completes. The next
   real-provider attempt is blocked. Call-count and per-IP caps remain the
   pre-request hard bounds.
-- Serverless instances each maintain their own counters. Distributed exact
-  accounting, edge limiting, CAPTCHA, and reputation remain backlog items.
+- Serverless instances each maintain their own call/cost and IP counters, so
+  limits are partial rather than globally exact across warm instances. NAT and
+  proxy egress can also aggregate unrelated users into one IP bucket.
+  Distributed exact accounting, edge limiting, CAPTCHA, and reputation remain
+  backlog items.
