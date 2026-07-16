@@ -4952,3 +4952,17 @@ Vercel secrets, post-flip log evidence, and both redeploy-based rollback paths.
 No application code, `.env`, Vercel setting, or online environment changed.
 This deployment runbook adds no new architecture decision, so it does not take
 D50; D48 and D49 remain the governing contracts.
+
+## 2026-07-16 weekly-report range-label trust fix
+
+Fixed the ready-data weekly-report template so its summary, frequency label,
+and main-exercise label describe the exact `result.range` instead of claiming
+that every client-supplied range is “this week.” The regression test was first
+used to characterize the former hard-coded wording, then intentionally flipped
+to require the exact 2026-05-19 to 2026-06-17 fixture range. Faithfulness eval
+goldens and the production-smoke assertion now enforce the same honest label.
+
+This independent bug-fix batch does not change the client's default 30-day
+range or add assistant-side date parsing. Interpreting an explicit “this week”
+request as a natural-week query is recorded separately in the roadmap for
+timezone and precedence design. No AR status or D-number is consumed.

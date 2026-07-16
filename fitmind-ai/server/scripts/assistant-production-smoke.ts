@@ -318,9 +318,12 @@ async function main(): Promise<void> {
       "Weekly report prompt should return workout Evidence.",
     );
     assert(
-      getAssistantAnswerText(weekly).includes("本周训练频率") &&
+      getAssistantAnswerText(weekly).includes(
+        "统计范围：2026-05-01 到 2026-05-15",
+      ) &&
+        getAssistantAnswerText(weekly).includes("该统计范围内训练频率") &&
         getAssistantAnswerText(weekly).includes("平均训练频率"),
-      "Weekly report should separate this-week frequency from range-average frequency.",
+      "Weekly report should label the exact requested range and distinguish total from range-average frequency.",
     );
     assertNoEnglishTemplate(weekly, "Weekly report");
 

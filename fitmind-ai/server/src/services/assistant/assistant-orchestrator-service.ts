@@ -568,12 +568,12 @@ function buildWeeklyTrainingReportAnswer(
   }
 
   return {
-    summary: `本周共记录 ${result.totals.workout_count} 次训练，${result.totals.set_count} 组，${result.totals.total_reps} 次，总训练量约 ${result.totals.total_volume.toLocaleString()} kg。`,
+    summary: `统计范围：${result.range.start_date} 到 ${result.range.end_date}。共记录 ${result.totals.workout_count} 次训练，${result.totals.set_count} 组，${result.totals.total_reps} 次，总训练量约 ${result.totals.total_volume.toLocaleString()} kg。`,
     bullets: [
-      `本周训练频率：${result.totals.workout_count} 次。`,
+      `该统计范围内训练频率：${result.totals.workout_count} 次。`,
       `近 ${result.frequency.range_days} 天平均训练频率：约每周 ${result.frequency.workouts_per_week} 次，用于观察长期趋势。`,
       topExercise
-        ? `本周主要训练动作是 ${topExercise.exercise_name}，共 ${topExercise.set_count} 组，总量约 ${topExercise.total_volume.toLocaleString()} kg。`
+        ? `该统计范围内主要训练动作是 ${topExercise.exercise_name}，共 ${topExercise.set_count} 组，总量约 ${topExercise.total_volume.toLocaleString()} kg。`
         : "当前还没有明显的主要训练动作。",
       topMuscleGroup
         ? `记录中占比最高的肌群是 ${topMuscleGroup.muscle_group_name}，约 ${formatPercent(topMuscleGroup.contribution_ratio)}。`

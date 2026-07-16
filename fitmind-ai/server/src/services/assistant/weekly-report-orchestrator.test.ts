@@ -175,6 +175,15 @@ describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", ()
       CANNED_REPORT.evidence.set_ids,
     );
 
+    // Regression contract: ready-data labels must describe the exact tool
+    // result range instead of claiming that every request covers this week.
+    expect(response.answer.summary).toContain(
+      "统计范围：2026-05-19 到 2026-06-17。",
+    );
+    expect(response.answer.summary).not.toContain("本周");
+    expect(response.answer.bullets[0]).toBe("该统计范围内训练频率：4 次。");
+    expect(response.answer.bullets[2]).toContain("该统计范围内主要训练动作是");
+
     // Numbers in the answer all trace back to the tool output.
     expect(response.faithfulness?.status).toBe("verified");
   });

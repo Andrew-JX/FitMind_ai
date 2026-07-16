@@ -57,6 +57,7 @@
 - **E. Prettier 格式欠债（~118 文件）** ✅ 2026-07-04 完成
   - 已用 formatting-only 豁免批执行 `npx prettier --write .`，并加 `.gitattributes` + `git add --renormalize .` 一次性清理格式与行尾欠债；从 T1 起 `pnpm format:check` 全仓绿是常规硬门禁。
 - **F. 中期方向**：Phase 6.0 多步 Agent、6.1 MCP（见下）。
+- **G. 助手自然语言日期范围解析**：当用户明确说“本周/这周”时，将工具查询范围解析为当前自然周，而不是继续沿用客户端默认近 30 天。需单独设计时区、周起始日、显式日期覆盖优先级与 eval；本次范围标签修复不改客户端默认，只保证回答与实际 `result.range` 一致。
 
 ---
 

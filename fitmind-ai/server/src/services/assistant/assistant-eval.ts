@@ -216,8 +216,8 @@ export const faithfulnessEvalCases: FaithfulnessEvalCase[] = [
     id: "faithful-plain",
     message: "帮我做一份本周训练报告",
     answer: buildFixtureAnswer(
-      "本周共记录 4 次训练，40 组，320 次，总训练量约 12000 kg。",
-      ["近 7 天平均训练频率：约每周 4 次。"],
+      "统计范围：2026-06-01 到 2026-06-07。共记录 4 次训练，40 组，320 次，总训练量约 12000 kg。",
+      ["该统计范围内训练频率：4 次。", "近 7 天平均训练频率：约每周 4 次。"],
     ),
     toolOutputs: [weeklyEvalToolOutput],
     expectedStatus: "verified",
@@ -235,7 +235,7 @@ export const faithfulnessEvalCases: FaithfulnessEvalCase[] = [
     id: "fabricated-number",
     message: "帮我做一份本周训练报告",
     answer: buildFixtureAnswer(
-      "本周共记录 4 次训练，最高重量竟达到 999 kg。",
+      "统计范围：2026-06-01 到 2026-06-07。共记录 4 次训练，最高重量竟达到 999 kg。",
       [],
     ),
     toolOutputs: [weeklyEvalToolOutput],
