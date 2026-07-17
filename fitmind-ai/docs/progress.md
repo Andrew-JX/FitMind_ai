@@ -5028,3 +5028,29 @@ code files. ER-1, ER-2, and ER-3 remain independent checkpoints with targeted
 tests plus `pnpm verify` and `pnpm eval`; no migration, dependency, real provider
 call, environment change, or deployment belongs to this kickoff batch. The full
 approved contract and rollback sequence are recorded in `docs/er-arc-plan.md`.
+
+## 2026-07-17 ER-1A: deterministic whole-message exercise extraction
+
+Implemented the ER-1A pure-function seam in exactly five code files, with no
+orchestrator or client wiring. `matchExerciseMentions` derives possible spans
+only from the existing dictionary keys and `exercise-aliases`, selects longest
+non-overlapping spans, and sends each phrase through `matchExercise` before
+conservatively aggregating candidates. Exact single actions resolve; broad or
+multiple actions remain ambiguous; unknown text never receives a guessed ID.
+
+Broad “卧推” now includes available flat and incline barbell/dumbbell variants,
+still capped at five candidates. The shared workout-intake regression was
+updated to expect its available incline candidate too, keeping voice intake and
+assistant extraction on one matcher contract rather than creating a second
+assistant-only alias table.
+
+Added the pure `resolveAssistantExerciseEntity` seam. It distinguishes a missing
+exercise (`absent`) from a remaining unknown phrase (`unresolved`) while
+delegating every actual match to the training matcher. Tests cover exact
+“杠铃卧推”, no action, “卧推” candidates, two actions, longest
+“上斜杠铃卧推”, unknown “火星推举”, and the five-candidate ceiling.
+
+No API, request DTO, provider, persistence, SSE, or production behavior is wired
+in this batch; that work remains ER-1B. Targeted matcher/intake tests pass 43/43.
+Full `pnpm verify` passes 74 files / 473 tests, and offline `pnpm eval` remains
+100% across intent routing, refusal, faithfulness, and safety.

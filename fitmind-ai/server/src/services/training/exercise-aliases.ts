@@ -34,7 +34,12 @@ export const SYSTEM_EXERCISE_ALIASES = {
 } as const satisfies ExerciseAliasMap;
 
 export const BROAD_EXERCISE_ALIASES = {
-  "\u5367\u63a8": ["bench_press_barbell", "bench_press_dumbbell"],
+  "\u5367\u63a8": [
+    "bench_press_barbell",
+    "bench_press_dumbbell",
+    "incline_bench_press_barbell",
+    "incline_bench_press_dumbbell",
+  ],
   "\u63a8\u80f8": ["bench_press_barbell", "bench_press_dumbbell"],
   "\u63a8\u80a9": [
     "shoulder_press_barbell",

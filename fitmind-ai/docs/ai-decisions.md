@@ -1318,3 +1318,42 @@ Decision:
 - Top-level client request validation remains distinct and may still return
   `400 VALIDATION_ERROR`. This decision only prevents invalid provider-produced
   tool arguments from becoming a user-visible 400.
+
+## [D51] ER-1A deterministic whole-message exercise extraction seam
+
+- **Date**: 2026-07-17
+- **Status**: Accepted plan / implemented pure seam; runtime wiring deferred to
+  ER-1B
+
+Background: assistant free text currently cannot supply `exercise_id`, even
+though workout intake already owns conservative dictionary matching through
+`exercise-matching-service.ts` and `exercise-aliases.ts`. ER-1A establishes the
+shared pure-function seam needed by later orchestration without changing any
+assistant runtime path.
+
+Decision:
+
+- Extend `exercise-matching-service` with whole-message mention extraction.
+  Candidate phrases are built only from dictionary standard/fallback keys and
+  the existing system/broad alias maps. Every selected phrase is passed back
+  through `matchExercise`; assistant code owns no alias-to-ID or confidence
+  mapping.
+- Select spans longest-first, discard overlaps, then restore message order.
+  This ensures “上斜杠铃卧推” wins over its embedded “杠铃卧推” phrase.
+- Aggregate distinct matched IDs conservatively. One unique exact result may be
+  matched; a broad alias or more than one distinct exercise is ambiguous and
+  never selects the first candidate. The existing five-candidate cap remains.
+- Expand broad “卧推” candidates to the available flat and incline barbell /
+  dumbbell variants. Because workout intake shares the matcher, its broad bench
+  confirmation candidates intentionally follow the same alias contract.
+- Add a pure assistant resolver that maps no exercise mention to `absent` and a
+  remaining unknown exercise phrase to `unresolved`. Unknown text is checked by
+  `matchExercise` and cannot produce a guessed ID.
+- ER-1A imports no orchestrator, provider, repository, or client code. It makes
+  no LLM/DB/network call and changes no runtime request path until ER-1B wires
+  the resolver.
+
+Verification covers exact full-message matching, no action, broad bench
+candidates, multiple exact exercises, longest non-overlap, unknown text, the
+five-candidate cap, and the shared workout-intake candidate contract. Full
+`pnpm verify` passes 74 files / 473 tests; offline `pnpm eval` remains 100%.

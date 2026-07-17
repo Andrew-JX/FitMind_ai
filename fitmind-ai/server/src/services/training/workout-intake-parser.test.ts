@@ -60,7 +60,7 @@ describe("workout-intake-parser", () => {
         { weight_kg: 70, reps: 6, rpe: null, intensity_label: null },
       ],
     });
-    expect(result.draft.exercises[0]?.candidate_exercises).toHaveLength(2);
+    expect(result.draft.exercises[0]?.candidate_exercises).toHaveLength(3);
 
     expect(result.draft.exercises[1]).toMatchObject({
       input_name: "坐姿划船",

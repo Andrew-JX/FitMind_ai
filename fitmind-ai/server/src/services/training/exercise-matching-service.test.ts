@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { resolveAssistantExerciseEntity } from "../assistant/assistant-entity-resolver.js";
 import {
   matchExercise,
+  matchExerciseMentions,
   type ExerciseMatchingDictionaryItem,
 } from "./exercise-matching-service.js";
 
@@ -17,6 +19,18 @@ const dictionary: ExerciseMatchingDictionaryItem[] = [
     code: "bench_press_dumbbell",
     name_en: "Dumbbell Bench Press",
     name_zh: "\u54d1\u94c3\u5367\u63a8",
+  },
+  {
+    id: "22222222-2222-4222-8222-222222222223",
+    code: "incline_bench_press_barbell",
+    name_en: "Incline Barbell Bench Press",
+    name_zh: "\u4e0a\u659c\u6760\u94c3\u5367\u63a8",
+  },
+  {
+    id: "22222222-2222-4222-8222-222222222224",
+    code: "incline_bench_press_dumbbell",
+    name_en: "Incline Dumbbell Bench Press",
+    name_zh: "\u4e0a\u659c\u54d1\u94c3\u5367\u63a8",
   },
   {
     id: "33333333-3333-4333-8333-333333333333",
@@ -168,7 +182,28 @@ describe("exercise-matching-service", () => {
       matched_exercise_name: null,
       match_status: "ambiguous",
     });
-    expect(bench.candidate_exercises).toHaveLength(2);
+    expect(bench.candidate_exercises).toEqual([
+      {
+        confidence: 0.82,
+        exercise_id: "11111111-1111-4111-8111-111111111111",
+        exercise_name: "\u6760\u94c3\u5367\u63a8",
+      },
+      {
+        confidence: 0.82,
+        exercise_id: "22222222-2222-4222-8222-222222222222",
+        exercise_name: "\u54d1\u94c3\u5367\u63a8",
+      },
+      {
+        confidence: 0.82,
+        exercise_id: "22222222-2222-4222-8222-222222222223",
+        exercise_name: "\u4e0a\u659c\u6760\u94c3\u5367\u63a8",
+      },
+      {
+        confidence: 0.82,
+        exercise_id: "22222222-2222-4222-8222-222222222224",
+        exercise_name: "\u4e0a\u659c\u54d1\u94c3\u5367\u63a8",
+      },
+    ]);
 
     expect(push.match_status).toBe("ambiguous");
     expect(push.matched_exercise_id).toBeNull();
@@ -257,5 +292,165 @@ describe("exercise-matching-service", () => {
         exercise_name: "\u76f4\u81c2\u4e0b\u538b",
       },
     ]);
+  });
+
+  it("matches exact exercise names embedded in complete messages", () => {
+    expect(
+      matchExerciseMentions(
+        "\u5e2e\u6211\u770b\u770b\u6760\u94c3\u5367\u63a8\u6700\u8fd1\u6709\u6ca1\u6709\u8fdb\u6b65",
+        dictionary,
+      ),
+    ).toMatchObject({
+      matched_exercise_id: "11111111-1111-4111-8111-111111111111",
+      matched_exercise_name: "\u6760\u94c3\u5367\u63a8",
+      match_status: "matched",
+    });
+  });
+
+  it("keeps multiple non-overlapping exercises ambiguous", () => {
+    const result = matchExerciseMentions(
+      "\u6bd4\u8f83\u6760\u94c3\u5367\u63a8\u548c\u54d1\u94c3\u5367\u63a8\u6700\u8fd1\u7684\u8868\u73b0",
+      dictionary,
+    );
+
+    expect(result).toMatchObject({
+      matched_exercise_id: null,
+      matched_exercise_name: null,
+      match_status: "ambiguous",
+    });
+    expect(
+      result?.candidate_exercises.map((candidate) => candidate.exercise_id),
+    ).toEqual([
+      "11111111-1111-4111-8111-111111111111",
+      "22222222-2222-4222-8222-222222222222",
+    ]);
+  });
+
+  it("selects the longest mention before removing overlaps", () => {
+    const result = matchExerciseMentions(
+      "\u4e0a\u659c\u6760\u94c3\u5367\u63a8\u6700\u8fd1\u6709\u8fdb\u6b65\u5417",
+      dictionary,
+    );
+
+    expect(result).toMatchObject({
+      matched_exercise_id: "22222222-2222-4222-8222-222222222223",
+      matched_exercise_name: "\u4e0a\u659c\u6760\u94c3\u5367\u63a8",
+      match_status: "matched",
+    });
+    expect(result?.candidate_exercises).toHaveLength(1);
+  });
+
+  it("returns null when a complete message contains no known exercise", () => {
+    expect(
+      matchExerciseMentions(
+        "\u8fd9\u4e2a\u52a8\u4f5c\u6700\u8fd1\u6709\u6ca1\u6709\u8fdb\u6b65",
+        dictionary,
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("assistant exercise entity resolver", () => {
+  it("resolves one exact exercise from a complete message", () => {
+    expect(
+      resolveAssistantExerciseEntity(
+        "\u6760\u94c3\u5367\u63a8\u6700\u8fd1\u6709\u6ca1\u6709\u8fdb\u6b65",
+        dictionary,
+      ),
+    ).toMatchObject({
+      matched_exercise_id: "11111111-1111-4111-8111-111111111111",
+      matched_exercise_name: "\u6760\u94c3\u5367\u63a8",
+      status: "matched",
+    });
+  });
+
+  it("distinguishes an absent exercise from an unknown phrase", () => {
+    expect(
+      resolveAssistantExerciseEntity(
+        "\u8fd9\u4e2a\u52a8\u4f5c\u6700\u8fd1\u6709\u6ca1\u6709\u8fdb\u6b65",
+        dictionary,
+      ),
+    ).toEqual({
+      candidate_exercises: [],
+      matched_exercise_id: null,
+      matched_exercise_name: null,
+      match_confidence: 0,
+      status: "absent",
+    });
+
+    expect(
+      resolveAssistantExerciseEntity(
+        "\u706b\u661f\u63a8\u4e3e\u6700\u8fd1\u6709\u6ca1\u6709\u8fdb\u6b65",
+        dictionary,
+      ),
+    ).toEqual({
+      candidate_exercises: [],
+      matched_exercise_id: null,
+      matched_exercise_name: null,
+      match_confidence: 0,
+      status: "unresolved",
+    });
+  });
+
+  it("returns flat and incline candidates for a broad bench mention", () => {
+    const result = resolveAssistantExerciseEntity(
+      "\u5367\u63a8\u6700\u8fd1\u6709\u6ca1\u6709\u8fdb\u6b65",
+      dictionary,
+    );
+
+    expect(result.status).toBe("ambiguous");
+    expect(result.matched_exercise_id).toBeNull();
+    expect(result.candidate_exercises).toHaveLength(4);
+    expect(
+      result.candidate_exercises.map((candidate) => candidate.exercise_name),
+    ).toEqual([
+      "\u6760\u94c3\u5367\u63a8",
+      "\u54d1\u94c3\u5367\u63a8",
+      "\u4e0a\u659c\u6760\u94c3\u5367\u63a8",
+      "\u4e0a\u659c\u54d1\u94c3\u5367\u63a8",
+    ]);
+  });
+
+  it("keeps two exact exercise mentions ambiguous instead of picking one", () => {
+    const result = resolveAssistantExerciseEntity(
+      "\u6760\u94c3\u5367\u63a8\u548c\u6760\u94c3\u786c\u62c9\u54ea\u4e2a\u8fdb\u6b65\u66f4\u5927",
+      dictionary,
+    );
+
+    expect(result).toMatchObject({
+      matched_exercise_id: null,
+      matched_exercise_name: null,
+      status: "ambiguous",
+    });
+    expect(
+      result.candidate_exercises.map((candidate) => candidate.exercise_id),
+    ).toEqual([
+      "11111111-1111-4111-8111-111111111111",
+      "88888888-8888-4888-8888-888888888888",
+    ]);
+  });
+
+  it("uses the longest non-overlapping exercise phrase", () => {
+    const result = resolveAssistantExerciseEntity(
+      "\u4e0a\u659c\u6760\u94c3\u5367\u63a8\u6700\u8fd1\u6709\u6ca1\u6709\u8fdb\u6b65",
+      dictionary,
+    );
+
+    expect(result).toMatchObject({
+      matched_exercise_id: "22222222-2222-4222-8222-222222222223",
+      matched_exercise_name: "\u4e0a\u659c\u6760\u94c3\u5367\u63a8",
+      status: "matched",
+    });
+    expect(result.candidate_exercises).toHaveLength(1);
+  });
+
+  it("caps ambiguous candidates at the matcher limit", () => {
+    const result = resolveAssistantExerciseEntity(
+      "\u5367\u63a8\u548c\u6760\u94c3\u786c\u62c9\u7684\u6570\u636e",
+      dictionary,
+    );
+
+    expect(result.status).toBe("ambiguous");
+    expect(result.candidate_exercises).toHaveLength(5);
   });
 });

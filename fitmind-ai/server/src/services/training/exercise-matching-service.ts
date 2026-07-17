@@ -24,6 +24,12 @@ export interface ExerciseMatchResult {
   match_status: "matched" | "ambiguous" | "unresolved";
 }
 
+interface ExerciseMentionSpan {
+  end: number;
+  phrase: string;
+  start: number;
+}
+
 interface CandidateCodeMatch {
   code: string;
   confidence: number;
@@ -122,6 +128,163 @@ export function matchExercise(
   }
 
   return buildUnresolvedResult();
+}
+
+/**
+ * Match exercise mentions embedded in a complete user message.
+ *
+ * Candidate phrases come only from the exercise dictionary and the existing
+ * alias maps. Selected phrases are passed back through {@link matchExercise},
+ * so alias-to-code and confidence decisions continue to have one source of
+ * truth. Longest spans win before overlaps are removed.
+ *
+ * @param message - Complete natural-language user message.
+ * @param dictionary - Exercise dictionary items available in the system.
+ * @returns Aggregated conservative match, or `null` when no known mention exists.
+ */
+export function matchExerciseMentions(
+  message: string,
+  dictionary: ExerciseMatchingDictionaryItem[],
+): ExerciseMatchResult | null {
+  const normalizedMessage = normalizeForMatch(message);
+
+  if (normalizedMessage.length === 0) {
+    return null;
+  }
+
+  const selectedMentions = selectLongestNonOverlappingMentions(
+    normalizedMessage,
+    buildMentionPhrases(dictionary),
+  );
+
+  if (selectedMentions.length === 0) {
+    return null;
+  }
+
+  return aggregateMentionMatches(
+    selectedMentions.map((mention) =>
+      matchExercise(mention.phrase, dictionary),
+    ),
+  );
+}
+
+function buildMentionPhrases(
+  dictionary: ExerciseMatchingDictionaryItem[],
+): string[] {
+  const phrases = new Set<string>();
+
+  for (const exercise of dictionary) {
+    for (const key of getFallbackMatchKeys(exercise)) {
+      if (key.length >= 2) {
+        phrases.add(key);
+      }
+    }
+  }
+
+  for (const aliases of Object.values(SYSTEM_EXERCISE_ALIASES)) {
+    for (const alias of aliases) {
+      const normalizedAlias = normalizeForMatch(alias);
+      if (normalizedAlias.length >= 2) {
+        phrases.add(normalizedAlias);
+      }
+    }
+  }
+
+  for (const alias of Object.keys(BROAD_EXERCISE_ALIASES)) {
+    const normalizedAlias = normalizeForMatch(alias);
+    if (normalizedAlias.length >= 2) {
+      phrases.add(normalizedAlias);
+    }
+  }
+
+  return [...phrases];
+}
+
+function selectLongestNonOverlappingMentions(
+  normalizedMessage: string,
+  phrases: string[],
+): ExerciseMentionSpan[] {
+  const possibleMentions: ExerciseMentionSpan[] = [];
+
+  for (const phrase of phrases) {
+    let start = normalizedMessage.indexOf(phrase);
+
+    while (start !== -1) {
+      possibleMentions.push({
+        end: start + phrase.length,
+        phrase,
+        start,
+      });
+      start = normalizedMessage.indexOf(phrase, start + 1);
+    }
+  }
+
+  possibleMentions.sort(
+    (left, right) =>
+      right.phrase.length - left.phrase.length || left.start - right.start,
+  );
+
+  const selected: ExerciseMentionSpan[] = [];
+
+  for (const mention of possibleMentions) {
+    const overlaps = selected.some(
+      (existing) =>
+        mention.start < existing.end && mention.end > existing.start,
+    );
+
+    if (!overlaps) {
+      selected.push(mention);
+    }
+  }
+
+  return selected.sort((left, right) => left.start - right.start);
+}
+
+function aggregateMentionMatches(
+  matches: ExerciseMatchResult[],
+): ExerciseMatchResult {
+  const candidates: ExerciseMatchCandidate[] = [];
+  const seenExerciseIds = new Set<string>();
+
+  for (const match of matches) {
+    for (const candidate of match.candidate_exercises) {
+      if (seenExerciseIds.has(candidate.exercise_id)) {
+        continue;
+      }
+
+      seenExerciseIds.add(candidate.exercise_id);
+      candidates.push(candidate);
+    }
+  }
+
+  const limitedCandidates = candidates.slice(0, 5);
+
+  if (limitedCandidates.length === 0) {
+    return buildUnresolvedResult();
+  }
+
+  const onlyCandidate = limitedCandidates[0];
+  const allMentionsMatched = matches.every(
+    (match) => match.match_status === "matched",
+  );
+
+  if (limitedCandidates.length === 1 && onlyCandidate && allMentionsMatched) {
+    return {
+      candidate_exercises: limitedCandidates,
+      matched_exercise_id: onlyCandidate.exercise_id,
+      matched_exercise_name: onlyCandidate.exercise_name,
+      match_confidence: onlyCandidate.confidence,
+      match_status: "matched",
+    };
+  }
+
+  return {
+    candidate_exercises: limitedCandidates,
+    matched_exercise_id: null,
+    matched_exercise_name: null,
+    match_confidence: limitedCandidates[0]?.confidence ?? 0,
+    match_status: "ambiguous",
+  };
 }
 
 function resolveAliasMatches(normalizedInput: string): CandidateCodeMatch[] {

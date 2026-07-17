@@ -2,7 +2,7 @@
 
 - **Date:** 2026-07-17
 - **Base:** `origin/main@e4bd2fb`
-- **Status:** Approved plan; docs-only branch awaiting review before ER-1A
+- **Status:** ER-1A implemented as a pure seam; branch awaiting review before ER-1B
 - **Goal:** Let the assistant resolve exercises and date ranges from ordinary
   language so selecting an exercise on another page is no longer a prerequisite.
 
@@ -251,7 +251,7 @@ Safety responses remain separate and continue to run first.
 
 ## Implementation batches
 
-### 1. ER-1A: whole-message exercise extraction — 5 code files
+### 1. ER-1A: whole-message exercise extraction — 5 code files — implemented, awaiting review
 
 Extend the matcher, aliases, and matching tests; add a pure assistant entity
 resolver and its tests. Cover exact, absent, broad, multiple, longest-overlap, and
