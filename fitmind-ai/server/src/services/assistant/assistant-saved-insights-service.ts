@@ -267,6 +267,15 @@ interface ParsedAssistantOutput {
 
 function parseStructuredOutput(value: unknown): ParsedAssistantOutput {
   const record = asRecord(value);
+
+  if (record?.clarification !== undefined && record.clarification !== null) {
+    throw new HttpError(
+      400,
+      "VALIDATION_ERROR",
+      "Assistant clarifications cannot be saved as insights.",
+    );
+  }
+
   const answer = asRecord(record?.answer);
   const rawIntent =
     stringOrNull(record?.intent) ?? stringOrNull(answer?.intent);

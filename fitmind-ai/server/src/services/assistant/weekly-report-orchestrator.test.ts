@@ -2,35 +2,84 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Canned weekly-report tool result, shared between the executeAiTool mock and the
 // assertions. Hoisted so the (hoisted) vi.mock factory below can reference it.
-const { CANNED_REPORT } = vi.hoisted(() => ({
-  CANNED_REPORT: {
-    range: { start_date: "2026-05-19", end_date: "2026-06-17" },
-    status: "ready" as const,
-    totals: {
-      workout_count: 4,
-      set_count: 20,
-      total_reps: 200,
-      total_volume: 5000,
-      total_weighted_volume: 5000,
+const { CANNED_PROGRESS, CANNED_REPORT, EXERCISE_DICTIONARY } = vi.hoisted(
+  () => ({
+    CANNED_PROGRESS: {
+      range: { start_date: "2026-05-19", end_date: "2026-06-17" },
+      exercise: {
+        exercise_id: "33333333-3333-4333-8333-333333333333",
+        exercise_name: "杠铃卧推",
+      },
+      totals: {
+        workout_count: 2,
+        set_count: 8,
+        total_reps: 64,
+        total_volume: 4800,
+        max_weight_kg: 80,
+        estimated_1rm_kg: 96,
+      },
+      sessions: [{ performed_at: "2026-06-10T10:00:00.000Z" }],
+      evidence: {
+        workout_ids: ["11111111-1111-1111-1111-111111111111"],
+        set_ids: ["22222222-2222-2222-2222-222222222222"],
+        calculation_rules: ["exercise_progress_aggregation"],
+      },
     },
-    frequency: { range_days: 30, workouts_per_week: 1 },
-    top_exercises: [
-      { exercise_name: "卧推", set_count: 8, total_volume: 2000 },
-    ],
-    top_muscle_groups: [{ muscle_group_name: "胸", contribution_ratio: 0.4 }],
-    low_volume_muscle_groups: [
-      { muscle_group_name: "小腿", contribution_ratio: 0.1 },
-    ],
-    selected_exercise_progress: null,
-    recovery_notes: [],
-    limitations: [],
-    evidence: {
-      workout_ids: ["11111111-1111-1111-1111-111111111111"],
-      set_ids: ["22222222-2222-2222-2222-222222222222"],
-      calculation_rules: ["weekly_report_aggregation"],
+    CANNED_REPORT: {
+      range: { start_date: "2026-05-19", end_date: "2026-06-17" },
+      status: "ready" as const,
+      totals: {
+        workout_count: 4,
+        set_count: 20,
+        total_reps: 200,
+        total_volume: 5000,
+        total_weighted_volume: 5000,
+      },
+      frequency: { range_days: 30, workouts_per_week: 1 },
+      top_exercises: [
+        { exercise_name: "卧推", set_count: 8, total_volume: 2000 },
+      ],
+      top_muscle_groups: [{ muscle_group_name: "胸", contribution_ratio: 0.4 }],
+      low_volume_muscle_groups: [
+        { muscle_group_name: "小腿", contribution_ratio: 0.1 },
+      ],
+      selected_exercise_progress: null,
+      recovery_notes: [],
+      limitations: [],
+      evidence: {
+        workout_ids: ["11111111-1111-1111-1111-111111111111"],
+        set_ids: ["22222222-2222-2222-2222-222222222222"],
+        calculation_rules: ["weekly_report_aggregation"],
+      },
     },
-  },
-}));
+    EXERCISE_DICTIONARY: [
+      {
+        id: "33333333-3333-4333-8333-333333333333",
+        code: "bench_press_barbell",
+        name_en: "Barbell Bench Press",
+        name_zh: "杠铃卧推",
+      },
+      {
+        id: "44444444-4444-4444-8444-444444444444",
+        code: "bench_press_dumbbell",
+        name_en: "Dumbbell Bench Press",
+        name_zh: "哑铃卧推",
+      },
+      {
+        id: "55555555-5555-4555-8555-555555555555",
+        code: "incline_bench_press_barbell",
+        name_en: "Incline Barbell Bench Press",
+        name_zh: "上斜杠铃卧推",
+      },
+      {
+        id: "66666666-6666-4666-8666-666666666666",
+        code: "incline_bench_press_dumbbell",
+        name_en: "Incline Dumbbell Bench Press",
+        name_zh: "上斜哑铃卧推",
+      },
+    ],
+  }),
+);
 
 // Provider returns prose (no tool call) → exercises the Slice 11.2a/11.3a safety net.
 vi.mock("./provider-adapter.js", () => ({
@@ -66,8 +115,17 @@ vi.mock("../ai/tools/tool-executor.js", () => ({
 vi.mock("../../db/chat-repository.js", () => ({
   createChatSession: vi.fn(async () => ({ id: "session-1" })),
   createChatMessage: vi.fn(async () => ({ id: "message-1" })),
+  findChatMessageByIdForUser: vi.fn(async () => null),
   findChatSessionByIdForUser: vi.fn(async () => null),
+  hasChatMessageById: vi.fn(async () => false),
   hasChatSessionById: vi.fn(async () => false),
+  listMessagesForSession: vi.fn(async () => []),
+}));
+
+vi.mock("../training/dictionary-service.js", () => ({
+  searchDictionaryExercises: vi.fn(async () => ({
+    items: EXERCISE_DICTIONARY,
+  })),
 }));
 
 vi.mock("../athlete-profile-service.js", () => ({
@@ -79,6 +137,12 @@ vi.mock("../planned-workout-service.js", () => ({
 }));
 
 import { runMockAssistantTurn } from "./assistant-orchestrator-service.js";
+import {
+  createChatMessage,
+  findChatSessionByIdForUser,
+  listMessagesForSession,
+  type ChatMessageRow,
+} from "../../db/chat-repository.js";
 import { executeAiTool } from "../ai/tools/tool-executor.js";
 import { AiToolValidationError } from "../ai/tools/tool-types.js";
 import { getPlanAdherenceContextForPlanner } from "../planned-workout-service.js";
@@ -95,8 +159,12 @@ import type {
   AssistantProviderGuardDecision,
 } from "./assistant-provider-guard.js";
 import type { AssistantIpGuardDecision } from "../../middleware/assistant-ip-rate-limit-middleware.js";
+import { saveAssistantInsightFromMessage } from "./assistant-saved-insights-service.js";
 
 const mockedExecuteAiTool = vi.mocked(executeAiTool);
+const mockedCreateChatMessage = vi.mocked(createChatMessage);
+const mockedFindChatSessionByIdForUser = vi.mocked(findChatSessionByIdForUser);
+const mockedListMessagesForSession = vi.mocked(listMessagesForSession);
 const mockedGetPlanAdherenceContext = vi.mocked(
   getPlanAdherenceContextForPlanner,
 );
@@ -109,17 +177,52 @@ const mockedIsAssistantAnswerPhrasingEnabled = vi.mocked(
   isAssistantAnswerPhrasingEnabled,
 );
 
+function createPersistedAssistantMessage(metadata: unknown): ChatMessageRow {
+  return {
+    id: "message-1",
+    session_id: "session-1",
+    role: "assistant",
+    content: [],
+    structured_output: null,
+    usage: null,
+    metadata,
+    token_input: null,
+    token_output: null,
+    created_at: "2026-06-17T10:00:00.000Z",
+  };
+}
+
 describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", () => {
   const originalPlanAdherenceFlag =
     process.env.ASSISTANT_PLAN_ADHERENCE_CONTEXT;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockedExecuteAiTool.mockReset();
+    mockedRunAssistantProvider.mockReset();
+    mockedRunAssistantAnswerPhrasing.mockReset();
     restorePlanAdherenceFlag();
     mockedExecuteAiTool.mockResolvedValue(CANNED_REPORT);
+    mockedRunAssistantProvider.mockResolvedValue({
+      kind: "message",
+      message: "这是你的周报概述……",
+    });
+    mockedRunAssistantAnswerPhrasing.mockImplementation(
+      async (phrasingInput) => ({
+        summary: phrasingInput.draftSummary,
+        call: {
+          attempted: false,
+          errored: false,
+          provider: null,
+          model: null,
+        },
+      }),
+    );
     mockedGetPlanAdherenceContext.mockResolvedValue(null);
     mockedGetConfiguredAssistantProvider.mockReturnValue("mock");
     mockedIsAssistantAnswerPhrasingEnabled.mockReturnValue(false);
+    mockedFindChatSessionByIdForUser.mockResolvedValue(null);
+    mockedListMessagesForSession.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -433,7 +536,7 @@ describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", ()
     },
   );
 
-  it("short-circuits missing default-tool request args before the provider and emits done", async () => {
+  it("short-circuits a missing exercise as actionable clarification before tool selection and phrasing", async () => {
     mockedGetConfiguredAssistantProvider.mockReturnValue("groq");
     const events: string[] = [];
 
@@ -453,22 +556,271 @@ describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", ()
     );
 
     expect(response.tool_calls).toEqual([]);
-    expect(response.answer.summary).toContain("请先指定要分析的动作");
+    expect(response.answer.recommendation).toContain("直接回复完整动作名");
+    expect(response.answer.recommendation).toContain("不需要去分析页");
+    expect(response.clarification).toEqual({
+      kind: "exercise",
+      reason: "unresolved",
+      options: [],
+    });
     expect(response.faithfulness).toBeUndefined();
     expect(response.message_id).toBe("message-1");
-    expect(telemetry.toolArgumentFallback).toEqual({
-      tool_argument_fallback: true,
-      fallback_reason: "missing_required_request_args",
-      tool_name: "get_exercise_progress",
-      argument_fields: ["exercise_id"],
-      validation_error_code: null,
-    });
+    expect(telemetry.toolArgumentFallback).toBeUndefined();
     expect(telemetry.providerErrorFallback).toBeUndefined();
     expect(mockedRunAssistantProvider).not.toHaveBeenCalled();
+    expect(mockedRunAssistantAnswerPhrasing).not.toHaveBeenCalled();
     expect(mockedExecuteAiTool).not.toHaveBeenCalled();
+    expect(mockedCreateChatMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        role: "assistant",
+        metadata: expect.objectContaining({
+          clarification_context: expect.objectContaining({
+            version: 1,
+            resolved_intent: "progress",
+            resolved_entities: {
+              exercise: expect.objectContaining({ status: "absent" }),
+            },
+          }),
+        }),
+      }),
+    );
     expect(events).toContain("structured_output");
     expect(events).toContain("done");
     expect(events).not.toContain("error");
+  });
+
+  it("injects a uniquely parsed exercise into the normal evidence tool path", async () => {
+    mockedExecuteAiTool.mockResolvedValueOnce(CANNED_PROGRESS);
+
+    const { response } = await runMockAssistantTurn("user-1", {
+      mode: "auto",
+      message: "杠铃卧推最近有没有进步",
+      start_date: "2026-05-19",
+      end_date: "2026-06-17",
+    });
+
+    expect(response.intent).toBe("progress");
+    expect(response.clarification).toBeUndefined();
+    expect(mockedRunAssistantProvider).toHaveBeenCalledWith(
+      expect.objectContaining({
+        assistant_context: expect.objectContaining({
+          exercise_id: "33333333-3333-4333-8333-333333333333",
+        }),
+      }),
+    );
+    expect(mockedExecuteAiTool).toHaveBeenCalledWith(
+      { userId: "user-1" },
+      "get_exercise_progress",
+      {
+        exercise_id: "33333333-3333-4333-8333-333333333333",
+        start_date: "2026-05-19",
+        end_date: "2026-06-17",
+      },
+    );
+  });
+
+  it("keeps an explicit exercise id above a conflicting message mention", async () => {
+    mockedExecuteAiTool.mockResolvedValueOnce(CANNED_PROGRESS);
+
+    await runMockAssistantTurn("user-1", {
+      mode: "auto",
+      message: "杠铃卧推最近有没有进步",
+      start_date: "2026-05-19",
+      end_date: "2026-06-17",
+      exercise_id: "44444444-4444-4444-8444-444444444444",
+    });
+
+    expect(mockedExecuteAiTool).toHaveBeenCalledWith(
+      { userId: "user-1" },
+      "get_exercise_progress",
+      {
+        exercise_id: "44444444-4444-4444-8444-444444444444",
+        start_date: "2026-05-19",
+        end_date: "2026-06-17",
+      },
+    );
+  });
+
+  it("returns validated candidates for a broad exercise without tool selection or phrasing", async () => {
+    const { response } = await runMockAssistantTurn("user-1", {
+      mode: "auto",
+      message: "卧推最近有没有进步",
+      start_date: "2026-05-19",
+      end_date: "2026-06-17",
+    });
+
+    expect(response.clarification).toEqual({
+      kind: "exercise",
+      reason: "ambiguous",
+      options: [
+        {
+          exercise_id: "33333333-3333-4333-8333-333333333333",
+          exercise_name: "杠铃卧推",
+        },
+        {
+          exercise_id: "44444444-4444-4444-8444-444444444444",
+          exercise_name: "哑铃卧推",
+        },
+        {
+          exercise_id: "55555555-5555-4555-8555-555555555555",
+          exercise_name: "上斜杠铃卧推",
+        },
+        {
+          exercise_id: "66666666-6666-4666-8666-666666666666",
+          exercise_name: "上斜哑铃卧推",
+        },
+      ],
+    });
+    expect(mockedRunAssistantProvider).not.toHaveBeenCalled();
+    expect(mockedRunAssistantAnswerPhrasing).not.toHaveBeenCalled();
+    expect(mockedExecuteAiTool).not.toHaveBeenCalled();
+  });
+
+  it("resumes only the latest validated clarification and consumes it with the next assistant reply", async () => {
+    await runMockAssistantTurn("user-1", {
+      mode: "auto",
+      message: "卧推最近有没有进步",
+      start_date: "2026-05-19",
+      end_date: "2026-06-17",
+    });
+    const pendingMetadata = mockedCreateChatMessage.mock.calls[1]?.[0].metadata;
+
+    mockedCreateChatMessage.mockClear();
+    mockedRunAssistantProvider.mockClear();
+    mockedExecuteAiTool.mockClear();
+    mockedFindChatSessionByIdForUser.mockResolvedValue({
+      id: "77777777-7777-4777-8777-777777777777",
+      user_id: "user-1",
+      title: null,
+      created_at: "2026-06-17T09:00:00.000Z",
+      last_message_at: "2026-06-17T10:00:00.000Z",
+    });
+    mockedListMessagesForSession.mockResolvedValue([
+      createPersistedAssistantMessage(pendingMetadata),
+    ]);
+    mockedExecuteAiTool.mockResolvedValueOnce(CANNED_PROGRESS);
+
+    const resumed = await runMockAssistantTurn("user-1", {
+      mode: "auto",
+      session_id: "77777777-7777-4777-8777-777777777777",
+      message: "杠铃卧推。",
+      start_date: "2026-05-19",
+      end_date: "2026-06-17",
+    });
+
+    expect(resumed.response.clarification).toBeUndefined();
+    expect(mockedRunAssistantProvider).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversation: { user_message: "卧推最近有没有进步" },
+        assistant_context: expect.objectContaining({
+          exercise_id: "33333333-3333-4333-8333-333333333333",
+        }),
+      }),
+    );
+    const consumedMetadata =
+      mockedCreateChatMessage.mock.calls[1]?.[0].metadata;
+    expect(consumedMetadata).not.toEqual(
+      expect.objectContaining({ clarification_context: expect.anything() }),
+    );
+
+    mockedCreateChatMessage.mockClear();
+    mockedRunAssistantProvider.mockClear();
+    mockedExecuteAiTool.mockClear();
+    mockedListMessagesForSession.mockResolvedValue([
+      createPersistedAssistantMessage(consumedMetadata),
+    ]);
+    mockedExecuteAiTool.mockResolvedValueOnce(CANNED_PROGRESS);
+
+    await runMockAssistantTurn("user-1", {
+      mode: "auto",
+      session_id: "77777777-7777-4777-8777-777777777777",
+      message: "杠铃卧推",
+      start_date: "2026-05-19",
+      end_date: "2026-06-17",
+    });
+
+    expect(mockedRunAssistantProvider).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversation: { user_message: "杠铃卧推" },
+      }),
+    );
+  });
+
+  it("routes an unrelated question normally instead of attaching an older clarification", async () => {
+    await runMockAssistantTurn("user-1", {
+      mode: "auto",
+      message: "卧推最近有没有进步",
+      start_date: "2026-05-19",
+      end_date: "2026-06-17",
+    });
+    const pendingMetadata = mockedCreateChatMessage.mock.calls[1]?.[0].metadata;
+
+    mockedCreateChatMessage.mockClear();
+    mockedRunAssistantProvider.mockClear();
+    mockedExecuteAiTool.mockClear();
+    mockedFindChatSessionByIdForUser.mockResolvedValue({
+      id: "77777777-7777-4777-8777-777777777777",
+      user_id: "user-1",
+      title: null,
+      created_at: "2026-06-17T09:00:00.000Z",
+      last_message_at: "2026-06-17T10:00:00.000Z",
+    });
+    mockedListMessagesForSession.mockResolvedValue([
+      createPersistedAssistantMessage(pendingMetadata),
+    ]);
+
+    const { response } = await runMockAssistantTurn("user-1", {
+      mode: "auto",
+      session_id: "77777777-7777-4777-8777-777777777777",
+      message: "帮我做周报",
+      start_date: "2026-05-19",
+      end_date: "2026-06-17",
+    });
+
+    expect(response.intent).toBe("weekly_report");
+    expect(response.clarification).toBeUndefined();
+    expect(mockedExecuteAiTool).toHaveBeenCalledWith(
+      { userId: "user-1" },
+      "get_weekly_training_report",
+      { start_date: "2026-05-19", end_date: "2026-06-17" },
+    );
+  });
+
+  it("rejects a clarification response when saving an insight", async () => {
+    const { response } = await runMockAssistantTurn("user-1", {
+      mode: "plateau_diagnosis",
+      message: "卧推平台期",
+      start_date: "2026-05-19",
+      end_date: "2026-06-17",
+    });
+    expect(mockedRunAssistantProvider).not.toHaveBeenCalled();
+    expect(response.clarification).toEqual(
+      expect.objectContaining({ kind: "exercise", reason: "ambiguous" }),
+    );
+    const createInsight = vi.fn(async () => {
+      throw new Error("clarification must not be persisted as an insight");
+    });
+
+    await expect(
+      saveAssistantInsightFromMessage(
+        { messageId: "message-1", userId: "user-1" },
+        {
+          createInsight,
+          deleteInsight: vi.fn(async () => false),
+          findInsight: vi.fn(async () => null),
+          findMessage: vi.fn(async () => ({
+            ...createPersistedAssistantMessage(null),
+            structured_output: response,
+          })),
+          hasMessage: vi.fn(async () => true),
+          listInsights: vi.fn(async () => []),
+        },
+      ),
+    ).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: "Assistant clarifications cannot be saved as insights.",
+    });
+    expect(createInsight).not.toHaveBeenCalled();
   });
 
   it("degrades a successful provider's invalid tool call to guidance and done", async () => {
@@ -677,10 +1029,26 @@ describe("runMockAssistantTurn provider budget gate (AR-1d commit 1)", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockedExecuteAiTool.mockReset();
+    mockedRunAssistantProvider.mockReset();
+    mockedRunAssistantAnswerPhrasing.mockReset();
     mockedExecuteAiTool.mockResolvedValue(CANNED_REPORT);
     mockedGetPlanAdherenceContext.mockResolvedValue(null);
     mockedGetConfiguredAssistantProvider.mockReturnValue("groq");
     mockedIsAssistantAnswerPhrasingEnabled.mockReturnValue(false);
+    mockedFindChatSessionByIdForUser.mockResolvedValue(null);
+    mockedListMessagesForSession.mockResolvedValue([]);
+    mockedRunAssistantAnswerPhrasing.mockImplementation(
+      async (phrasingInput) => ({
+        summary: phrasingInput.draftSummary,
+        call: {
+          attempted: false,
+          errored: false,
+          provider: null,
+          model: null,
+        },
+      }),
+    );
     mockedRunAssistantProvider.mockResolvedValue({
       kind: "message",
       message: "provider prose",
@@ -692,6 +1060,47 @@ describe("runMockAssistantTurn provider budget gate (AR-1d commit 1)", () => {
         usage: { prompt_tokens: 50, completion_tokens: 10, total_tokens: 60 },
       },
     });
+  });
+
+  it("accounts for intent rescue but stops clarification before tool selection and phrasing", async () => {
+    const guard = createGuard([allowDecision]);
+    const classify = vi.fn(async () => ({
+      intent: "progress" as const,
+      call: {
+        attempted: true,
+        errored: false,
+        provider: "groq" as const,
+        model: "llama-3.3-70b-versatile",
+        usage: {
+          prompt_tokens: 100,
+          completion_tokens: 20,
+          total_tokens: 120,
+        },
+      },
+    }));
+
+    const { response, telemetry } = await runMockAssistantTurn(
+      "user-1",
+      {
+        ...input,
+        mode: "auto",
+        message: "帮我看看",
+      },
+      { providerGuard: guard, intentRouter: { classify } },
+    );
+
+    expect(response.clarification).toEqual({
+      kind: "exercise",
+      reason: "unresolved",
+      options: [],
+    });
+    expect(classify).toHaveBeenCalledTimes(1);
+    expect(guard.guardRealProviderAttempt).toHaveBeenCalledTimes(1);
+    expect(guard.recordCost).toHaveBeenCalledTimes(1);
+    expect(telemetry.llm?.attemptCount).toBe(1);
+    expect(mockedRunAssistantProvider).not.toHaveBeenCalled();
+    expect(mockedRunAssistantAnswerPhrasing).not.toHaveBeenCalled();
+    expect(mockedExecuteAiTool).not.toHaveBeenCalled();
   });
 
   it("keeps safety ahead of the instance gate and every provider call", async () => {

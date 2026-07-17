@@ -5,6 +5,8 @@ import {
   createChatSession,
   findChatSessionByIdForUser,
   hasChatSessionById,
+  listMessagesForSession,
+  type ChatMessageRow,
 } from "../../db/chat-repository.js";
 import { loadServerEnv } from "../../env.js";
 import { HttpError } from "../../utils/http-error.js";
@@ -22,6 +24,11 @@ import type {
 } from "../agent/react-planner-types.js";
 import { getAthleteProfile } from "../athlete-profile-service.js";
 import { getPlanAdherenceContextForPlanner } from "../planned-workout-service.js";
+import { searchDictionaryExercises } from "../training/dictionary-service.js";
+import {
+  matchExercise,
+  type ExerciseMatchingDictionaryItem,
+} from "../training/exercise-matching-service.js";
 import {
   enforceFaithfulnessInDev,
   verifyAnswerFaithfulness,
@@ -73,11 +80,18 @@ import {
 } from "./provider-config.js";
 import {
   composeKnowledgeAnswer,
+  composeExerciseClarificationAnswer,
   composeMixedToolRagAnswer,
   composeUnsupportedAnswer,
+  assistantClarificationSchema,
+  type AssistantClarification,
   type AssistantAnswerEvidence,
   type AssistantStructuredAnswer,
 } from "./assistant-answer-composer.js";
+import {
+  resolveAssistantExerciseEntity,
+  type AssistantExerciseEntityResolution,
+} from "./assistant-entity-resolver.js";
 import {
   classifyAssistantIntent,
   isOutOfScopeMessage,
@@ -138,6 +152,72 @@ const mockAssistantTurnSchema = z
       });
     }
   });
+
+const assistantRoutedIntentSchema = z.enum([
+  "weekly_report",
+  "plateau_diagnosis",
+  "next_week_plan",
+  "summary",
+  "progress",
+  "imbalance",
+  "recommendation",
+  "exercise_history",
+  "evidence",
+  "knowledge",
+  "mixed_tool_rag",
+  "unsupported",
+]);
+
+const assistantExerciseClarificationContextSchema = z
+  .object({
+    version: z.literal(1),
+    clarification: assistantClarificationSchema,
+    original_request: z
+      .object({
+        mode: assistantModeSchema,
+        message: z.string().trim().min(1),
+        start_date: z.string().refine(isValidDateOnly),
+        end_date: z.string().refine(isValidDateOnly),
+      })
+      .strict(),
+    resolved_intent: assistantRoutedIntentSchema,
+    resolved_entities: z
+      .object({
+        exercise: z
+          .object({
+            status: z.enum(["absent", "ambiguous", "unresolved"]),
+            matched_exercise_id: z.null(),
+            matched_exercise_name: z.null(),
+            candidate_exercises: z
+              .array(
+                z
+                  .object({
+                    exercise_id: z.string().uuid(),
+                    exercise_name: z.string().trim().min(1),
+                    confidence: z.number().min(0).max(1),
+                  })
+                  .strict(),
+              )
+              .max(5),
+          })
+          .strict(),
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.clarification.kind !== "exercise") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["clarification", "kind"],
+        message: "ER-1 clarification context must target an exercise.",
+      });
+    }
+  });
+
+type AssistantExerciseClarificationContext = z.infer<
+  typeof assistantExerciseClarificationContextSchema
+>;
 
 interface TrainingOverviewResult {
   range: {
@@ -284,6 +364,7 @@ export interface MockAssistantTurnResponseData {
     duration_ms: number;
   }>;
   answer: AssistantStructuredAnswer;
+  clarification?: AssistantClarification | undefined;
   agent_trace?: AgentTrace | undefined;
   faithfulness?: AnswerFaithfulnessResult | undefined;
   plan?: NextWeekPlanDraft | undefined;
@@ -355,6 +436,12 @@ interface PersistedTextBlock {
 
 interface ResolvedSession {
   sessionId: string;
+}
+
+interface ResolvedExerciseTurnInput {
+  entityResolution: AssistantExerciseEntityResolution | null;
+  input: MockAssistantTurnInput;
+  resumedIntent: AssistantRoutedIntent | null;
 }
 
 interface ProviderSimulationResult {
@@ -1069,10 +1156,158 @@ async function resolveSession(
   throw new HttpError(404, "NOT_FOUND", "Chat session was not found.");
 }
 
+function findLatestExerciseClarificationContext(
+  messages: ChatMessageRow[],
+): AssistantExerciseClarificationContext | null {
+  const latestMessage = messages.at(-1);
+
+  if (latestMessage?.role !== "assistant") {
+    return null;
+  }
+
+  const metadata = z
+    .object({
+      clarification_context: assistantExerciseClarificationContextSchema,
+    })
+    .passthrough()
+    .safeParse(latestMessage.metadata);
+
+  return metadata.success ? metadata.data.clarification_context : null;
+}
+
+async function loadExerciseMatchingDictionary(): Promise<
+  ExerciseMatchingDictionaryItem[]
+> {
+  const dictionary = await searchDictionaryExercises({});
+
+  return dictionary.items;
+}
+
+async function resolveExerciseTurnInput(input: {
+  request: MockAssistantTurnInput;
+  sessionId: string;
+  userId: string;
+}): Promise<ResolvedExerciseTurnInput> {
+  const messages =
+    input.request.session_id === undefined
+      ? []
+      : await listMessagesForSession(input.sessionId, input.userId);
+  const pendingContext = findLatestExerciseClarificationContext(messages);
+  const needsDictionary =
+    input.request.exercise_id === undefined || pendingContext !== null;
+  const dictionary = needsDictionary
+    ? await loadExerciseMatchingDictionary()
+    : [];
+
+  if (
+    pendingContext !== null &&
+    pendingContext.clarification.kind === "exercise"
+  ) {
+    const directReply = matchExercise(
+      input.request.message.replace(/[，。！？?,.!]/gu, ""),
+      dictionary,
+    );
+    const replyExerciseId =
+      input.request.exercise_id ?? directReply.matched_exercise_id;
+    const isDirectAllowedReply =
+      directReply.match_status === "matched" &&
+      directReply.matched_exercise_id === replyExerciseId &&
+      replyExerciseId !== null &&
+      pendingContext.clarification.options.some(
+        (option) => option.exercise_id === replyExerciseId,
+      );
+
+    if (isDirectAllowedReply) {
+      return {
+        entityResolution: {
+          candidate_exercises: directReply.candidate_exercises,
+          matched_exercise_id: replyExerciseId,
+          matched_exercise_name: directReply.matched_exercise_name,
+          match_confidence: directReply.match_confidence,
+          status: "matched",
+        },
+        input: {
+          ...pendingContext.original_request,
+          session_id: input.request.session_id,
+          exercise_id: replyExerciseId,
+        },
+        resumedIntent: pendingContext.resolved_intent,
+      };
+    }
+  }
+
+  if (input.request.exercise_id !== undefined) {
+    return {
+      entityResolution: null,
+      input: input.request,
+      resumedIntent: null,
+    };
+  }
+
+  const entityResolution = resolveAssistantExerciseEntity(
+    input.request.message,
+    dictionary,
+  );
+
+  return {
+    entityResolution,
+    input:
+      entityResolution.status === "matched" &&
+      entityResolution.matched_exercise_id !== null
+        ? {
+            ...input.request,
+            exercise_id: entityResolution.matched_exercise_id,
+          }
+        : input.request,
+    resumedIntent: null,
+  };
+}
+
+function requiresExerciseEntity(intent: AssistantRoutedIntent): boolean {
+  return intent === "progress" || intent === "plateau_diagnosis";
+}
+
+function buildExerciseClarificationContext(input: {
+  intent: AssistantRoutedIntent;
+  request: MockAssistantTurnInput;
+  resolution: AssistantExerciseEntityResolution;
+}): AssistantExerciseClarificationContext {
+  const clarification = assistantClarificationSchema.parse({
+    kind: "exercise",
+    reason:
+      input.resolution.status === "ambiguous" ? "ambiguous" : "unresolved",
+    options: input.resolution.candidate_exercises.map((candidate) => ({
+      exercise_id: candidate.exercise_id,
+      exercise_name: candidate.exercise_name,
+    })),
+  });
+
+  return assistantExerciseClarificationContextSchema.parse({
+    version: 1,
+    clarification,
+    original_request: {
+      mode: input.request.mode,
+      message: input.request.message,
+      start_date: input.request.start_date,
+      end_date: input.request.end_date,
+    },
+    resolved_intent: input.intent,
+    resolved_entities: {
+      exercise: {
+        status: input.resolution.status,
+        matched_exercise_id: null,
+        matched_exercise_name: null,
+        candidate_exercises: input.resolution.candidate_exercises,
+      },
+    },
+  });
+}
+
 async function persistMockTurnMessages(input: {
   sessionId: string;
   request: MockAssistantTurnInput;
   response: MockAssistantTurnResponseData;
+  clarificationContext?: AssistantExerciseClarificationContext | undefined;
 }): Promise<string> {
   await createChatMessage({
     sessionId: input.sessionId,
@@ -1098,6 +1333,9 @@ async function persistMockTurnMessages(input: {
       assistant_type: input.response.assistant_type,
       mode: input.response.mode,
       tool_names: input.response.answer.evidence.tool_names,
+      ...(input.clarificationContext === undefined
+        ? {}
+        : { clarification_context: input.clarificationContext }),
     },
   });
 
@@ -1311,11 +1549,11 @@ export async function runMockAssistantTurn(
     state: "thinking",
   });
 
-  const input = mockAssistantTurnSchema.parse(rawInput);
+  const requestInput = mockAssistantTurnSchema.parse(rawInput);
   const resolvedSession = await resolveSession(
     userId,
-    input.session_id,
-    input.message,
+    requestInput.session_id,
+    requestInput.message,
   );
   await emitEvent(options, {
     type: "session",
@@ -1323,7 +1561,7 @@ export async function runMockAssistantTurn(
   });
 
   if (isAssistantSafetyGateEnabled()) {
-    const safetyClassification = classifyAssistantSafety(input.message);
+    const safetyClassification = classifyAssistantSafety(requestInput.message);
 
     if (
       safetyClassification.boundary === "medical_boundary" &&
@@ -1335,7 +1573,7 @@ export async function runMockAssistantTurn(
 
       const response: MockAssistantTurnResponseData = {
         session_id: resolvedSession.sessionId,
-        mode: input.mode,
+        mode: requestInput.mode,
         assistant_type: "deterministic_mock",
         intent: "unsupported",
         tool_calls: [],
@@ -1344,7 +1582,7 @@ export async function runMockAssistantTurn(
 
       const messageId = await persistMockTurnMessages({
         sessionId: resolvedSession.sessionId,
-        request: input,
+        request: requestInput,
         response,
       });
       response.message_id = messageId;
@@ -1376,6 +1614,13 @@ export async function runMockAssistantTurn(
     }
   }
 
+  const exerciseTurn = await resolveExerciseTurnInput({
+    request: requestInput,
+    sessionId: resolvedSession.sessionId,
+    userId,
+  });
+  const input = exerciseTurn.input;
+
   // Safety is intentionally evaluated before the call-level provider budget
   // gate. The per-IP decision is already request-scoped at this boundary, but
   // no instance guard may run for a safety-short-circuited turn.
@@ -1393,14 +1638,73 @@ export async function runMockAssistantTurn(
           configuredProvider === "openai_compatible"
         ? createOpenAiCompatibleIntentRouter()
         : null;
-  const routed = await resolveRoutedIntent(
-    input,
-    guardIntentRouter(intentRouter, providerGate),
-  );
+  const routed =
+    exerciseTurn.resumedIntent === null
+      ? await resolveRoutedIntent(
+          input,
+          guardIntentRouter(intentRouter, providerGate),
+        )
+      : withoutRouterCall(exerciseTurn.resumedIntent);
   const intent = routed.intent;
   // Router rescue call is billed; its record must be counted on every path below.
   const routerRecord = routed.routerCall;
   const executionMode = resolveExecutionModeForIntent(input, intent);
+
+  if (
+    requiresExerciseEntity(intent) &&
+    input.exercise_id === undefined &&
+    exerciseTurn.entityResolution !== null
+  ) {
+    const clarificationContext = buildExerciseClarificationContext({
+      intent,
+      request: requestInput,
+      resolution: exerciseTurn.entityResolution,
+    });
+    const clarification = clarificationContext.clarification;
+
+    if (clarification.kind !== "exercise") {
+      throw new Error("ER-1 produced a non-exercise clarification.");
+    }
+
+    const answer = composeExerciseClarificationAnswer(clarification);
+    await emitAnswerEvents(answer, options);
+
+    const response: MockAssistantTurnResponseData = {
+      session_id: resolvedSession.sessionId,
+      mode: requestInput.mode,
+      assistant_type: "deterministic_mock",
+      intent,
+      tool_calls: [],
+      answer,
+      clarification,
+    };
+    const messageId = await persistMockTurnMessages({
+      sessionId: resolvedSession.sessionId,
+      request: requestInput,
+      response,
+      clarificationContext,
+    });
+    response.message_id = messageId;
+
+    await emitEvent(options, {
+      type: "structured_output",
+      output: response,
+    });
+    await emitEvent(options, {
+      type: "done",
+      message_id: messageId,
+      session_id: resolvedSession.sessionId,
+    });
+
+    return {
+      response,
+      telemetry: buildTurnTelemetry(
+        [routerRecord],
+        undefined,
+        providerGate.getBudgetFallback(),
+      ),
+    };
+  }
 
   if (intent === "unsupported") {
     // Slice 11a：没听懂的提问不要直接死给。明显越界（黑名单/空）保持澄清式拒答；
@@ -1449,7 +1753,7 @@ export async function runMockAssistantTurn(
 
     const messageId = await persistMockTurnMessages({
       sessionId: resolvedSession.sessionId,
-      request: input,
+      request: requestInput,
       response,
     });
     response.message_id = messageId;
@@ -1510,7 +1814,7 @@ export async function runMockAssistantTurn(
 
     const messageId = await persistMockTurnMessages({
       sessionId: resolvedSession.sessionId,
-      request: input,
+      request: requestInput,
       response,
     });
     response.message_id = messageId;
@@ -1837,7 +2141,7 @@ export async function runMockAssistantTurn(
 
   const messageId = await persistMockTurnMessages({
     sessionId: resolvedSession.sessionId,
-    request: input,
+    request: requestInput,
     response,
   });
   response.message_id = messageId;

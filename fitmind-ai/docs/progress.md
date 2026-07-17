@@ -5054,3 +5054,33 @@ No API, request DTO, provider, persistence, SSE, or production behavior is wired
 in this batch; that work remains ER-1B. Targeted matcher/intake tests pass 43/43.
 Full `pnpm verify` passes 74 files / 473 tests, and offline `pnpm eval` remains
 100% across intent routing, refusal, faithfulness, and safety.
+
+## 2026-07-17 ER-1B: assistant server wiring and pending clarification
+
+Wired D51's deterministic resolver into the assistant runtime in exactly five
+code files. The semantic path is now safety → canonical dictionary/entity
+resolution → intent routing/rescue → entity sufficiency → existing provider and
+tool flow. A unique free-text action such as “杠铃卧推最近有没有进步” supplies
+the existing `get_exercise_progress` path with its dictionary ID. An explicit
+caller `exercise_id` remains authoritative over conflicting message text.
+
+Missing, unknown, and broad actions now return a validated top-level exercise
+`clarification` before tool-selection and phrasing. The response is actionable:
+users can reply with a complete exercise name and do not need to visit the
+analysis page. The original request/mode/intent, parsed entity state, and allowed
+options live in the assistant message's existing metadata. Only the latest
+assistant message in the owned session can resume; an allowed direct reply
+consumes it, while any unrelated question routes normally and replaces it. No
+migration or dependency was added.
+
+Provider accounting tests distinguish all phases: deterministic-route misses may
+perform one guarded, cost-recorded intent rescue; clarification performs zero
+tool-selection and zero phrasing calls. Safety tests additionally pin that the
+dictionary resolver and every provider phase remain untouched on a safety hit.
+Clarification structured outputs are rejected by the server saved-insight path,
+including otherwise eligible plateau intents.
+
+Targeted assistant regressions pass 42/42. Full `pnpm verify` passes 74 files /
+480 tests, and offline `pnpm eval` remains 100% across intent routing, refusal,
+faithfulness, and safety. Client normalization, save affordance, and candidate
+buttons remain ER-1C/ER-1D.

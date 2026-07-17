@@ -1,5 +1,45 @@
+import { z } from "zod";
+
 import type { AssistantRoutedIntent } from "./assistant-intent-router.js";
 import type { RetrievedKnowledgeChunk } from "../rag/knowledge-retriever.js";
+
+const assistantExerciseClarificationOptionSchema = z
+  .object({
+    exercise_id: z.string().uuid(),
+    exercise_name: z.string().trim().min(1),
+  })
+  .strict();
+
+export const assistantClarificationSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("exercise"),
+      reason: z.enum(["ambiguous", "unresolved"]),
+      options: z.array(assistantExerciseClarificationOptionSchema).max(5),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("date_range"),
+      reason: z.literal("ambiguous"),
+      options: z
+        .array(
+          z
+            .object({
+              label: z.string().trim().min(1),
+              start_date: z.string().trim().min(1),
+              end_date: z.string().trim().min(1),
+            })
+            .strict(),
+        )
+        .max(5),
+    })
+    .strict(),
+]);
+
+export type AssistantClarification = z.infer<
+  typeof assistantClarificationSchema
+>;
 
 export interface AssistantAnswerEvidence {
   source: "deterministic_tool_executor" | "deterministic_mock_provider";
@@ -27,6 +67,43 @@ export interface AssistantStructuredAnswer {
   sources: AssistantAnswerSource[];
   intent: AssistantRoutedIntent;
   limitations: string[];
+}
+
+/**
+ * Compose an actionable, deterministic exercise clarification answer.
+ *
+ * @param clarification - Validated exercise clarification payload.
+ * @returns Structured answer that does not claim any training evidence.
+ */
+export function composeExerciseClarificationAnswer(
+  clarification: Extract<AssistantClarification, { kind: "exercise" }>,
+): AssistantStructuredAnswer {
+  const validated = assistantClarificationSchema.parse(clarification);
+
+  if (validated.kind !== "exercise") {
+    throw new Error("Exercise clarification composer received a date range.");
+  }
+
+  const hasOptions = validated.options.length > 0;
+  const summary =
+    validated.reason === "ambiguous"
+      ? "我找到了多个可能的动作，需要你确认一个后才能继续分析。"
+      : "我已经理解你想分析动作，但还需要你告诉我具体动作名。";
+
+  return {
+    summary,
+    bullets: hasOptions
+      ? validated.options.map((option) => option.exercise_name)
+      : ["请直接回复完整动作名，例如“杠铃卧推”。"],
+    conclusion: "我不会猜测动作，也不会在动作未确认时调用训练分析工具。",
+    recommendation: hasOptions
+      ? "点一个候选，或直接回复完整动作名即可；不需要去分析页选动作。"
+      : "直接回复完整动作名即可；不需要去分析页选动作。",
+    evidence: emptyEvidence,
+    sources: [],
+    intent: "unsupported",
+    limitations: ["动作确认完成前不会生成训练数据结论。"],
+  };
 }
 
 export const emptyEvidence: AssistantAnswerEvidence = {

@@ -59,9 +59,15 @@ vi.mock("../../db/chat-repository.js", () => ({
   createChatMessage: vi.fn(async () => ({ id: "message-1" })),
   findChatSessionByIdForUser: vi.fn(async () => null),
   hasChatSessionById: vi.fn(async () => false),
+  listMessagesForSession: vi.fn(async () => []),
+}));
+
+vi.mock("../training/dictionary-service.js", () => ({
+  searchDictionaryExercises: vi.fn(async () => ({ items: [] })),
 }));
 
 import { executeAiTool } from "../ai/tools/tool-executor.js";
+import { searchDictionaryExercises } from "../training/dictionary-service.js";
 import { runMockAssistantTurn } from "./assistant-orchestrator-service.js";
 import { runAssistantProvider } from "./provider-adapter.js";
 import type {
@@ -71,6 +77,7 @@ import type {
 
 const mockedExecuteAiTool = vi.mocked(executeAiTool);
 const mockedRunAssistantProvider = vi.mocked(runAssistantProvider);
+const mockedSearchDictionaryExercises = vi.mocked(searchDictionaryExercises);
 
 function createRouter(): LlmIntentRouter {
   const classify = vi.fn<(message: string) => Promise<LlmIntentClassification>>(
@@ -137,6 +144,7 @@ describe("runMockAssistantTurn safety gate", () => {
       },
     });
     expect(router.classify).not.toHaveBeenCalled();
+    expect(mockedSearchDictionaryExercises).not.toHaveBeenCalled();
     expect(mockedRunAssistantProvider).not.toHaveBeenCalled();
     expect(mockedExecuteAiTool).not.toHaveBeenCalled();
     expect(events).not.toContain("retrieving");

@@ -1357,3 +1357,54 @@ Verification covers exact full-message matching, no action, broad bench
 candidates, multiple exact exercises, longest non-overlap, unknown text, the
 five-candidate cap, and the shared workout-intake candidate contract. Full
 `pnpm verify` passes 74 files / 473 tests; offline `pnpm eval` remains 100%.
+
+## [D52] ER-1B server-side exercise resolution and pending clarification
+
+- **Date**: 2026-07-17
+- **Status**: Accepted plan / implemented; awaiting review
+
+Background: D51 established a deterministic whole-message resolver, but the
+assistant orchestrator still consumed only caller-supplied `exercise_id`.
+Free-text action questions therefore continued to fall into D50's missing-tool-
+argument guidance and could not escape the cross-page selection loop.
+
+Decision:
+
+- Preserve the semantic order: request/session validation, safety, deterministic
+  exercise resolution, deterministic intent routing plus guarded rescue when
+  needed, then entity sufficiency. Safety returns before dictionary access,
+  provider gate construction, intent rescue, tool selection, or phrasing.
+- Load the canonical exercise dictionary through the existing training
+  dictionary service and delegate every message match to D51. A caller-supplied
+  `exercise_id` wins without being overwritten; otherwise one matched message
+  entity is injected into the existing provider/tool request. No entity LLM or
+  second alias map is introduced.
+- For `progress` and `plateau_diagnosis`, absent, unresolved, or ambiguous
+  exercises return a validated top-level `clarification` union before
+  tool-selection. Public exercise options contain only dictionary IDs/names and
+  remain capped at five. The answer explicitly permits a full-name reply and
+  says that visiting the analysis page is unnecessary.
+- Persist pending state in the assistant message's existing JSON metadata: the
+  original request, requested mode, resolved intent, parsed entity state, and
+  allowed options. Read only the latest message in the authenticated session;
+  it must be an assistant message carrying valid context. A direct exact reply
+  matching an allowed option resumes the original intent. The resulting reply,
+  or any unrelated new question, becomes latest without pending context, so the
+  state is consumed and cannot stick. No migration is added.
+- A clarification itself is ineligible for saved insights. The server rejects
+  any structured output carrying `clarification` before considering otherwise
+  eligible intents such as `plateau_diagnosis`; ER-1C will also remove client
+  save affordances.
+- Billing assertions remain phase-specific. Entity resolution is zero-LLM and
+  precedes provider calls. Clarification triggers neither tool-selection nor
+  phrasing. A deterministic-router miss may still make one guarded intent-rescue
+  call, record its cost, and then clarify. Existing provider guards, per-IP
+  behavior, budgets, faithfulness, tool validation, and SSE completion semantics
+  are unchanged.
+
+Regression coverage pins exact free text, explicit-ID precedence, broad
+candidates, actionable missing copy, latest-only continuation, single-use
+consumption, unrelated-question invalidation, saved-insight rejection, safety
+before dictionary parsing, and separate rescue/tool-selection/phrasing call
+counts. Full `pnpm verify` passes 74 files / 480 tests; offline `pnpm eval`
+remains 100%.

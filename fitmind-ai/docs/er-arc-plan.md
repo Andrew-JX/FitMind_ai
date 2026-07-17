@@ -2,7 +2,7 @@
 
 - **Date:** 2026-07-17
 - **Base:** `origin/main@e4bd2fb`
-- **Status:** ER-1A implemented as a pure seam; branch awaiting review before ER-1B
+- **Status:** ER-1B server wiring implemented; branch awaiting review before ER-1C
 - **Goal:** Let the assistant resolve exercises and date ranges from ordinary
   language so selecting an exercise on another page is no longer a prerequisite.
 
@@ -251,13 +251,13 @@ Safety responses remain separate and continue to run first.
 
 ## Implementation batches
 
-### 1. ER-1A: whole-message exercise extraction — 5 code files — implemented, awaiting review
+### 1. ER-1A: whole-message exercise extraction — 5 code files — implemented and merged
 
 Extend the matcher, aliases, and matching tests; add a pure assistant entity
 resolver and its tests. Cover exact, absent, broad, multiple, longest-overlap, and
 unknown exercise cases.
 
-### 2. ER-1B: server wiring and pending clarification — 5 code files
+### 2. ER-1B: server wiring and pending clarification — 5 code files — implemented, awaiting review
 
 Wire the resolver through the orchestrator, answer composer, chat repository, a
 validated clarification-context module, and orchestrator regression coverage.
