@@ -4992,3 +4992,39 @@ requests with `exercise_id` through the existing suite.
 
 Verification: targeted assistant tests 38/38, full unit suite 463/463, lint,
 and workspace type-check all passed before final `pnpm verify`.
+
+## 2026-07-17 ER assistant entity-resolution arc: docs-only kickoff
+
+Approved the ER arc plan from `origin/main@e4bd2fb` without changing application
+code. ER is ordered by usability return: ER-1 reuses the existing deterministic
+exercise matcher so free-text assistant turns can resolve `exercise_id`; ER-2
+moves default-range semantics to the server and resolves supported relative date
+terms in the device timezone with Sunday as the week start; ER-3 separates
+out-of-scope, unrecognized, and actionable entity clarification copy.
+
+The plan fixes the precedence contracts: current explicit exercise choice beats
+message parsing, explicit dates beat message time terms, and parsed entities beat
+clarification/defaults. Ambiguous or multiple exercises and conflicting supported
+time terms are never guessed. The assistant exposes optional candidate buttons
+while allowing a direct full-name reply; only the immediately preceding assistant
+clarification can resume, and clarification messages cannot be saved as insights.
+Pending state uses existing message JSON metadata, so no migration is planned.
+
+The provider-cost boundary was reviewed explicitly. Entity parsing itself is
+zero-LLM and runs before provider calls. Clarification triggers neither
+tool-selection nor phrasing calls, but a deterministic intent-router miss may
+still have invoked the existing guarded and billed intent rescue. Future tests
+must assert those phases separately rather than claiming every clarification is
+zero-provider.
+
+ER-2 v1 intentionally does not understand arbitrary duration language such as
+“最近三个月”. It falls back to the exact default 30-day range, and answer prose
+must report the tool's actual `result.range` instead of echoing an unsupported
+three-month claim. Eval goldens will assert exact resolved dates and tool
+arguments, never merely the presence of a “本周” label.
+
+The implementation is divided into nine reviewable batches, each capped at five
+code files. ER-1, ER-2, and ER-3 remain independent checkpoints with targeted
+tests plus `pnpm verify` and `pnpm eval`; no migration, dependency, real provider
+call, environment change, or deployment belongs to this kickoff batch. The full
+approved contract and rollback sequence are recorded in `docs/er-arc-plan.md`.
