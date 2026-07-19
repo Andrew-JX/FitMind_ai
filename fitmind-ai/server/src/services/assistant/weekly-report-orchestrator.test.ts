@@ -292,6 +292,71 @@ describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", ()
     expect(response.faithfulness?.status).toBe("verified");
   });
 
+  it("rounds weekly-report volume metrics to 0.5 kg without changing faithfulness", async () => {
+    const fractionalReport = {
+      ...CANNED_REPORT,
+      totals: {
+        ...CANNED_REPORT.totals,
+        total_volume: 5000.333,
+      },
+      top_exercises: [
+        {
+          ...CANNED_REPORT.top_exercises[0],
+          total_volume: 2000.333,
+        },
+      ],
+    };
+    mockedExecuteAiTool.mockResolvedValueOnce(fractionalReport);
+
+    const { response } = await runMockAssistantTurn("user-1", {
+      mode: "auto",
+      message: "周报",
+      start_date: "2026-05-19",
+      end_date: "2026-06-17",
+    });
+
+    expect(response.answer.summary).toContain("总训练量约 5,000.5 kg");
+    expect(response.answer.bullets[2]).toContain("总量约 2,000.5 kg");
+    expect(response.faithfulness).toMatchObject({
+      status: "verified",
+      unverifiedClaims: [],
+    });
+    expect(fractionalReport.totals.total_volume).toBe(5000.333);
+    expect(fractionalReport.top_exercises[0]?.total_volume).toBe(2000.333);
+  });
+
+  it("rounds training-overview volume metrics through the shared kg formatter", async () => {
+    const fractionalOverview = {
+      range: { start_date: "2026-05-19", end_date: "2026-06-17" },
+      totals: {
+        workout_count: 2,
+        set_count: 8,
+        total_reps: 64,
+        total_volume: 4800.333,
+      },
+      by_exercise: [{ exercise_name: "杠铃卧推", total_volume: 2400.333 }],
+      evidence: {
+        workout_ids: ["11111111-1111-1111-1111-111111111111"],
+        calculation_rules: ["training_summary_aggregation"],
+      },
+    };
+    mockedExecuteAiTool.mockResolvedValueOnce(fractionalOverview);
+
+    const { response } = await runMockAssistantTurn("user-1", {
+      mode: "training_overview",
+      message: "训练总结",
+      start_date: "2026-05-19",
+      end_date: "2026-06-17",
+    });
+
+    expect(response.answer.summary).toContain("总训练量约 4,800.5 kg");
+    expect(response.answer.bullets[0]).toContain("累计约 2,400.5 kg");
+    expect(response.faithfulness).toMatchObject({
+      status: "verified",
+      unverifiedClaims: [],
+    });
+  });
+
   it("counts the routing call's token usage in telemetry on the groq path (not the public response)", async () => {
     mockedGetConfiguredAssistantProvider.mockReturnValue("groq");
     mockedRunAssistantProvider.mockResolvedValueOnce({
@@ -617,6 +682,35 @@ describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", ()
         end_date: "2026-06-17",
       },
     );
+  });
+
+  it("rounds fractional 1RM and max weight while verifying against raw tool values", async () => {
+    const fractionalProgress = {
+      ...CANNED_PROGRESS,
+      totals: {
+        ...CANNED_PROGRESS.totals,
+        max_weight_kg: 80.26,
+        estimated_1rm_kg: 88.667,
+      },
+    };
+    mockedExecuteAiTool.mockResolvedValueOnce(fractionalProgress);
+
+    const { response } = await runMockAssistantTurn("user-1", {
+      mode: "auto",
+      message: "杠铃卧推最近有没有进步",
+      start_date: "2026-05-19",
+      end_date: "2026-06-17",
+    });
+
+    expect(response.answer.summary).toContain("估算 1RM 约为 88.5 kg");
+    expect(response.answer.summary).toContain("最高训练重量约为 80.5 kg");
+    expect(response.answer.summary).not.toContain("88.667");
+    expect(response.faithfulness).toMatchObject({
+      status: "verified",
+      unverifiedClaims: [],
+    });
+    expect(fractionalProgress.totals.estimated_1rm_kg).toBe(88.667);
+    expect(fractionalProgress.totals.max_weight_kg).toBe(80.26);
   });
 
   it("keeps an explicit exercise id above a conflicting message mention", async () => {

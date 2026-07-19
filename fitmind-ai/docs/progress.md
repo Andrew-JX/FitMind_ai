@@ -5084,3 +5084,26 @@ Targeted assistant regressions pass 42/42. Full `pnpm verify` passes 74 files /
 480 tests, and offline `pnpm eval` remains 100% across intent routing, refusal,
 faithfulness, and safety. Client normalization, save affordance, and candidate
 buttons remain ER-1C/ER-1D.
+
+## 2026-07-19 Assistant 1RM and metric-weight presentation precision
+
+Changed the assistant's shared kg presenter to deterministic nearest-0.5 kg
+display. Raw Epley values such as `88.667` now render as `88.5 kg`; integer and
+half-step output stays compact, and large training-volume values retain stable
+thousands grouping. Training overview, weekly report, exercise progress, and
+plateau evidence now use the same presentation contract. Tool/analytics output
+objects are not mutated.
+
+The central risk was verified rather than assumed: faithfulness parses the
+rounded number from answer prose, while its acceptable-number set comes from the
+raw tool result. Existing absolute 0.5 / relative 1% tolerance accepts the
+presentation rounding. End-to-end tests pin fractional 1RM/max weight and
+fractional overview/weekly volumes as rounded text with unchanged raw values and
+`faithfulness.status:"verified"`.
+
+Recorded a separate ER-1C backlog item for the reported free-text Evidence card
+with four empty bullets. That client structured-output mapping issue is not
+changed in this independent server presentation batch.
+
+Targeted formatter/faithfulness regressions pass 42/42. Full `pnpm verify`
+passes 74 files / 483 tests, and offline `pnpm eval` remains 100%.

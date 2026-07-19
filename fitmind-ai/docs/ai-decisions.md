@@ -1408,3 +1408,36 @@ consumption, unrelated-question invalidation, saved-insight rejection, safety
 before dictionary parsing, and separate rescue/tool-selection/phrasing call
 counts. Full `pnpm verify` passes 74 files / 480 tests; offline `pnpm eval`
 remains 100%.
+
+## [D53] Assistant metric-weight presentation uses 0.5 kg increments
+
+- **Date**: 2026-07-19
+- **Status**: Implemented; awaiting review
+
+Background: exercise progress exposed raw Epley estimates such as `88.667 kg`.
+That precision belongs to the calculation result, not to a user-facing gym
+weight. It made the answer look more exact than the underlying estimate.
+
+Decision:
+
+- Round every assistant metric rendered through `formatMetricKg` to the nearest
+  `0.5 kg`, using deterministic half-up `Math.round(value / 0.5) * 0.5` display
+  logic. Half-kilogram precision reflects common plate/dumbbell increments while
+  retaining useful information that integer-only display would discard.
+- Route all assistant kg presentation in training overview, weekly report,
+  exercise progress, and plateau evidence through the same formatter. Integer
+  values remain compact (`80 kg`); half steps render with one decimal
+  (`88.5 kg`); large values retain stable `en-US` grouping.
+- This is presentation-only. Tool outputs, analytics results, persisted evidence,
+  and provider/tool arguments remain unchanged; no rounded value is written back
+  into a result object.
+- Faithfulness still extracts numeric tokens from the formatted answer. It then
+  compares them against the raw numeric values recursively collected from the
+  actual tool output, using D21's `max(0.5 absolute, 1% relative)` tolerance.
+  The regression therefore proves `88.5` remains verified against raw `88.667`
+  instead of bypassing the answer-text check or replacing the source value.
+
+Tests cover fractional 1RM, maximum weight, weekly total/action volume, and
+training-overview total/action volume. They assert rounded prose, unchanged raw
+objects, and `faithfulness.status:"verified"` with no unverified claims. Full
+`pnpm verify` passes 74 files / 483 tests; offline `pnpm eval` remains 100%.

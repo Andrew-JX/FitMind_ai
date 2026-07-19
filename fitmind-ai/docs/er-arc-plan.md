@@ -267,7 +267,10 @@ guarded intent rescue.
 ### 3. ER-1C: client clarification contract — 5 code files
 
 Extend client structured-output types and normalization; exclude clarification
-from saved-insight eligibility; add corresponding unit coverage.
+from saved-insight eligibility; add corresponding unit coverage. Also reproduce
+and inspect the reported free-text path where the Evidence card renders four
+empty bullets, with emphasis on structured-output-to-message normalization; do
+not assume the server evidence payload is empty without tracing both sides.
 
 ### 4. ER-1D: candidate UI and request construction — 5 code files
 

@@ -434,6 +434,8 @@ interface PersistedTextBlock {
   text: string;
 }
 
+const METRIC_WEIGHT_DISPLAY_INCREMENT_KG = 0.5;
+
 interface ResolvedSession {
   sessionId: string;
 }
@@ -597,10 +599,10 @@ function buildTrainingOverviewAnswer(
   }
 
   return {
-    summary: `根据你最近这段时间的训练记录，你共训练了 ${result.totals.workout_count} 次，完成 ${result.totals.set_count} 组，累计 ${result.totals.total_reps} 次，总训练量约 ${result.totals.total_volume} kg。`,
+    summary: `根据你最近这段时间的训练记录，你共训练了 ${result.totals.workout_count} 次，完成 ${result.totals.set_count} 组，累计 ${result.totals.total_reps} 次，总训练量约 ${formatMetricKg(result.totals.total_volume)}。`,
     bullets: [
       topExercise
-        ? `当前训练量最集中的动作是 ${topExercise.exercise_name}，累计约 ${topExercise.total_volume} kg。`
+        ? `当前训练量最集中的动作是 ${topExercise.exercise_name}，累计约 ${formatMetricKg(topExercise.total_volume)}。`
         : "当前时间范围内还没有明显集中的主要动作。",
       `这个总结来自 ${result.evidence.workout_ids.length} 条已记录 workout。`,
       "这些数字来自已记录训练，不是模型凭空猜测。",
@@ -658,12 +660,12 @@ function buildWeeklyTrainingReportAnswer(
   }
 
   return {
-    summary: `统计范围：${result.range.start_date} 到 ${result.range.end_date}。共记录 ${result.totals.workout_count} 次训练，${result.totals.set_count} 组，${result.totals.total_reps} 次，总训练量约 ${result.totals.total_volume.toLocaleString()} kg。`,
+    summary: `统计范围：${result.range.start_date} 到 ${result.range.end_date}。共记录 ${result.totals.workout_count} 次训练，${result.totals.set_count} 组，${result.totals.total_reps} 次，总训练量约 ${formatMetricKg(result.totals.total_volume)}。`,
     bullets: [
       `该统计范围内训练频率：${result.totals.workout_count} 次。`,
       `近 ${result.frequency.range_days} 天平均训练频率：约每周 ${result.frequency.workouts_per_week} 次，用于观察长期趋势。`,
       topExercise
-        ? `该统计范围内主要训练动作是 ${topExercise.exercise_name}，共 ${topExercise.set_count} 组，总量约 ${topExercise.total_volume.toLocaleString()} kg。`
+        ? `该统计范围内主要训练动作是 ${topExercise.exercise_name}，共 ${topExercise.set_count} 组，总量约 ${formatMetricKg(topExercise.total_volume)}。`
         : "当前还没有明显的主要训练动作。",
       topMuscleGroup
         ? `记录中占比最高的肌群是 ${topMuscleGroup.muscle_group_name}，约 ${formatPercent(topMuscleGroup.contribution_ratio)}。`
@@ -2474,7 +2476,13 @@ function formatMetricKg(value: number | null): string {
     return "暂无结果";
   }
 
-  return `${value.toLocaleString()} kg`;
+  const roundedValue =
+    Math.round(value / METRIC_WEIGHT_DISPLAY_INCREMENT_KG) *
+    METRIC_WEIGHT_DISPLAY_INCREMENT_KG;
+
+  return `${roundedValue.toLocaleString("en-US", {
+    maximumFractionDigits: 1,
+  })} kg`;
 }
 
 function formatPercent(value: number): string {

@@ -58,6 +58,7 @@
   - 已用 formatting-only 豁免批执行 `npx prettier --write .`，并加 `.gitattributes` + `git add --renormalize .` 一次性清理格式与行尾欠债；从 T1 起 `pnpm format:check` 全仓绿是常规硬门禁。
 - **F. 中期方向**：Phase 6.0 多步 Agent、6.1 MCP（见下）。
 - **G. 助手自然语言日期范围解析 → ER-2（计划已批准，待 ER-1 完成后实施）**：已纳入 [`ER 助手实体解析弧线`](./er-arc-plan.md)。设备时区、周起始日=周日、显式日期优先级、精确 range eval、无法识别时间词的诚实默认范围均在 ER-2 固定；当前线上仍只保证回答与实际 `result.range` 一致。
+- **H. ER-1C 排查文本解析路径的 Evidence 空卡片**：线上观察到自由文本动作解析成功后，Evidence 卡片可能渲染 4 个空 bullet。优先检查客户端 `assistant-structured-output` 到消息 Evidence 字段的映射与历史消息归一化；本项不属于服务端重量精度修复，纳入 ER-1C 单独复现、测试和修复。
 
 ---
 
