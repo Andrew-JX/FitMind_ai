@@ -13,7 +13,7 @@ import {
   useAuth,
 } from "./features/auth/use-auth";
 import { FeedbackButton } from "./features/feedback/FeedbackButton";
-import { AthleteProfileButton } from "./features/profile/AthleteProfileButton";
+import { ProfileView } from "./features/profile/ProfileView";
 import { AnalysisView } from "./features/training/AnalysisView";
 import { TrainingView } from "./features/training/TrainingView";
 import { useExerciseSearch } from "./features/training/use-exercise-search";
@@ -111,19 +111,14 @@ export function App() {
   return (
     <AppShell
       activeTab={activeTab}
-      onClearAuth={auth.logout}
       onSelectTab={setActiveTab}
       secondaryAction={
-        <>
-          <AthleteProfileButton token={auth.token} />
-          <FeedbackButton
-            sourceRoute={getSourceRoute(activeTab)}
-            token={auth.token ?? ""}
-          />
-        </>
+        <FeedbackButton
+          sourceRoute={getSourceRoute(activeTab)}
+          token={auth.token ?? ""}
+        />
       }
       subtitle="基于真实训练日志的可追溯 AI 训练分析助手"
-      userLabel={auth.user.display_name ?? auth.user.email}
     >
       <section style={tabSectionStyle(activeTab === "training")}>
         <TrainingView
@@ -196,6 +191,15 @@ export function App() {
           token={auth.token}
         />
       </section>
+
+      <section style={tabSectionStyle(activeTab === "profile")}>
+        <ProfileView
+          displayName={auth.user.display_name}
+          email={auth.user.email}
+          onLogout={auth.logout}
+          token={auth.token}
+        />
+      </section>
     </AppShell>
   );
 
@@ -242,6 +246,10 @@ function getSourceRoute(activeTab: AppTabKey): string {
 
   if (activeTab === "assistant") {
     return "/assistant";
+  }
+
+  if (activeTab === "profile") {
+    return "/profile";
   }
 
   return "/training";

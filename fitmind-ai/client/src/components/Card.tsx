@@ -17,7 +17,7 @@ export function Card(props: CardProps) {
   return (
     <section
       style={{
-        backgroundColor: theme.colors.surf,
+        background: `${theme.gradients.card}, ${theme.colors.surf}`,
         border: `1px solid ${theme.colors.bdr}`,
         borderRadius: theme.radius.card,
         boxShadow: theme.shadows.card,

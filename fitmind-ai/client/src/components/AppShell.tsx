@@ -3,16 +3,14 @@ import { Badge } from "./Badge";
 import { Icon, type IconName } from "./Icon";
 import { IconButton } from "./IconButton";
 
-export type AppTabKey = "training" | "analysis" | "assistant";
+export type AppTabKey = "training" | "analysis" | "assistant" | "profile";
 
 export interface AppShellProps {
   activeTab: AppTabKey;
   children: React.ReactNode;
-  onClearAuth: () => void;
   onSelectTab: (tab: AppTabKey) => void;
   secondaryAction?: React.ReactNode | undefined;
   subtitle: string;
-  userLabel: string;
 }
 
 export function AppShell(props: AppShellProps) {
@@ -89,79 +87,58 @@ export function AppShell(props: AppShellProps) {
             </div>
           </div>
 
-          <IconButton
-            icon={isDark ? "sun" : "moon"}
-            label="切换主题"
-            onClick={toggleTheme}
-          />
-        </div>
-
-        <div
-          style={{
-            alignItems: "center",
-            display: "flex",
-            gap: 8,
-            justifyContent: "space-between",
-            marginTop: 12,
-          }}
-        >
           <div
             style={{
-              color: theme.colors.tx2,
-              fontSize: 11,
-              minWidth: 0,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
+              alignItems: "center",
+              display: "flex",
+              flex: "0 0 auto",
+              gap: 8,
             }}
           >
-            当前用户：{props.userLabel}
-          </div>
-          <div style={{ alignItems: "center", display: "flex", gap: 8 }}>
             {props.secondaryAction}
-            <button
-              onClick={props.onClearAuth}
-              style={{
-                backgroundColor: theme.colors.surf2,
-                border: `1px solid ${theme.colors.bdr}`,
-                borderRadius: theme.radius.pill,
-                color: theme.colors.tx2,
-                cursor: "pointer",
-                flex: "0 0 auto",
-                fontSize: 11,
-                fontWeight: 700,
-                padding: "7px 12px",
-              }}
-              type="button"
-            >
-              退出登录
-            </button>
+            <IconButton
+              icon={isDark ? "sun" : "moon"}
+              label="切换主题"
+              onClick={toggleTheme}
+            />
           </div>
         </div>
       </header>
 
       <main style={{ padding: "12px 16px 0" }}>{props.children}</main>
 
-      <nav style={navStyle(theme)}>
-        <TabButton
-          active={props.activeTab === "training"}
-          icon="dumbbell"
-          label="训练"
-          onClick={() => props.onSelectTab("training")}
-        />
-        <TabButton
-          active={props.activeTab === "analysis"}
-          icon="chart"
-          label="分析"
-          onClick={() => props.onSelectTab("analysis")}
-        />
-        <TabButton
-          active={props.activeTab === "assistant"}
-          icon="bot"
-          label="AI 助手"
+      <div style={bottomBarStyle}>
+        <nav style={navStyle(theme)}>
+          <div aria-hidden="true" style={navPillStyle(theme, props.activeTab)} />
+          <TabButton
+            active={props.activeTab === "training"}
+            icon="dumbbell"
+            label="训练"
+            onClick={() => props.onSelectTab("training")}
+          />
+          <TabButton
+            active={props.activeTab === "analysis"}
+            icon="chart"
+            label="分析"
+            onClick={() => props.onSelectTab("analysis")}
+          />
+          <TabButton
+            active={props.activeTab === "profile"}
+            icon="user"
+            label="个人"
+            onClick={() => props.onSelectTab("profile")}
+          />
+        </nav>
+
+        <button
+          aria-label="AI 助手"
           onClick={() => props.onSelectTab("assistant")}
-        />
-      </nav>
+          style={assistantFabStyle(props.activeTab === "assistant")}
+          type="button"
+        >
+          <Icon name="bot" size={26} />
+        </button>
+      </div>
     </div>
   );
 }
@@ -183,7 +160,7 @@ function TabButton(props: TabButtonProps) {
         alignItems: "center",
         background: "transparent",
         border: "none",
-        color: props.active ? theme.colors.ac : theme.colors.tx3,
+        color: props.active ? theme.colors.tx : theme.colors.tx3,
         cursor: "pointer",
         display: "flex",
         flexDirection: "column",
@@ -191,6 +168,9 @@ function TabButton(props: TabButtonProps) {
         minHeight: 48,
         minWidth: 0,
         padding: "5px 0",
+        // Keep labels above the sliding glass pill.
+        position: "relative",
+        transition: "color 0.3s ease",
         WebkitTouchCallout: "none",
         WebkitUserSelect: "none",
         userSelect: "none",
@@ -212,6 +192,20 @@ function TabButton(props: TabButtonProps) {
   );
 }
 
+/** Fixed bottom row that holds the tab nav (left) and the AI FAB (right). */
+const bottomBarStyle: React.CSSProperties = {
+  alignItems: "flex-end",
+  bottom: "max(10px, env(safe-area-inset-bottom, 0px))",
+  display: "flex",
+  gap: 12,
+  left: "50%",
+  maxWidth: 406,
+  position: "fixed",
+  transform: "translateX(-50%)",
+  width: "calc(100% - 24px)",
+  zIndex: 300,
+};
+
 function navStyle(
   theme: ReturnType<typeof useTheme>["theme"],
 ): React.CSSProperties {
@@ -219,16 +213,79 @@ function navStyle(
     backgroundColor: theme.colors.surf,
     border: `1px solid ${theme.colors.bdr}`,
     borderRadius: 18,
-    bottom: "max(10px, env(safe-area-inset-bottom, 0px))",
     boxShadow: theme.shadows.card,
     display: "grid",
+    flex: "1 1 auto",
     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    left: "50%",
-    maxWidth: 390,
+    minWidth: 0,
     padding: "7px 6px",
-    position: "fixed",
-    transform: "translateX(-50%)",
-    width: "calc(100% - 20px)",
-    zIndex: 300,
+    position: "relative",
+  };
+}
+
+/**
+ * Always-visible AI assistant FAB (design: 62px neon-green round button).
+ *
+ * The neon green is intentionally hardcoded: the design keeps the FAB
+ * `#c8f035` in both themes, unlike the theme accent which darkens in light
+ * mode. On the assistant view it gains a neon ring instead of a nav pill.
+ *
+ * @param isAssistantActive - Whether the assistant view is currently shown
+ * @returns FAB style with elevation and active ring
+ */
+function assistantFabStyle(isAssistantActive: boolean): React.CSSProperties {
+  return {
+    alignItems: "center",
+    background: "#c8f035",
+    border: "none",
+    borderRadius: "50%",
+    boxShadow: isAssistantActive
+      ? "0 8px 20px rgba(0,0,0,0.45), 0 0 0 3px rgba(200,240,53,0.35)"
+      : "0 8px 20px rgba(0,0,0,0.45)",
+    color: "#0f0f0f",
+    cursor: "pointer",
+    display: "flex",
+    flex: "0 0 62px",
+    height: 62,
+    justifyContent: "center",
+    marginBottom: 6,
+    transition: "box-shadow 0.3s ease",
+    width: 62,
+  };
+}
+
+const NAV_TAB_ORDER: AppTabKey[] = ["training", "analysis", "profile"];
+
+/**
+ * Sliding glass pill that marks the active tab (design segmented-control range).
+ *
+ * When the assistant view is active no nav tab is selected: the pill fades out
+ * and slides home, mirroring the design's `navPillOn` behavior.
+ *
+ * @param theme - Active theme tokens
+ * @param activeTab - Currently selected tab
+ * @returns Absolutely positioned pill style translated to the active column
+ */
+function navPillStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+  activeTab: AppTabKey,
+): React.CSSProperties {
+  const activeIndex = Math.max(0, NAV_TAB_ORDER.indexOf(activeTab));
+
+  return {
+    background: `linear-gradient(180deg, ${theme.colors.glassA}, ${theme.colors.glassB})`,
+    border: `1px solid ${theme.colors.glassA}`,
+    borderRadius: 13,
+    boxShadow: `inset 0 1px 0 ${theme.colors.glassC}, 0 6px 14px ${theme.colors.sh40}`,
+    height: "calc(100% - 14px)",
+    left: 6,
+    opacity: NAV_TAB_ORDER.includes(activeTab) ? 1 : 0,
+    pointerEvents: "none",
+    position: "absolute",
+    top: 7,
+    transform: `translateX(${activeIndex * 100}%)`,
+    transition:
+      "transform 0.5s cubic-bezier(0.3, 1.4, 0.4, 1), opacity 0.25s ease",
+    width: "calc((100% - 12px) / 3)",
   };
 }

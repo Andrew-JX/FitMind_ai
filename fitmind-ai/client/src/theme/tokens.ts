@@ -16,6 +16,23 @@ export interface ThemeColors {
   green: string;
   purple: string;
   pink: string;
+  /** Dimmed accent for supporting accent text (design --fm-accDim). */
+  accDim: string;
+  /** Translucent inner surface for nested blocks (design --fm-soft). */
+  soft: string;
+  /** Hairline divider inside cards (design --fm-div). */
+  divider: string;
+  /** Top inner highlight used in card/inset insets (design --fm-sheen). */
+  sheen: string;
+  /** Drawer grab-handle color (design --fm-grab). */
+  grab: string;
+  /** Glass slider gradient stops for segmented controls (design --fm-glassA/B/C). */
+  glassA: string;
+  glassB: string;
+  glassC: string;
+  /** Elevation shadow tones (design --fm-sh25 / --fm-sh40). */
+  sh25: string;
+  sh40: string;
 }
 
 export interface ThemeSpacing {
@@ -35,19 +52,32 @@ export interface ThemeShadows {
   card: string;
 }
 
+export interface ThemeGradients {
+  /** Top micro-sheen layered over a card surface (design card range). */
+  card: string;
+}
+
 export interface Theme {
   colors: ThemeColors;
   fonts: ThemeFonts;
+  gradients: ThemeGradients;
   isDark: boolean;
   radius: {
     card: string;
     control: string;
     pill: string;
     soft: string;
+    /** Bottom-drawer top corners (design 24px). */
+    sheet: string;
+    /** True capsule / pill shape (design 999px). */
+    capsule: string;
   };
   shadows: ThemeShadows;
   spacing: ThemeSpacing;
 }
+
+const sharedCardGradient =
+  "linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0))";
 
 const sharedFonts: ThemeFonts = {
   body: "-apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif",
@@ -82,16 +112,31 @@ export const darkTheme: Theme = {
     green: "#4ade80",
     purple: "#a78bfa",
     pink: "#f472b6",
+    accDim: "rgba(200,240,53,0.6)",
+    soft: "rgba(255,255,255,0.04)",
+    divider: "rgba(255,255,255,0.06)",
+    sheen: "rgba(255,255,255,0.06)",
+    grab: "rgba(255,255,255,0.18)",
+    glassA: "rgba(255,255,255,0.16)",
+    glassB: "rgba(255,255,255,0.05)",
+    glassC: "rgba(255,255,255,0.22)",
+    sh25: "rgba(0,0,0,0.25)",
+    sh40: "rgba(0,0,0,0.4)",
   },
   fonts: sharedFonts,
+  gradients: {
+    card: sharedCardGradient,
+  },
   radius: {
-    card: "14px",
+    card: "20px",
     control: "12px",
     pill: "20px",
     soft: "10px",
+    sheet: "24px",
+    capsule: "999px",
   },
   shadows: {
-    card: "none",
+    card: "inset 0 1px 0 rgba(255,255,255,0.06), 0 10px 24px rgba(0,0,0,0.25)",
   },
   spacing: sharedSpacing,
 };
@@ -99,16 +144,16 @@ export const darkTheme: Theme = {
 export const lightTheme: Theme = {
   isDark: false,
   colors: {
-    bg: "#f0f0ee",
+    bg: "#f2f2f7",
     surf: "#ffffff",
-    surf2: "#e8e8e6",
+    surf2: "#e9e9ef",
     surf3: "#dededc",
     bdr: "rgba(0,0,0,0.08)",
-    bdr2: "rgba(0,0,0,0.15)",
-    tx: "#111111",
-    tx2: "#666666",
-    tx3: "#aaaaaa",
-    ac: "#4a8c00",
+    bdr2: "rgba(0,0,0,0.14)",
+    tx: "#1c1c1e",
+    tx2: "#6d6d72",
+    tx3: "#94949a",
+    ac: "#5c7404",
     acText: "#ffffff",
     blue: "#1a6fd4",
     red: "#c93030",
@@ -116,16 +161,31 @@ export const lightTheme: Theme = {
     green: "#1a9a46",
     purple: "#6d28d9",
     pink: "#c0306a",
+    accDim: "rgba(92,116,4,0.65)",
+    soft: "rgba(0,0,0,0.04)",
+    divider: "rgba(0,0,0,0.07)",
+    sheen: "rgba(255,255,255,0.6)",
+    grab: "rgba(0,0,0,0.18)",
+    glassA: "#ffffff",
+    glassB: "rgba(255,255,255,0.88)",
+    glassC: "rgba(255,255,255,0.95)",
+    sh25: "rgba(0,0,0,0.08)",
+    sh40: "rgba(0,0,0,0.14)",
   },
   fonts: sharedFonts,
+  gradients: {
+    card: sharedCardGradient,
+  },
   radius: {
-    card: "14px",
+    card: "20px",
     control: "12px",
     pill: "20px",
     soft: "10px",
+    sheet: "24px",
+    capsule: "999px",
   },
   shadows: {
-    card: "0 1px 3px rgba(0,0,0,0.04)",
+    card: "inset 0 1px 0 rgba(255,255,255,0.6), 0 10px 24px rgba(0,0,0,0.08)",
   },
   spacing: sharedSpacing,
 };
