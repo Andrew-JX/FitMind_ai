@@ -7,9 +7,10 @@ import { AssistantIntroCard } from "./AssistantIntroCard";
 import { AssistantWeeklyReportDigest } from "./AssistantWeeklyReportDigest";
 import type { AssistantPromptSuggestion } from "./assistant-types";
 import { useAssistantChat } from "./use-assistant-chat";
-import { useCurrentPlan } from "./use-current-plan";
+import type { UseCurrentPlanResult } from "./use-current-plan";
 
 export interface AssistantWorkspaceProps {
+  currentPlan: UseCurrentPlanResult;
   refreshSignal: number;
   selectedExerciseId?: string | null | undefined;
   selectedExerciseName?: string | null | undefined;
@@ -18,7 +19,7 @@ export interface AssistantWorkspaceProps {
 
 export function AssistantWorkspace(props: AssistantWorkspaceProps) {
   const chat = useAssistantChat(props.token);
-  const currentPlan = useCurrentPlan(props.token);
+  const currentPlan = props.currentPlan;
   const [promptSuggestion, setPromptSuggestion] =
     useState<AssistantPromptSuggestion>({
       message: "",

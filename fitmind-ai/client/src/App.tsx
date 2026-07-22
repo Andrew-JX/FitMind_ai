@@ -12,6 +12,7 @@ import {
   setToken,
   useAuth,
 } from "./features/auth/use-auth";
+import { useCurrentPlan } from "./features/assistant/use-current-plan";
 import { FeedbackButton } from "./features/feedback/FeedbackButton";
 import { ProfileView } from "./features/profile/ProfileView";
 import { AnalysisView } from "./features/training/AnalysisView";
@@ -41,6 +42,7 @@ export function App() {
   const exerciseSearch = useExerciseSearch();
   const trainingSummary = useTrainingSummary(auth.token);
   const workouts = useWorkouts(auth.token);
+  const currentPlan = useCurrentPlan(auth.token);
   const [activeTab, setActiveTab] = useState<AppTabKey>("training");
   const [selectedProgressExerciseId, setSelectedProgressExerciseId] = useState<
     string | null
@@ -130,6 +132,8 @@ export function App() {
             onSearch: exerciseSearch.searchExercises,
             searchError: exerciseSearch.searchError,
           }}
+          currentPlan={currentPlan}
+          onOpenAssistant={() => setActiveTab("assistant")}
           summary={trainingSummary.summary}
           summaryLoading={trainingSummary.isLoading}
           workoutFormProps={{
@@ -185,6 +189,7 @@ export function App() {
 
       <section style={tabSectionStyle(activeTab === "assistant")}>
         <AssistantWorkspace
+          currentPlan={currentPlan}
           refreshSignal={assistantRefreshSignal}
           selectedExerciseId={selectedProgressExerciseId}
           selectedExerciseName={selectedProgressExerciseName}
@@ -204,7 +209,11 @@ export function App() {
   );
 
   async function handleWorkoutCreated(): Promise<void> {
-    await Promise.all([workouts.refreshWorkouts(), trainingSummary.refresh()]);
+    await Promise.all([
+      workouts.refreshWorkouts(),
+      trainingSummary.refresh(),
+      currentPlan.refresh(),
+    ]);
     setAnalysisRefreshSignal((currentValue) => currentValue + 1);
     setAssistantRefreshSignal((currentValue) => currentValue + 1);
 

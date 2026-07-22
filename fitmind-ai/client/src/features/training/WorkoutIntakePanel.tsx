@@ -281,18 +281,22 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
   return (
     <>
       <div style={triggerActionsStyle}>
-        <Button
+        <button
           aria-label={COPY.speechTrigger}
           disabled={isBusy}
           onClick={handleVoiceStart}
           style={micButtonStyle}
           title={COPY.speechTrigger}
           type="button"
-          variant="secondary"
         >
-          <Icon name="mic" size={18} />
-          <span>{COPY.speechTriggerLong}</span>
-        </Button>
+          <span style={micIconRingStyle} aria-hidden="true">
+            <Icon name="mic" size={22} />
+          </span>
+          <span style={{ fontSize: 14, fontWeight: 800 }}>
+            {COPY.speechTriggerLong}
+          </span>
+          <span style={micHintStyle}>说动作、重量、次数和组数</span>
+        </button>
       </div>
 
       {errorMessage && !isModalOpen ? (
@@ -770,10 +774,33 @@ function resolveLinkStyle(
 
 const micButtonStyle: React.CSSProperties = {
   alignItems: "center",
-  display: "inline-flex",
+  background: "#c8f035",
+  border: "none",
+  borderRadius: 18,
+  boxShadow: "0 8px 22px rgba(200,240,53,0.24)",
+  color: "#0f0f0f",
+  cursor: "pointer",
+  display: "grid",
   gap: 8,
+  justifyItems: "center",
+  padding: "20px 14px",
+  width: "100%",
+};
+
+const micIconRingStyle: React.CSSProperties = {
+  alignItems: "center",
+  background: "rgba(15,15,15,0.12)",
+  borderRadius: "50%",
+  display: "flex",
+  height: 48,
   justifyContent: "center",
-  minWidth: 0,
+  width: 48,
+};
+
+const micHintStyle: React.CSSProperties = {
+  color: "rgba(15,15,15,0.62)",
+  fontSize: 11,
+  fontWeight: 600,
 };
 
 const actionGridStyle: React.CSSProperties = {

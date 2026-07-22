@@ -5,11 +5,14 @@ import type { WorkoutFormProps } from "./WorkoutForm";
 import type { WorkoutsPanelProps } from "./WorkoutsPanel";
 import type { TrainingSummary } from "./training-summary-api";
 import type { TrainingSessionInitialDraft } from "./training-session-draft";
+import type { UseCurrentPlanResult } from "../assistant/use-current-plan";
 
 import { ActionSheet } from "../../components/ActionSheet";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
+import { useTheme } from "../../theme/ThemeContext";
 import { ExercisePicker } from "./ExercisePicker";
+import { TrainingPlanCard } from "./TrainingPlanCard";
 import { TrainingSessionComposer } from "./TrainingSessionComposer";
 import { TrainingStatsStrip } from "./TrainingStatsStrip";
 import { WorkoutIntakePanel } from "./WorkoutIntakePanel";
@@ -19,7 +22,9 @@ import { mapWorkoutIntakeDraftToSessionInitialDraft } from "./workout-intake-to-
 import { mapWorkoutToSessionInitialDraft } from "./workout-to-session-draft";
 
 export interface TrainingViewProps {
+  currentPlan: UseCurrentPlanResult;
   exercisePickerProps: ExercisePickerProps;
+  onOpenAssistant: () => void;
   summary: TrainingSummary | null;
   summaryLoading: boolean;
   workoutFormProps: WorkoutFormProps;
@@ -27,6 +32,7 @@ export interface TrainingViewProps {
 }
 
 export function TrainingView(props: TrainingViewProps) {
+  const { theme } = useTheme();
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [isDictionaryOpen, setIsDictionaryOpen] = useState(false);
   const [isIntakeSheetOpen, setIsIntakeSheetOpen] = useState(false);
@@ -45,24 +51,61 @@ export function TrainingView(props: TrainingViewProps) {
       />
 
       {!isComposerOpen ? (
+        <TrainingPlanCard
+          currentPlan={props.currentPlan}
+          onOpenAssistant={props.onOpenAssistant}
+        />
+      ) : null}
+
+      {!isComposerOpen ? (
         <div style={recordActionsStyle}>
-          <Button
+          <button
+            onClick={() => setIsIntakeSheetOpen(true)}
+            style={voiceRecordButtonStyle}
+            type="button"
+          >
+            <svg
+              aria-hidden="true"
+              fill="none"
+              height="20"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+              width="20"
+            >
+              <rect height="12" rx="3" width="6" x="9" y="2" />
+              <path d="M5 10a7 7 0 0 0 14 0" />
+              <path d="M12 19v3" />
+            </svg>
+            <strong style={recordButtonLabelStyle}>语音记录训练</strong>
+          </button>
+          <button
             onClick={() => {
               setComposerMode("create_active");
               setPendingInitialDraft(null);
               setIsComposerOpen(true);
             }}
+            style={manualRecordButtonStyle(theme)}
             type="button"
           >
-            + 记录训练
-          </Button>
-          <Button
-            onClick={() => setIsIntakeSheetOpen(true)}
-            type="button"
-            variant="secondary"
-          >
-            语音记录训练
-          </Button>
+            <svg
+              aria-hidden="true"
+              fill="none"
+              height="20"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+              width="20"
+            >
+              <path d="M12 5v14" />
+              <path d="M5 12h14" />
+            </svg>
+            <strong style={recordButtonLabelStyle}>手动记录训练</strong>
+          </button>
         </div>
       ) : null}
 
@@ -181,11 +224,47 @@ const viewStyle: React.CSSProperties = {
 };
 
 const recordActionsStyle: React.CSSProperties = {
-  alignItems: "stretch",
   display: "grid",
-  gap: 10,
-  gridTemplateColumns: "minmax(0, 1fr)",
+  gap: 8,
+  gridTemplateColumns: "1fr 1fr",
 };
+
+/** Design: neon-green voice record button (green stays fixed in both themes). */
+const voiceRecordButtonStyle: React.CSSProperties = {
+  background: "#c8f035",
+  border: "none",
+  borderRadius: 18,
+  boxShadow: "0 8px 20px rgba(200,240,53,0.2)",
+  color: "#0f0f0f",
+  cursor: "pointer",
+  display: "grid",
+  gap: 4,
+  justifyItems: "center",
+  padding: "14px 10px",
+};
+
+const recordButtonLabelStyle: React.CSSProperties = {
+  fontSize: 13,
+  fontWeight: 800,
+};
+
+/** Design: neutral card-gradient manual record button. */
+function manualRecordButtonStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    background: `linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03)), ${theme.colors.surf}`,
+    border: `1px solid ${theme.colors.bdr}`,
+    borderRadius: 18,
+    boxShadow: `inset 0 1px 0 ${theme.colors.bdr}`,
+    color: theme.colors.tx,
+    cursor: "pointer",
+    display: "grid",
+    gap: 4,
+    justifyItems: "center",
+    padding: "14px 10px",
+  };
+}
 
 const dictionaryHeaderStyle: React.CSSProperties = {
   alignItems: "center",

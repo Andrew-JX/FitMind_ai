@@ -13,6 +13,7 @@ import { HttpClientError } from "../../services/http-client";
 import { useTheme } from "../../theme/ThemeContext";
 import { searchExercises } from "./dictionary-api";
 import { getExerciseDisplayName } from "./exercise-display";
+import { WorkoutCalendar } from "./WorkoutCalendar";
 import { WorkoutCard } from "./WorkoutCard";
 
 export interface WorkoutsPanelProps {
@@ -42,6 +43,10 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
   const [pendingDeleteWorkoutId, setPendingDeleteWorkoutId] = useState<
     string | null
   >(null);
+  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<
+    string | null
+  >(null);
 
   useEffect(() => {
     if (props.selectedWorkoutId !== collapsedWorkoutId) {
@@ -49,21 +54,42 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
     }
   }, [collapsedWorkoutId, props.selectedWorkoutId]);
 
+  const workoutsForSelectedDate =
+    selectedCalendarDate === null
+      ? []
+      : props.workouts.filter(
+          (workout) =>
+            toLocalDateKey(workout.performed_at) === selectedCalendarDate,
+        );
+
   return (
     <Card>
       <div style={headerStyle}>
-        <div>
+        <div style={{ alignItems: "baseline", display: "flex", gap: 8 }}>
           <h2 style={titleStyle}>训练记录</h2>
-          <p style={copyStyle(theme)}>共 {props.workouts.length} 条</p>
+          <span style={{ color: theme.colors.tx3, fontSize: 12 }}>
+            共 {props.workouts.length} 条
+          </span>
         </div>
-        <Button
-          disabled={props.isLoadingList}
-          onClick={() => void props.onRefresh()}
-          type="button"
-          variant="secondary"
-        >
-          {props.isLoadingList ? "刷新中..." : "刷新"}
-        </Button>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button
+            onClick={() =>
+              setViewMode((mode) => (mode === "list" ? "calendar" : "list"))
+            }
+            style={miniButtonStyle(theme, true)}
+            type="button"
+          >
+            {viewMode === "list" ? "日历视图" : "列表视图"}
+          </button>
+          <button
+            disabled={props.isLoadingList}
+            onClick={() => void props.onRefresh()}
+            style={miniButtonStyle(theme, false)}
+            type="button"
+          >
+            {props.isLoadingList ? "刷新中..." : "刷新"}
+          </button>
+        </div>
       </div>
 
       {props.listError ? (
@@ -139,47 +165,70 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
         <p style={copyStyle(theme)}>正在加载训练记录...</p>
       ) : null}
 
-      {!props.isLoadingList &&
-      !props.listError &&
-      props.workouts.length === 0 ? (
-        <div style={{ marginTop: 14 }}>
-          <StateNotice
-            description="先记录一次训练，这里会展示你的训练时间、动作和组数。"
-            icon="dumbbell"
-            title="暂无训练记录"
+      {viewMode === "calendar" ? (
+        <div style={{ display: "grid", gap: 12, marginTop: 14 }}>
+          <WorkoutCalendar
+            onSelectDate={setSelectedCalendarDate}
+            selectedDate={selectedCalendarDate}
+            workouts={props.workouts}
           />
+          {selectedCalendarDate ? (
+            <div style={listStyle}>
+              {renderWorkoutCards(workoutsForSelectedDate)}
+            </div>
+          ) : (
+            <p style={copyStyle(theme)}>
+              点选带高亮的日期，查看当天的训练记录。
+            </p>
+          )}
         </div>
-      ) : null}
-
-      {props.workouts.length > 0 ? (
-        <div style={listStyle}>
-          {props.workouts.map((workout) => {
-            const isExpanded =
-              props.selectedWorkoutId === workout.id &&
-              collapsedWorkoutId !== workout.id;
-            const detail = isExpanded ? props.selectedWorkout : null;
-
-            return (
-              <WorkoutCard
-                detail={detail}
-                exerciseNames={exerciseNames}
-                isDeleting={props.deletingWorkoutId === workout.id}
-                isExpanded={isExpanded}
-                isLoadingDetail={props.isLoadingDetail}
-                key={workout.id}
-                onDelete={() => handleDeleteWorkout(workout.id)}
-                onEdit={() => props.onEditWorkout(workout.id)}
-                onEdited={() => handleWorkoutEdited(workout.id)}
-                onToggle={() => handleToggleWorkout(workout.id, isExpanded)}
-                token={props.token}
-                workout={workout}
+      ) : (
+        <>
+          {!props.isLoadingList &&
+          !props.listError &&
+          props.workouts.length === 0 ? (
+            <div style={{ marginTop: 14 }}>
+              <StateNotice
+                description="先记录一次训练，这里会展示你的训练时间、动作和组数。"
+                icon="dumbbell"
+                title="暂无训练记录"
               />
-            );
-          })}
-        </div>
-      ) : null}
+            </div>
+          ) : null}
+
+          {props.workouts.length > 0 ? (
+            <div style={listStyle}>{renderWorkoutCards(props.workouts)}</div>
+          ) : null}
+        </>
+      )}
     </Card>
   );
+
+  function renderWorkoutCards(list: WorkoutSummaryDto[]): React.ReactNode {
+    return list.map((workout) => {
+      const isExpanded =
+        props.selectedWorkoutId === workout.id &&
+        collapsedWorkoutId !== workout.id;
+      const detail = isExpanded ? props.selectedWorkout : null;
+
+      return (
+        <WorkoutCard
+          detail={detail}
+          exerciseNames={exerciseNames}
+          isDeleting={props.deletingWorkoutId === workout.id}
+          isExpanded={isExpanded}
+          isLoadingDetail={props.isLoadingDetail}
+          key={workout.id}
+          onDelete={() => handleDeleteWorkout(workout.id)}
+          onEdit={() => props.onEditWorkout(workout.id)}
+          onEdited={() => handleWorkoutEdited(workout.id)}
+          onToggle={() => handleToggleWorkout(workout.id, isExpanded)}
+          token={props.token}
+          workout={workout}
+        />
+      );
+    });
+  }
 
   async function handleDeleteWorkout(workoutId: string): Promise<void> {
     setPendingDeleteWorkoutId(workoutId);
@@ -301,6 +350,32 @@ const headerStyle: React.CSSProperties = {
   gap: 12,
   justifyContent: "space-between",
 };
+
+/** Local calendar-day key (YYYY-MM-DD) from a workout's performed_at. */
+function toLocalDateKey(performedAt: string): string {
+  const date = new Date(performedAt);
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/** Compact pill button used by the record-panel header (view toggle / refresh). */
+function miniButtonStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+  accent: boolean,
+): React.CSSProperties {
+  return {
+    background: theme.colors.divider,
+    border: "none",
+    borderRadius: 10,
+    color: accent ? theme.colors.ac : theme.colors.tx2,
+    cursor: "pointer",
+    fontSize: 11,
+    fontWeight: 700,
+    padding: "7px 11px",
+  };
+}
 
 const listStyle: React.CSSProperties = {
   display: "grid",

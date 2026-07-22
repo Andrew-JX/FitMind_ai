@@ -109,7 +109,10 @@ export function AppShell(props: AppShellProps) {
 
       <div style={bottomBarStyle}>
         <nav style={navStyle(theme)}>
-          <div aria-hidden="true" style={navPillStyle(theme, props.activeTab)} />
+          <div
+            aria-hidden="true"
+            style={navPillStyle(theme, props.activeTab)}
+          />
           <TabButton
             active={props.activeTab === "training"}
             icon="dumbbell"
