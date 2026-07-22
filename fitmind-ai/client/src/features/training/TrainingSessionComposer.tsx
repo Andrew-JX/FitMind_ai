@@ -168,7 +168,7 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
     <section style={composerStyle}>
       <div style={backdropStyle(theme)} />
       <div style={panelStyle(theme)}>
-        <header style={headerStyle}>
+        <header style={headerStyle(theme)}>
           <div style={headerTopRowStyle}>
             <Button
               disabled={isSubmitting}
@@ -1352,8 +1352,8 @@ function backdropStyle(
 ): React.CSSProperties {
   return {
     background: theme.isDark
-      ? "rgba(9, 11, 18, 0.88)"
-      : "rgba(245, 247, 251, 0.92)",
+      ? "rgba(0, 0, 0, 0.6)"
+      : "rgba(0, 0, 0, 0.28)",
     inset: 0,
     position: "absolute",
   };
@@ -1363,9 +1363,7 @@ function panelStyle(
   theme: ReturnType<typeof useTheme>["theme"],
 ): React.CSSProperties {
   return {
-    background: theme.isDark
-      ? "linear-gradient(180deg, rgba(17,21,34,0.98) 0%, rgba(10,13,22,0.98) 100%)"
-      : "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(244,247,252,0.98) 100%)",
+    background: theme.colors.bg,
     color: theme.colors.tx,
     display: "flex",
     flexDirection: "column",
@@ -1378,11 +1376,16 @@ function panelStyle(
   };
 }
 
-const headerStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 16,
-  paddingBottom: 18,
-};
+function headerStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    borderBottom: `1px solid ${theme.colors.bdr}`,
+    display: "grid",
+    gap: 16,
+    paddingBottom: 16,
+  };
+}
 
 const headerTopRowStyle: React.CSSProperties = {
   alignItems: "center",
