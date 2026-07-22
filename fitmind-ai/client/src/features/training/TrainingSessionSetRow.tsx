@@ -149,14 +149,17 @@ function rowStyle(
   isCompleted: boolean,
 ): React.CSSProperties {
   return {
-    backgroundColor: isCompleted ? theme.colors.surf : theme.colors.surf2,
-    border: `1px solid ${isCompleted ? theme.colors.ac : theme.colors.bdr}`,
+    animation: isCompleted
+      ? "fmjelly 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)"
+      : "none",
+    background: isCompleted ? "rgba(200,240,53,0.08)" : theme.colors.surf2,
+    border: `1px solid ${isCompleted ? "rgba(200,240,53,0.35)" : theme.colors.bdr}`,
     borderRadius: theme.radius.control,
     display: "grid",
     gap: 12,
     padding: 12,
     transition:
-      "border-color 150ms ease, transform 150ms ease, opacity 150ms ease",
+      "background 300ms ease, border-color 300ms ease, opacity 150ms ease",
   };
 }
 

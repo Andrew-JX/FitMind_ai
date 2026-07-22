@@ -253,9 +253,10 @@ function cardStyle(
   isActionLayerOpen: boolean,
 ): React.CSSProperties {
   return {
-    backgroundColor: theme.colors.surf,
+    background: `${theme.gradients.card}, ${theme.colors.surf}`,
     border: `1px solid ${isExpanded ? theme.colors.ac : theme.colors.bdr}`,
     borderRadius: theme.radius.card,
+    boxShadow: theme.shadows.card,
     display: "grid",
     gap: 14,
     padding: 16,
