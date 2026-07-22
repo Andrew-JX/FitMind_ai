@@ -260,10 +260,11 @@ function selectStyle(
   theme: ReturnType<typeof useTheme>["theme"],
 ): React.CSSProperties {
   return {
-    backgroundColor: theme.colors.surf2,
+    backgroundColor: theme.colors.divider,
     border: `1px solid ${theme.colors.bdr}`,
     borderRadius: 12,
     color: theme.colors.tx,
+    fontWeight: 600,
     padding: "10px 12px",
   };
 }
@@ -273,14 +274,14 @@ function resultCardStyle(
   isSelectable: boolean,
 ): React.CSSProperties {
   return {
-    backgroundColor: theme.colors.surf2,
-    border: `1px solid ${theme.colors.bdr}`,
-    borderRadius: 12,
+    backgroundColor: theme.colors.soft,
+    border: "none",
+    borderRadius: 14,
     color: theme.colors.tx,
     cursor: isSelectable ? "pointer" : "default",
     display: "block",
     minHeight: 58,
-    padding: 12,
+    padding: "12px 13px",
     textAlign: "left",
     width: "100%",
   };

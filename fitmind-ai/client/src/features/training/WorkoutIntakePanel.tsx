@@ -568,9 +568,25 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
               0%, 100% { transform: scaleY(0.35); opacity: 0.55; }
               50% { transform: scaleY(1); opacity: 1; }
             }
+            @keyframes fitmindMicPulse {
+              0% { box-shadow: 0 0 0 0 rgba(200,240,53,0.35); }
+              70% { box-shadow: 0 0 0 16px rgba(200,240,53,0); }
+              100% { box-shadow: 0 0 0 0 rgba(200,240,53,0); }
+            }
           `}
         </style>
         <div style={voiceContentStyle}>
+          <div
+            aria-hidden="true"
+            style={{
+              ...voiceMicRingStyle,
+              animation: speechRecognition.isListening
+                ? "fitmindMicPulse 1.8s ease-out infinite"
+                : "none",
+            }}
+          >
+            <Icon name="mic" size={30} />
+          </div>
           <div style={voiceWaveStyle} aria-hidden="true">
             {Array.from({ length: 7 }, (_, index) => (
               <span
@@ -578,6 +594,9 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
                 style={{
                   ...voiceWaveBarStyle,
                   animationDelay: `${index * 80}ms`,
+                  animationPlayState: speechRecognition.isListening
+                    ? "running"
+                    : "paused",
                   backgroundColor: theme.colors.ac,
                 }}
               />
@@ -837,6 +856,17 @@ const voiceContentStyle: React.CSSProperties = {
   display: "grid",
   gap: 14,
   justifyItems: "center",
+};
+
+const voiceMicRingStyle: React.CSSProperties = {
+  alignItems: "center",
+  background: "#c8f035",
+  borderRadius: "50%",
+  color: "#0f0f0f",
+  display: "flex",
+  height: 72,
+  justifyContent: "center",
+  width: 72,
 };
 
 const voiceWaveStyle: React.CSSProperties = {
