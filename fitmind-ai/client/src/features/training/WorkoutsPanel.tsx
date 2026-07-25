@@ -44,6 +44,7 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
     string | null
   >(null);
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [isListExpanded, setIsListExpanded] = useState(false);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<
     string | null
   >(null);
@@ -197,7 +198,24 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
           ) : null}
 
           {props.workouts.length > 0 ? (
-            <div style={listStyle}>{renderWorkoutCards(props.workouts)}</div>
+            <div style={listStyle}>
+              {renderWorkoutCards(
+                isListExpanded
+                  ? props.workouts
+                  : props.workouts.slice(0, LIST_PREVIEW_COUNT),
+              )}
+              {props.workouts.length > LIST_PREVIEW_COUNT ? (
+                <button
+                  onClick={() => setIsListExpanded((value) => !value)}
+                  style={showMoreStyle(theme)}
+                  type="button"
+                >
+                  {isListExpanded
+                    ? "收起"
+                    : `查看更多（还有 ${props.workouts.length - LIST_PREVIEW_COUNT} 条）`}
+                </button>
+              ) : null}
+            </div>
           ) : null}
         </>
       )}
@@ -358,6 +376,25 @@ function toLocalDateKey(performedAt: string): string {
   const month = `${date.getMonth() + 1}`.padStart(2, "0");
   const day = `${date.getDate()}`.padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+/** How many records the list shows before "查看更多" is needed. */
+const LIST_PREVIEW_COUNT = 5;
+
+/** Design: dashed full-width control that reveals the rest of the records. */
+function showMoreStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    background: "transparent",
+    border: `1px dashed ${theme.colors.grab}`,
+    borderRadius: 10,
+    color: theme.colors.tx2,
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 700,
+    padding: 10,
+  };
 }
 
 /** Compact pill button used by the record-panel header (view toggle / refresh). */

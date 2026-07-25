@@ -6,8 +6,6 @@ import type {
   WorkoutSummaryDto,
 } from "../../../../shared/src/training";
 
-import { Button } from "../../components/Button";
-import { IconButton } from "../../components/IconButton";
 import { Pill } from "../../components/Pill";
 import { useTheme } from "../../theme/ThemeContext";
 
@@ -68,16 +66,16 @@ export function WorkoutCard(props: WorkoutCardProps) {
             {notes ? ` · ${truncateNotes(notes)}` : ""}
           </p>
         </div>
-        <Button
+        <button
           onClick={(event) => {
             event.stopPropagation();
             void props.onToggle();
           }}
+          style={detailToggleStyle(theme)}
           type="button"
-          variant="secondary"
         >
           {props.isExpanded ? "收起详情" : "查看详情"}
-        </Button>
+        </button>
       </div>
 
       {props.isExpanded ? (
@@ -110,20 +108,6 @@ export function WorkoutCard(props: WorkoutCardProps) {
                 <p style={detailParagraphStyle(theme)}>
                   {props.detail.notes?.trim() || "本次训练没有备注。"}
                 </p>
-              </div>
-
-              <div style={actionRowStyle}>
-                <Button
-                  disabled={!props.token || props.isDeleting}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    props.onEdit();
-                  }}
-                  type="button"
-                  variant="secondary"
-                >
-                  编辑训练
-                </Button>
               </div>
 
               <div style={groupListStyle}>
@@ -191,26 +175,28 @@ export function WorkoutCard(props: WorkoutCardProps) {
                 })}
               </div>
 
-              <div style={deleteRowStyle}>
-                <div onClick={(event) => event.stopPropagation()}>
-                  <IconButton
-                    disabled={props.isDeleting}
-                    icon="trash"
-                    label="删除训练"
-                    onClick={() => void props.onDelete()}
-                    tone="danger"
-                  />
-                </div>
+              <div style={actionRowStyle}>
+                <button
+                  disabled={!props.token || props.isDeleting}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    props.onEdit();
+                  }}
+                  style={editActionStyle(theme)}
+                  type="button"
+                >
+                  编辑训练
+                </button>
                 <button
                   disabled={props.isDeleting}
                   onClick={(event) => {
                     event.stopPropagation();
                     void props.onDelete();
                   }}
-                  style={deleteButtonStyle(theme)}
+                  style={deleteActionStyle(theme)}
                   type="button"
                 >
-                  {props.isDeleting ? "删除中..." : "删除训练"}
+                  {props.isDeleting ? "删除中..." : "删除"}
                 </button>
               </div>
             </>
@@ -399,18 +385,61 @@ const setRowStyle: React.CSSProperties = {
   justifyContent: "space-between",
 };
 
-const deleteRowStyle: React.CSSProperties = {
-  alignItems: "center",
-  display: "flex",
+/** Design: 编辑训练 / 删除 sit side by side under the expanded detail. */
+const actionRowStyle: React.CSSProperties = {
+  display: "grid",
   gap: 8,
-  justifyContent: "flex-end",
+  gridTemplateColumns: "1fr 1fr",
 };
 
-const actionRowStyle: React.CSSProperties = {
-  display: "flex",
-  gap: 8,
-  justifyContent: "flex-end",
-};
+/** Design: accent-green chip that expands/collapses a workout record. */
+function detailToggleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    background: theme.colors.divider,
+    border: "none",
+    borderRadius: 10,
+    color: theme.colors.ac,
+    cursor: "pointer",
+    flex: "0 0 auto",
+    fontSize: 11,
+    fontWeight: 700,
+    padding: "7px 11px",
+  };
+}
+
+/** Design: neutral inset edit button. */
+function editActionStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    background: theme.colors.surf2,
+    border: `1px solid ${theme.colors.bdr2}`,
+    borderRadius: 10,
+    color: theme.colors.tx,
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 700,
+    padding: "9px 10px",
+  };
+}
+
+/** Design: soft red danger button. */
+function deleteActionStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    background: "rgba(248,113,113,0.10)",
+    border: "1px solid rgba(248,113,113,0.35)",
+    borderRadius: 10,
+    color: theme.colors.red,
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 700,
+    padding: "9px 10px",
+  };
+}
 
 function cardStyle(
   theme: ReturnType<typeof useTheme>["theme"],
@@ -533,14 +562,18 @@ function groupCardStyle(
   };
 }
 
+/** Design: outlined accent chip toggling an exercise group's set list. */
 function groupToggleStyle(
   theme: ReturnType<typeof useTheme>["theme"],
 ): React.CSSProperties {
   return {
+    background: "transparent",
+    border: `1px solid ${theme.colors.accDim}`,
+    borderRadius: 8,
     color: theme.colors.ac,
     flex: "0 0 auto",
     fontSize: 11,
-    fontWeight: 700,
+    padding: "5px 8px",
   };
 }
 
@@ -590,20 +623,6 @@ function metaTextStyle(
     fontSize: 12,
     lineHeight: 1.5,
     margin: "4px 0 0",
-  };
-}
-
-function deleteButtonStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-): React.CSSProperties {
-  return {
-    background: "transparent",
-    border: "none",
-    color: theme.colors.red,
-    cursor: "pointer",
-    fontSize: 12,
-    fontWeight: 700,
-    padding: 0,
   };
 }
 
