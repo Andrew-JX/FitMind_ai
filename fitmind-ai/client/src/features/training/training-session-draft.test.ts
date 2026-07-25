@@ -42,6 +42,7 @@ describe("training-session-draft", () => {
         completed: true,
         effort: "normal",
         id: "set-1",
+        isWarmup: false,
         reps: "10",
         restSeconds: null,
         weightKg: "0",
@@ -60,11 +61,40 @@ describe("training-session-draft", () => {
       sets: [
         {
           exercise_id: "pull-up-id",
+          is_warmup: false,
           reps: 10,
           set_index: 1,
           weight_kg: 0,
         },
       ],
+    });
+  });
+
+  it("carries a warm-up draft set through to is_warmup on the payload", () => {
+    const exercise = createDraftExercise(
+      createExercise({ id: "bench-id" }),
+      "胸",
+    );
+    exercise.sets = [
+      {
+        completed: true,
+        effort: "normal",
+        id: "warm-1",
+        isWarmup: true,
+        reps: "12",
+        restSeconds: null,
+        weightKg: "40",
+      },
+    ];
+
+    expect(
+      buildWorkoutRequestFromDraft({
+        draftExercises: [exercise],
+        elapsedSeconds: 0,
+        performedAt: new Date("2026-05-29T10:00:00.000Z"),
+      }),
+    ).toMatchObject({
+      sets: [{ exercise_id: "bench-id", is_warmup: true, reps: 12 }],
     });
   });
 

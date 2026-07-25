@@ -152,6 +152,7 @@ function mapWorkoutSetToDraftSet(
     completed: true,
     effort: mapRpeToEffort(set.rpe),
     id: `persisted-${set.id}`,
+    isWarmup: set.is_warmup,
     persistedSetId: set.id,
     reps: `${set.reps}`,
     restSeconds: null,

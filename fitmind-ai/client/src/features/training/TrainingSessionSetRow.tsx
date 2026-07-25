@@ -42,7 +42,19 @@ export function TrainingSessionSetRow(props: TrainingSessionSetRowProps) {
       style={rowStyle(theme, showCompletion ? props.setDraft.completed : true)}
     >
       <div style={rowHeaderStyle}>
-        <strong style={{ fontSize: 13 }}>第 {props.index + 1} 组</strong>
+        <div style={rowLabelStyle}>
+          <strong style={{ fontSize: 13 }}>第 {props.index + 1} 组</strong>
+          <button
+            aria-pressed={props.setDraft.isWarmup}
+            onClick={() =>
+              props.onUpdate("isWarmup", !props.setDraft.isWarmup)
+            }
+            style={setTypeToggleStyle(theme, props.setDraft.isWarmup)}
+            type="button"
+          >
+            {props.setDraft.isWarmup ? "热身组" : "正式组"}
+          </button>
+        </div>
         <div style={rowActionStyle}>
           {props.onStartRestTimer ? (
             <button
@@ -169,6 +181,38 @@ const rowHeaderStyle: React.CSSProperties = {
   gap: 12,
   justifyContent: "space-between",
 };
+
+const rowLabelStyle: React.CSSProperties = {
+  alignItems: "center",
+  display: "flex",
+  gap: 8,
+  minWidth: 0,
+};
+
+/**
+ * 正式组 / 热身组 toggle (design set-type control). Drop sets (递减组) are a
+ * separate backend feature and intentionally not offered here yet.
+ *
+ * @param theme - Active theme tokens
+ * @param isWarmup - Whether this set is currently marked as a warm-up
+ * @returns The pill toggle style, tinted blue when warm-up
+ */
+function setTypeToggleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+  isWarmup: boolean,
+): React.CSSProperties {
+  return {
+    background: isWarmup ? "rgba(74,158,255,0.14)" : theme.colors.divider,
+    border: "none",
+    borderRadius: 6,
+    color: isWarmup ? theme.colors.blue : theme.colors.tx2,
+    cursor: "pointer",
+    fontSize: 10,
+    fontWeight: 700,
+    padding: "3px 7px",
+    whiteSpace: "nowrap",
+  };
+}
 
 const rowActionStyle: React.CSSProperties = {
   display: "flex",

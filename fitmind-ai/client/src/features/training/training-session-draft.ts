@@ -20,6 +20,8 @@ export interface DraftSet {
   completed: boolean;
   effort: EffortLevel;
   id: string;
+  /** Warm-up marker (design 热身组). Persists to `is_warmup`; still counted. */
+  isWarmup: boolean;
   persistedSetId?: string | null | undefined;
   reps: string;
   restSeconds: number | null;
@@ -76,6 +78,7 @@ export function createDraftSet(previousSet?: DraftSet): DraftSet {
     completed: false,
     effort: previousSet?.effort ?? "normal",
     id: createDraftSetId(),
+    isWarmup: previousSet?.isWarmup ?? false,
     reps: previousSet?.reps ?? "",
     restSeconds: previousSet?.restSeconds ?? null,
     weightKg: previousSet?.weightKg ?? "",
@@ -174,7 +177,7 @@ export function buildWorkoutRequestFromDraft(input: {
 
       preparedSets.push({
         exercise_id: draftExercise.exerciseId,
-        is_warmup: false,
+        is_warmup: setDraft.isWarmup,
         reps: Number.parseInt(setDraft.reps, 10),
         rpe: mapEffortToRpe(setDraft.effort),
         weight_kg: getDraftSetWeightKg(setDraft, draftExercise),

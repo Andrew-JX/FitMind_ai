@@ -166,6 +166,11 @@ export function WorkoutCard(props: WorkoutCardProps) {
                                 <div>
                                   <strong style={{ fontSize: 13 }}>
                                     第 {setItem.set_index} 组
+                                    {setItem.is_warmup ? (
+                                      <span style={warmupBadgeStyle(theme)}>
+                                        热身
+                                      </span>
+                                    ) : null}
                                   </strong>
                                   <p style={metaTextStyle(theme)}>
                                     {setItem.weight_kg} 公斤 × {setItem.reps} 次
@@ -558,6 +563,22 @@ function setItemStyle(
     border: `1px solid ${theme.colors.bdr}`,
     borderRadius: theme.radius.control,
     padding: 10,
+  };
+}
+
+/** Small inline "热身" tag on warm-up sets in the workout detail view. */
+function warmupBadgeStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    background: "rgba(74,158,255,0.14)",
+    borderRadius: 6,
+    color: theme.colors.blue,
+    fontSize: 10,
+    fontWeight: 700,
+    marginLeft: 6,
+    padding: "2px 6px",
+    verticalAlign: "middle",
   };
 }
 
