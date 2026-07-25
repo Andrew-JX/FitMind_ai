@@ -430,13 +430,13 @@ function addSetButtonStyle(
   theme: ReturnType<typeof useTheme>["theme"],
 ): React.CSSProperties {
   return {
-    backgroundColor: theme.colors.surf2,
-    border: `1px dashed ${theme.colors.bdr2}`,
-    borderRadius: theme.radius.control,
+    background: "transparent",
+    border: `1px dashed ${theme.colors.grab}`,
+    borderRadius: 10,
     color: theme.colors.tx2,
     cursor: "pointer",
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: 700,
-    padding: "12px 14px",
+    padding: 10,
   };
 }

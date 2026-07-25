@@ -1351,9 +1351,7 @@ function backdropStyle(
   theme: ReturnType<typeof useTheme>["theme"],
 ): React.CSSProperties {
   return {
-    background: theme.isDark
-      ? "rgba(0, 0, 0, 0.6)"
-      : "rgba(0, 0, 0, 0.28)",
+    background: theme.isDark ? "rgba(0, 0, 0, 0.6)" : "rgba(0, 0, 0, 0.28)",
     inset: 0,
     position: "absolute",
   };

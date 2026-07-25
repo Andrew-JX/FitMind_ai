@@ -1,6 +1,5 @@
 import type { DraftSet, EffortLevel } from "./training-session-draft";
 
-import { Button } from "../../components/Button";
 import { Input } from "../../components/Input";
 import { useTheme } from "../../theme/ThemeContext";
 
@@ -42,20 +41,23 @@ export function TrainingSessionSetRow(props: TrainingSessionSetRowProps) {
       style={rowStyle(theme, showCompletion ? props.setDraft.completed : true)}
     >
       <div style={rowHeaderStyle}>
-        <div style={rowLabelStyle}>
-          <strong style={{ fontSize: 13 }}>第 {props.index + 1} 组</strong>
+        <span style={rowLabelStyle}>
+          <span style={setIndexStyle(theme, props.setDraft.completed)}>
+            第 {props.index + 1} 组
+          </span>
           <button
             aria-pressed={props.setDraft.isWarmup}
-            onClick={() =>
-              props.onUpdate("isWarmup", !props.setDraft.isWarmup)
-            }
+            onClick={() => props.onUpdate("isWarmup", !props.setDraft.isWarmup)}
             style={setTypeToggleStyle(theme, props.setDraft.isWarmup)}
             type="button"
           >
             {props.setDraft.isWarmup ? "热身组" : "正式组"}
           </button>
-        </div>
-        <div style={rowActionStyle}>
+          {restLabel ? (
+            <span style={restInfoStyle(theme)}>{restLabel}</span>
+          ) : null}
+        </span>
+        <span style={rowActionStyle}>
           {props.onStartRestTimer ? (
             <button
               disabled={!props.canComplete}
@@ -63,25 +65,41 @@ export function TrainingSessionSetRow(props: TrainingSessionSetRowProps) {
               style={miniActionStyle(theme, !props.canComplete)}
               type="button"
             >
-              休息倒计时
+              休息
             </button>
           ) : null}
           <button
             onClick={props.onCopy}
             style={miniActionStyle(theme)}
+            title="复制本组"
             type="button"
           >
-            复制本组
+            复制
           </button>
-          <button
-            disabled={!props.canDelete}
-            onClick={props.onDelete}
-            style={miniActionStyle(theme, !props.canDelete)}
-            type="button"
-          >
-            删除本组
-          </button>
-        </div>
+          {showCompletion ? (
+            <button
+              disabled={!props.canComplete}
+              onClick={props.onToggleCompleted}
+              style={doneActionStyle(
+                theme,
+                props.setDraft.completed,
+                !props.canComplete,
+              )}
+              type="button"
+            >
+              {props.setDraft.completed ? "✓ 已完成" : "完成"}
+            </button>
+          ) : null}
+          {props.canDelete ? (
+            <button
+              onClick={props.onDelete}
+              style={deleteActionStyle(theme)}
+              type="button"
+            >
+              删除
+            </button>
+          ) : null}
+        </span>
       </div>
 
       <div style={metricGridStyle}>
@@ -106,44 +124,22 @@ export function TrainingSessionSetRow(props: TrainingSessionSetRowProps) {
         </label>
       </div>
 
-      <div style={effortWrapStyle}>
-        <span style={labelCaptionStyle(theme)}>体感</span>
-        <div style={effortRowStyle}>
-          {EFFORT_OPTIONS.map((option) => {
-            const isActive = option.value === props.setDraft.effort;
+      <div style={effortRowStyle}>
+        {EFFORT_OPTIONS.map((option) => {
+          const isActive = option.value === props.setDraft.effort;
 
-            return (
-              <button
-                key={option.value}
-                onClick={() => props.onUpdate("effort", option.value)}
-                style={effortButtonStyle(theme, option.tone, isActive)}
-                type="button"
-              >
-                {option.label}
-              </button>
-            );
-          })}
-        </div>
+          return (
+            <button
+              key={option.value}
+              onClick={() => props.onUpdate("effort", option.value)}
+              style={effortButtonStyle(theme, option.tone, isActive)}
+              type="button"
+            >
+              {option.label}
+            </button>
+          );
+        })}
       </div>
-
-      {showCompletion ? (
-        <div style={completeRowStyle(Boolean(restLabel))}>
-          {restLabel ? (
-            <span style={restInfoStyle(theme)}>{restLabel}</span>
-          ) : (
-            <span />
-          )}
-          <Button
-            disabled={!props.canComplete}
-            onClick={props.onToggleCompleted}
-            style={completeButtonStyle(props.setDraft.completed)}
-            type="button"
-            variant={props.setDraft.completed ? "primary" : "secondary"}
-          >
-            {props.setDraft.completed ? "✓ 已完成" : "□ 标记完成"}
-          </Button>
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -164,12 +160,12 @@ function rowStyle(
     animation: isCompleted
       ? "fmjelly 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)"
       : "none",
-    background: isCompleted ? "rgba(200,240,53,0.08)" : theme.colors.surf2,
+    background: isCompleted ? "rgba(200,240,53,0.08)" : theme.colors.soft,
     border: `1px solid ${isCompleted ? "rgba(200,240,53,0.35)" : theme.colors.bdr}`,
-    borderRadius: theme.radius.control,
+    borderRadius: 12,
     display: "grid",
-    gap: 12,
-    padding: 12,
+    gap: 8,
+    padding: 10,
     transition:
       "background 300ms ease, border-color 300ms ease, opacity 150ms ease",
   };
@@ -183,8 +179,8 @@ const rowHeaderStyle: React.CSSProperties = {
 };
 
 const rowLabelStyle: React.CSSProperties = {
-  alignItems: "center",
-  display: "flex",
+  alignItems: "baseline",
+  display: "inline-flex",
   gap: 8,
   minWidth: 0,
 };
@@ -215,24 +211,83 @@ function setTypeToggleStyle(
 }
 
 const rowActionStyle: React.CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: 8,
-  justifyContent: "flex-end",
+  alignItems: "center",
+  display: "inline-flex",
+  flex: "0 0 auto",
+  gap: 5,
 };
 
+/** Design: compact filled action chip in the set-row header (休息 / 复制). */
 function miniActionStyle(
   theme: ReturnType<typeof useTheme>["theme"],
   disabled = false,
 ): React.CSSProperties {
   return {
+    background: theme.colors.divider,
+    border: "none",
+    borderRadius: 8,
+    color: theme.colors.tx2,
+    cursor: disabled ? "not-allowed" : "pointer",
+    fontSize: 11,
+    opacity: disabled ? 0.56 : 1,
+    padding: "6px 9px",
+  };
+}
+
+/**
+ * Design: the set-completion toggle lives in the header action strip, tinted
+ * accent-green once the set is done.
+ *
+ * @param theme - Active theme tokens
+ * @param isCompleted - Whether this set is marked complete
+ * @param disabled - Whether completion is currently unavailable
+ * @returns The done-chip style
+ */
+function doneActionStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+  isCompleted: boolean,
+  disabled: boolean,
+): React.CSSProperties {
+  return {
+    background: isCompleted ? theme.colors.ac : theme.colors.divider,
+    border: "none",
+    borderRadius: 8,
+    color: isCompleted ? theme.colors.acText : theme.colors.tx2,
+    cursor: disabled ? "not-allowed" : "pointer",
+    fontSize: 11,
+    fontWeight: 700,
+    opacity: disabled ? 0.56 : 1,
+    padding: "6px 9px",
+    transition: "all 0.2s ease",
+    whiteSpace: "nowrap",
+  };
+}
+
+/** Design: borderless muted delete affordance at the end of the strip. */
+function deleteActionStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
     background: "transparent",
     border: "none",
-    color: disabled ? theme.colors.tx3 : theme.colors.tx2,
-    cursor: disabled ? "not-allowed" : "pointer",
-    fontSize: 12,
-    opacity: disabled ? 0.56 : 1,
-    padding: 0,
+    color: theme.colors.tx3,
+    cursor: "pointer",
+    fontSize: 11,
+    padding: "6px 4px",
+  };
+}
+
+/** Set index label; turns accent-green when the set is complete (design). */
+function setIndexStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+  isCompleted: boolean,
+): React.CSSProperties {
+  return {
+    color: isCompleted ? theme.colors.ac : theme.colors.tx,
+    fontSize: 11,
+    fontWeight: 700,
+    transition: "color 0.3s ease",
+    whiteSpace: "nowrap",
   };
 }
 
@@ -242,31 +297,17 @@ const metricGridStyle: React.CSSProperties = {
   gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
 };
 
+/** Design: 10px muted caption stacked above each metric input. */
 function labelStyle(
   theme: ReturnType<typeof useTheme>["theme"],
 ): React.CSSProperties {
   return {
     color: theme.colors.tx2,
     display: "grid",
-    fontSize: 12,
-    gap: 8,
+    fontSize: 10,
+    gap: 4,
   };
 }
-
-function labelCaptionStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-): React.CSSProperties {
-  return {
-    color: theme.colors.tx2,
-    fontSize: 12,
-    fontWeight: 600,
-  };
-}
-
-const effortWrapStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 8,
-};
 
 const effortRowStyle: React.CSSProperties = {
   display: "grid",
@@ -287,43 +328,26 @@ function effortButtonStyle(
         : theme.colors.orange;
 
   return {
-    backgroundColor: isActive
-      ? color
-      : theme.isDark
-        ? "rgba(255,255,255,0.03)"
-        : "rgba(0,0,0,0.02)",
+    backgroundColor: isActive ? color : theme.colors.soft,
     border: `1px solid ${isActive ? color : theme.colors.bdr}`,
-    borderRadius: theme.radius.control,
-    color: isActive ? "#ffffff" : color,
+    borderRadius: 8,
+    color: isActive ? theme.colors.acText : color,
     cursor: "pointer",
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 700,
-    padding: "10px 8px",
+    padding: "7px 0",
+    transition: "all 0.2s ease",
   };
 }
 
-function completeRowStyle(hasRestLabel: boolean): React.CSSProperties {
-  return {
-    alignItems: "center",
-    display: "flex",
-    gap: 12,
-    justifyContent: hasRestLabel ? "space-between" : "flex-end",
-  };
-}
-
+/** Design: rest countdown shown inline in the header, accent-green tabular. */
 function restInfoStyle(
   theme: ReturnType<typeof useTheme>["theme"],
 ): React.CSSProperties {
   return {
-    color: theme.colors.tx2,
-    fontSize: 12,
-    fontWeight: 600,
-  };
-}
-
-function completeButtonStyle(isCompleted: boolean): React.CSSProperties {
-  return {
-    minWidth: 110,
-    transform: isCompleted ? "scale(1.01)" : "scale(1)",
+    color: theme.colors.ac,
+    fontSize: 11,
+    fontVariantNumeric: "tabular-nums",
+    whiteSpace: "nowrap",
   };
 }

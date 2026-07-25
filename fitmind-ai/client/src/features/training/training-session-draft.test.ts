@@ -105,6 +105,7 @@ describe("training-session-draft", () => {
         completed: false,
         effort: "normal",
         id: "set-1",
+        isWarmup: false,
         reps: "",
         restSeconds: null,
         weightKg: "100",

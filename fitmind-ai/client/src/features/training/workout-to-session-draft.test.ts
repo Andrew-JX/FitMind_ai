@@ -138,6 +138,7 @@ describe("buildWorkoutEditPlan", () => {
       completed: true,
       effort: "hard",
       id: "new-set",
+      isWarmup: false,
       persistedSetId: null,
       reps: "6",
       restSeconds: null,
