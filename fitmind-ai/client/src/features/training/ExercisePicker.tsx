@@ -1,7 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import { Button } from "../../components/Button";
-import { Input } from "../../components/Input";
 import { Pill } from "../../components/Pill";
 import { StateNotice } from "../../components/StateNotice";
 import { useTheme } from "../../theme/ThemeContext";
@@ -46,6 +44,18 @@ export function ExercisePicker(props: ExercisePickerProps) {
   const [selectedExercise, setSelectedExercise] =
     useState<DictionaryExercise | null>(null);
 
+  // The design has no explicit search button: typing or switching the muscle
+  // filter searches directly, debounced so each keystroke is not a request.
+  useEffect(() => {
+    const timerId = window.setTimeout(() => {
+      void onSearch({ muscle: selectedMuscle, q: keyword });
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [keyword, onSearch, selectedMuscle]);
+
   async function handleSubmit(
     event: React.FormEvent<HTMLFormElement>,
   ): Promise<void> {
@@ -59,40 +69,29 @@ export function ExercisePicker(props: ExercisePickerProps) {
   return (
     <section>
       <form onSubmit={handleSubmit} style={formStyle}>
-        <label style={labelStyle(theme)}>
-          搜索动作
-          <Input
-            disabled={isLoadingExercises}
-            onChange={(event) => setKeyword(event.target.value)}
-            placeholder="输入动作名称，例如卧推或深蹲"
-            type="text"
-            value={keyword}
-          />
-        </label>
-
-        <label style={labelStyle(theme)}>
-          筛选肌群
-          <select
-            disabled={isLoadingExercises || isLoadingMuscleGroups}
-            onChange={(event) => setSelectedMuscle(event.target.value)}
-            style={selectStyle(theme)}
-            value={selectedMuscle}
-          >
-            <option value="">全部肌群</option>
-            {muscleGroups.map((muscleGroup) => (
-              <option key={muscleGroup.id} value={muscleGroup.code}>
-                {getMuscleGroupDisplayName(muscleGroup)}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <Button
+        <input
+          aria-label="搜索动作名称"
+          disabled={isLoadingExercises}
+          onChange={(event) => setKeyword(event.target.value)}
+          placeholder="搜索动作名称"
+          style={searchInputStyle(theme)}
+          type="text"
+          value={keyword}
+        />
+        <select
+          aria-label="筛选肌群"
           disabled={isLoadingExercises || isLoadingMuscleGroups}
-          type="submit"
+          onChange={(event) => setSelectedMuscle(event.target.value)}
+          style={selectStyle(theme)}
+          value={selectedMuscle}
         >
-          {isLoadingExercises ? "搜索中..." : "搜索动作"}
-        </Button>
+          <option value="">全部肌群</option>
+          {muscleGroups.map((muscleGroup) => (
+            <option key={muscleGroup.id} value={muscleGroup.code}>
+              {getMuscleGroupDisplayName(muscleGroup)}
+            </option>
+          ))}
+        </select>
       </form>
 
       {searchError ? (
@@ -189,49 +188,75 @@ function ExerciseResultContent(props: {
   return (
     <>
       <div style={titleRowStyle}>
-        <strong style={{ fontSize: 13 }}>
+        <strong
+          style={{ fontSize: 13, fontWeight: 600, letterSpacing: "-0.1px" }}
+        >
           {getExerciseDisplayName(props.exercise)}
         </strong>
+        <div style={pillRowStyle}>
+          {movementLabel ? <Pill tone="analysis">{movementLabel}</Pill> : null}
+          {equipmentLabel ? <Pill tone="neutral">{equipmentLabel}</Pill> : null}
+          {props.primaryMuscles.map((muscleCode) => (
+            <Pill key={muscleCode} tone="accent">
+              {getMuscleCodeLabel(muscleCode)}
+            </Pill>
+          ))}
+        </div>
       </div>
-      <div style={pillRowStyle}>
-        {movementLabel ? <Pill tone="analysis">{movementLabel}</Pill> : null}
-        {equipmentLabel ? <Pill tone="neutral">{equipmentLabel}</Pill> : null}
-        {props.primaryMuscles.map((muscleCode) => (
-          <Pill key={muscleCode} tone="accent">
-            {getMuscleCodeLabel(muscleCode)}
-          </Pill>
-        ))}
-      </div>
+      <span aria-hidden="true" style={chevronStyle}>
+        ›
+      </span>
     </>
   );
 }
 
+/** Design: search field + muscle filter share one row (1fr / 110px). */
 const formStyle: React.CSSProperties = {
   display: "grid",
-  gap: 12,
+  gap: 8,
+  gridTemplateColumns: "1fr 110px",
 };
+
+/** Design: soft-filled search input inside the library section. */
+function searchInputStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    background: theme.colors.soft,
+    border: `1px solid ${theme.colors.bdr}`,
+    borderRadius: 12,
+    color: theme.colors.tx,
+    font: "inherit",
+    fontSize: 13,
+    padding: "9px 10px",
+    width: "100%",
+  };
+}
 
 const resultListStyle: React.CSSProperties = {
   display: "grid",
-  gap: 10,
+  gap: 8,
   listStyle: "none",
-  margin: "16px 0 0",
+  margin: "8px 0 0",
   padding: 0,
 };
 
 const titleRowStyle: React.CSSProperties = {
-  alignItems: "center",
-  display: "flex",
-  flexWrap: "wrap",
-  gap: 8,
-  justifyContent: "space-between",
+  display: "grid",
+  gap: 4,
+  minWidth: 0,
 };
 
 const pillRowStyle: React.CSSProperties = {
   display: "flex",
   flexWrap: "wrap",
   gap: 6,
-  marginTop: 8,
+};
+
+/** Design: trailing chevron on each library row. */
+const chevronStyle: React.CSSProperties = {
+  flex: "0 0 auto",
+  opacity: 0.6,
 };
 
 function copyStyle(
@@ -245,17 +270,6 @@ function copyStyle(
   };
 }
 
-function labelStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-): React.CSSProperties {
-  return {
-    color: theme.colors.tx2,
-    display: "grid",
-    fontSize: 12,
-    gap: 8,
-  };
-}
-
 function selectStyle(
   theme: ReturnType<typeof useTheme>["theme"],
 ): React.CSSProperties {
@@ -264,8 +278,11 @@ function selectStyle(
     border: `1px solid ${theme.colors.bdr}`,
     borderRadius: 12,
     color: theme.colors.tx,
+    font: "inherit",
+    fontSize: 13,
     fontWeight: 600,
-    padding: "10px 12px",
+    padding: "9px 8px",
+    width: "100%",
   };
 }
 
@@ -274,13 +291,15 @@ function resultCardStyle(
   isSelectable: boolean,
 ): React.CSSProperties {
   return {
+    alignItems: "center",
     backgroundColor: theme.colors.soft,
     border: "none",
     borderRadius: 14,
     color: theme.colors.tx,
     cursor: isSelectable ? "pointer" : "default",
-    display: "block",
-    minHeight: 58,
+    display: "flex",
+    gap: 8,
+    justifyContent: "space-between",
     padding: "12px 13px",
     textAlign: "left",
     width: "100%",

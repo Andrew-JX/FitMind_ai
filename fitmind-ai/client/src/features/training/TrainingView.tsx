@@ -8,7 +8,6 @@ import type { TrainingSessionInitialDraft } from "./training-session-draft";
 import type { UseCurrentPlanResult } from "../assistant/use-current-plan";
 
 import { ActionSheet } from "../../components/ActionSheet";
-import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { useTheme } from "../../theme/ThemeContext";
 import { ExercisePicker } from "./ExercisePicker";
@@ -139,19 +138,19 @@ export function TrainingView(props: TrainingViewProps) {
 
       <Card>
         <div style={dictionaryHeaderStyle}>
-          <div>
+          <div style={{ display: "grid", gap: 2, minWidth: 0 }}>
             <h2 style={dictionaryTitleStyle}>动作库</h2>
-            <p style={dictionaryCopyStyle}>
-              查看可添加到训练记录的动作，完整中文动作库会在下一批继续打磨。
-            </p>
+            <span style={dictionaryCopyStyle(theme)}>
+              按肌群浏览标准动作要点
+            </span>
           </div>
-          <Button
+          <button
             onClick={() => setIsDictionaryOpen((currentValue) => !currentValue)}
+            style={dictionaryToggleStyle(theme)}
             type="button"
-            variant="secondary"
           >
-            {isDictionaryOpen ? "收起动作库" : "查看动作库"}
-          </Button>
+            {isDictionaryOpen ? "收起" : "展开"}
+          </button>
         </div>
 
         {isDictionaryOpen ? (
@@ -269,18 +268,39 @@ function manualRecordButtonStyle(
 const dictionaryHeaderStyle: React.CSSProperties = {
   alignItems: "center",
   display: "flex",
-  gap: 12,
+  gap: 8,
   justifyContent: "space-between",
 };
 
 const dictionaryTitleStyle: React.CSSProperties = {
-  fontSize: 16,
+  fontSize: 15,
+  fontWeight: 700,
+  letterSpacing: "-0.2px",
   margin: 0,
 };
 
-const dictionaryCopyStyle: React.CSSProperties = {
-  fontSize: 12,
-  lineHeight: 1.6,
-  margin: "6px 0 0",
-  opacity: 0.82,
-};
+function dictionaryCopyStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    color: theme.colors.tx3,
+    fontSize: 12,
+  };
+}
+
+/** Design: accent-green chip toggling the exercise library section. */
+function dictionaryToggleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    background: theme.colors.divider,
+    border: "none",
+    borderRadius: 10,
+    color: theme.colors.ac,
+    cursor: "pointer",
+    flex: "0 0 auto",
+    fontSize: 11,
+    fontWeight: 700,
+    padding: "7px 11px",
+  };
+}

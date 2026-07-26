@@ -1,7 +1,5 @@
 import { useTheme } from "../theme/ThemeContext";
-import { Badge } from "./Badge";
 import { Icon, type IconName } from "./Icon";
-import { IconButton } from "./IconButton";
 
 export type AppTabKey = "training" | "analysis" | "assistant" | "profile";
 
@@ -40,9 +38,9 @@ export function AppShell(props: AppShellProps) {
       >
         <div
           style={{
-            alignItems: "flex-start",
+            alignItems: "center",
             display: "flex",
-            gap: 12,
+            gap: 8,
             justifyContent: "space-between",
           }}
         >
@@ -54,36 +52,20 @@ export function AppShell(props: AppShellProps) {
               minWidth: 0,
             }}
           >
-            <div
-              style={{
-                alignItems: "center",
-                backgroundColor: theme.colors.ac,
-                borderRadius: 10,
-                color: theme.colors.acText,
-                display: "flex",
-                flex: "0 0 30px",
-                height: 30,
-                justifyContent: "center",
-                width: 30,
-              }}
-            >
-              <Icon name="zap" size={16} />
-            </div>
+            <span style={logoOuterStyle(theme)}>
+              <span style={logoMidStyle}>
+                <span style={logoInnerStyle}>
+                  <Icon name="dumbbell" size={11} />
+                </span>
+              </span>
+            </span>
             <div style={{ minWidth: 0 }}>
-              <div style={{ alignItems: "center", display: "flex", gap: 8 }}>
-                <strong style={{ fontSize: 16 }}>FitMind AI</strong>
-                <Badge tone="accent">Workspace</Badge>
-              </div>
-              <div
-                style={{
-                  color: theme.colors.tx2,
-                  fontSize: 12,
-                  lineHeight: 1.5,
-                  marginTop: 3,
-                }}
-              >
+              <strong style={{ display: "block", fontSize: 15 }}>
+                FitMind AI
+              </strong>
+              <span style={{ color: theme.colors.tx3, fontSize: 11 }}>
                 {props.subtitle}
-              </div>
+              </span>
             </div>
           </div>
 
@@ -95,12 +77,15 @@ export function AppShell(props: AppShellProps) {
               gap: 8,
             }}
           >
-            {props.secondaryAction}
-            <IconButton
-              icon={isDark ? "sun" : "moon"}
-              label="切换主题"
+            <button
+              aria-label="切换主题"
               onClick={toggleTheme}
-            />
+              style={themeToggleStyle(theme)}
+              type="button"
+            >
+              <Icon name={isDark ? "sun" : "moon"} size={14} />
+            </button>
+            {props.secondaryAction}
           </div>
         </div>
       </header>
@@ -193,6 +178,63 @@ function TabButton(props: TabButtonProps) {
       </span>
     </button>
   );
+}
+
+/** Design: nested logo mark — dark tile, grey inner, neon square with a barbell. */
+function logoOuterStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    alignItems: "center",
+    background: theme.isDark ? "#0d0d0d" : theme.colors.surf2,
+    border: `1px solid ${theme.colors.bdr}`,
+    borderRadius: 9,
+    display: "flex",
+    flex: "0 0 30px",
+    height: 30,
+    justifyContent: "center",
+    width: 30,
+  };
+}
+
+const logoMidStyle: React.CSSProperties = {
+  alignItems: "center",
+  background: "#3a3a3a",
+  borderRadius: 7,
+  display: "flex",
+  height: 23,
+  justifyContent: "center",
+  width: 23,
+};
+
+const logoInnerStyle: React.CSSProperties = {
+  alignItems: "center",
+  background: "#c8f035",
+  borderRadius: 4,
+  color: "#0f0f0f",
+  display: "flex",
+  height: 15,
+  justifyContent: "center",
+  width: 15,
+};
+
+/** Design: 32px square theme switch in the header. */
+function themeToggleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    alignItems: "center",
+    background: theme.colors.surf2,
+    border: `1px solid ${theme.colors.bdr}`,
+    borderRadius: 10,
+    color: theme.colors.tx3,
+    cursor: "pointer",
+    display: "inline-flex",
+    flex: "0 0 32px",
+    height: 32,
+    justifyContent: "center",
+    width: 32,
+  };
 }
 
 /** Fixed bottom row that holds the tab nav (left) and the AI FAB (right). */
