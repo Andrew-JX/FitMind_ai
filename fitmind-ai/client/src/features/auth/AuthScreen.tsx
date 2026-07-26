@@ -5,6 +5,7 @@ import type {
   RegisterRequest,
 } from "../../../../shared/src/auth";
 
+import { Icon } from "../../components/Icon";
 import { StateNotice } from "../../components/StateNotice";
 import { useTheme } from "../../theme/ThemeContext";
 import {
@@ -74,9 +75,9 @@ export function AuthScreen(props: AuthScreenProps) {
     <main
       style={{
         alignItems: "center",
-        background: theme.isDark
-          ? "radial-gradient(circle at top, rgba(200,240,53,0.16), transparent 32%), #0f0f0f"
-          : "radial-gradient(circle at top, rgba(74,140,0,0.12), transparent 32%), #f0f0ee",
+        background: `radial-gradient(circle at top, ${
+          theme.isDark ? "rgba(200,240,53,0.16)" : "rgba(92,116,4,0.12)"
+        }, transparent 32%), ${theme.colors.bg}`,
         color: theme.colors.tx,
         display: "flex",
         justifyContent: "center",
@@ -95,23 +96,13 @@ export function AuthScreen(props: AuthScreenProps) {
           width: "100%",
         }}
       >
-        <div
-          style={{
-            alignItems: "center",
-            backgroundColor: theme.colors.ac,
-            borderRadius: 16,
-            color: theme.colors.acText,
-            display: "flex",
-            fontSize: 18,
-            fontWeight: 800,
-            height: 56,
-            justifyContent: "center",
-            marginBottom: 16,
-            width: 56,
-          }}
-        >
-          FM
-        </div>
+        <span style={logoOuterStyle(theme)}>
+          <span style={logoMidStyle}>
+            <span style={logoInnerStyle}>
+              <Icon name="dumbbell" size={23} />
+            </span>
+          </span>
+        </span>
 
         <h1 style={{ fontSize: 28, margin: 0 }}>FitMind AI</h1>
         <p
@@ -123,7 +114,7 @@ export function AuthScreen(props: AuthScreenProps) {
             marginTop: 8,
           }}
         >
-          基于真实训练日志的可追溯 AI 训练分析工作台。
+          基于真实训练日志的可追溯 AI 教练。
         </p>
 
         <div
@@ -135,8 +126,10 @@ export function AuthScreen(props: AuthScreenProps) {
             gridTemplateColumns: "1fr 1fr",
             marginBottom: 20,
             padding: 6,
+            position: "relative",
           }}
         >
+          <div aria-hidden="true" style={segmentPillStyle(theme, mode)} />
           <button
             disabled={isSubmitting}
             onClick={() => {
@@ -161,13 +154,29 @@ export function AuthScreen(props: AuthScreenProps) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: "grid", gap: 14 }}>
+        <form onSubmit={handleSubmit} style={{ display: "grid", gap: 12 }}>
+          {mode === "register" ? (
+            <label style={labelStyle(theme)}>
+              昵称
+              <input
+                autoComplete="nickname"
+                disabled={isSubmitting}
+                onChange={(event) => setDisplayName(event.target.value)}
+                placeholder="怎么称呼你"
+                style={fieldStyle(theme)}
+                type="text"
+                value={displayName}
+              />
+            </label>
+          ) : null}
+
           <label style={labelStyle(theme)}>
             邮箱
             <input
               autoComplete="email"
               disabled={isSubmitting}
               onChange={(event) => setEmail(event.target.value)}
+              placeholder="you@example.com"
               required
               style={fieldStyle(theme)}
               type="email"
@@ -184,6 +193,7 @@ export function AuthScreen(props: AuthScreenProps) {
               disabled={isSubmitting}
               minLength={8}
               onChange={(event) => setPassword(event.target.value)}
+              placeholder="至少 8 位"
               required
               style={fieldStyle(theme)}
               type="password"
@@ -204,46 +214,37 @@ export function AuthScreen(props: AuthScreenProps) {
           ) : null}
 
           {mode === "register" ? (
-            <>
-              <label style={labelStyle(theme)}>
-                确认密码
-                <input
-                  autoComplete="new-password"
-                  disabled={isSubmitting}
-                  minLength={8}
-                  onChange={(event) => setConfirmPassword(event.target.value)}
-                  required
-                  style={fieldStyle(theme)}
-                  type="password"
-                  value={confirmPassword}
-                />
-              </label>
-
-              <label style={labelStyle(theme)}>
-                显示名称
-                <input
-                  autoComplete="nickname"
-                  disabled={isSubmitting}
-                  onChange={(event) => setDisplayName(event.target.value)}
-                  style={fieldStyle(theme)}
-                  type="text"
-                  value={displayName}
-                />
-              </label>
-            </>
+            <label style={labelStyle(theme)}>
+              确认密码
+              <input
+                autoComplete="new-password"
+                disabled={isSubmitting}
+                minLength={8}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                placeholder="再输入一次"
+                required
+                style={fieldStyle(theme)}
+                type="password"
+                value={confirmPassword}
+              />
+            </label>
           ) : null}
 
           <button
             disabled={isSubmitting}
             style={{
-              backgroundColor: theme.colors.ac,
+              alignItems: "center",
+              background: "#c8f035",
               border: "none",
               borderRadius: 14,
-              color: theme.colors.acText,
+              color: "#0f0f0f",
               cursor: "pointer",
+              display: "flex",
               fontSize: 14,
               fontWeight: 700,
-              padding: "13px 14px",
+              height: 48,
+              justifyContent: "center",
+              padding: 0,
             }}
             type="submit"
           >
@@ -274,8 +275,7 @@ export function AuthScreen(props: AuthScreenProps) {
             marginTop: 14,
           }}
         >
-          登录状态保存在安全的 HttpOnly 会话 cookie
-          中，刷新页面后会自动保持登录。
+          登录后会为你安全地保持登录状态，下次打开无需重新登录。
         </p>
       </section>
     </main>
@@ -287,15 +287,83 @@ function toggleButtonStyle(
   isActive: boolean,
 ): React.CSSProperties {
   return {
-    backgroundColor: isActive ? theme.colors.bg : "transparent",
+    background: "transparent",
     border: "none",
     borderRadius: 12,
     color: isActive ? theme.colors.tx : theme.colors.tx2,
     cursor: "pointer",
+    fontSize: 16,
     fontWeight: isActive ? 700 : 500,
     padding: "10px 12px",
+    position: "relative",
+    transition: "color 0.3s ease",
   };
 }
+
+/**
+ * Sliding glass pill behind the 登录/注册 segmented control (design auth range).
+ *
+ * @param theme - Active theme tokens
+ * @param mode - Currently selected auth mode
+ * @returns The absolutely positioned pill, translated to the active segment
+ */
+function segmentPillStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+  mode: AuthMode,
+): React.CSSProperties {
+  return {
+    background: `linear-gradient(180deg, ${theme.colors.glassA}, ${theme.colors.glassB})`,
+    border: `1px solid ${theme.colors.glassA}`,
+    borderRadius: 12,
+    boxShadow: `inset 0 1px 0 ${theme.colors.glassC}, 0 6px 14px ${theme.colors.sh40}`,
+    height: "calc(100% - 12px)",
+    left: 6,
+    pointerEvents: "none",
+    position: "absolute",
+    top: 6,
+    transform: `translateX(${mode === "register" ? "calc(100% + 8px)" : "0"})`,
+    transition: "transform 0.5s cubic-bezier(0.3, 1.4, 0.4, 1)",
+    width: "calc((100% - 20px) / 2)",
+  };
+}
+
+/** Design: nested logo mark on the auth screen (56 / 44 / 31px). */
+function logoOuterStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    alignItems: "center",
+    background: theme.isDark ? "#0d0d0d" : theme.colors.surf2,
+    borderRadius: 16,
+    boxShadow: `0 4px 14px ${theme.colors.sh40}`,
+    display: "flex",
+    height: 56,
+    justifyContent: "center",
+    marginBottom: 16,
+    width: 56,
+  };
+}
+
+const logoMidStyle: React.CSSProperties = {
+  alignItems: "center",
+  background: "#3a3a3a",
+  borderRadius: 13,
+  display: "flex",
+  height: 44,
+  justifyContent: "center",
+  width: 44,
+};
+
+const logoInnerStyle: React.CSSProperties = {
+  alignItems: "center",
+  background: "#c8f035",
+  borderRadius: 9,
+  color: "#0f0f0f",
+  display: "flex",
+  height: 31,
+  justifyContent: "center",
+  width: 31,
+};
 
 function labelStyle(
   theme: ReturnType<typeof useTheme>["theme"],
@@ -304,7 +372,8 @@ function labelStyle(
     color: theme.colors.tx2,
     display: "grid",
     fontSize: 12,
-    gap: 8,
+    fontWeight: 600,
+    gap: 6,
   };
 }
 
@@ -325,10 +394,12 @@ function fieldStyle(
 ): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf2,
-    border: `1px solid ${theme.colors.bdr}`,
+    border: `1px solid ${theme.colors.bdr2}`,
     borderRadius: 12,
     color: theme.colors.tx,
+    font: "inherit",
     fontSize: 16,
-    padding: "12px 14px",
+    padding: 12,
+    width: "100%",
   };
 }
