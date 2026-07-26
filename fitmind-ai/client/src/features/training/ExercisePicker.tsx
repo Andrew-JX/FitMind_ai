@@ -85,9 +85,15 @@ export function ExercisePicker(props: ExercisePickerProps) {
           style={selectStyle(theme)}
           value={selectedMuscle}
         >
-          <option value="">全部肌群</option>
+          <option style={optionStyle(theme)} value="">
+            全部肌群
+          </option>
           {muscleGroups.map((muscleGroup) => (
-            <option key={muscleGroup.id} value={muscleGroup.code}>
+            <option
+              key={muscleGroup.id}
+              style={optionStyle(theme)}
+              value={muscleGroup.code}
+            >
               {getMuscleGroupDisplayName(muscleGroup)}
             </option>
           ))}
@@ -270,12 +276,24 @@ function copyStyle(
   };
 }
 
+/**
+ * Muscle filter select.
+ *
+ * @remarks
+ * The background must stay opaque: the native dropdown paints its option list
+ * with this color, so a translucent token (e.g. `divider`) makes the options and
+ * the highlighted row unreadable. Options get explicit colors for the same
+ * reason — they are rendered by the OS, not by the surrounding CSS.
+ *
+ * @param theme - Active theme tokens
+ * @returns The select control style
+ */
 function selectStyle(
   theme: ReturnType<typeof useTheme>["theme"],
 ): React.CSSProperties {
   return {
-    backgroundColor: theme.colors.divider,
-    border: `1px solid ${theme.colors.bdr}`,
+    backgroundColor: theme.colors.surf2,
+    border: `1px solid ${theme.colors.bdr2}`,
     borderRadius: 12,
     color: theme.colors.tx,
     font: "inherit",
@@ -283,6 +301,15 @@ function selectStyle(
     fontWeight: 600,
     padding: "9px 8px",
     width: "100%",
+  };
+}
+
+function optionStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.surf,
+    color: theme.colors.tx,
   };
 }
 
