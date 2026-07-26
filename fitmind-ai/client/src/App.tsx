@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { AppShell, type AppTabKey } from "./components/AppShell";
 import { AssistantWorkspace } from "./features/assistant/AssistantWorkspace";
@@ -15,6 +15,7 @@ import {
 import { useCurrentPlan } from "./features/assistant/use-current-plan";
 import { FeedbackButton } from "./features/feedback/FeedbackButton";
 import { ProfileView } from "./features/profile/ProfileView";
+import { createAnalysisRange } from "./features/training/analysis-range";
 import { AnalysisView } from "./features/training/AnalysisView";
 import { TrainingView } from "./features/training/TrainingView";
 import { useExerciseSearch } from "./features/training/use-exercise-search";
@@ -40,7 +41,10 @@ declare global {
 export function App() {
   const auth = useAuth();
   const exerciseSearch = useExerciseSearch();
-  const trainingSummary = useTrainingSummary(auth.token);
+  // The training tab's overview strip is labelled 近 30 天, so it keeps its own
+  // fixed range; the analysis tab owns a switchable one.
+  const trainingRange = useMemo(() => createAnalysisRange("last30"), []);
+  const trainingSummary = useTrainingSummary(auth.token, trainingRange);
   const workouts = useWorkouts(auth.token);
   const currentPlan = useCurrentPlan(auth.token);
   const [activeTab, setActiveTab] = useState<AppTabKey>("training");
@@ -49,7 +53,6 @@ export function App() {
   >(null);
   const [selectedProgressExerciseName, setSelectedProgressExerciseName] =
     useState<string | null>(null);
-  const [progressRefreshSignal, setProgressRefreshSignal] = useState(0);
   const [analysisRefreshSignal, setAnalysisRefreshSignal] = useState(0);
   const [assistantRefreshSignal, setAssistantRefreshSignal] = useState(0);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
@@ -161,29 +164,10 @@ export function App() {
 
       <section style={tabSectionStyle(activeTab === "analysis")}>
         <AnalysisView
-          muscleLoadProps={{
-            refreshSignal: analysisRefreshSignal,
-            token: auth.token,
-          }}
-          progressProps={{
-            refreshSignal: progressRefreshSignal,
-            selectedExerciseId: selectedProgressExerciseId,
-            selectedExerciseName: selectedProgressExerciseName,
-            token: auth.token,
-          }}
-          recommendationProps={{
-            refreshSignal: analysisRefreshSignal,
-            token: auth.token,
-          }}
-          summary={trainingSummary.summary}
-          summaryProps={{
-            errorMessage: trainingSummary.errorMessage,
-            isLoading: trainingSummary.isLoading,
-            onExerciseSelect: handleExerciseSelect,
-            onRefresh: trainingSummary.refresh,
-            selectedExerciseId: selectedProgressExerciseId,
-            summary: trainingSummary.summary,
-          }}
+          onExerciseSelect={handleExerciseSelect}
+          refreshSignal={analysisRefreshSignal}
+          selectedExerciseId={selectedProgressExerciseId}
+          token={auth.token}
         />
       </section>
 
@@ -216,10 +200,6 @@ export function App() {
     ]);
     setAnalysisRefreshSignal((currentValue) => currentValue + 1);
     setAssistantRefreshSignal((currentValue) => currentValue + 1);
-
-    if (selectedProgressExerciseId !== null) {
-      setProgressRefreshSignal((currentValue) => currentValue + 1);
-    }
   }
 
   async function handleDeleteWorkout(workoutId: string): Promise<boolean> {
@@ -229,22 +209,23 @@ export function App() {
       await trainingSummary.refresh();
       setAnalysisRefreshSignal((currentValue) => currentValue + 1);
       setAssistantRefreshSignal((currentValue) => currentValue + 1);
-
-      if (selectedProgressExerciseId !== null) {
-        setProgressRefreshSignal((currentValue) => currentValue + 1);
-      }
     }
 
     return wasDeleted;
   }
 
+  /**
+   * Records which exercise the analysis tab is focused on.
+   *
+   * The analysis tab renders that focus itself; this state exists so the
+   * assistant's exercise-scoped shortcuts know what to ask about.
+   */
   function handleExerciseSelect(
     exerciseId: string,
     exerciseName: string,
   ): void {
     setSelectedProgressExerciseId(exerciseId);
     setSelectedProgressExerciseName(exerciseName);
-    setActiveTab("analysis");
   }
 }
 

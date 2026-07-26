@@ -26,6 +26,8 @@ export interface ThemeColors {
   sheen: string;
   /** Drawer grab-handle color (design --fm-grab). */
   grab: string;
+  /** Inactive chart-bar fill (design --fm-bar). */
+  bar: string;
   /** Glass slider gradient stops for segmented controls (design --fm-glassA/B/C). */
   glassA: string;
   glassB: string;
@@ -117,6 +119,7 @@ export const darkTheme: Theme = {
     divider: "rgba(255,255,255,0.06)",
     sheen: "rgba(255,255,255,0.06)",
     grab: "rgba(255,255,255,0.18)",
+    bar: "rgba(255,255,255,0.14)",
     glassA: "rgba(255,255,255,0.16)",
     glassB: "rgba(255,255,255,0.05)",
     glassC: "rgba(255,255,255,0.22)",
@@ -166,6 +169,7 @@ export const lightTheme: Theme = {
     divider: "rgba(0,0,0,0.07)",
     sheen: "rgba(255,255,255,0.6)",
     grab: "rgba(0,0,0,0.18)",
+    bar: "rgba(0,0,0,0.12)",
     glassA: "#ffffff",
     glassB: "rgba(255,255,255,0.88)",
     glassC: "rgba(255,255,255,0.95)",
