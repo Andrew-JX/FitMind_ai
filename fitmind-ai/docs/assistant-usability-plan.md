@@ -103,7 +103,12 @@ Repo conventions apply to every batch: at most 5 code files, independently
 reviewable and revertible, tests in the same batch as the behavior, and
 `pnpm verify` plus `pnpm --filter @fitmind/client test:e2e` green before review.
 
-### PL-1 — tell the truth about the outcome — at most 3 code files
+### PL-1 — tell the truth about the outcome — implemented, awaiting review/deploy
+
+Implementation note (2026-07-27): completed on
+`codex/pl-1-plan-outcome-truth`. The three planned production files changed;
+one existing Playwright spec carries the required failure/success regression.
+The production verification tap below remains the hard gate before PL-2.
 
 Scope: `use-current-plan.ts`, `AssistantCurrentPlanCard.tsx`,
 `AssistantWorkspace.tsx`.

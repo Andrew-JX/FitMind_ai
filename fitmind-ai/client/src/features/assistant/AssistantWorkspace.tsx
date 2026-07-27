@@ -44,7 +44,7 @@ export function AssistantWorkspace(props: AssistantWorkspaceProps) {
       <AssistantCurrentPlanCard
         actionError={currentPlan.actionError}
         isMutating={currentPlan.isMutating}
-        onAbandon={() => void currentPlan.abandon()}
+        onAbandon={currentPlan.abandon}
         plan={currentPlan.plan}
         status={currentPlan.status}
       />

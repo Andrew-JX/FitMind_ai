@@ -5107,3 +5107,24 @@ changed in this independent server presentation batch.
 
 Targeted formatter/faithfulness regressions pass 42/42. Full `pnpm verify`
 passes 74 files / 483 tests, and offline `pnpm eval` remains 100%.
+
+## 2026-07-27 PL-1: truthful planned-workout mutation outcomes
+
+Implemented the first batch of `assistant-usability-plan.md` without guessing at
+the production PATCH failure. `useCurrentPlan.abandon` now returns
+`Promise<boolean>`, and the assistant card waits for that result before showing
+one success or failure toast. A failed request cannot emit 「已放弃本周计划」.
+Both header actions are disabled while a mutation is in flight.
+
+The refresh, accept, and abandon paths now preserve an `HttpClientError`'s HTTP
+status and server message in `actionError`; only non-HTTP failures use the
+Chinese fallback. This makes the user's single production retry actionable for
+PL-2 while leaving the server and planned-workout API contract unchanged.
+
+The Playwright regression drives a 500 response followed by a successful retry.
+It pins the exact HTTP 500 message, absence of a false success, one settled
+success toast, and the card's refresh to empty state. `pnpm verify` passes 74
+files / 491 tests. The complete browser suite reports all 10 cases `ok`,
+including the new regression; in this Windows sandbox the Playwright command
+then hangs while reclaiming its self-started Vite process and is terminated by
+the outer timeout after all results have printed.

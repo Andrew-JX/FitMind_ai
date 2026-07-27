@@ -73,6 +73,99 @@ test("toast confirms an action and clears itself", async ({ page }) => {
   await expect(page.getByRole("status")).toHaveCount(0, { timeout: 4_000 });
 });
 
+test("plan abandon reports the settled outcome without a false success", async ({
+  page,
+}) => {
+  await installApiMocks(page, { authenticated: true });
+
+  const currentPlan = {
+    id: "22222222-2222-4222-8222-222222222222",
+    status: "active",
+    startDate: "2026-07-20",
+    endDate: "2026-07-26",
+    plan: {
+      strategy: "维持基线",
+      exercises: [],
+      notes: [],
+    },
+    sourceMessageId: null,
+    createdAt: "2026-07-20T08:00:00.000Z",
+    updatedAt: "2026-07-20T08:00:00.000Z",
+    adherence: {
+      planned_exercise_count: 0,
+      trained_exercise_count: 0,
+      extra_exercise_count: 0,
+      exercise_adherence_ratio: 0,
+      set_adherence_ratio: 0,
+      exercises: [],
+    },
+  };
+  let activePlan: typeof currentPlan | null = currentPlan;
+  let patchCount = 0;
+
+  await page.route("**/api/planned-workouts/current", (route) =>
+    route.fulfill(jsonRoute({ plannedWorkout: activePlan })),
+  );
+  await page.route(
+    "**/api/planned-workouts/22222222-2222-4222-8222-222222222222",
+    async (route) => {
+      patchCount += 1;
+
+      if (patchCount === 1) {
+        return route.fulfill({
+          body: JSON.stringify({
+            ok: false,
+            error: {
+              code: "INTERNAL_ERROR",
+              message: "Database rejected the plan status update.",
+            },
+          }),
+          contentType: "application/json",
+          status: 500,
+        });
+      }
+
+      activePlan = null;
+      return route.fulfill(
+        jsonRoute({
+          plannedWorkout: { ...currentPlan, status: "abandoned" },
+        }),
+      );
+    },
+  );
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "AI 助手" }).click();
+
+  const abandon = page.getByRole("button", { name: "放弃计划" });
+  const toggle = page.getByRole("button", { name: "展开" });
+  await expect(abandon).toBeVisible();
+
+  await abandon.click();
+
+  await expect(page.getByRole("status")).toHaveText(
+    "放弃计划失败，请查看卡片中的错误信息。",
+  );
+  await expect(page.getByText("已放弃本周计划")).toHaveCount(0);
+  await expect(
+    page
+      .getByText(
+        "请求失败（HTTP 500）：Database rejected the plan status update.",
+      )
+      .last(),
+  ).toBeVisible();
+  await expect(abandon).toBeEnabled();
+  await expect(toggle).toBeEnabled();
+
+  await abandon.click();
+
+  await expect(page.getByRole("status")).toHaveText("已放弃本周计划");
+  await expect(page.getByRole("status")).toHaveCount(1);
+  await expect(page.getByText("还没有本周计划。")).toBeVisible();
+  expect(patchCount).toBe(2);
+  await page.close();
+});
+
 test("workout list pages through real server cursors", async ({ page }) => {
   await installApiMocks(page, { authenticated: true });
 

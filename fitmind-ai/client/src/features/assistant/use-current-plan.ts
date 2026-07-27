@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { HttpClientError } from "../../services/http-client";
 import {
   abandonPlannedWorkout,
   acceptPlannedWorkout,
@@ -20,7 +21,7 @@ export interface UseCurrentPlanResult {
     draft: AssistantPlanDraft,
     sourceMessageId?: string | undefined,
   ) => Promise<boolean>;
-  abandon: () => Promise<void>;
+  abandon: () => Promise<boolean>;
 }
 
 /**
@@ -40,16 +41,21 @@ export function useCurrentPlan(token: string | null): UseCurrentPlanResult {
     if (!token) {
       setPlan(null);
       setStatus("idle");
+      setActionError(null);
       return;
     }
 
     setStatus("loading");
+    setActionError(null);
 
     try {
       const current = await getCurrentPlannedWorkout(token);
       setPlan(current);
       setStatus("ready");
-    } catch {
+    } catch (error) {
+      setActionError(
+        getReadableErrorMessage(error, "本周计划加载失败，请稍后再试。"),
+      );
       setStatus("error");
     }
   }, [token]);
@@ -74,8 +80,10 @@ export function useCurrentPlan(token: string | null): UseCurrentPlanResult {
         await acceptPlannedWorkout(token, { plan: draft, sourceMessageId });
         await refresh();
         return true;
-      } catch {
-        setActionError("接受计划失败，请稍后再试。");
+      } catch (error) {
+        setActionError(
+          getReadableErrorMessage(error, "接受计划失败，请稍后再试。"),
+        );
         return false;
       } finally {
         setIsMutating(false);
@@ -84,9 +92,9 @@ export function useCurrentPlan(token: string | null): UseCurrentPlanResult {
     [token, refresh],
   );
 
-  const abandon = useCallback(async (): Promise<void> => {
+  const abandon = useCallback(async (): Promise<boolean> => {
     if (!token || !plan) {
-      return;
+      return false;
     }
 
     setIsMutating(true);
@@ -95,8 +103,12 @@ export function useCurrentPlan(token: string | null): UseCurrentPlanResult {
     try {
       await abandonPlannedWorkout(token, plan.id);
       await refresh();
-    } catch {
-      setActionError("放弃计划失败，请稍后再试。");
+      return true;
+    } catch (error) {
+      setActionError(
+        getReadableErrorMessage(error, "放弃计划失败，请稍后再试。"),
+      );
+      return false;
     } finally {
       setIsMutating(false);
     }
@@ -111,4 +123,17 @@ export function useCurrentPlan(token: string | null): UseCurrentPlanResult {
     accept,
     abandon,
   };
+}
+
+function getReadableErrorMessage(
+  error: unknown,
+  fallbackMessage: string,
+): string {
+  if (error instanceof HttpClientError) {
+    return typeof error.status === "number"
+      ? `请求失败（HTTP ${error.status}）：${error.message}`
+      : error.message;
+  }
+
+  return fallbackMessage;
 }

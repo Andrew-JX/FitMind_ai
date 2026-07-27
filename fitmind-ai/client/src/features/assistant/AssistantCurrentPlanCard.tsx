@@ -16,7 +16,7 @@ export interface AssistantCurrentPlanCardProps {
   status: CurrentPlanStatus;
   isMutating: boolean;
   actionError: string | null;
-  onAbandon: () => void;
+  onAbandon: () => Promise<boolean>;
 }
 
 const STATUS_LABEL: Record<PlanAdherenceStatus, string> = {
@@ -58,7 +58,9 @@ export function AssistantCurrentPlanCard(props: AssistantCurrentPlanCardProps) {
   if (status === "error" && !plan) {
     return (
       <Card>
-        <p style={mutedStyle(theme)}>本周计划加载失败，可稍后重试。</p>
+        <p style={errorStyle(theme)}>
+          {props.actionError ?? "本周计划加载失败，可稍后重试。"}
+        </p>
       </Card>
     );
   }
@@ -87,8 +89,13 @@ export function AssistantCurrentPlanCard(props: AssistantCurrentPlanCardProps) {
             <button
               disabled={props.isMutating}
               onClick={() => {
-                props.onAbandon();
-                showToast("已放弃本周计划");
+                void props.onAbandon().then((didAbandon) => {
+                  showToast(
+                    didAbandon
+                      ? "已放弃本周计划"
+                      : "放弃计划失败，请查看卡片中的错误信息。",
+                  );
+                });
               }}
               style={abandonButtonStyle(theme, props.isMutating)}
               type="button"
@@ -96,8 +103,9 @@ export function AssistantCurrentPlanCard(props: AssistantCurrentPlanCardProps) {
               放弃计划
             </button>
             <button
+              disabled={props.isMutating}
               onClick={() => setIsExpanded((currentValue) => !currentValue)}
-              style={toggleButtonStyle(theme)}
+              style={toggleButtonStyle(theme, props.isMutating)}
               type="button"
             >
               {isExpanded ? "收起" : "展开"}
@@ -208,15 +216,17 @@ function abandonButtonStyle(
 
 function toggleButtonStyle(
   theme: ReturnType<typeof useTheme>["theme"],
+  disabled: boolean,
 ): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf2,
     border: `1px solid ${theme.colors.bdr}`,
     borderRadius: 8,
     color: theme.colors.ac,
-    cursor: "pointer",
+    cursor: disabled ? "not-allowed" : "pointer",
     fontSize: 11,
     fontWeight: 700,
+    opacity: disabled ? 0.5 : 1,
     padding: "5px 10px",
   };
 }

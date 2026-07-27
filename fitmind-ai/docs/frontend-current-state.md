@@ -520,8 +520,8 @@ assistant 的 exercise progress quick prompt 复用逻辑。
 心智模型=本周「目标动作集」：接受一次设为本周目标，常驻卡片哪天打开都在，真实训练按周自动匹配依从度（不强排到具体某天）。
 
 - `planned-workout-api.ts`：`getCurrentPlannedWorkout` / `acceptPlannedWorkout`（周期=今天起 7 天，client 端 `denormalizePlanDraft` 转回 snake_case）/ `abandonPlannedWorkout`。
-- `use-current-plan.ts`：hook，token 变化时拉 `GET /current`，暴露 `accept`/`abandon`/`refresh` + status/isMutating/actionError。
-- `AssistantCurrentPlanCard.tsx`：常驻在助手页顶部（`AssistantWorkspace` 内，IntroCard 之下）。计划 + 逐动作 done/partial/missed 状态 chip + 依从比例进度条 + 放弃按钮；空/加载/错误态齐全。
+- `use-current-plan.ts`：hook，token 变化时拉 `GET /current`，暴露 `accept`/`abandon`/`refresh` + status/isMutating/actionError。`abandon` 返回 `Promise<boolean>`；三个请求路径都保留 `HttpClientError` 的 HTTP 状态和服务端 message，非 HTTP 错误才使用中文 fallback。
+- `AssistantCurrentPlanCard.tsx`：常驻在助手页顶部（`AssistantWorkspace` 内，IntroCard 之下）。计划 + 逐动作 done/partial/missed 状态 chip + 依从比例进度条 + 放弃按钮；空/加载/错误态齐全。放弃操作结算后才弹结果 toast，失败不报成功；mutation 期间放弃与展开/收起按钮同时禁用。
 - 接受按钮：`AssistantPlanCard` 底部「设为本周计划」，handler 在 `AssistantChatPanel`（accepting/accepted by message.id），drill 路径同 `onSaveInsight`（panel→list→bubble→plan card）；接受成功后 hook.accept 内部 refresh 顶部卡片。
 
 约束补充：accept 的周期窗口固定为接受当天起 7 天；目标重量为 null 的动作不编造数字。
