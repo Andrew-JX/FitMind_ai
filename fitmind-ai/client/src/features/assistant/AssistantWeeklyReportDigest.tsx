@@ -66,12 +66,12 @@ export function AssistantWeeklyReportDigest(
   }
 
   return (
-    <Card padding="14px">
+    <Card>
       <section style={containerStyle}>
         <div style={contentStyle}>
           <div style={titleRowStyle}>
             <h3 style={titleStyle}>{digest.title}</h3>
-            <Badge tone="accent">Weekly Digest</Badge>
+            <Badge tone="accent">本周周报</Badge>
           </div>
           <p style={summaryStyle(theme)}>{digest.summary}</p>
           <time dateTime={digest.generated_at} style={metaStyle(theme)}>
@@ -81,7 +81,7 @@ export function AssistantWeeklyReportDigest(
         <IconButton
           disabled={isDismissing}
           icon="x"
-          label="Dismiss weekly report digest"
+          label="关闭本周周报"
           onClick={() => void dismissDigest()}
         />
       </section>
@@ -90,7 +90,7 @@ export function AssistantWeeklyReportDigest(
 }
 
 function formatDigestMeta(digest: WeeklyReportDigest): string {
-  return `ISO week ${digest.iso_week}, ${digest.week_start_date} to ${digest.week_end_date}`;
+  return `第 ${digest.iso_week} 周 · ${digest.week_start_date} 至 ${digest.week_end_date}`;
 }
 
 const containerStyle: React.CSSProperties = {

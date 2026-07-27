@@ -1,21 +1,25 @@
 import { useEffect, useState } from "react";
 
 import { Card } from "../../components/Card";
-import { IconButton } from "../../components/IconButton";
-import { StateNotice } from "../../components/StateNotice";
 import { useTheme } from "../../theme/ThemeContext";
 import {
   deleteAssistantSavedInsight,
   listAssistantSavedInsights,
   type AssistantSavedInsight,
 } from "./assistant-saved-insights-api";
-import { getAssistantInsightTypeLabel } from "./assistant-saved-insights";
 
 export interface AssistantSavedInsightsPanelProps {
   refreshKey: number;
   token: string | null;
 }
 
+/**
+ * Assistant tab's 已保存洞察 card: saved coach replies with their date, plus
+ * copy-to-clipboard and delete.
+ *
+ * @param props - Auth token and the refresh key bumped on every new save
+ * @returns Saved insights card
+ */
 export function AssistantSavedInsightsPanel(
   props: AssistantSavedInsightsPanelProps,
 ) {
@@ -65,55 +69,54 @@ export function AssistantSavedInsightsPanel(
   }
 
   return (
-    <Card padding="14px">
-      <section style={panelStyle}>
-        <div style={headingRowStyle}>
-          <div>
-            <h3 style={{ margin: 0 }}>已保存洞察</h3>
-            <p style={copyStyle(theme)}>回看周报、平台期诊断和下周训练草案。</p>
-          </div>
+    <Card>
+      <div style={bodyStyle}>
+        <div style={headingStyle}>
+          <h3 style={titleStyle}>已保存洞察</h3>
+          <span style={subtitleStyle(theme)}>
+            回看周报、平台期诊断和下周训练草案。
+          </span>
         </div>
 
         {displayItems.length === 0 ? (
-          <StateNotice
-            description="Save a coach reply to keep it available for review and copy-text sharing."
-            icon="bot"
-            title="还没有保存洞察"
-          />
-        ) : (
-          <div style={listStyle}>
-            {displayItems.map((item) => (
-              <article key={item.id} style={itemStyle(theme)}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={typeStyle(theme)}>
-                    {getAssistantInsightTypeLabel(item.insight_type)}
-                  </div>
-                  <h4 style={titleStyle}>{item.title}</h4>
-                  <p style={summaryStyle(theme)}>{item.summary}</p>
-                  <time style={dateStyle(theme)} dateTime={item.created_at}>
-                    {formatDateTime(item.created_at)}
-                  </time>
-                </div>
-                <div style={actionsStyle}>
-                  <IconButton
-                    icon="copy"
-                    label="复制已保存洞察"
-                    onClick={() => void copyInsight(item)}
-                  />
-                  <IconButton
-                    icon="trash"
-                    label="删除已保存洞察"
-                    onClick={() => void deleteInsight(item)}
-                    tone="danger"
-                  />
-                </div>
-              </article>
-            ))}
+          <div style={emptyStyle(theme)}>
+            <strong style={emptyTitleStyle(theme)}>还没有保存洞察</strong>
+            <span style={emptyCopyStyle(theme)}>
+              保存教练回复后，可以随时回看或复制分享。
+            </span>
           </div>
+        ) : (
+          displayItems.map((item) => (
+            <article key={item.id} style={itemStyle(theme)}>
+              <strong style={itemTitleStyle(theme)}>{item.title}</strong>
+              <p style={itemSummaryStyle(theme)}>{item.summary}</p>
+              <div style={itemFooterStyle}>
+                <time dateTime={item.created_at} style={dateStyle(theme)}>
+                  {formatDateTime(item.created_at)}
+                </time>
+                <div style={itemActionsStyle}>
+                  <button
+                    onClick={() => void copyInsight(item)}
+                    style={textButtonStyle(theme)}
+                    type="button"
+                  >
+                    复制
+                  </button>
+                  <button
+                    onClick={() => void deleteInsight(item)}
+                    style={textButtonStyle(theme)}
+                    type="button"
+                  >
+                    删除
+                  </button>
+                </div>
+              </div>
+            </article>
+          ))
         )}
 
         {statusText ? <p style={statusStyle(theme)}>{statusText}</p> : null}
-      </section>
+      </div>
     </Card>
   );
 }
@@ -125,7 +128,7 @@ function formatDateTime(value: string): string {
     return value;
   }
 
-  return date.toLocaleString(undefined, {
+  return date.toLocaleString("zh-CN", {
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
@@ -133,98 +136,113 @@ function formatDateTime(value: string): string {
   });
 }
 
-const panelStyle: React.CSSProperties = {
+const bodyStyle: React.CSSProperties = {
   display: "grid",
   gap: 12,
 };
 
-const headingRowStyle: React.CSSProperties = {
-  alignItems: "flex-start",
-  display: "flex",
-  gap: 12,
-  justifyContent: "space-between",
+const headingStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 2,
 };
 
-const listStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 10,
+const titleStyle: React.CSSProperties = {
+  fontSize: 15,
+  fontWeight: 700,
+  letterSpacing: "-0.2px",
+  margin: 0,
 };
+
+function subtitleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return { color: theme.colors.tx3, fontSize: 11, lineHeight: 1.6 };
+}
 
 function itemStyle(
   theme: ReturnType<typeof useTheme>["theme"],
 ): React.CSSProperties {
   return {
-    alignItems: "flex-start",
-    border: `1px solid ${theme.colors.bdr}`,
-    borderRadius: theme.radius.card,
-    display: "flex",
-    gap: 10,
-    justifyContent: "space-between",
-    padding: 12,
+    backgroundColor: theme.colors.soft,
+    borderRadius: 14,
+    display: "grid",
+    gap: 8,
+    padding: "13px 14px",
   };
 }
 
-const actionsStyle: React.CSSProperties = {
+function itemTitleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return { color: theme.colors.tx, fontSize: 12, fontWeight: 700 };
+}
+
+function itemSummaryStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return { color: theme.colors.tx, fontSize: 12, lineHeight: 1.7, margin: 0 };
+}
+
+const itemFooterStyle: React.CSSProperties = {
+  alignItems: "center",
   display: "flex",
-  flexShrink: 0,
   gap: 8,
+  justifyContent: "space-between",
 };
 
-const titleStyle: React.CSSProperties = {
-  fontSize: 14,
-  margin: "4px 0",
+const itemActionsStyle: React.CSSProperties = {
+  display: "flex",
+  gap: 12,
 };
 
-function typeStyle(
+function textButtonStyle(
   theme: ReturnType<typeof useTheme>["theme"],
 ): React.CSSProperties {
   return {
-    color: theme.colors.ac,
+    background: "transparent",
+    border: "none",
+    color: theme.colors.tx3,
+    cursor: "pointer",
     fontSize: 11,
-    fontWeight: 800,
-    textTransform: "uppercase",
-  };
-}
-
-function summaryStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-): React.CSSProperties {
-  return {
-    color: theme.colors.tx2,
-    fontSize: 13,
-    lineHeight: 1.5,
-    margin: 0,
-  };
-}
-
-function copyStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-): React.CSSProperties {
-  return {
-    color: theme.colors.tx2,
-    fontSize: 13,
-    lineHeight: 1.5,
-    margin: "6px 0 0",
+    padding: 0,
   };
 }
 
 function dateStyle(
   theme: ReturnType<typeof useTheme>["theme"],
 ): React.CSSProperties {
+  return { color: theme.colors.tx3, fontSize: 11 };
+}
+
+function emptyStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
-    color: theme.colors.tx3,
-    display: "block",
-    fontSize: 11,
-    marginTop: 8,
+    alignItems: "center",
+    backgroundColor: theme.colors.soft,
+    borderRadius: 14,
+    display: "grid",
+    gap: 4,
+    justifyItems: "center",
+    padding: 18,
+    textAlign: "center",
   };
+}
+
+function emptyTitleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return { color: theme.colors.tx, fontSize: 13 };
+}
+
+function emptyCopyStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return { color: theme.colors.tx2, fontSize: 11, lineHeight: 1.6 };
 }
 
 function statusStyle(
   theme: ReturnType<typeof useTheme>["theme"],
 ): React.CSSProperties {
-  return {
-    color: theme.colors.tx3,
-    fontSize: 12,
-    margin: 0,
-  };
+  return { color: theme.colors.tx3, fontSize: 12, margin: 0 };
 }

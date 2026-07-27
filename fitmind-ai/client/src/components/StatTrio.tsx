@@ -6,35 +6,65 @@ export interface StatTrioEntry {
   value: string;
 }
 
+/**
+ * Design uses two sizes of the same grid: the roomier one on the training and
+ * analysis tabs, and a tighter one inside the assistant's insight card.
+ */
+export type StatTrioSize = "md" | "sm";
+
 export interface StatTrioProps {
   /** Inner corner radius: 16 on the training tab, 14 inside a padded card. */
   radius?: number | undefined;
+  size?: StatTrioSize | undefined;
   stats: StatTrioEntry[];
 }
+
+interface StatTrioMetrics {
+  cellPadding: string;
+  labelSize: number;
+  valueLetterSpacing: string | undefined;
+  valueSize: number;
+}
+
+const METRICS: Record<StatTrioSize, StatTrioMetrics> = {
+  md: {
+    cellPadding: "12px 14px",
+    labelSize: 11,
+    valueLetterSpacing: "-0.3px",
+    valueSize: 20,
+  },
+  sm: {
+    cellPadding: "11px 12px",
+    labelSize: 10,
+    valueLetterSpacing: undefined,
+    valueSize: 18,
+  },
+};
 
 /**
  * Design's soft 3-cell statistic grid: label above a tabular-number value,
  * left aligned, split by hairline dividers.
  *
- * Shared by the training tab's overview strip and the analysis tab's 总览 card,
- * which are the same element in the design.
+ * Shared by the training tab's overview strip, the analysis tab's 总览 card and
+ * the assistant's insight overview, which are the same element in the design.
  *
- * @param props - Stat entries and the inner corner radius
+ * @param props - Stat entries, corner radius, and size variant
  * @returns Statistic grid element
  */
 export function StatTrio(props: StatTrioProps) {
   const { theme } = useTheme();
+  const metrics = METRICS[props.size ?? "md"];
 
   return (
     <div style={gridStyle(theme, props.radius ?? 14, props.stats.length)}>
       {props.stats.map((stat, index) => (
         <div
           key={stat.label}
-          style={cellStyle(theme, index < props.stats.length - 1)}
+          style={cellStyle(theme, metrics, index < props.stats.length - 1)}
         >
-          <span style={labelStyle(theme)}>{stat.label}</span>
+          <span style={labelStyle(theme, metrics)}>{stat.label}</span>
           <div style={valueRowStyle}>
-            <strong style={valueStyle(theme)}>{stat.value}</strong>
+            <strong style={valueStyle(theme, metrics)}>{stat.value}</strong>
             <span style={unitStyle(theme)}>{stat.unit}</span>
           </div>
         </div>
@@ -59,13 +89,14 @@ function gridStyle(
 
 function cellStyle(
   theme: ReturnType<typeof useTheme>["theme"],
+  metrics: StatTrioMetrics,
   hasDivider: boolean,
 ): React.CSSProperties {
   return {
     borderRight: hasDivider ? `1px solid ${theme.colors.divider}` : "none",
     display: "grid",
     gap: 4,
-    padding: "12px 14px",
+    padding: metrics.cellPadding,
   };
 }
 
@@ -78,22 +109,26 @@ const valueRowStyle: React.CSSProperties = {
 
 function labelStyle(
   theme: ReturnType<typeof useTheme>["theme"],
+  metrics: StatTrioMetrics,
 ): React.CSSProperties {
   return {
     color: theme.colors.tx3,
-    fontSize: 11,
+    fontSize: metrics.labelSize,
   };
 }
 
 function valueStyle(
   theme: ReturnType<typeof useTheme>["theme"],
+  metrics: StatTrioMetrics,
 ): React.CSSProperties {
   return {
     color: theme.colors.tx,
-    fontSize: 20,
+    fontSize: metrics.valueSize,
     fontVariantNumeric: "tabular-nums",
     fontWeight: 800,
-    letterSpacing: "-0.3px",
+    ...(metrics.valueLetterSpacing
+      ? { letterSpacing: metrics.valueLetterSpacing }
+      : {}),
   };
 }
 

@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
 
-import { Badge } from "../../components/Badge";
 import { Card } from "../../components/Card";
-import { Pill } from "../../components/Pill";
 import { StateNotice } from "../../components/StateNotice";
+import { StatTrio, type StatTrioEntry } from "../../components/StatTrio";
 import { HttpClientError } from "../../services/http-client";
 import { useTheme } from "../../theme/ThemeContext";
+import { getToneColors, type SemanticTone } from "../../theme/tokens";
 import { createDefaultAssistantRange } from "./assistant-date-range";
 import {
   getAssistantInsights,
+  type AssistantInsightCard,
+  type AssistantInsightType,
   type AssistantInsightsResponse,
 } from "./assistant-insights-api";
 import type { AssistantPromptSuggestion } from "./assistant-types";
@@ -21,6 +23,21 @@ export interface AssistantInsightDashboardProps {
   token: string | null;
 }
 
+const TYPE_LABEL: Record<AssistantInsightType, string> = {
+  next_training_focus: "今日建议",
+  training_imbalance: "偏科提醒",
+  recovery_check: "恢复提醒",
+  exercise_progress: "动作进展",
+  evidence_explain: "判断依据",
+};
+
+/**
+ * Assistant tab's 主动训练洞察 card: the deterministic 30-day overview plus the
+ * backend's insight cards, each tappable to prefill the composer.
+ *
+ * @param props - Auth token, refresh signal, and the prompt handler
+ * @returns Insight dashboard card
+ */
 export function AssistantInsightDashboard(
   props: AssistantInsightDashboardProps,
 ) {
@@ -88,119 +105,132 @@ export function AssistantInsightDashboard(
 
   const hasEmptyState =
     snapshot !== null && snapshot.overview.workout_count === 0;
+  const stats: StatTrioEntry[] = [
+    {
+      label: "训练次数",
+      unit: "次",
+      value: (snapshot?.overview.workout_count ?? 0).toLocaleString(),
+    },
+    {
+      label: "训练组数",
+      unit: "组",
+      value: (snapshot?.overview.set_count ?? 0).toLocaleString(),
+    },
+    {
+      label: "总训练量",
+      unit: "公斤",
+      value: Math.round(snapshot?.overview.total_volume ?? 0).toLocaleString(),
+    },
+  ];
 
   return (
     <Card>
-      <div style={headerStyle}>
-        <div>
-          <div style={titleRowStyle}>
-            <h3 style={titleStyle}>主动训练洞察</h3>
-            <Badge tone="accent">Insight Dashboard</Badge>
-          </div>
-          <p style={copyStyle(theme)}>
-            打开这里就能先看到训练建议、偏科提醒、恢复提醒和重点动作进展，再决定要不要继续追问。
-          </p>
+      <div style={bodyStyle}>
+        <div style={headingStyle}>
+          <h3 style={titleStyle}>主动训练洞察</h3>
+          <span style={subtitleStyle(theme)}>
+            打开这里就能先看到训练建议、偏科提醒和重点动作进展，再决定要不要继续追问。
+          </span>
         </div>
-      </div>
 
-      {errorMessage ? (
-        <StateNotice
-          description="这次没有成功拉取训练洞察。通常是后端暂时不可用或本地环境未启动；恢复后重新进入页面或再试一次即可。"
-          icon="bot"
-          title="洞察加载失败"
-          tone="error"
-        />
-      ) : null}
+        {errorMessage ? (
+          <StateNotice
+            description="通常是后端暂时不可用或本地环境未启动；恢复后重新进入页面即可。"
+            icon="bot"
+            title="洞察加载失败"
+            tone="error"
+          />
+        ) : null}
 
-      {isLoading && !snapshot ? (
-        <p style={copyStyle(theme)}>
-          正在整理最近 30 天的训练记录并生成本页洞察...
-        </p>
-      ) : null}
+        {isLoading && !snapshot ? (
+          <p style={mutedStyle(theme)}>正在整理最近 30 天的训练记录...</p>
+        ) : null}
 
-      {hasEmptyState ? (
-        <StateNotice
-          description="当前账号还没有足够训练记录，但页面结构已经就绪。只要补 1-2 次训练，这里就会开始展示建议、偏科提醒、恢复节奏和动作进展。"
-          icon="bot"
-          title="洞察已准备好，等你喂第一批训练数据"
-        />
-      ) : null}
+        {snapshot ? <StatTrio size="sm" stats={stats} /> : null}
 
-      {snapshot ? (
-        <>
-          <div style={overviewGridStyle}>
-            <div style={overviewCellStyle(theme)}>
-              <span style={overviewLabelStyle(theme)}>训练次数</span>
-              <strong style={overviewValueStyle(theme)}>
-                {snapshot.overview.workout_count.toLocaleString()} 次
-              </strong>
-            </div>
-            <div style={overviewCellStyle(theme)}>
-              <span style={overviewLabelStyle(theme)}>训练组数</span>
-              <strong style={overviewValueStyle(theme)}>
-                {snapshot.overview.set_count.toLocaleString()} 组
-              </strong>
-            </div>
-            <div style={overviewCellStyle(theme)}>
-              <span style={overviewLabelStyle(theme)}>总训练量</span>
-              <strong style={overviewValueStyle(theme)}>
-                {snapshot.overview.total_volume.toLocaleString()} 公斤
-              </strong>
-            </div>
-          </div>
+        {hasEmptyState ? (
+          <StateNotice
+            description="只要补 1-2 次训练，这里就会开始展示建议、偏科提醒、恢复节奏和动作进展。"
+            icon="bot"
+            title="洞察已准备好，等你喂第一批训练数据"
+          />
+        ) : null}
 
-          <div style={cardListStyle}>
-            {snapshot.cards.map((card) => {
-              const content = (
-                <>
-                  <div style={cardHeaderStyle}>
-                    <h4 style={cardTitleStyle}>{card.title}</h4>
-                    <Pill tone={card.tone}>{getToneLabel(card.type)}</Pill>
-                  </div>
-                  <p style={cardSummaryStyle(theme)}>{card.summary}</p>
-                  {card.hint ? (
-                    <p style={cardHintStyle(theme)}>{card.hint}</p>
-                  ) : null}
-                  {card.evidence_summary ? (
-                    <p style={cardEvidenceStyle(theme)}>
-                      {card.evidence_summary}
-                    </p>
-                  ) : null}
-                </>
-              );
+        {snapshot?.cards.map((card) => (
+          <InsightCard
+            card={card}
+            key={card.type}
+            onSelectPrompt={props.onPromptSelect}
+          />
+        ))}
 
-              if (!card.suggested_prompt) {
-                return (
-                  <article key={card.type} style={cardStyle(theme, false)}>
-                    {content}
-                  </article>
-                );
-              }
-
-              return (
-                <button
-                  key={card.type}
-                  onClick={() => props.onPromptSelect(card.suggested_prompt!)}
-                  style={cardStyle(theme, true)}
-                  type="button"
-                >
-                  {content}
-                </button>
-              );
-            })}
-          </div>
-
-          <div style={limitationBoxStyle(theme)}>
-            <h4 style={limitationTitleStyle}>说明与边界</h4>
-            <ul style={limitationListStyle(theme)}>
+        {snapshot && snapshot.limitations.length > 0 ? (
+          <div style={limitationStyle(theme)}>
+            <strong style={limitationTitleStyle(theme)}>说明与边界</strong>
+            <span style={limitationBodyStyle(theme)}>
               {snapshot.limitations.map((item) => (
-                <li key={item}>{item}</li>
+                <span key={item} style={limitationLineStyle}>
+                  · {item}
+                </span>
               ))}
-            </ul>
+            </span>
           </div>
-        </>
-      ) : null}
+        ) : null}
+      </div>
     </Card>
+  );
+}
+
+interface InsightCardProps {
+  card: AssistantInsightCard;
+  onSelectPrompt: (prompt: AssistantPromptSuggestion) => void;
+}
+
+/**
+ * One insight card.
+ *
+ * The design shows a ☆ 保存 action here, which has no backend: saved insights
+ * are keyed by an assistant *message* id and these cards are not messages. It
+ * is left out rather than faked; the whole card stays tappable to prefill the
+ * composer, which is the action the backend does support.
+ *
+ * @param props - Card payload and the prompt handler
+ * @returns Insight card element
+ */
+function InsightCard(props: InsightCardProps) {
+  const { theme } = useTheme();
+  const { card } = props;
+  const tagColor = getToneColors(theme, card.tone as SemanticTone).text;
+
+  const content = (
+    <>
+      <div style={cardHeaderStyle}>
+        <strong style={{ ...cardTagStyle, color: tagColor }}>
+          {TYPE_LABEL[card.type]}
+        </strong>
+      </div>
+      <p style={cardBodyStyle(theme)}>{card.summary}</p>
+      {card.hint ? <span style={cardHintStyle(theme)}>{card.hint}</span> : null}
+      {card.evidence_summary ? (
+        <span style={cardFootStyle(theme)}>{card.evidence_summary}</span>
+      ) : null}
+    </>
+  );
+
+  if (!card.suggested_prompt) {
+    return <div style={cardStyle(theme, false)}>{content}</div>;
+  }
+
+  const prompt = card.suggested_prompt;
+
+  return (
+    <button
+      onClick={() => props.onSelectPrompt(prompt)}
+      style={cardStyle(theme, true)}
+      type="button"
+    >
+      {content}
+    </button>
   );
 }
 
@@ -216,50 +246,56 @@ function getReadableErrorMessage(error: unknown): string {
   return "助手洞察暂时不可用。";
 }
 
-function getToneLabel(
-  type: AssistantInsightsResponse["cards"][number]["type"],
-): string {
-  switch (type) {
-    case "next_training_focus":
-      return "今日建议";
-    case "training_imbalance":
-      return "偏科提醒";
-    case "recovery_check":
-      return "恢复提醒";
-    case "exercise_progress":
-      return "动作进展";
-    case "evidence_explain":
-      return "判断依据";
-  }
-}
-
-const headerStyle: React.CSSProperties = {
-  marginBottom: 16,
+const bodyStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 12,
 };
 
-const titleRowStyle: React.CSSProperties = {
-  alignItems: "center",
-  display: "flex",
-  gap: 8,
-  marginBottom: 4,
+const headingStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 2,
 };
 
 const titleStyle: React.CSSProperties = {
-  fontSize: 16,
+  fontSize: 15,
+  fontWeight: 700,
+  letterSpacing: "-0.2px",
   margin: 0,
 };
 
-const overviewGridStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 10,
-  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-};
+function subtitleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    color: theme.colors.tx3,
+    fontSize: 11,
+    lineHeight: 1.6,
+  };
+}
 
-const cardListStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 12,
-  marginTop: 16,
-};
+function mutedStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return { color: theme.colors.tx2, fontSize: 12, lineHeight: 1.6, margin: 0 };
+}
+
+function cardStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+  isButton: boolean,
+): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.soft,
+    border: "none",
+    borderRadius: 14,
+    color: theme.colors.tx,
+    cursor: isButton ? "pointer" : "default",
+    display: "grid",
+    gap: 6,
+    padding: "13px 14px",
+    textAlign: "left",
+    width: "100%",
+  };
+}
 
 const cardHeaderStyle: React.CSSProperties = {
   alignItems: "center",
@@ -268,130 +304,58 @@ const cardHeaderStyle: React.CSSProperties = {
   justifyContent: "space-between",
 };
 
-const cardTitleStyle: React.CSSProperties = {
-  fontSize: 15,
-  margin: 0,
+const cardTagStyle: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 700,
 };
 
-const limitationTitleStyle: React.CSSProperties = {
-  fontSize: 14,
-  margin: 0,
-};
-
-function copyStyle(
+function cardBodyStyle(
   theme: ReturnType<typeof useTheme>["theme"],
 ): React.CSSProperties {
-  return {
-    color: theme.colors.tx2,
-    fontSize: 13,
-    lineHeight: 1.6,
-    margin: 0,
-  };
-}
-
-function overviewCellStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-): React.CSSProperties {
-  return {
-    backgroundColor: theme.colors.surf2,
-    border: `1px solid ${theme.colors.bdr}`,
-    borderRadius: theme.radius.card,
-    display: "grid",
-    gap: 6,
-    padding: 12,
-  };
-}
-
-function overviewLabelStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-): React.CSSProperties {
-  return {
-    color: theme.colors.tx3,
-    fontSize: 11,
-  };
-}
-
-function overviewValueStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-): React.CSSProperties {
-  return {
-    color: theme.colors.tx,
-    fontSize: 14,
-    lineHeight: 1.4,
-  };
-}
-
-function cardStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-  isButton: boolean,
-): React.CSSProperties {
-  return {
-    backgroundColor: theme.colors.surf2,
-    border: `1px solid ${theme.colors.bdr}`,
-    borderRadius: theme.radius.card,
-    cursor: isButton ? "pointer" : "default",
-    display: "grid",
-    gap: 8,
-    padding: 14,
-    textAlign: "left",
-  };
-}
-
-function cardSummaryStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-): React.CSSProperties {
-  return {
-    color: theme.colors.tx,
-    fontSize: 13,
-    lineHeight: 1.7,
-    margin: 0,
-  };
+  return { color: theme.colors.tx, fontSize: 13, lineHeight: 1.7, margin: 0 };
 }
 
 function cardHintStyle(
   theme: ReturnType<typeof useTheme>["theme"],
 ): React.CSSProperties {
+  return { color: theme.colors.orange, fontSize: 11, lineHeight: 1.6 };
+}
+
+function cardFootStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return { color: theme.colors.tx3, fontSize: 11, lineHeight: 1.6 };
+}
+
+function limitationStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
   return {
-    color: theme.colors.orange,
-    fontSize: 12,
-    lineHeight: 1.6,
-    margin: 0,
+    backgroundColor: theme.colors.soft,
+    borderRadius: 14,
+    display: "grid",
+    gap: 4,
+    padding: "13px 14px",
   };
 }
 
-function cardEvidenceStyle(
+function limitationTitleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return { color: theme.colors.tx2, fontSize: 11, fontWeight: 700 };
+}
+
+function limitationBodyStyle(
   theme: ReturnType<typeof useTheme>["theme"],
 ): React.CSSProperties {
   return {
     color: theme.colors.tx3,
-    fontSize: 11,
-    lineHeight: 1.6,
-    margin: 0,
-  };
-}
-
-function limitationBoxStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-): React.CSSProperties {
-  return {
-    backgroundColor: theme.colors.surf,
-    border: `1px solid ${theme.colors.bdr}`,
-    borderRadius: theme.radius.card,
     display: "grid",
-    gap: 10,
-    marginTop: 16,
-    padding: 14,
+    fontSize: 11,
+    lineHeight: 1.7,
   };
 }
 
-function limitationListStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-): React.CSSProperties {
-  return {
-    color: theme.colors.tx2,
-    fontSize: 12,
-    lineHeight: 1.6,
-    margin: 0,
-    paddingLeft: 18,
-  };
-}
+const limitationLineStyle: React.CSSProperties = {
+  display: "block",
+};

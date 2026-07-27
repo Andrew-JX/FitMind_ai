@@ -43,7 +43,8 @@ export function AssistantMessageList(props: AssistantMessageListProps) {
   );
 }
 
+/** Design: the thread sits directly on the page, gap 8 between bubbles. */
 const listStyle: React.CSSProperties = {
   display: "grid",
-  gap: 12,
+  gap: 8,
 };

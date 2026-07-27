@@ -1,6 +1,4 @@
 import { Badge } from "../../components/Badge";
-import { Icon } from "../../components/Icon";
-import { IconButton } from "../../components/IconButton";
 import { useTheme } from "../../theme/ThemeContext";
 import { AssistantAgentTrace } from "./AssistantAgentTrace";
 import { AssistantPlanCard } from "./AssistantPlanCard";
@@ -18,25 +16,49 @@ export interface AssistantMessageBubbleProps {
   onSaveInsight?: ((message: AssistantChatMessage) => void) | undefined;
 }
 
+/**
+ * One chat message.
+ *
+ * The design's bubble is deliberately bare: neon green right-aligned for the
+ * user, inset left-aligned for the coach. The faithfulness badge stays because
+ * it is the only place the app shows that an answer's numbers were checked;
+ * everything else the answer carries (agent trace, evidence, sources,
+ * limitations) collapses into one 查看依据 row so it costs no vertical space
+ * until asked for.
+ *
+ * @param props - The message plus its save / plan action state
+ * @returns Message element
+ */
 export function AssistantMessageBubble(props: AssistantMessageBubbleProps) {
   const { message } = props;
   const { theme } = useTheme();
   const isAssistant = message.role === "assistant";
   const showDebugMetadata =
     import.meta.env.DEV && import.meta.env.VITE_ASSISTANT_DEBUG === "true";
+  const isAwaitingFirstToken = message.isStreaming && !message.text;
+
+  if (isAwaitingFirstToken) {
+    return (
+      <div style={columnStyle(false)}>
+        <div style={typingBubbleStyle(theme)}>教练正在输入…</div>
+      </div>
+    );
+  }
+
+  const hasFooter =
+    isAssistant &&
+    (Boolean(message.faithfulness) ||
+      isAssistantMessageSaveEligible(message) ||
+      message.isStreaming);
 
   return (
-    <article style={bubbleLayoutStyle}>
-      <div style={avatarStyle(theme, isAssistant)}>
-        <Icon name={isAssistant ? "bot" : "user"} size={12} />
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={metaRowStyle}>
-          <span style={nameStyle(theme)}>
-            {isAssistant ? "训练助手" : "你"}
-          </span>
+    <article style={columnStyle(!isAssistant)}>
+      <div style={bubbleStyle(theme, isAssistant)}>{message.text}</div>
+
+      {hasFooter ? (
+        <div style={footerStyle}>
           {message.isStreaming ? <Badge tone="info">生成中</Badge> : null}
-          {isAssistant && !message.isStreaming && message.faithfulness ? (
+          {!message.isStreaming && message.faithfulness ? (
             <Badge
               tone={
                 message.faithfulness.status === "verified"
@@ -49,81 +71,85 @@ export function AssistantMessageBubble(props: AssistantMessageBubbleProps) {
                 : `⚠ ${message.faithfulness.unverifiedClaimCount} 处待核`}
             </Badge>
           ) : null}
-        </div>
-        <div style={bubbleStyle(theme, isAssistant)}>
-          <p style={messageTextStyle}>{message.text || "..."}</p>
-          {isAssistant && message.agentTrace ? (
-            <AssistantAgentTrace trace={message.agentTrace} />
-          ) : null}
-          {isAssistant && message.plan ? (
-            <AssistantPlanCard
-              isAccepted={props.isPlanAccepted}
-              isAccepting={props.isPlanAccepting}
-              onAccept={
-                props.onAcceptPlan
-                  ? () => props.onAcceptPlan?.(message)
-                  : undefined
-              }
-              plan={message.plan}
-            />
-          ) : null}
-          {isAssistant ? (
-            <AssistantMessageEvidenceSummary
-              message={message}
-              showDebugMetadata={showDebugMetadata}
-            />
-          ) : null}
           {isAssistantMessageSaveEligible(message) ? (
-            <div style={actionRowStyle}>
-              <IconButton
+            <>
+              <button
                 disabled={props.isSaving || props.isSaved}
-                icon={props.isSaved ? "check" : "plus"}
-                label={props.isSaved ? "洞察已保存" : "保存洞察"}
                 onClick={() => props.onSaveInsight?.(message)}
-              />
-              <IconButton
-                icon="copy"
-                label="复制洞察文本"
+                style={textButtonStyle(theme, props.isSaved ?? false)}
+                type="button"
+              >
+                {props.isSaved ? "✓ 已保存" : "☆ 保存为洞察"}
+              </button>
+              <button
                 onClick={() => props.onCopyInsight?.(message)}
-              />
-            </div>
+                style={textButtonStyle(theme, false)}
+                type="button"
+              >
+                复制
+              </button>
+            </>
           ) : null}
         </div>
-      </div>
+      ) : null}
+
+      {isAssistant && message.plan ? (
+        <AssistantPlanCard
+          isAccepted={props.isPlanAccepted}
+          isAccepting={props.isPlanAccepting}
+          onAccept={
+            props.onAcceptPlan ? () => props.onAcceptPlan?.(message) : undefined
+          }
+          plan={message.plan}
+        />
+      ) : null}
+
+      {isAssistant ? (
+        <AssistantMessageBasis
+          message={message}
+          showDebugMetadata={showDebugMetadata}
+        />
+      ) : null}
     </article>
   );
 }
 
-function AssistantMessageEvidenceSummary(props: {
+/**
+ * Collapsed 查看依据 row holding everything traceable about one answer.
+ *
+ * @param props - The message and whether to expose dev-only routing metadata
+ * @returns Details element, or null when the answer carries no basis
+ */
+function AssistantMessageBasis(props: {
   message: AssistantChatMessage;
   showDebugMetadata: boolean;
 }) {
   const { message } = props;
+  const { theme } = useTheme();
   const hasEvidence =
     (message.evidence?.toolNames.length ?? 0) > 0 ||
     (message.evidence?.workoutIds.length ?? 0) > 0 ||
     (message.evidence?.setIds.length ?? 0) > 0;
   const hasSources = (message.sources?.length ?? 0) > 0;
   const hasLimitations = (message.limitations?.length ?? 0) > 0;
+  const hasTrace = Boolean(message.agentTrace);
 
-  if (
-    !hasEvidence &&
-    !hasSources &&
-    !hasLimitations &&
-    !(props.showDebugMetadata && message.intent)
-  ) {
+  if (!hasEvidence && !hasSources && !hasLimitations && !hasTrace) {
     return null;
   }
 
   return (
-    <div style={structuredOutputStyle}>
-      {props.showDebugMetadata && message.intent ? (
-        <div style={structuredLineStyle}>Intent: {message.intent}</div>
-      ) : null}
-      {hasEvidence ? (
-        <details>
-          <summary style={summaryStyle}>Evidence</summary>
-          <ul style={listStyle}>
+    <details style={basisStyle(theme)}>
+      <summary style={basisSummaryStyle(theme)}>查看依据</summary>
+      <div style={basisBodyStyle}>
+        {props.showDebugMetadata && message.intent ? (
+          <div style={basisLineStyle(theme)}>Intent: {message.intent}</div>
+        ) : null}
+        {hasTrace && message.agentTrace ? (
+          <AssistantAgentTrace trace={message.agentTrace} />
+        ) : null}
+        {hasEvidence ? (
+          <ul style={basisListStyle(theme)}>
             {message.evidence?.toolNames.length ? (
               <li>工具：{message.evidence.toolNames.join("、")}</li>
             ) : null}
@@ -137,131 +163,160 @@ function AssistantMessageEvidenceSummary(props: {
               <li>规则：{message.evidence.calculationRules.join("、")}</li>
             ) : null}
           </ul>
-        </details>
-      ) : null}
-      {hasSources ? (
-        <details>
-          <summary style={summaryStyle}>Sources</summary>
-          <ul style={listStyle}>
-            {message.sources?.map((source) => (
-              <li key={source.id}>
-                <strong>{source.title}</strong>
-                <span>：{source.chunkText}</span>
-              </li>
-            ))}
-          </ul>
-        </details>
-      ) : null}
-      {hasLimitations ? (
-        <details>
-          <summary style={summaryStyle}>Limitations</summary>
-          <ul style={listStyle}>
-            {message.limitations?.map((limitation) => (
-              <li key={limitation}>{limitation}</li>
-            ))}
-          </ul>
-        </details>
-      ) : null}
-    </div>
+        ) : null}
+        {hasSources ? (
+          <div style={basisBlockStyle}>
+            <strong style={basisLabelStyle(theme)}>知识来源</strong>
+            <ul style={basisListStyle(theme)}>
+              {message.sources?.map((source) => (
+                <li key={source.id}>
+                  <strong>{source.title}</strong>：{source.chunkText}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {hasLimitations ? (
+          <div style={basisBlockStyle}>
+            <strong style={basisLabelStyle(theme)}>边界</strong>
+            <ul style={basisListStyle(theme)}>
+              {message.limitations?.map((limitation) => (
+                <li key={limitation}>{limitation}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </div>
+    </details>
   );
 }
 
-const bubbleLayoutStyle: React.CSSProperties = {
-  alignItems: "flex-start",
-  display: "flex",
-  gap: 10,
-};
-
-function avatarStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-  isAssistant: boolean,
-): React.CSSProperties {
+function columnStyle(isUser: boolean): React.CSSProperties {
   return {
-    alignItems: "center",
-    backgroundColor: isAssistant
-      ? theme.isDark
-        ? "rgba(200, 240, 53, 0.18)"
-        : "rgba(74, 140, 0, 0.12)"
-      : theme.colors.surf2,
-    border: `1px solid ${isAssistant ? theme.colors.ac : theme.colors.bdr}`,
-    borderRadius: 8,
-    color: isAssistant ? theme.colors.ac : theme.colors.tx3,
-    display: "inline-flex",
-    flexShrink: 0,
-    height: 24,
-    justifyContent: "center",
-    marginTop: 2,
-    width: 24,
+    alignItems: isUser ? "flex-end" : "flex-start",
+    display: "flex",
+    flexDirection: "column",
+    gap: 4,
   };
 }
 
-const metaRowStyle: React.CSSProperties = {
-  alignItems: "center",
-  display: "flex",
-  gap: 8,
-  marginBottom: 6,
-};
-
-function nameStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-): React.CSSProperties {
-  return {
-    color: theme.colors.tx3,
-    fontSize: 11,
-    fontWeight: 700,
-  };
-}
-
+/**
+ * Design's chat bubble.
+ *
+ * The user bubble keeps the fixed neon green in both themes, like the FAB and
+ * the chart's latest bar.
+ *
+ * @param theme - Active theme tokens
+ * @param isAssistant - Whether the coach authored the message
+ * @returns Bubble style
+ */
 function bubbleStyle(
   theme: ReturnType<typeof useTheme>["theme"],
   isAssistant: boolean,
 ): React.CSSProperties {
   return {
-    backgroundColor: isAssistant ? theme.colors.surf : theme.colors.surf2,
-    border: `1px solid ${isAssistant ? theme.colors.bdr : "transparent"}`,
-    borderRadius: theme.radius.card,
-    color: theme.colors.tx,
-    padding: "12px 14px",
+    background: isAssistant ? theme.colors.surf2 : "#c8f035",
+    borderRadius: isAssistant ? "14px 14px 14px 4px" : "14px 14px 4px 14px",
+    color: isAssistant ? theme.colors.tx : "#0f0f0f",
+    fontSize: 13,
+    lineHeight: 1.6,
+    maxWidth: "85%",
+    padding: "10px 12px",
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
   };
 }
 
-const messageTextStyle: React.CSSProperties = {
-  lineHeight: 1.7,
-  margin: 0,
-  whiteSpace: "pre-wrap",
-  wordBreak: "break-word",
-};
+function typingBubbleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.surf2,
+    borderRadius: "14px 14px 14px 4px",
+    color: theme.colors.tx2,
+    fontSize: 13,
+    padding: "10px 12px",
+  };
+}
 
-const structuredOutputStyle: React.CSSProperties = {
-  borderTop: "1px solid rgba(128, 128, 128, 0.22)",
-  display: "grid",
-  gap: 8,
-  marginTop: 12,
-  paddingTop: 10,
-};
-
-const structuredLineStyle: React.CSSProperties = {
-  fontSize: 11,
-  fontWeight: 700,
-  opacity: 0.7,
-};
-
-const summaryStyle: React.CSSProperties = {
-  cursor: "pointer",
-  fontSize: 12,
-  fontWeight: 800,
-};
-
-const listStyle: React.CSSProperties = {
-  fontSize: 12,
-  lineHeight: 1.6,
-  margin: "8px 0 0",
-  paddingLeft: 18,
-};
-
-const actionRowStyle: React.CSSProperties = {
+const footerStyle: React.CSSProperties = {
+  alignItems: "center",
   display: "flex",
-  gap: 8,
-  justifyContent: "flex-end",
+  flexWrap: "wrap",
+  gap: 10,
+  padding: "0 4px",
+};
+
+function textButtonStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+  isDone: boolean,
+): React.CSSProperties {
+  return {
+    background: "transparent",
+    border: "none",
+    color: isDone ? theme.colors.ac : theme.colors.tx3,
+    cursor: isDone ? "default" : "pointer",
+    fontSize: 11,
+    padding: 0,
+  };
+}
+
+function basisStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.soft,
+    borderRadius: 12,
+    marginTop: 2,
+    padding: "9px 12px",
+    width: "100%",
+  };
+}
+
+function basisSummaryStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    color: theme.colors.tx2,
+    cursor: "pointer",
+    fontSize: 11,
+    fontWeight: 700,
+  };
+}
+
+const basisBodyStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 10,
   marginTop: 10,
 };
+
+const basisBlockStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 4,
+};
+
+function basisLabelStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return { color: theme.colors.tx2, fontSize: 11, fontWeight: 700 };
+}
+
+function basisLineStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return { color: theme.colors.tx3, fontSize: 11, fontWeight: 700 };
+}
+
+function basisListStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    color: theme.colors.tx3,
+    display: "grid",
+    fontSize: 11,
+    gap: 4,
+    lineHeight: 1.6,
+    margin: 0,
+    paddingLeft: "1rem",
+  };
+}

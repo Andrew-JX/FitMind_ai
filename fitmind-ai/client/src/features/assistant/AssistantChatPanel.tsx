@@ -1,13 +1,11 @@
 import { useState } from "react";
 
-import { Card } from "../../components/Card";
 import { StateNotice } from "../../components/StateNotice";
 import { useTheme } from "../../theme/ThemeContext";
 import { createDefaultAssistantRange } from "./assistant-date-range";
 import { AssistantComposer } from "./AssistantComposer";
 import { AssistantMessageList } from "./AssistantMessageList";
 import { AssistantQuickPrompts } from "./AssistantQuickPrompts";
-import { AssistantSavedInsightsPanel } from "./AssistantSavedInsightsPanel";
 import {
   buildAssistantInsightCopyText,
   isAssistantMessageSaveEligible,
@@ -29,6 +27,7 @@ export interface AssistantChatPanelProps {
         sourceMessageId?: string | undefined,
       ) => Promise<boolean>)
     | undefined;
+  onInsightSaved: () => void;
   onPromptSuggestionChange: (prompt: AssistantPromptSuggestion) => void;
   promptSuggestion?: AssistantPromptSuggestion | null | undefined;
   selectedExerciseId?: string | null | undefined;
@@ -36,6 +35,16 @@ export interface AssistantChatPanelProps {
   token: string | null;
 }
 
+/**
+ * Assistant tab's conversation half: quick prompts, the message thread, and
+ * the composer.
+ *
+ * The design leaves the thread outside any card so the bubbles sit directly on
+ * the page background.
+ *
+ * @param props - Chat state plus prompt and plan wiring
+ * @returns Conversation section
+ */
 export function AssistantChatPanel(props: AssistantChatPanelProps) {
   const { chat } = props;
   const { theme } = useTheme();
@@ -45,7 +54,6 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
   const [savingMessageIds, setSavingMessageIds] = useState<Set<string>>(
     () => new Set(),
   );
-  const [savedInsightsRefreshKey, setSavedInsightsRefreshKey] = useState(0);
   const [insightStatusText, setInsightStatusText] = useState<string | null>(
     null,
   );
@@ -90,10 +98,6 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
     await chat.sendMessage(payload);
   }
 
-  function applyQuickPrompt(nextPrompt: AssistantPromptSuggestion): void {
-    props.onPromptSuggestionChange(nextPrompt);
-  }
-
   async function handleSaveInsight(
     assistantMessage: AssistantChatMessage,
   ): Promise<void> {
@@ -115,7 +119,7 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
         nextValues.add(assistantMessage.messageId);
         return nextValues;
       });
-      setSavedInsightsRefreshKey((currentValue) => currentValue + 1);
+      props.onInsightSaved();
       setInsightStatusText("洞察已保存。");
     } catch {
       setInsightStatusText("洞察保存失败。");
@@ -174,8 +178,7 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
   return (
     <section style={panelStyle}>
       <AssistantQuickPrompts
-        activeMode={mode}
-        onSelectPrompt={applyQuickPrompt}
+        onSelectPrompt={props.onPromptSuggestionChange}
         selectedExerciseId={props.selectedExerciseId}
         selectedExerciseName={props.selectedExerciseName}
       />
@@ -189,52 +192,38 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
         />
       ) : null}
 
-      <Card padding="14px">
-        <section style={sectionStyle}>
-          <div>
-            <h3 style={{ margin: 0 }}>继续追问</h3>
-            <p style={copyStyle(theme)}>
-              可以直接追问训练记录、动作进展或训练知识。上面的按钮只是示例。
-            </p>
-          </div>
-          <AssistantMessageList
-            isMessageSaved={(assistantMessage) =>
-              typeof assistantMessage.messageId === "string" &&
-              savedMessageIds.has(assistantMessage.messageId)
-            }
-            isMessageSaving={(assistantMessage) =>
-              typeof assistantMessage.messageId === "string" &&
-              savingMessageIds.has(assistantMessage.messageId)
-            }
-            isPlanAccepted={(assistantMessage) =>
-              acceptedPlanIds.has(assistantMessage.id)
-            }
-            isPlanAccepting={(assistantMessage) =>
-              acceptingPlanIds.has(assistantMessage.id)
-            }
-            messages={chat.messages}
-            onAcceptPlan={
-              props.onAcceptPlan
-                ? (assistantMessage) => void handleAcceptPlan(assistantMessage)
-                : undefined
-            }
-            onCopyInsight={(assistantMessage) =>
-              void handleCopyInsight(assistantMessage)
-            }
-            onSaveInsight={(assistantMessage) =>
-              void handleSaveInsight(assistantMessage)
-            }
-          />
-          {insightStatusText ? (
-            <p style={insightStatusStyle(theme)}>{insightStatusText}</p>
-          ) : null}
-        </section>
-      </Card>
-
-      <AssistantSavedInsightsPanel
-        refreshKey={savedInsightsRefreshKey}
-        token={props.token}
+      <AssistantMessageList
+        isMessageSaved={(assistantMessage) =>
+          typeof assistantMessage.messageId === "string" &&
+          savedMessageIds.has(assistantMessage.messageId)
+        }
+        isMessageSaving={(assistantMessage) =>
+          typeof assistantMessage.messageId === "string" &&
+          savingMessageIds.has(assistantMessage.messageId)
+        }
+        isPlanAccepted={(assistantMessage) =>
+          acceptedPlanIds.has(assistantMessage.id)
+        }
+        isPlanAccepting={(assistantMessage) =>
+          acceptingPlanIds.has(assistantMessage.id)
+        }
+        messages={chat.messages}
+        onAcceptPlan={
+          props.onAcceptPlan
+            ? (assistantMessage) => void handleAcceptPlan(assistantMessage)
+            : undefined
+        }
+        onCopyInsight={(assistantMessage) =>
+          void handleCopyInsight(assistantMessage)
+        }
+        onSaveInsight={(assistantMessage) =>
+          void handleSaveInsight(assistantMessage)
+        }
       />
+
+      {insightStatusText ? (
+        <p style={insightStatusStyle(theme)}>{insightStatusText}</p>
+      ) : null}
 
       <AssistantComposer
         canRetry={chat.messages.length > 0}
@@ -270,22 +259,6 @@ const panelStyle: React.CSSProperties = {
   gap: 12,
 };
 
-const sectionStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 10,
-};
-
-function copyStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-): React.CSSProperties {
-  return {
-    color: theme.colors.tx2,
-    fontSize: 13,
-    lineHeight: 1.6,
-    margin: "8px 0 0",
-  };
-}
-
 function insightStatusStyle(
   theme: ReturnType<typeof useTheme>["theme"],
 ): React.CSSProperties {
@@ -293,5 +266,6 @@ function insightStatusStyle(
     color: theme.colors.tx3,
     fontSize: 12,
     margin: 0,
+    padding: "0 4px",
   };
 }

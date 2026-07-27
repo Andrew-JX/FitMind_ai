@@ -1,22 +1,14 @@
-import { useState } from "react";
-
-import { Badge } from "../../components/Badge";
 import { Card } from "../../components/Card";
 import { useTheme } from "../../theme/ThemeContext";
-import type {
-  AssistantMode,
-  AssistantPromptSuggestion,
-} from "./assistant-types";
-import { splitAssistantQuickPrompts } from "./assistant-quick-prompts";
+import type { AssistantPromptSuggestion } from "./assistant-types";
 
 export interface AssistantQuickPromptsProps {
-  activeMode: AssistantMode;
   onSelectPrompt: (prompt: AssistantPromptSuggestion) => void;
   selectedExerciseId?: string | null | undefined;
   selectedExerciseName?: string | null | undefined;
 }
 
-interface PromptDefinition {
+interface PromptCardDefinition {
   description: string;
   disabled?: boolean | undefined;
   helper?: string | undefined;
@@ -24,263 +16,232 @@ interface PromptDefinition {
   title: string;
 }
 
+interface PromptChipDefinition {
+  disabled?: boolean | undefined;
+  prompt: AssistantPromptSuggestion;
+  title: string;
+}
+
+/**
+ * Assistant tab's 快捷问题 card: the design's four core coach questions as a
+ * 2×2 grid, with the remaining modes as capsules underneath.
+ *
+ * @param props - Prompt handler and the currently focused exercise
+ * @returns Quick prompts card
+ */
 export function AssistantQuickPrompts(props: AssistantQuickPromptsProps) {
   const { theme } = useTheme();
-  const [showMorePrompts, setShowMorePrompts] = useState(false);
   const selectedExerciseName = props.selectedExerciseName?.trim() || "当前动作";
-  const prompts = buildPromptDefinitions({
-    selectedExerciseId: props.selectedExerciseId,
-    selectedExerciseName,
-  });
-  const promptGroups = splitAssistantQuickPrompts(prompts);
-  const visiblePrompts = showMorePrompts
-    ? [...promptGroups.primary, ...promptGroups.more]
-    : promptGroups.primary;
+  const hasSelectedExercise = Boolean(props.selectedExerciseId);
+  const cards = buildPromptCards(selectedExerciseName, hasSelectedExercise);
+  const chips = buildPromptChips(selectedExerciseName, hasSelectedExercise);
 
   return (
     <Card>
-      <div style={sectionHeaderStyle}>
-        <div>
-          <h3 style={sectionTitleStyle}>快捷问题</h3>
-          <p style={sectionCopyStyle(theme)}>
+      <div style={bodyStyle}>
+        <div style={headingStyle}>
+          <h3 style={titleStyle}>快捷问题</h3>
+          <span style={subtitleStyle(theme)}>
             先从核心教练问题开始，也可以直接输入自己的训练问题。
-          </p>
+          </span>
         </div>
-        <Badge tone="neutral">建议</Badge>
-      </div>
 
-      <div style={promptListStyle}>
-        {visiblePrompts.map((prompt) => {
-          const isActive = props.activeMode === prompt.prompt.mode;
-
-          return (
+        <div style={cardGridStyle}>
+          {cards.map((card) => (
             <button
-              disabled={prompt.disabled}
-              key={prompt.title}
-              onClick={() => props.onSelectPrompt(prompt.prompt)}
-              style={promptButtonStyle(
-                theme,
-                isActive,
-                Boolean(prompt.disabled),
-              )}
+              disabled={card.disabled}
+              key={card.title}
+              onClick={() => props.onSelectPrompt(card.prompt)}
+              style={cardStyle(theme, Boolean(card.disabled))}
               type="button"
             >
-              <div style={promptTitleRowStyle}>
-                <span style={promptTitleStyle(theme, Boolean(prompt.disabled))}>
-                  {prompt.title}
-                </span>
-                {isActive ? <Badge tone="accent">当前</Badge> : null}
-              </div>
-              <span
-                style={promptDescriptionStyle(theme, Boolean(prompt.disabled))}
-              >
-                {prompt.description}
-              </span>
-              {prompt.disabled && prompt.helper ? (
-                <span style={promptHelperStyle(theme)}>{prompt.helper}</span>
+              <strong style={cardTitleStyle}>{card.title}</strong>
+              <span style={cardCopyStyle(theme)}>{card.description}</span>
+              {card.disabled && card.helper ? (
+                <span style={cardHelperStyle(theme)}>{card.helper}</span>
               ) : null}
             </button>
-          );
-        })}
-      </div>
+          ))}
+        </div>
 
-      {promptGroups.more.length > 0 ? (
-        <button
-          onClick={() => setShowMorePrompts((currentValue) => !currentValue)}
-          style={moreButtonStyle(theme)}
-          type="button"
-        >
-          {showMorePrompts ? "收起问题" : "更多问题"}
-        </button>
-      ) : null}
+        <div style={chipRowStyle}>
+          {chips.map((chip) => (
+            <button
+              disabled={chip.disabled}
+              key={chip.title}
+              onClick={() => props.onSelectPrompt(chip.prompt)}
+              style={chipStyle(theme, Boolean(chip.disabled))}
+              type="button"
+            >
+              {chip.title}
+            </button>
+          ))}
+        </div>
+      </div>
     </Card>
   );
 }
 
-function buildPromptDefinitions(input: {
-  selectedExerciseId?: string | null | undefined;
-  selectedExerciseName: string;
-}): PromptDefinition[] {
+/** The design's four core cards, in its order. */
+function buildPromptCards(
+  selectedExerciseName: string,
+  hasSelectedExercise: boolean,
+): PromptCardDefinition[] {
   return [
     {
       description: "总结本周训练频率、总量、主要动作、肌群分布和 Evidence。",
-      prompt: {
-        mode: "weekly_report",
-        message: "帮我做一份本周训练报告",
-      },
+      prompt: { mode: "weekly_report", message: "帮我做一份本周训练报告" },
       title: "本周训练报告",
     },
     {
       description:
         "结合训练 Evidence 和知识 Sources，保守诊断动作是否进入平台期。",
-      disabled: !input.selectedExerciseId,
+      disabled: !hasSelectedExercise,
       helper: "请先在分析页选择一个重点动作。",
       prompt: {
         mode: "plateau_diagnosis",
-        message: `${input.selectedExerciseName}平台期怎么诊断？`,
+        message: `${selectedExerciseName}平台期怎么诊断？`,
       },
       title: "平台期诊断",
     },
     {
       description: "基于 Evidence + Sources 生成下周训练草案，不把它当作处方。",
-      prompt: {
-        mode: "next_week_plan",
-        message: "给我一个下周训练草案",
-      },
+      prompt: { mode: "next_week_plan", message: "给我一个下周训练草案" },
       title: "下周训练草案",
     },
     {
       description: "快速查看最近训练次数、组数、训练量和主要动作。",
-      prompt: {
-        mode: "training_overview",
-        message: "最近训练总览",
-      },
+      prompt: { mode: "training_overview", message: "最近训练总览" },
       title: "最近训练总览",
     },
+  ];
+}
+
+/**
+ * Modes the design's four cards do not cover.
+ *
+ * The design fills this row with three free-text examples; these are the same
+ * shape (one tap prefills the composer) but keep the existing intent routing
+ * instead of dropping five working entry points.
+ */
+function buildPromptChips(
+  selectedExerciseName: string,
+  hasSelectedExercise: boolean,
+): PromptChipDefinition[] {
+  return [
     {
-      description: "根据最近记录，给出保守的下一次训练方向。",
-      prompt: {
-        mode: "next_training_focus",
-        message: "我今天练什么？",
-      },
+      prompt: { mode: "next_training_focus", message: "我今天练什么？" },
       title: "我今天练什么？",
     },
     {
-      description: "查看训练量分布，判断胸部相关训练是否比较集中。",
-      prompt: {
-        mode: "muscle_balance",
-        message: "我胸练得够吗？",
-      },
+      prompt: { mode: "muscle_balance", message: "我胸练得够吗？" },
       title: "我胸练得够吗？",
     },
     {
-      description: "判断最近训练是否明显集中在少数动作或同一类部位。",
-      prompt: {
-        mode: "training_imbalance",
-        message: "我是不是偏科？",
-      },
+      prompt: { mode: "training_imbalance", message: "我是不是偏科？" },
       title: "我是不是偏科？",
     },
     {
-      description: `分析 ${input.selectedExerciseName} 的重量变化、最高重量和估算 1RM。`,
-      disabled: !input.selectedExerciseId,
-      helper: "请先在分析页选择一个动作。",
+      disabled: !hasSelectedExercise,
       prompt: {
         mode: "exercise_progress",
-        message: `分析一下${input.selectedExerciseName}的进展。`,
+        message: `分析一下${selectedExerciseName}的进展。`,
       },
       title: "当前动作进展",
     },
     {
-      description: "解释这些建议背后参考了哪些训练记录和计算规则。",
-      prompt: {
-        mode: "evidence_explain",
-        message: "智能助手根据什么判断？",
-      },
+      prompt: { mode: "evidence_explain", message: "智能助手根据什么判断？" },
       title: "判断依据",
     },
   ];
 }
 
-const sectionHeaderStyle: React.CSSProperties = {
-  alignItems: "flex-start",
-  display: "flex",
+const bodyStyle: React.CSSProperties = {
+  display: "grid",
   gap: 12,
-  justifyContent: "space-between",
 };
 
-const sectionTitleStyle: React.CSSProperties = {
-  fontSize: 16,
+const headingStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 2,
+};
+
+const titleStyle: React.CSSProperties = {
+  fontSize: 15,
+  fontWeight: 700,
+  letterSpacing: "-0.2px",
   margin: 0,
 };
 
-function sectionCopyStyle(
+function subtitleStyle(
   theme: ReturnType<typeof useTheme>["theme"],
 ): React.CSSProperties {
-  return {
-    color: theme.colors.tx2,
-    fontSize: 12,
-    lineHeight: 1.6,
-    margin: "6px 0 0",
-  };
+  return { color: theme.colors.tx3, fontSize: 11, lineHeight: 1.6 };
 }
 
-const promptListStyle: React.CSSProperties = {
+const cardGridStyle: React.CSSProperties = {
   display: "grid",
-  gap: 10,
-  marginTop: 14,
-};
-
-const promptTitleRowStyle: React.CSSProperties = {
-  alignItems: "center",
-  display: "flex",
   gap: 8,
-  justifyContent: "space-between",
+  gridTemplateColumns: "1fr 1fr",
 };
 
-function promptButtonStyle(
+function cardStyle(
   theme: ReturnType<typeof useTheme>["theme"],
-  isActive: boolean,
   isDisabled: boolean,
 ): React.CSSProperties {
   return {
-    backgroundColor: isActive ? theme.colors.surf2 : theme.colors.surf,
-    border: `1px solid ${isActive ? theme.colors.ac : theme.colors.bdr}`,
-    borderRadius: theme.radius.card,
+    backgroundColor: theme.colors.soft,
+    border: "none",
+    borderRadius: 14,
+    color: theme.colors.tx,
     cursor: isDisabled ? "not-allowed" : "pointer",
     display: "grid",
-    gap: 8,
+    gap: 4,
+    minWidth: 0,
     opacity: isDisabled ? 0.45 : 1,
-    padding: "14px 14px 13px",
+    padding: 13,
     textAlign: "left",
+    whiteSpace: "normal",
   };
 }
 
-function promptTitleStyle(
+const cardTitleStyle: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 700,
+  letterSpacing: "-0.1px",
+};
+
+function cardCopyStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return { color: theme.colors.tx3, fontSize: 10, lineHeight: 1.5 };
+}
+
+function cardHelperStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return { color: theme.colors.orange, fontSize: 10, lineHeight: 1.5 };
+}
+
+const chipRowStyle: React.CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 6,
+};
+
+function chipStyle(
   theme: ReturnType<typeof useTheme>["theme"],
   isDisabled: boolean,
 ): React.CSSProperties {
   return {
-    color: isDisabled ? theme.colors.tx2 : theme.colors.tx,
-    fontSize: 14,
-    fontWeight: 700,
-  };
-}
-
-function promptDescriptionStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-  isDisabled: boolean,
-): React.CSSProperties {
-  return {
-    color: isDisabled ? theme.colors.tx3 : theme.colors.tx2,
-    fontSize: 12,
-    lineHeight: 1.6,
-  };
-}
-
-function promptHelperStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-): React.CSSProperties {
-  return {
-    color: theme.colors.orange,
-    fontSize: 11,
-    lineHeight: 1.5,
-  };
-}
-
-function moreButtonStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-): React.CSSProperties {
-  return {
-    backgroundColor: theme.colors.surf2,
-    border: `1px solid ${theme.colors.bdr}`,
-    borderRadius: theme.radius.control,
+    backgroundColor: theme.colors.divider,
+    border: "none",
+    borderRadius: theme.radius.capsule,
     color: theme.colors.tx2,
-    cursor: "pointer",
-    fontSize: 13,
-    fontWeight: 700,
-    marginTop: 12,
-    padding: "10px 12px",
-    width: "100%",
+    cursor: isDisabled ? "not-allowed" : "pointer",
+    fontSize: 11,
+    fontWeight: 600,
+    opacity: isDisabled ? 0.45 : 1,
+    padding: "8px 12px",
   };
 }
