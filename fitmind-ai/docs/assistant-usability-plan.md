@@ -1,8 +1,9 @@
 # Assistant usability plan: plan-card lifecycle + ER-2/ER-3 sequencing
 
-Status: **plan only, awaiting review**. No code in this document has been
+Status: **plan only, ready for execution**. No code in this document has been
 written. Authored 2026-07-27 after the user's first real-device pass over the
-finished UI (main at `2ac9411`).
+finished UI (main at `2ac9411`); the one open decision it carried was resolved
+by the user the same day and is folded into PL-3.
 
 The trigger was two reports from that pass:
 
@@ -143,7 +144,9 @@ branches so review knows what to expect:
 
 No batch may "fix" this by catching the error and pretending success.
 
-### PL-3 — expired plans read as expired — at most 4 code files
+### PL-3 — expired plans read as expired and can be archived — at most 5 code files
+
+Decision taken by the user on 2026-07-27: **归档**.
 
 Client-side classification, deliberately: the device already knows today in the
 user's real timezone, and the plan carries `endDate`. Doing this on the server
@@ -152,27 +155,70 @@ introduces — so a server-side lifecycle field should wait for that plumbing
 rather than inventing a second, UTC-only notion of "today" that would be off by
 a day for this user.
 
-Behavior when `plan.endDate` is before the device's today:
+Expected files: a pure lifecycle module beside `assistant-date-range.ts`, its
+test, `AssistantCurrentPlanCard.tsx`, `use-current-plan.ts`,
+`AssistantWorkspace.tsx`.
 
-- the heading stops claiming 本周计划 and reads as a closed plan (wording is
-  PL-3's deliverable, reviewed against F3: it must not name a window the plan
-  does not cover);
-- an 已过期 chip plus a factual line stating the plan's own end date;
-- adherence still renders — the closed plan's final numbers are the useful part;
-- the primary action becomes 归档 (`PATCH status=completed`), so the card can be
-  cleared with closure instead of being framed as abandonment. 放弃计划 stays
-  available.
+#### Classifier
 
-**Open decision for the user (see below).** If the answer is "just hide it", PL-3
-shrinks to a filter and the 归档 action is dropped.
+`classifyPlanLifecycle({ endDate, today })` returns `"active" | "expired"`, with
+`today` injected so tests are deterministic.
 
-Tests: a plan ending yesterday classifies as expired, one ending today does not
-(inclusive boundary), and the expired card renders neither 本周 nor any date the
-plan does not cover.
+Both values are date-only `YYYY-MM-DD` strings, so the comparison is a plain
+lexicographic string compare — `endDate < today` means expired. No `Date`
+arithmetic, therefore no DST or timezone drift, and no repeat of the
+millisecond-subtraction class of bug the ER plan already warns about. `today`
+comes from the device clock through the same local-date formatter
+`assistant-date-range.ts` already uses.
 
-Sequencing note: PL-3's 归档 uses the same `PATCH` endpoint as 放弃. If PL-2
-found that endpoint broken, PL-3 must land after PL-2 or it ships a second
-button that fails the same way.
+The boundary is inclusive: a plan whose `endDate` is today is still active.
+
+#### Card behavior when expired
+
+- The heading stops asserting 本周计划. Its replacement is PL-3's deliverable and
+  is reviewed against F3: it must not name a window the plan does not cover. The
+  existing meta line already prints the plan's real `startDate ~ endDate` and
+  stays.
+- An 已过期 chip, using the same tone helper as the per-exercise status chips so
+  it reads as part of the card rather than a bolted-on banner.
+- Adherence still renders. The closed plan's final numbers are the useful part
+  of it, and 展开/收起 behaves as before.
+- The primary action becomes 归档 → `PATCH {"status":"completed"}` through a new
+  `archive()` on the hook, shaped exactly like `abandon()` after PL-1: returns
+  `Promise<boolean>`, same readable-error handling, toast only after it settles.
+- 放弃计划 stays available.
+
+No server change is required: `planStatusBodySchema` already accepts
+`completed`, and once the row leaves `active` the existing `/current` query stops
+returning it, so the card falls through to its established empty state.
+
+#### Why archive rather than abandon
+
+The two statuses are not cosmetic variants. `getLatestAcceptedPlannedWorkoutForUser`
+feeds the D42 planner adherence context, which accepts `active` and `completed`
+and excludes `abandoned`. So 归档 means "this week closed, keep it as evidence
+for future plans", while 放弃 means "discard it". Making 归档 the primary action
+on an expired plan is what preserves the learning loop's input; offering only
+放弃 would quietly throw that history away.
+
+#### Tests
+
+- Classifier: `endDate` yesterday is expired; today is active; tomorrow is
+  active; cross-month and cross-year boundaries behave; the comparison is
+  unaffected by the host timezone.
+- Card: an expired card renders neither 本周 nor any date the plan does not
+  cover, renders 已过期, and its primary action calls `archive`.
+- Failure path: a rejected `archive` surfaces the failure and leaves the card in
+  place — it must not optimistically clear.
+
+#### Out of scope for PL-3
+
+No change to `/current`, no server-side lifecycle field (that waits for ER-2B's
+timezone), and no modification of existing rows.
+
+Sequencing note: 归档 uses the same `PATCH` endpoint as 放弃. If PL-2 found that
+endpoint broken, PL-3 must land after PL-2 or it ships a second button that fails
+the same way.
 
 ### PL-4 — one active plan per user — at most 3 code files, no migration
 
@@ -220,19 +266,19 @@ larger usability push and is not blocked by any of the above.
 PL-1 and PL-3 are client-only and carry no production data risk. PL-4 changes
 write behavior and needs the D42 pin.
 
-## Open decision for the user
+## Resolved decisions
 
-**What should an expired plan's primary action be?**
+**Expired plan's primary action: 归档** (user, 2026-07-27). Specified in PL-3.
 
-- **归档 (recommended)** — `PATCH status=completed`, card clears, the plan keeps
-  its final adherence in history and stays eligible for the D42 planner context.
-- **自动消失** — `/current` skips expired plans; simplest, but the user never
-  sees how the closed week went and the row silently stays `active` in the
+The alternatives and why they were not taken, recorded so the choice is not
+relitigated mid-execution:
+
+- **自动消失** — `/current` skips expired plans. Simplest, but the user never
+  sees how the closed week went, and the row silently stays `active` in the
   database, which keeps F4 alive.
-- **顺延** — roll the plan's window forward to the current week. Rejected in this
-  draft: it would attribute the old plan's targets to a week the user never
-  agreed to, and adherence would then be computed over a window the plan was not
-  written for.
+- **顺延** — roll the plan's window forward to the current week. It would
+  attribute the old plan's targets to a week the user never agreed to, and
+  adherence would then be computed over a window the plan was not written for.
 
 ## Review checkpoints
 
@@ -242,6 +288,9 @@ Applied when each batch comes back for review:
   error with a generic string;
 - no copy may name a date range the underlying data does not cover;
 - tests must assert the failure path, not only the happy path;
+- 归档 must write `completed`, never `abandoned` — the two carry different
+  meaning for the D42 planner context, and collapsing them silently drops
+  training history from the learning loop;
 - `pnpm verify` and the client e2e suite green, independently re-run by the
   reviewer;
 - PL-4 must show the D42 adherence-context pin passing both before and after.
