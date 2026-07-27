@@ -1,9 +1,9 @@
 # Assistant usability plan: plan-card lifecycle + ER-2/ER-3 sequencing
 
-Status: **plan only, ready for execution**. No code in this document has been
-written. Authored 2026-07-27 after the user's first real-device pass over the
-finished UI (main at `2ac9411`); the one open decision it carried was resolved
-by the user the same day and is folded into PL-3.
+Status: **in execution**. Authored 2026-07-27 after the user's first real-device
+pass over the finished UI (main at `2ac9411`). The one open decision it carried
+was resolved the same day and is folded into PL-3. PL-1 is implemented and
+reviewed; PL-2 went dormant when the failure stopped reproducing; PL-3 is next.
 
 The trigger was two reports from that pass:
 
@@ -128,24 +128,65 @@ for F1.
 Explicitly out of scope: fixing whatever the server is returning. PL-1 makes the
 cause visible; it does not assume one.
 
-**Delivery gate:** after PL-1 ships, the user taps 放弃计划 once on production and
-reports the message shown. That message determines PL-2's content. Do not start
-PL-2 before then.
+**Delivery gate — answered, see PL-2.** The gate asked the user to tap 放弃计划
+once on production. They did, and it succeeded.
 
-### PL-2 — fix the underlying abandon failure — scope set by PL-1's output
+Review findings (2026-07-27), both accepted as non-blocking and folded into
+PL-3 rather than sent back:
 
-Cannot be specified further without the real error code. Pre-registered
-branches so review knows what to expect:
+- **R1** — `abandon()` early-returns `false` on `!token || !plan` without
+  setting `actionError`, while the failure toast tells the user to read the
+  card's error message, which in that path does not exist. Unreachable today:
+  the button only renders when `plan` is present, and `bootstrap()` stores a
+  sentinel token so `!token` is false for any authenticated session. Latent
+  inconsistency, not a live bug.
+- **R2** — `abandon()` wraps both the `PATCH` and the follow-up `refresh()` in
+  one `try`. `refresh()` never rethrows, so the outer `catch` only ever sees the
+  `PATCH` — but a `PATCH` that succeeds followed by a `refresh` that fails
+  returns `true` while `refresh` writes its own `actionError`, producing a
+  success toast beside an error line. Same contradictory-pair shape as F1, far
+  smaller blast radius.
 
-- **401/expired session** → the hook must not attempt a mutation with a null
-  in-memory token; route through the cookie-authenticated path the workout hooks
-  already use, and pin it with the existing "cookie-restored session, no
-  in-memory token" e2e case.
-- **404** → the client is holding a plan id the server no longer owns; refresh
-  before mutating and surface a distinct "计划已不存在" state.
-- **500** → capture the server stack from the Vercel logs first; if it is a
-  `planDraftSchema` parse failure on legacy plan JSON, the fix is a tolerant read
-  path for historical rows, and that decision needs its own review.
+### PL-2 — dormant: the failure did not reproduce
+
+The failure was **transient**. After PL-1 was reviewed, the user tapped 放弃计划
+again on production and the plan was abandoned cleanly.
+
+The inference that this was a real `PATCH` failure the first time, rather than a
+display artifact, is solid: in the shipped code the success path is
+`PATCH → refresh() → plan becomes null → empty state`, and the failure path
+never calls `refresh()`, so the card stays put. The plan disappearing means the
+`PATCH` succeeded. And the first report cannot have been a disguised `refresh`
+failure, because `refresh()` swallows its own errors and never reaches
+`abandon`'s catch. So: the `PATCH` genuinely failed once and genuinely succeeds
+now.
+
+**Most probable cause, recorded as a hypothesis rather than a diagnosis:** the
+plan repository opens a fresh pool per call and ends it afterwards — five
+`createRepositoryPool()` / `activePool.end()` pairs in
+`db/planned-workout-repository.ts` — so every request is a new TCP+TLS handshake
+to Neon with no pooling. This is the T4 debt already on the roadmap. A suspended
+Neon endpoint plus a cold connection is a well-understood source of one-off
+timeouts, and it fits a failure that neither reproduces nor leaves a client-side
+trail. It is **not** confirmed: nothing captured the status code at the time.
+
+There is therefore nothing to fix here yet, and inventing a fix for an
+unobserved cause would be exactly the speculation this batch was written to
+avoid. PL-2 is **dormant, not cancelled**.
+
+**Reactivation trigger.** PL-1 is the instrument: once deployed, any recurrence
+shows `请求失败（HTTP <status>）：<server message>` on the card. If it recurs,
+capture:
+
+1. the full status and message from the card;
+2. whether a retry immediately after succeeds (transient) or fails again
+   (deterministic);
+3. the matching Vercel function log line for that request.
+
+Then reopen PL-2 against the pre-registered branches from the original draft
+(401 session, 404 stale id, 500 server fault). If the recurrence pattern is
+cold-start shaped, PL-2 closes in favour of T4 rather than growing a local
+workaround.
 
 No batch may "fix" this by catching the error and pretending success.
 
@@ -206,6 +247,19 @@ for future plans", while 放弃 means "discard it". Making 归档 the primary ac
 on an expired plan is what preserves the learning loop's input; offering only
 放弃 would quietly throw that history away.
 
+#### Carried over from the PL-1 review
+
+Both findings are small, sit in the files PL-3 already touches, and are cheaper
+to fix here than in their own batch:
+
+- **R1** — give the `!token || !plan` early return its own `actionError`, or
+  give the toast a message that does not promise a card error that was never
+  written. Applies to `archive()` too, which is shaped the same way.
+- **R2** — a `PATCH` that succeeds followed by a failing `refresh()` must not
+  produce a success toast beside an error line. Either keep the refresh outside
+  the success signal, or report the refresh failure as its own distinct state.
+  Applies to `abandon`, `accept`, and the new `archive`.
+
 #### Tests
 
 - Classifier: `endDate` yesterday is expired; today is active; tomorrow is
@@ -215,15 +269,25 @@ on an expired plan is what preserves the learning loop's input; offering only
   cover, renders 已过期, and its primary action calls `archive`.
 - Failure path: a rejected `archive` surfaces the failure and leaves the card in
   place — it must not optimistically clear.
+- R2 pin: a succeeding `PATCH` followed by a failing `refresh` must not emit the
+  success toast.
+
+#### Verification note
+
+The user abandoned their stale plan on 2026-07-27, so that account currently has
+no active plan and PL-3 cannot be eyeballed against real production data until a
+new one is accepted. The batch must stand on its unit and Playwright coverage;
+the mocked plan fixture already added in `ui-finishers.spec.ts` is the place to
+build the expired case.
 
 #### Out of scope for PL-3
 
 No change to `/current`, no server-side lifecycle field (that waits for ER-2B's
 timezone), and no modification of existing rows.
 
-Sequencing note: 归档 uses the same `PATCH` endpoint as 放弃. If PL-2 found that
-endpoint broken, PL-3 must land after PL-2 or it ships a second button that fails
-the same way.
+Sequencing note: 归档 uses the same `PATCH` endpoint as 放弃, which is currently
+believed healthy (PL-2 dormant). If PL-2 ever reactivates and finds that endpoint
+genuinely broken, PL-3's 归档 button is affected the same way.
 
 ### PL-4 — one active plan per user — at most 3 code files, no migration
 
@@ -259,14 +323,19 @@ Two cross-links worth honoring during execution:
 ## Recommended execution order
 
 ```
-PL-1  →  [user taps 放弃 on prod, reports message]  →  PL-2  →  PL-3  →  PL-4
+PL-1 (done, awaiting merge)  →  PL-3  →  PL-4
       →  ER-1C  →  ER-1D  →  ER-2A  →  ER-2B  →  ER-2C  →  ER-3  →  ER-EVAL
+
+PL-2: dormant, reactivated only by a recurrence (see PL-2 for what to capture)
 ```
 
-Rationale: PL-1 is small, corrects a lie this UI batch shipped, and is the only
-way to learn what PL-2 must fix. PL-3 removes the mislabelled card the user is
-looking at daily. PL-4 closes the data hole that recreates it. The ER arc is the
-larger usability push and is not blocked by any of the above.
+Rationale: PL-1 corrects a lie this UI batch shipped and is the instrument that
+makes any recurrence diagnosable, so it should merge even though the failure it
+was written to expose has stopped reproducing. PL-3 fixes the mislabelled card,
+which is structural and did **not** go away — the user cleared one stale plan by
+hand, and the next accepted plan will expire into exactly the same state. PL-4
+closes the data hole behind it. The ER arc is the larger usability push and is
+not blocked by any of the above.
 
 PL-1 and PL-3 are client-only and carry no production data risk. PL-4 changes
 write behavior and needs the D42 pin.
