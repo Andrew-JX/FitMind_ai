@@ -94,7 +94,8 @@ function textareaStyle(
     borderRadius: 14,
     color: theme.colors.tx,
     font: "inherit",
-    // Design: 15px keeps iOS from zooming the viewport on focus.
+    // The design asks for 15px, but the global rule pins text-entry fields to
+    // 16px so iOS does not zoom the viewport on focus.
     fontSize: 15,
     minHeight: 58,
     padding: 10,

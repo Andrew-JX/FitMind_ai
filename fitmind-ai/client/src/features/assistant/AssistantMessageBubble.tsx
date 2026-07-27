@@ -206,6 +206,10 @@ function columnStyle(isUser: boolean): React.CSSProperties {
  * The user bubble keeps the fixed neon green in both themes, like the FAB and
  * the chart's latest bar.
  *
+ * The coach bubble takes a hairline border in light mode only: the design's
+ * inset fill (#e9e9ef) sits almost on top of the light page background
+ * (#f2f2f7), and the thread has no card behind it to give the bubble an edge.
+ *
  * @param theme - Active theme tokens
  * @param isAssistant - Whether the coach authored the message
  * @returns Bubble style
@@ -216,6 +220,10 @@ function bubbleStyle(
 ): React.CSSProperties {
   return {
     background: isAssistant ? theme.colors.surf2 : "#c8f035",
+    border:
+      isAssistant && !theme.isDark
+        ? `1px solid ${theme.colors.bdr}`
+        : "1px solid transparent",
     borderRadius: isAssistant ? "14px 14px 14px 4px" : "14px 14px 4px 14px",
     color: isAssistant ? theme.colors.tx : "#0f0f0f",
     fontSize: 13,
@@ -232,6 +240,9 @@ function typingBubbleStyle(
 ): React.CSSProperties {
   return {
     backgroundColor: theme.colors.surf2,
+    border: theme.isDark
+      ? "1px solid transparent"
+      : `1px solid ${theme.colors.bdr}`,
     borderRadius: "14px 14px 14px 4px",
     color: theme.colors.tx2,
     fontSize: 13,

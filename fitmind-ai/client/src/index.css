@@ -116,11 +116,23 @@ button:disabled {
 input,
 textarea,
 select {
-  font-size: 16px !important;
   min-width: 0;
   transition:
     border-color 150ms ease,
     opacity 150ms ease;
+}
+
+/*
+ * iOS Safari zooms the viewport when a text-entry field smaller than 16px takes
+ * focus, so those are pinned regardless of what a component asks for.
+ *
+ * `select` is deliberately excluded: tapping one opens the native picker
+ * instead of focusing inline, so it never triggers the zoom, and forcing 16px
+ * there made the design's compact 12-13px dropdowns render oversized.
+ */
+input,
+textarea {
+  font-size: 16px !important;
 }
 
 input::placeholder,
