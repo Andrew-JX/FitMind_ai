@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AppShell, type AppTabKey } from "./components/AppShell";
 import { AssistantWorkspace } from "./features/assistant/AssistantWorkspace";
@@ -55,6 +55,10 @@ export function App() {
     useState<string | null>(null);
   const [analysisRefreshSignal, setAnalysisRefreshSignal] = useState(0);
   const [assistantRefreshSignal, setAssistantRefreshSignal] = useState(0);
+  // Set only by an interactive login, so a cookie-restored session on boot
+  // still lands straight on the app with no dwell.
+  const isInteractiveLoginRef = useRef(false);
+  const [isHoldingAuthScreen, setIsHoldingAuthScreen] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
 
   useEffect(() => {
@@ -70,6 +74,25 @@ export function App() {
       isActive = false;
     };
   }, []);
+
+  // Design: after a successful login the submit button draws a checkmark before
+  // the app appears, so hold the auth screen for that beat.
+  useEffect(() => {
+    if (auth.status !== "authenticated" || !isInteractiveLoginRef.current) {
+      return;
+    }
+
+    isInteractiveLoginRef.current = false;
+    setIsHoldingAuthScreen(true);
+
+    const timerId = window.setTimeout(() => {
+      setIsHoldingAuthScreen(false);
+    }, LOGIN_SUCCESS_DWELL_MS);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [auth.status]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) {
@@ -102,12 +125,16 @@ export function App() {
     );
   }
 
-  if (!(auth.status === "authenticated" && auth.user)) {
+  if (!(auth.status === "authenticated" && auth.user) || isHoldingAuthScreen) {
     return (
       <AuthScreen
         errorMessage={auth.errorMessage}
+        isAuthenticated={auth.status === "authenticated"}
         onLogin={auth.login}
         onRegister={auth.register}
+        onSubmitStart={() => {
+          isInteractiveLoginRef.current = true;
+        }}
         status={auth.status}
       />
     );
@@ -147,11 +174,14 @@ export function App() {
             deleteError: workouts.deleteError,
             deletingWorkoutId: workouts.deletingWorkoutId,
             detailError: workouts.detailError,
+            hasMoreWorkouts: workouts.hasMoreWorkouts,
             isLoadingDetail: workouts.isLoadingDetail,
             isLoadingList: workouts.isLoadingList,
+            isLoadingMoreWorkouts: workouts.isLoadingMoreWorkouts,
             listError: workouts.listError,
             onDeleteWorkout: handleDeleteWorkout,
             onWorkoutEdited: handleWorkoutCreated,
+            onLoadMoreWorkouts: workouts.loadMoreWorkouts,
             onRefresh: workouts.refreshWorkouts,
             onSelectWorkout: workouts.selectWorkout,
             selectedWorkout: workouts.selectedWorkout,
@@ -252,6 +282,15 @@ function tabSectionStyle(isActive: boolean): React.CSSProperties {
     paddingBottom: 16,
   };
 }
+
+/**
+ * How long the auth screen stays up after the session goes live.
+ *
+ * The checkmark finishes drawing 600ms in (0.1s delay + 0.5s draw), so this
+ * matches the design prototype's ~950ms hold and leaves the completed check on
+ * screen rather than cutting away mid-stroke.
+ */
+const LOGIN_SUCCESS_DWELL_MS = 950;
 
 const bootstrapScreenStyle: React.CSSProperties = {
   display: "grid",

@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import { StateNotice } from "../../components/StateNotice";
-import { useTheme } from "../../theme/ThemeContext";
+import { useToast } from "../../components/ToastProvider";
 import { createDefaultAssistantRange } from "./assistant-date-range";
 import { AssistantComposer } from "./AssistantComposer";
 import { AssistantMessageList } from "./AssistantMessageList";
@@ -47,15 +47,12 @@ export interface AssistantChatPanelProps {
  */
 export function AssistantChatPanel(props: AssistantChatPanelProps) {
   const { chat } = props;
-  const { theme } = useTheme();
+  const { showToast } = useToast();
   const [savedMessageIds, setSavedMessageIds] = useState<Set<string>>(
     () => new Set(),
   );
   const [savingMessageIds, setSavingMessageIds] = useState<Set<string>>(
     () => new Set(),
-  );
-  const [insightStatusText, setInsightStatusText] = useState<string | null>(
-    null,
   );
   const [acceptingPlanIds, setAcceptingPlanIds] = useState<Set<string>>(
     () => new Set(),
@@ -110,7 +107,6 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
       nextValues.add(assistantMessage.messageId);
       return nextValues;
     });
-    setInsightStatusText(null);
 
     try {
       await saveAssistantInsight(props.token, assistantMessage.messageId);
@@ -120,9 +116,9 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
         return nextValues;
       });
       props.onInsightSaved();
-      setInsightStatusText("洞察已保存。");
+      showToast("洞察已保存");
     } catch {
-      setInsightStatusText("洞察保存失败。");
+      showToast("洞察保存失败");
     } finally {
       setSavingMessageIds((currentValues) => {
         const nextValues = new Set(currentValues);
@@ -141,7 +137,6 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
 
     const planKey = assistantMessage.id;
     setAcceptingPlanIds((currentValues) => new Set(currentValues).add(planKey));
-    setInsightStatusText(null);
 
     try {
       const accepted = await props.onAcceptPlan(
@@ -153,9 +148,9 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
         setAcceptedPlanIds((currentValues) =>
           new Set(currentValues).add(planKey),
         );
-        setInsightStatusText("已设为本周计划，可在页面顶部查看完成进度。");
+        showToast("已设为本周计划");
       } else {
-        setInsightStatusText("接受计划失败，请稍后再试。");
+        showToast("接受计划失败，请稍后再试");
       }
     } finally {
       setAcceptingPlanIds((currentValues) => {
@@ -172,7 +167,7 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
     await navigator.clipboard.writeText(
       buildAssistantInsightCopyText(assistantMessage),
     );
-    setInsightStatusText("洞察文本已复制。");
+    showToast("洞察文本已复制");
   }
 
   return (
@@ -221,10 +216,6 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
         }
       />
 
-      {insightStatusText ? (
-        <p style={insightStatusStyle(theme)}>{insightStatusText}</p>
-      ) : null}
-
       <AssistantComposer
         canRetry={chat.messages.length > 0}
         isStreaming={chat.isStreaming}
@@ -258,14 +249,3 @@ const panelStyle: React.CSSProperties = {
   display: "grid",
   gap: 12,
 };
-
-function insightStatusStyle(
-  theme: ReturnType<typeof useTheme>["theme"],
-): React.CSSProperties {
-  return {
-    color: theme.colors.tx3,
-    fontSize: 12,
-    margin: 0,
-    padding: "0 4px",
-  };
-}

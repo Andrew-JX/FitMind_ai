@@ -18,8 +18,15 @@ type AuthMode = "login" | "register";
 
 export interface AuthScreenProps {
   errorMessage: string | null;
+  /**
+   * True once the session is live. The screen stays mounted for a short beat so
+   * the submit button can finish its checkmark before the app takes over.
+   */
+  isAuthenticated?: boolean | undefined;
   onLogin: (input: LoginRequest) => Promise<void>;
   onRegister: (input: RegisterRequest) => Promise<void>;
+  /** Fired when an interactive submit starts, so the app can hold the dwell. */
+  onSubmitStart?: (() => void) | undefined;
   status: AuthStatus;
 }
 
@@ -40,6 +47,9 @@ export function AuthScreen(props: AuthScreenProps) {
   );
 
   const isSubmitting = status === "authenticating";
+  const isSucceeded = props.isAuthenticated === true;
+  // Design: the button shrinks to a circle for both the spinner and the check.
+  const isMorphed = isSubmitting || isSucceeded;
   const visibleErrorMessage = localErrorMessage ?? errorMessage;
 
   async function handleSubmit(
@@ -68,6 +78,7 @@ export function AuthScreen(props: AuthScreenProps) {
       saveRememberedLoginEmail("");
     }
 
+    props.onSubmitStart?.();
     await onLogin({ email, password });
   }
 
@@ -230,30 +241,65 @@ export function AuthScreen(props: AuthScreenProps) {
             </label>
           ) : null}
 
-          <button
-            disabled={isSubmitting}
-            style={{
-              alignItems: "center",
-              background: "#c8f035",
-              border: "none",
-              borderRadius: 14,
-              color: "#0f0f0f",
-              cursor: "pointer",
-              display: "flex",
-              fontSize: 14,
-              fontWeight: 700,
-              height: 48,
-              justifyContent: "center",
-              padding: 0,
-            }}
-            type="submit"
-          >
-            {isSubmitting
-              ? "提交中..."
-              : mode === "login"
-                ? "登录 FitMind AI"
-                : "创建账号"}
-          </button>
+          <div style={submitRowStyle}>
+            <button
+              disabled={isMorphed}
+              style={submitButtonStyle(isMorphed)}
+              type="submit"
+            >
+              <span style={submitLabelStyle(isMorphed)}>
+                {mode === "login" ? "登录 FitMind AI" : "创建账号"}
+              </span>
+              <svg
+                aria-hidden="true"
+                height="26"
+                style={submitCheckStyle(isSucceeded)}
+                viewBox="0 0 24 24"
+                width="26"
+              >
+                <path
+                  d="M5 12.5 10 17.5 19 7"
+                  fill="none"
+                  stroke="#0f0f0f"
+                  strokeDasharray="30"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2.6"
+                  style={{
+                    animation: isSucceeded
+                      ? "fmcheck 0.5s cubic-bezier(0.65, 0, 0.35, 1) 0.1s both"
+                      : "none",
+                  }}
+                />
+              </svg>
+            </button>
+            <svg
+              aria-hidden="true"
+              height="62"
+              style={submitSpinnerStyle(isSubmitting)}
+              viewBox="0 0 62 62"
+              width="62"
+            >
+              <circle
+                cx="31"
+                cy="31"
+                fill="none"
+                r="28"
+                stroke="rgba(200,240,53,0.22)"
+                strokeWidth="3"
+              />
+              <circle
+                cx="31"
+                cy="31"
+                fill="none"
+                r="28"
+                stroke="#c8f035"
+                strokeDasharray="44 176"
+                strokeLinecap="round"
+                strokeWidth="3"
+              />
+            </svg>
+          </div>
         </form>
 
         {visibleErrorMessage ? (
@@ -280,6 +326,75 @@ export function AuthScreen(props: AuthScreenProps) {
       </section>
     </main>
   );
+}
+
+/** Fixed-height row so the button can shrink without moving the layout. */
+const submitRowStyle: React.CSSProperties = {
+  alignItems: "center",
+  display: "flex",
+  height: 48,
+  justifyContent: "center",
+  position: "relative",
+};
+
+/**
+ * Design's morphing submit button: full-width pill that shrinks to a 48px
+ * circle while the request runs and while the checkmark draws.
+ *
+ * @param isMorphed - Whether the button is in its circular state
+ * @returns Button style
+ */
+function submitButtonStyle(isMorphed: boolean): React.CSSProperties {
+  return {
+    alignItems: "center",
+    background: "#c8f035",
+    border: "none",
+    borderRadius: isMorphed ? 999 : 14,
+    color: "#0f0f0f",
+    cursor: isMorphed ? "default" : "pointer",
+    display: "flex",
+    fontSize: 14,
+    fontWeight: 700,
+    height: 48,
+    justifyContent: "center",
+    // Disabled only to block a second submit; the design keeps the morphing
+    // button at full neon, so opt out of the global disabled dimming.
+    opacity: 1,
+    overflow: "hidden",
+    padding: 0,
+    position: "relative",
+    transition:
+      "width 0.5s cubic-bezier(0.65, 0, 0.35, 1), border-radius 0.5s cubic-bezier(0.65, 0, 0.35, 1)",
+    width: isMorphed ? 48 : "100%",
+  };
+}
+
+function submitLabelStyle(isMorphed: boolean): React.CSSProperties {
+  return {
+    opacity: isMorphed ? 0 : 1,
+    transition: "opacity 0.2s ease",
+    whiteSpace: "nowrap",
+  };
+}
+
+function submitCheckStyle(isSucceeded: boolean): React.CSSProperties {
+  return {
+    left: 11,
+    opacity: isSucceeded ? 1 : 0,
+    position: "absolute",
+    top: 11,
+    transition: "opacity 0.15s ease",
+  };
+}
+
+function submitSpinnerStyle(isSubmitting: boolean): React.CSSProperties {
+  return {
+    animation: "fmspin 0.8s linear infinite",
+    opacity: isSubmitting ? 1 : 0,
+    pointerEvents: "none",
+    position: "absolute",
+    transition: "opacity 0.3s ease",
+  };
 }
 
 function toggleButtonStyle(

@@ -20,11 +20,14 @@ export interface WorkoutsPanelProps {
   deleteError: string | null;
   deletingWorkoutId: string | null;
   detailError: string | null;
+  hasMoreWorkouts: boolean;
   isLoadingDetail: boolean;
   isLoadingList: boolean;
+  isLoadingMoreWorkouts: boolean;
   listError: string | null;
   onDeleteWorkout: (workoutId: string) => Promise<boolean>;
   onEditWorkout: (workoutId: string) => void;
+  onLoadMoreWorkouts: () => Promise<void>;
   onRefresh: () => Promise<void>;
   onSelectWorkout: (workoutId: string) => Promise<void>;
   onWorkoutEdited?: (() => Promise<void>) | undefined;
@@ -204,23 +207,61 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
                   ? props.workouts
                   : props.workouts.slice(0, LIST_PREVIEW_COUNT),
               )}
-              {props.workouts.length > LIST_PREVIEW_COUNT ? (
-                <button
-                  onClick={() => setIsListExpanded((value) => !value)}
-                  style={showMoreStyle(theme)}
-                  type="button"
-                >
-                  {isListExpanded
-                    ? "收起"
-                    : `查看更多（还有 ${props.workouts.length - LIST_PREVIEW_COUNT} 条）`}
-                </button>
-              ) : null}
+              {renderListFooter()}
             </div>
           ) : null}
         </>
       )}
     </Card>
   );
+
+  /**
+   * The list's one footer button.
+   *
+   * It first expands the records already loaded, then — once they are all
+   * visible and the server said there is another page — fetches that page.
+   *
+   * @returns The footer button, or null when there is nothing left to do
+   */
+  function renderListFooter(): React.ReactNode {
+    const hiddenCount = props.workouts.length - LIST_PREVIEW_COUNT;
+
+    if (!isListExpanded) {
+      return hiddenCount > 0 ? (
+        <button
+          onClick={() => setIsListExpanded(true)}
+          style={showMoreStyle(theme)}
+          type="button"
+        >
+          查看更多（还有 {hiddenCount} 条）
+        </button>
+      ) : null;
+    }
+
+    return (
+      <div style={footerRowStyle}>
+        {props.hasMoreWorkouts ? (
+          <button
+            disabled={props.isLoadingMoreWorkouts}
+            onClick={() => void props.onLoadMoreWorkouts()}
+            style={showMoreStyle(theme)}
+            type="button"
+          >
+            {props.isLoadingMoreWorkouts ? "加载中…" : "加载更早的记录"}
+          </button>
+        ) : null}
+        {props.workouts.length > LIST_PREVIEW_COUNT ? (
+          <button
+            onClick={() => setIsListExpanded(false)}
+            style={showMoreStyle(theme)}
+            type="button"
+          >
+            收起
+          </button>
+        ) : null}
+      </div>
+    );
+  }
 
   function renderWorkoutCards(list: WorkoutSummaryDto[]): React.ReactNode {
     return list.map((workout) => {
@@ -380,6 +421,11 @@ function toLocalDateKey(performedAt: string): string {
 
 /** How many records the list shows before "查看更多" is needed. */
 const LIST_PREVIEW_COUNT = 5;
+
+const footerRowStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 8,
+};
 
 /** Design: dashed full-width control that reveals the rest of the records. */
 function showMoreStyle(

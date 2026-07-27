@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { Card } from "../../components/Card";
+import { useToast } from "../../components/ToastProvider";
 import { useTheme } from "../../theme/ThemeContext";
 import { getToneColors, type SemanticTone } from "../../theme/tokens";
 import type {
@@ -42,6 +43,7 @@ const STATUS_TONE: Record<PlanAdherenceStatus, SemanticTone> = {
  */
 export function AssistantCurrentPlanCard(props: AssistantCurrentPlanCardProps) {
   const { theme } = useTheme();
+  const { showToast } = useToast();
   const { plan, status } = props;
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -84,7 +86,10 @@ export function AssistantCurrentPlanCard(props: AssistantCurrentPlanCardProps) {
           <div style={actionRowStyle}>
             <button
               disabled={props.isMutating}
-              onClick={props.onAbandon}
+              onClick={() => {
+                props.onAbandon();
+                showToast("已放弃本周计划");
+              }}
               style={abandonButtonStyle(theme, props.isMutating)}
               type="button"
             >

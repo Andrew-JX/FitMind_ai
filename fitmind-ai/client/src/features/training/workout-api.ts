@@ -41,20 +41,45 @@ interface WorkoutSetMutationResponseData {
   set: WorkoutSetDto;
 }
 
+export interface ListWorkoutsQuery {
+  /** Opaque cursor from a previous page's `next_cursor`. */
+  cursor?: string | undefined;
+  limit?: number | undefined;
+}
+
+export interface WorkoutPage {
+  items: WorkoutSummaryDto[];
+  nextCursor: string | null;
+}
+
 /**
- * Loads the current user's workout summaries.
+ * Loads one page of the current user's workout summaries.
  *
  * @param token - In-memory auth token
- * @returns Workout list summaries
+ * @param query - Optional cursor and page size
+ * @returns One page of workout summaries plus the cursor for the next one
  */
 export async function listWorkouts(
   token: string,
-): Promise<WorkoutSummaryDto[]> {
-  const response = await requestJson<WorkoutListResponseData>("/api/workouts", {
-    token,
-  });
+  query: ListWorkoutsQuery = {},
+): Promise<WorkoutPage> {
+  const searchParams = new URLSearchParams();
 
-  return response.items;
+  if (query.cursor) {
+    searchParams.set("cursor", query.cursor);
+  }
+
+  if (query.limit !== undefined) {
+    searchParams.set("limit", `${query.limit}`);
+  }
+
+  const queryString = searchParams.toString();
+  const response = await requestJson<WorkoutListResponseData>(
+    queryString ? `/api/workouts?${queryString}` : "/api/workouts",
+    { token },
+  );
+
+  return { items: response.items, nextCursor: response.next_cursor };
 }
 
 /**

@@ -1,5 +1,6 @@
 import { useTheme } from "../theme/ThemeContext";
 import { Icon, type IconName } from "./Icon";
+import { useToast } from "./ToastProvider";
 
 export type AppTabKey = "training" | "analysis" | "assistant" | "profile";
 
@@ -13,6 +14,7 @@ export interface AppShellProps {
 
 export function AppShell(props: AppShellProps) {
   const { isDark, theme, toggleTheme } = useTheme();
+  const { showToast } = useToast();
 
   return (
     <div
@@ -79,7 +81,10 @@ export function AppShell(props: AppShellProps) {
           >
             <button
               aria-label="切换主题"
-              onClick={toggleTheme}
+              onClick={() => {
+                toggleTheme();
+                showToast(isDark ? "已切换为浅色主题" : "已切换为深色主题");
+              }}
               style={themeToggleStyle(theme)}
               type="button"
             >

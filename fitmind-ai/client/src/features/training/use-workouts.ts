@@ -13,15 +13,23 @@ export interface UseWorkoutsResult {
   deleteWorkoutById: (workoutId: string) => Promise<boolean>;
   detailError: string | null;
   deletingWorkoutId: string | null;
+  /** Whether the server reported another page after the loaded ones. */
+  hasMoreWorkouts: boolean;
   isLoadingDetail: boolean;
   isLoadingList: boolean;
+  isLoadingMoreWorkouts: boolean;
   listError: string | null;
+  /** Appends the next cursor page to the loaded list. */
+  loadMoreWorkouts: () => Promise<void>;
   refreshWorkouts: () => Promise<void>;
   selectedWorkout: WorkoutDetailDto | null;
   selectedWorkoutId: string | null;
   selectWorkout: (workoutId: string) => Promise<void>;
   workouts: WorkoutSummaryDto[];
 }
+
+/** Matches the server's default page size. */
+const WORKOUT_PAGE_SIZE = 20;
 
 /**
  * Loads workout list and detail state for the authenticated client.
@@ -44,6 +52,8 @@ export function useWorkouts(token: string | null): UseWorkoutsResult {
   const [deletingWorkoutId, setDeletingWorkoutId] = useState<string | null>(
     null,
   );
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [isLoadingMoreWorkouts, setIsLoadingMoreWorkouts] = useState(false);
 
   const refreshWorkoutsOnTokenChange = useEffectEvent(async () => {
     await refreshWorkouts();
@@ -60,6 +70,8 @@ export function useWorkouts(token: string | null): UseWorkoutsResult {
       setDeletingWorkoutId(null);
       setIsLoadingList(false);
       setIsLoadingDetail(false);
+      setNextCursor(null);
+      setIsLoadingMoreWorkouts(false);
       return;
     }
 
@@ -77,12 +89,13 @@ export function useWorkouts(token: string | null): UseWorkoutsResult {
     setDeleteError(null);
 
     try {
-      const items = await listWorkouts(token);
-      setWorkouts(items);
+      const page = await listWorkouts(token, { limit: WORKOUT_PAGE_SIZE });
+      setWorkouts(page.items);
+      setNextCursor(page.nextCursor);
 
       if (
         selectedWorkoutId &&
-        items.some((item) => item.id === selectedWorkoutId)
+        page.items.some((item) => item.id === selectedWorkoutId)
       ) {
         return;
       }
@@ -91,6 +104,7 @@ export function useWorkouts(token: string | null): UseWorkoutsResult {
       setSelectedWorkout(null);
     } catch (error) {
       setWorkouts([]);
+      setNextCursor(null);
       setSelectedWorkoutId(null);
       setSelectedWorkout(null);
       setListError(
@@ -101,6 +115,43 @@ export function useWorkouts(token: string | null): UseWorkoutsResult {
       );
     } finally {
       setIsLoadingList(false);
+    }
+  }
+
+  async function loadMoreWorkouts(): Promise<void> {
+    if (!token || nextCursor === null || isLoadingMoreWorkouts) {
+      return;
+    }
+
+    setIsLoadingMoreWorkouts(true);
+    setListError(null);
+
+    try {
+      const page = await listWorkouts(token, {
+        cursor: nextCursor,
+        limit: WORKOUT_PAGE_SIZE,
+      });
+
+      // Guard against a duplicate id slipping in if a record was added between
+      // pages; the cursor is stable but the underlying list is not frozen.
+      setWorkouts((currentWorkouts) => {
+        const knownIds = new Set(currentWorkouts.map((workout) => workout.id));
+
+        return [
+          ...currentWorkouts,
+          ...page.items.filter((item) => !knownIds.has(item.id)),
+        ];
+      });
+      setNextCursor(page.nextCursor);
+    } catch (error) {
+      setListError(
+        getReadableErrorMessage(
+          error,
+          "Workout list is unavailable right now.",
+        ),
+      );
+    } finally {
+      setIsLoadingMoreWorkouts(false);
     }
   }
 
@@ -170,9 +221,12 @@ export function useWorkouts(token: string | null): UseWorkoutsResult {
     deleteWorkoutById,
     detailError,
     deletingWorkoutId,
+    hasMoreWorkouts: nextCursor !== null,
     isLoadingDetail,
     isLoadingList,
+    isLoadingMoreWorkouts,
     listError,
+    loadMoreWorkouts,
     refreshWorkouts,
     selectedWorkout,
     selectedWorkoutId,

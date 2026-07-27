@@ -25,11 +25,43 @@
   }
 }
 
+/* Auth submit spinner ring (design fmspin). */
+@keyframes fmspin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Auth submit checkmark draw-on (design fmcheck). */
+@keyframes fmcheck {
+  from {
+    stroke-dashoffset: 30;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   @keyframes fmjelly {
     from,
     to {
       transform: none;
+    }
+  }
+
+  /* Keep the spinner readable as a static ring rather than a strobe. */
+  @keyframes fmspin {
+    from,
+    to {
+      transform: none;
+    }
+  }
+
+  @keyframes fmcheck {
+    from,
+    to {
+      stroke-dashoffset: 0;
     }
   }
 }

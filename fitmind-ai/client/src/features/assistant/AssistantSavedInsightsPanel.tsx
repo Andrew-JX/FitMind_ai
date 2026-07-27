@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { Card } from "../../components/Card";
+import { useToast } from "../../components/ToastProvider";
 import { useTheme } from "../../theme/ThemeContext";
 import {
   deleteAssistantSavedInsight,
@@ -24,8 +25,9 @@ export function AssistantSavedInsightsPanel(
   props: AssistantSavedInsightsPanelProps,
 ) {
   const { theme } = useTheme();
+  const { showToast } = useToast();
   const [items, setItems] = useState<AssistantSavedInsight[]>([]);
-  const [statusText, setStatusText] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const displayItems = props.token ? items : [];
 
   useEffect(() => {
@@ -42,7 +44,7 @@ export function AssistantSavedInsightsPanel(
       })
       .catch(() => {
         if (isMounted) {
-          setStatusText("保存洞察加载失败。");
+          setLoadError("已保存洞察加载失败，稍后重试。");
         }
       });
 
@@ -53,7 +55,7 @@ export function AssistantSavedInsightsPanel(
 
   async function copyInsight(item: AssistantSavedInsight): Promise<void> {
     await navigator.clipboard.writeText(item.share_text);
-    setStatusText("洞察文本已复制。");
+    showToast("洞察文本已复制");
   }
 
   async function deleteInsight(item: AssistantSavedInsight): Promise<void> {
@@ -65,7 +67,7 @@ export function AssistantSavedInsightsPanel(
     setItems((currentItems) =>
       currentItems.filter((currentItem) => currentItem.id !== item.id),
     );
-    setStatusText("已删除保存洞察。");
+    showToast("已删除保存洞察");
   }
 
   return (
@@ -115,7 +117,7 @@ export function AssistantSavedInsightsPanel(
           ))
         )}
 
-        {statusText ? <p style={statusStyle(theme)}>{statusText}</p> : null}
+        {loadError ? <p style={statusStyle(theme)}>{loadError}</p> : null}
       </div>
     </Card>
   );
