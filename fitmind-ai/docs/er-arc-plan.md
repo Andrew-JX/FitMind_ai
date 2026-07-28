@@ -264,7 +264,7 @@ validated clarification-context module, and orchestrator regression coverage.
 Clarification must stop before tool selection/phrasing while preserving possible
 guarded intent rescue.
 
-### 3. ER-1C: client clarification contract — 5 code files
+### 3. ER-1C: client clarification contract — implemented 2026-07-27
 
 Extend client structured-output types and normalization; exclude clarification
 from saved-insight eligibility; add corresponding unit coverage. Also reproduce
@@ -272,11 +272,40 @@ and inspect the reported free-text path where the Evidence card renders four
 empty bullets, with emphasis on structured-output-to-message normalization; do
 not assume the server evidence payload is empty without tracing both sides.
 
-### 4. ER-1D: candidate UI and request construction — 5 code files
+Delivered: the clarification union on `assistant-types.ts`, a
+`normalizeClarification` that drops incomplete options but keeps a zero-option
+`unresolved` exercise clarification (that arm is the server's "type the name"
+state, and the message must still be marked as a clarification), and a
+save-eligibility rule that refuses any message carrying one.
+
+**Empty-bullet investigation — does not reproduce.** Traced both sides rather
+than assuming. The server's clarification answer does carry a fully empty
+evidence payload (`emptyEvidence` in `assistant-answer-composer.ts`), so the
+report's premise about the data was right. The rendering half is what changed:
+the assistant UI rebuild (`b23e5ef`) made each evidence `<li>` conditional and
+gated the whole 查看依据 block on having any content, so empty arrays now render
+nothing instead of four labelled-but-empty bullets. Pinned by assertion rather
+than by reading — `assistant-clarification.spec.ts` fails if a bullet matching
+`^(工具|训练|组数|规则)：$` ever appears on a clarification turn.
+
+### 4. ER-1D: candidate UI and request construction — implemented 2026-07-27
 
 Wire message bubble/list/panel candidate actions and introduce a pure, tested
 request-payload builder. A current clarification choice outranks older selected
 exercise state.
+
+Delivered: `assistant-request-payload.ts` as the single payload path — the
+composer's normal submit and a tapped candidate both go through it, so the two
+cannot drift. The precedence rule is unit-pinned: a tapped candidate wins over
+`selectedExerciseId`, and it carries its exercise even in a mode that would not
+normally send one. Candidates render as quick-prompt-shaped capsules under the
+coach bubble and are disabled while a turn is streaming. A tapped option submits
+the exercise's display name, which is the same continuation the server sees when
+the name is typed.
+
+Not built: date-range candidate buttons. The union arm is normalized and typed,
+but the server cannot emit a date clarification until ER-2B, so rendering it now
+would be unreachable UI. It belongs to ER-2C.
 
 ### 5. ER-2A: pure date resolver — 2 code files
 

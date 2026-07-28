@@ -1,5 +1,6 @@
 import type {
   AssistantChatMessage,
+  AssistantClarification,
   AssistantMessageEvidence,
   AssistantMessageFaithfulness,
   AssistantMessageSource,
@@ -25,6 +26,70 @@ function normalizeFaithfulness(
     checkedNumbers: faithfulness.checkedNumbers ?? 0,
     unverifiedClaimCount: faithfulness.unverifiedClaims?.length ?? 0,
   };
+}
+
+/**
+ * Normalizes a clarification payload, dropping anything malformed.
+ *
+ * @remarks
+ * A half-valid clarification is worse than none: the buttons would submit an
+ * id the server never offered, so incomplete options are dropped rather than
+ * rendered.
+ *
+ * An exercise clarification with zero options is still kept — that is the
+ * server's `unresolved` state, meaning "type the exercise name", and the
+ * message must stay marked as a clarification so it cannot be saved as an
+ * insight. A date-range clarification with zero options carries nothing at all
+ * and degrades to `undefined`.
+ *
+ * @param output - Raw structured output from the stream
+ * @returns The normalized clarification, or undefined when unusable
+ */
+function normalizeClarification(
+  output: AssistantStructuredOutput,
+): AssistantClarification | undefined {
+  const clarification = output.clarification;
+
+  if (!clarification) {
+    return undefined;
+  }
+
+  if (clarification.kind === "exercise") {
+    const reason =
+      clarification.reason === "ambiguous" ? "ambiguous" : "unresolved";
+    const options = (clarification.options ?? []).flatMap((option) =>
+      option.exercise_id && option.exercise_name
+        ? [
+            {
+              exerciseId: option.exercise_id,
+              exerciseName: option.exercise_name,
+            },
+          ]
+        : [],
+    );
+
+    return { kind: "exercise", options, reason };
+  }
+
+  if (clarification.kind === "date_range") {
+    const options = (clarification.options ?? []).flatMap((option) =>
+      option.label && option.start_date && option.end_date
+        ? [
+            {
+              endDate: option.end_date,
+              label: option.label,
+              startDate: option.start_date,
+            },
+          ]
+        : [],
+    );
+
+    return options.length > 0
+      ? { kind: "date_range", options, reason: "ambiguous" }
+      : undefined;
+  }
+
+  return undefined;
 }
 
 const PLAN_STRATEGIES: readonly AssistantPlanStrategy[] = [
@@ -102,6 +167,7 @@ export function mergeStructuredOutputIntoMessage(
     message.id === assistantMessageId
       ? {
           ...message,
+          clarification: normalizeClarification(output),
           evidence: normalizeEvidence(output),
           faithfulness: normalizeFaithfulness(output),
           intent: output.intent,

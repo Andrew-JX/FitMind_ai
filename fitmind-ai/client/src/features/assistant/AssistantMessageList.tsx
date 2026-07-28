@@ -1,4 +1,5 @@
 import { StateNotice } from "../../components/StateNotice";
+import type { AssistantClarificationChoice } from "./assistant-request-payload";
 import type { AssistantChatMessage } from "./assistant-types";
 import { AssistantMessageBubble } from "./AssistantMessageBubble";
 
@@ -7,8 +8,12 @@ export interface AssistantMessageListProps {
   isMessageSaving?: ((message: AssistantChatMessage) => boolean) | undefined;
   isPlanAccepting?: ((message: AssistantChatMessage) => boolean) | undefined;
   isPlanAccepted?: ((message: AssistantChatMessage) => boolean) | undefined;
+  isSending?: boolean | undefined;
   messages: AssistantChatMessage[];
   onAcceptPlan?: ((message: AssistantChatMessage) => void) | undefined;
+  onClarificationChoice?:
+    | ((choice: AssistantClarificationChoice) => void)
+    | undefined;
   onCopyInsight?: ((message: AssistantChatMessage) => void) | undefined;
   onSaveInsight?: ((message: AssistantChatMessage) => void) | undefined;
 }
@@ -32,9 +37,11 @@ export function AssistantMessageList(props: AssistantMessageListProps) {
           isPlanAccepting={props.isPlanAccepting?.(message)}
           isSaved={props.isMessageSaved?.(message)}
           isSaving={props.isMessageSaving?.(message)}
+          isSending={props.isSending}
           key={message.id}
           message={message}
           onAcceptPlan={props.onAcceptPlan}
+          onClarificationChoice={props.onClarificationChoice}
           onCopyInsight={props.onCopyInsight}
           onSaveInsight={props.onSaveInsight}
         />

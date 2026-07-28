@@ -124,4 +124,81 @@ describe("mergeStructuredOutputIntoMessage", () => {
 
     expect(result[0]?.faithfulness).toBeUndefined();
   });
+
+  it("normalizes an exercise clarification into candidate options", () => {
+    const messages: AssistantChatMessage[] = [
+      { id: "assistant-1", role: "assistant", text: "需要确认动作" },
+    ];
+
+    const result = mergeStructuredOutputIntoMessage(messages, "assistant-1", {
+      clarification: {
+        kind: "exercise",
+        options: [
+          { exercise_id: "ex-1", exercise_name: "杠铃卧推" },
+          { exercise_id: "ex-2", exercise_name: "哑铃卧推" },
+        ],
+        reason: "ambiguous",
+      },
+      intent: "unsupported",
+    });
+
+    expect(result[0]?.clarification).toEqual({
+      kind: "exercise",
+      options: [
+        { exerciseId: "ex-1", exerciseName: "杠铃卧推" },
+        { exerciseId: "ex-2", exerciseName: "哑铃卧推" },
+      ],
+      reason: "ambiguous",
+    });
+  });
+
+  it("keeps an unresolved exercise clarification that carries no options", () => {
+    const messages: AssistantChatMessage[] = [
+      { id: "assistant-1", role: "assistant", text: "请告诉我动作名" },
+    ];
+
+    const result = mergeStructuredOutputIntoMessage(messages, "assistant-1", {
+      clarification: { kind: "exercise", options: [], reason: "unresolved" },
+    });
+
+    expect(result[0]?.clarification).toEqual({
+      kind: "exercise",
+      options: [],
+      reason: "unresolved",
+    });
+  });
+
+  it("drops candidate options that are missing an id or a name", () => {
+    const messages: AssistantChatMessage[] = [
+      { id: "assistant-1", role: "assistant", text: "需要确认动作" },
+    ];
+
+    const result = mergeStructuredOutputIntoMessage(messages, "assistant-1", {
+      clarification: {
+        kind: "exercise",
+        options: [
+          { exercise_id: "ex-1", exercise_name: "杠铃卧推" },
+          { exercise_name: "缺 id 的候选" },
+          { exercise_id: "ex-3" },
+        ],
+        reason: "ambiguous",
+      },
+    });
+
+    expect(result[0]?.clarification?.options).toEqual([
+      { exerciseId: "ex-1", exerciseName: "杠铃卧推" },
+    ]);
+  });
+
+  it("ignores a clarification of an unknown kind", () => {
+    const messages: AssistantChatMessage[] = [
+      { id: "assistant-1", role: "assistant", text: "回答" },
+    ];
+
+    const result = mergeStructuredOutputIntoMessage(messages, "assistant-1", {
+      clarification: { kind: "muscle_group", options: [] },
+    });
+
+    expect(result[0]?.clarification).toBeUndefined();
+  });
 });

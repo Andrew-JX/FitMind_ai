@@ -7,13 +7,17 @@ import { AssistantComposer } from "./AssistantComposer";
 import { AssistantMessageList } from "./AssistantMessageList";
 import { AssistantQuickPrompts } from "./AssistantQuickPrompts";
 import {
+  buildAssistantRequestPayload,
+  buildClarificationChoiceMessage,
+  type AssistantClarificationChoice,
+} from "./assistant-request-payload";
+import {
   buildAssistantInsightCopyText,
   isAssistantMessageSaveEligible,
 } from "./assistant-saved-insights";
 import { saveAssistantInsight } from "./assistant-saved-insights-api";
 import type {
   AssistantChatMessage,
-  AssistantChatRequestPayload,
   AssistantPlanDraft,
   AssistantPromptSuggestion,
 } from "./assistant-types";
@@ -74,23 +78,49 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
       return;
     }
 
-    const range = createDefaultAssistantRange();
-    const payload: AssistantChatRequestPayload = {
-      mode,
+    const payload = buildAssistantRequestPayload({
+      defaultRange: createDefaultAssistantRange(),
       message,
-      start_date: range.start_date,
-      end_date: range.end_date,
-      exercise_id:
-        requiresSelectedExercise || mode === "weekly_report"
-          ? (props.selectedExerciseId ?? undefined)
-          : undefined,
-      session_id: chat.sessionId ?? undefined,
-    };
+      mode,
+      selectedExerciseId: props.selectedExerciseId,
+      sessionId: chat.sessionId,
+    });
 
     props.onPromptSuggestionChange({
       message: "",
       mode: "auto",
     });
+
+    await chat.sendMessage(payload);
+  }
+
+  /**
+   * Answers a pending clarification by submitting the tapped option.
+   *
+   * The choice is passed straight to the payload builder, which is what makes
+   * it outrank any exercise the analysis tab still has selected — otherwise
+   * tapping a candidate could send a stale id and the assistant would answer
+   * about a different exercise than the one the user just picked.
+   */
+  async function handleClarificationChoice(
+    choice: AssistantClarificationChoice,
+  ): Promise<void> {
+    if (chat.isStreaming) {
+      return;
+    }
+
+    const payload = buildAssistantRequestPayload({
+      choice,
+      defaultRange: createDefaultAssistantRange(),
+      message: buildClarificationChoiceMessage(choice),
+      // The clarification carries the entity, not the intent: let the server
+      // re-route the continuation the same way it would a typed answer.
+      mode: "auto",
+      selectedExerciseId: props.selectedExerciseId,
+      sessionId: chat.sessionId,
+    });
+
+    props.onPromptSuggestionChange({ message: "", mode: "auto" });
 
     await chat.sendMessage(payload);
   }
@@ -202,11 +232,15 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
         isPlanAccepting={(assistantMessage) =>
           acceptingPlanIds.has(assistantMessage.id)
         }
+        isSending={chat.isStreaming}
         messages={chat.messages}
         onAcceptPlan={
           props.onAcceptPlan
             ? (assistantMessage) => void handleAcceptPlan(assistantMessage)
             : undefined
+        }
+        onClarificationChoice={(choice) =>
+          void handleClarificationChoice(choice)
         }
         onCopyInsight={(assistantMessage) =>
           void handleCopyInsight(assistantMessage)

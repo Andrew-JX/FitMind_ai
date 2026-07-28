@@ -20,6 +20,10 @@ export function isAssistantMessageSaveEligible(
   return (
     message.role === "assistant" &&
     !message.isStreaming &&
+    // A clarification is half an answer: it asks the user for an entity rather
+    // than reporting anything. Saving one would put a question in the insight
+    // library. (ER-1C)
+    message.clarification === undefined &&
     typeof message.messageId === "string" &&
     typeof message.intent === "string" &&
     ELIGIBLE_INTENTS.has(message.intent)

@@ -90,4 +90,21 @@ describe("assistant saved insight helpers", () => {
     expect(text).not.toContain("workout-1");
     expect(text).not.toContain("set-1");
   });
+
+  it("refuses to save a message that is still asking for clarification", () => {
+    expect(
+      isAssistantMessageSaveEligible({
+        clarification: {
+          kind: "exercise",
+          options: [{ exerciseId: "ex-1", exerciseName: "杠铃卧推" }],
+          reason: "ambiguous",
+        },
+        id: "assistant-1",
+        intent: "weekly_report",
+        messageId: "message-1",
+        role: "assistant",
+        text: "我找到了多个可能的动作",
+      }),
+    ).toBe(false);
+  });
 });

@@ -131,6 +131,36 @@ export interface AssistantMessageFaithfulness {
 
 export type AssistantMessageRole = "user" | "assistant";
 
+export interface AssistantExerciseClarificationOption {
+  exerciseId: string;
+  exerciseName: string;
+}
+
+export interface AssistantDateRangeClarificationOption {
+  label: string;
+  startDate: string;
+  endDate: string;
+}
+
+/**
+ * A turn the server could not answer without one more piece of information.
+ *
+ * Mirrors the server's `assistantClarificationSchema` discriminated union. The
+ * date-range arm exists because it is part of the contract, but the server only
+ * produces it once ER-2 lands, so nothing renders it yet.
+ */
+export type AssistantClarification =
+  | {
+      kind: "exercise";
+      reason: "ambiguous" | "unresolved";
+      options: AssistantExerciseClarificationOption[];
+    }
+  | {
+      kind: "date_range";
+      reason: "ambiguous";
+      options: AssistantDateRangeClarificationOption[];
+    };
+
 export interface AssistantChatMessage {
   id: string;
   messageId?: string | undefined;
@@ -144,6 +174,7 @@ export interface AssistantChatMessage {
   agentTrace?: AssistantAgentTrace | undefined;
   plan?: AssistantPlanDraft | undefined;
   faithfulness?: AssistantMessageFaithfulness | undefined;
+  clarification?: AssistantClarification | undefined;
 }
 
 export interface AssistantActiveToolCall {
@@ -173,6 +204,21 @@ export interface AssistantMessageSource {
 export interface AssistantStructuredOutput {
   intent?: string | undefined;
   message_id?: string | undefined;
+  clarification?:
+    | {
+        kind?: string | undefined;
+        reason?: string | undefined;
+        options?:
+          | Array<{
+              exercise_id?: string | undefined;
+              exercise_name?: string | undefined;
+              label?: string | undefined;
+              start_date?: string | undefined;
+              end_date?: string | undefined;
+            }>
+          | undefined;
+      }
+    | undefined;
   agent_trace?:
     | {
         goal?: string | undefined;

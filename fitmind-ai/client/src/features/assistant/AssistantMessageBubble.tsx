@@ -2,6 +2,7 @@ import { Badge } from "../../components/Badge";
 import { useTheme } from "../../theme/ThemeContext";
 import { AssistantAgentTrace } from "./AssistantAgentTrace";
 import { AssistantPlanCard } from "./AssistantPlanCard";
+import type { AssistantClarificationChoice } from "./assistant-request-payload";
 import { isAssistantMessageSaveEligible } from "./assistant-saved-insights";
 import type { AssistantChatMessage } from "./assistant-types";
 import { BRAND_NEON } from "../../theme/tokens";
@@ -11,8 +12,13 @@ export interface AssistantMessageBubbleProps {
   isSaving?: boolean | undefined;
   isPlanAccepting?: boolean | undefined;
   isPlanAccepted?: boolean | undefined;
+  /** Disables candidate buttons while another turn is already streaming. */
+  isSending?: boolean | undefined;
   message: AssistantChatMessage;
   onAcceptPlan?: ((message: AssistantChatMessage) => void) | undefined;
+  onClarificationChoice?:
+    | ((choice: AssistantClarificationChoice) => void)
+    | undefined;
   onCopyInsight?: ((message: AssistantChatMessage) => void) | undefined;
   onSaveInsight?: ((message: AssistantChatMessage) => void) | undefined;
 }
@@ -55,6 +61,25 @@ export function AssistantMessageBubble(props: AssistantMessageBubbleProps) {
   return (
     <article style={columnStyle(!isAssistant)}>
       <div style={bubbleStyle(theme, isAssistant)}>{message.text}</div>
+
+      {message.clarification?.kind === "exercise" &&
+      message.clarification.options.length > 0 ? (
+        <div style={candidateRowStyle}>
+          {message.clarification.options.map((option) => (
+            <button
+              disabled={props.isSending}
+              key={option.exerciseId}
+              onClick={() =>
+                props.onClarificationChoice?.({ kind: "exercise", option })
+              }
+              style={candidateStyle(theme, props.isSending ?? false)}
+              type="button"
+            >
+              {option.exerciseName}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {hasFooter ? (
         <div style={footerStyle}>
@@ -248,6 +273,42 @@ function typingBubbleStyle(
     color: theme.colors.tx2,
     fontSize: 13,
     padding: "10px 12px",
+  };
+}
+
+/** Candidate options sit under the coach bubble, aligned with it. */
+const candidateRowStyle: React.CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 6,
+  maxWidth: "85%",
+  padding: "0 4px",
+};
+
+/**
+ * One clarification candidate.
+ *
+ * Reuses the quick-prompt capsule shape so the answer to "which exercise?"
+ * looks like the other one-tap prompts rather than a novel control.
+ *
+ * @param theme - Active theme tokens
+ * @param isDisabled - Whether a turn is already in flight
+ * @returns Capsule button style
+ */
+function candidateStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+  isDisabled: boolean,
+): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.divider,
+    border: "none",
+    borderRadius: theme.radius.capsule,
+    color: theme.colors.tx,
+    cursor: isDisabled ? "not-allowed" : "pointer",
+    fontSize: 12,
+    fontWeight: 600,
+    opacity: isDisabled ? 0.45 : 1,
+    padding: "8px 12px",
   };
 }
 
