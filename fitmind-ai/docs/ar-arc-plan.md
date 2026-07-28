@@ -305,7 +305,7 @@ and the complete AR-1 cost/abuse guardrail stack have passed review, so AR-2's
 engineering prerequisites are satisfied. The database-target gate, disposable
 local verifier, paid-call warning, Vercel environment checklist, online smoke,
 and rollback steps are now collected in
-[the AR-2 flip checklist](./ar-2-flip-checklist.md).
+[the AR-2 flip checklist](./archive/ar-2-flip-checklist.md).
 
 Before the user changes production Vercel env, the user must still run local
 live validation with DeepSeek:

@@ -299,254 +299,53 @@ When exceeded, both endpoints return:
 
 ## 5. 训练分析视图模块
 
-这些是普通查询接口，提供给前端展示用（不经过 AI）。AI 工具会调用对应的 service 函数（不是 HTTP）。
+> ⚠️ 本节曾描述一套 `/api/analytics/*` 设计，那套接口**从未实现**，实际建成的是下面的 `/api/training/*`。2026-07-27 更正。
 
-### GET /api/analytics/volume-distribution?weeks=4
+普通查询接口，供前端展示（不经过 AI）。AI 工具调用对应的 service 函数，不走 HTTP。全部需要鉴权，返回统一信封。
 
-最近 N 周的肌群容量分布。
+日期范围参数统一为 `start_date` / `end_date`（`YYYY-MM-DD`，闭区间，非法或倒置返回 `VALIDATION_ERROR`）。
 
-**Response 200**：
+| 端点 | 用途 | 关键返回 |
+| --- | --- | --- |
+| `GET /api/training/summary` | 区间训练汇总 | `range` / `totals`（次数·组数·次数·容量）/ `by_exercise`（按容量降序）/ `evidence` |
+| `GET /api/training/exercise-progress` | 单动作进展，额外需 `exercise_id`(uuid) | `exercise` / `totals`（含 `max_weight_kg`、`estimated_1rm_kg`）/ `sessions`（按时间升序）/ `evidence` |
+| `GET /api/training/muscle-load` | 肌群加权容量分布 | 见「Phase 4.3 Addition」一节 |
+| `GET /api/training/recommendation-context` | 给助手用的确定性上下文预览 | `summary` / `focus_exercises` / `recent_workouts` |
+| `GET /api/training/assistant-insights` | 主动洞察看板数据 | 见「Phase 4.3 Addition」一节 |
+| `GET /api/training/weekly-report` | 周报 | 见「Phase 5.0 Addition」一节 |
 
-```json
-{
-  "ok": true,
-  "data": {
-    "weeks": 4,
-    "by_muscle": [
-      { "muscle_code": "chest", "weighted_volume": 28500, "share": 0.32 },
-      { "muscle_code": "back", "weighted_volume": 24000, "share": 0.27 }
-    ]
-  }
-}
-```
-
-### GET /api/analytics/recovery-status?muscle=legs
-
-单肌群当前恢复状态。
-
-**Response 200**：
-
-```json
-{
-  "ok": true,
-  "data": {
-    "muscle_code": "legs",
-    "fatigue_score": 5.2,            // 0-10
-    "status": "moderate",            // recovered / moderate / high
-    "days_since_last": 2,
-    "last_workout_at": "2026-04-29T10:00:00Z"
-  }
-}
-```
-
-### GET /api/analytics/progress?exercise_code=bench_press_barbell&weeks=8
-
-**Response 200**：
-
-```json
-{
-  "ok": true,
-  "data": {
-    "exercise_code": "bench_press_barbell",
-    "weeks": 8,
-    "data_points": [
-      { "week_start": "...", "estimated_1rm_kg": 110.5 },
-      ...
-    ],
-    "slope_kg_per_week": 0.4,
-    "is_plateau": false,
-    "plateau_weeks": 0
-  }
-}
-```
+**口径约束**：这些端点只做确定性计算，返回里出现的每个数字都必须能由 `evidence` 中的 workout/set 复算出来。`range` 必须回显服务端实际使用的区间——前端文案据此标注，不得自行命名时间窗口。
 
 ------
 
 ## 6. AI 聊天模块（核心）
 
-### POST /api/chat（**SSE 端点，重点**）
+> ⚠️ 本节曾描述 `/api/chat`（POST，SSE）与一组 `/api/sessions` 读取端点，均**从未实现**。实际的助手入口是下面两个。2026-07-27 更正。
 
-**Request**：
+### POST /api/assistant/stream-turn（SSE，主入口）
 
-```json
-{
-  "session_id": "uuid",         // 不传则后端创建新会话
-  "message": "我今天能练腿吗"
-}
-```
+见「6.1 SSE 事件契约」。请求体：`mode` / `message` / `start_date` / `end_date` / 可选 `exercise_id` / 可选 `session_id`（带上即续用同一会话）。
 
-**Response Headers**：
+### POST /api/assistant/mock-turn
 
-```
-Content-Type: text/event-stream
-Cache-Control: no-cache
-Connection: keep-alive
-```
+同一编排的非流式版本，返回一次性 JSON，供测试与不支持 SSE 的客户端使用。
 
-**SSE 事件类型**（前端状态机依据）：
-
-```
-event: state
-data: {"state":"thinking"}
-
-event: state
-data: {"state":"tool_calling","tool":"get_recovery_status"}
-
-event: tool_result
-data: {"tool":"get_recovery_status","output":{"muscle_code":"legs","fatigue_score":5.2,...}}
-
-event: state
-data: {"state":"answering"}
-
-event: text_delta
-data: {"delta":"你的腿部"}
-
-event: text_delta
-data: {"delta":"今天恢复程度中等"}
-
-...
-
-event: structured_output
-data: {"summary":"...","recommendation":"...","evidence":[...],"risk_level":"low","disclaimer":"..."}
-
-event: state
-data: {"state":"done","session_id":"uuid","message_id":"uuid","usage":{"input_tokens":1234,"output_tokens":456}}
-```
-
-**错误事件**：
-
-```
-event: error
-data: {"code":"AI_PROVIDER_ERROR","message":"upstream timeout"}
-```
-
-**注意**：
-
-- 这个接口不能用 `EventSource`（GET-only），必须 fetch + ReadableStream
-- 鉴权用 `Authorization` header（同其他接口）
-
-> 实现说明：当前线上端点是 `POST /api/assistant/stream-turn`，实际事件名是
-> `state` / `session` / `provider_selected` / `tool_call_started` / `tool_call_finished` /
-> `answer_delta` / `structured_output` / `done` / `error`（上方示例是早期草案命名，待整段重写）。
-
-**多步 Agent 事件（Phase 6.0，`next_week_plan` intent）**：
-
-`next_week_plan` 走多步 ReAct 规划器，额外发以下事件，并新增 `state: "planning"`：
-
-```
-event: state
-data: {"state":"planning"}
-
-event: agent_step_started
-data: {"index":1,"kind":"tool","title":"查训练容量","thought":"...","tool_name":"get_weekly_training_report"}
-
-event: agent_step_finished
-data: {"index":1,"status":"success","duration_ms":12,"observation":"训练 4 次 / 40 组；约每周 4 次；..."}
-
-...（找弱项 / 查进展 / 检索知识 / 生成草案，共最多 5 步）
-
-event: structured_output
-data: {"intent":"next_week_plan","answer":{...},"agent_trace":{...},"plan":{"strategy":"maintain","exercises":[{"exercise_name":"Barbell Bench Press","sets":3,"rep_min":6,"rep_max":10,"target_weight_kg":72.5,"basis":"基于估算 1RM ..."}],"notes":["..."]}}
-```
-
-- `kind`：`tool` | `retrieval` | `synthesis`；`status`：`success` | `error` | `skipped`。
-- `agent_trace` 随 `structured_output` 一并持久化到消息，可在历史里重渲染 trace 时间线。
-- `structured_output` 在 `next_week_plan` agent 路径可选带 `plan`：确定性生成的可执行下周草案 `{ strategy, exercises[{ exercise_name, sets, rep_min, rep_max, target_weight_kg, basis }], notes[] }`（见 `ai-decisions.md` D23）。`target_weight_kg` 仅在有真实重量基线（估算 1RM / 近期最高重量）时给出，否则为 `null`（不编造）。**结构化字段、不内联进答案文本**——因此不进入 faithfulness 数字扫描。本片先不落库；前端结构化渲染留作后续 Slice。
-- `structured_output` 可选带 `faithfulness`：`{ status: "verified" | "flagged", checkedNumbers, unverifiedClaims[] }`（运行时确定性 faithfulness 校验结果，见 `ai-decisions.md` D21）。常规工具路径与 `next_week_plan` agent 路径会带；knowledge/unsupported 等无工具数据的路径不带。仅标注、不改答案文案。前端可据此渲染"数据已核对"徽章（后续 Slice）。
-- **Token/成本是服务端运维 telemetry，不进响应**：每轮 LLM token 用量（路由 + 可选 11.3b 措辞）只进后端 `assistant_turn` 日志行，**不**出现在 `structured_output` / 响应 DTO（见 `ai-decisions.md` D40 / C1）。客户端不依赖 Groq/OpenAI 的 usage 结构。
-- **Safety 是服务端 telemetry，不进响应**：Slice 10 急性/模糊疼痛、红旗症状、诊断/治疗/用药请求会在路由前短路到确定性安全模板；公开响应仍是 `intent: "unsupported"`，不新增 `safety` DTO 字段。服务端 `assistant_turn` 日志带 `safety_boundary` / `safety_reason`（见 `ai-decisions.md` D41）。Phase 1 前端不区分普通 unsupported 与安全拒答。
-- **动作实体解析与澄清（ER-1B）**：safety 短路之后、intent 路由和任何 tool-selection/phrasing 之前，服务端从 canonical exercise dictionary 运行确定性整句解析。动作优先级为显式 `exercise_id` > 消息唯一匹配 > clarification。需要动作的 intent 若缺失、词典外或歧义，正常发送 `answer_delta`、带下述 `clarification` 的 `structured_output` 和 `done`，不调用 tool-selection 或 phrasing。确定性 intent 未命中时，受既有 guard/预算约束的 intent rescue 仍可能在澄清前发生并计费。
-- `structured_output` 可选带 `clarification`：`{ kind:"exercise", reason:"ambiguous"|"unresolved", options:[{ exercise_id, exercise_name }] }`，候选最多 5 个。响应文案允许直接回复完整动作名；客户端候选按钮和类型映射留给 ER-1C/ER-1D。
-- 澄清的原问题、请求 mode、解析 intent、动作解析状态与候选保存在 assistant message 的既有 JSON metadata。只有同一用户会话最新一条 assistant message 可续接；允许候选的直接完整动作回复会恢复原问题，下一条 assistant message 不再携带 pending context，因此状态用完失效。改问其他问题按新 turn 路由。无 migration。
-- **Provider 已产出非法工具参数时继续确定性降级**：真实 provider 已返回、但其 tool call 缺参或参数非法时，仍使用既有中文引导并以 `done` 完成，不把 Zod/provider 英文错误或 HTTP 400 暴露给客户端。这里不改变请求 DTO 自身的 schema 校验：客户端提交非法顶层请求仍可返回 `400 VALIDATION_ERROR`。
-- **Tool 参数降级是服务端 telemetry，不进响应**：`assistant_turn` 日志用 `tool_argument_fallback`、`tool_argument_fallback_reason`、`tool_argument_fallback_tool`、`tool_argument_fields`、`tool_argument_validation_error_code` 区分请求前置短路与 provider tool-call 校验兜底；公开 DTO 与 SSE 事件集合不新增字段（见 `ai-decisions.md` D50）。
-- 前端对未知事件类型必须**忽略**（向前兼容），不能当成错误处理。
-- 客户端可通过 `AbortController` 中断；后端要妥善处理 connection close
-
-### GET /api/sessions
-
-查询会话列表（鉴权）。
-
-**Response 200**：
-
-```json
-{
-  "ok": true,
-  "data": {
-    "items": [
-      { "id": "uuid", "title": "腿日恢复咨询", "last_message_at": "...", "message_count": 4 }
-    ]
-  }
-}
-```
-
-### GET /api/sessions/:id/messages
-
-查询会话内的所有消息（用于刷新页面后恢复对话）。
-
-**Response 200**：
-
-```json
-{
-  "ok": true,
-  "data": {
-    "session": { "id": "uuid", "title": "..." },
-    "messages": [
-      {
-        "id": "uuid",
-        "role": "user",
-        "content": [{ "type": "text", "text": "我今天能练腿吗" }],
-        "created_at": "..."
-      },
-      {
-        "id": "uuid",
-        "role": "assistant",
-        "content": [
-          { "type": "tool_use", "id": "tu_1", "name": "get_recovery_status", "input": { "muscle_group": "legs" } },
-          { "type": "text", "text": "..." }
-        ],
-        "structured_output": { ... },  // 业务封装的 JSON
-        "created_at": "..."
-      }
-    ]
-  }
-}
-```
-
-### DELETE /api/sessions/:id
-
-删除会话（级联删消息）。
+两个端点都挂 per-user 限流（见 §9）。会话历史目前没有独立的读取端点：`session_id` 由 `done` 事件回传，客户端自行保留。
 
 ------
 
 ## 7. 用户数据管理
 
-### GET /api/me
+> ⚠️ 本节曾描述 `/api/me` 的读取（用户总体统计）与删除（注销并级联删除）两个端点，均**未实现**。当前只有下列端点。2026-07-27 更正。
 
-返回当前用户的总体统计。
+| 端点 | 用途 |
+| --- | --- |
+| `GET /api/auth/me` | 返回当前登录用户（见 §2），不含统计 |
+| `GET /api/athlete-profile` / `PUT /api/athlete-profile` | 训练档案，见「Slice 4 Addition」一节 |
+| `POST /api/feedback` | 应用内反馈。请求体 `message`（必填）+ 可选 `source_route`；返回创建的反馈 id |
 
-**Response 200**：
+账户注销尚未实现，需要时另行设计（涉及级联删除范围与不可逆确认）。
 
-```json
-{
-  "ok": true,
-  "data": {
-    "user": { ... },
-    "stats": {
-      "total_workouts": 87,
-      "total_sets": 1240,
-      "first_workout_at": "...",
-      "ai_calls_today": 7
-    }
-  }
-}
-```
-
-### DELETE /api/me
-
-注销账户，级联删除所有数据。
-
-------
 
 ## 8. Tool Calling 内部约定（后端实现要点）
 

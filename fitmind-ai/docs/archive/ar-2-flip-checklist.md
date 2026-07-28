@@ -1,7 +1,13 @@
 # AR-2 DeepSeek flip checklist
 
-**Status:** checklist ready; local live validation and the Vercel change are
-still user-operated and have not been run.
+**Status: archived 2026-07-27 — this flip has been executed.**
+
+AR-2 went live on 2026-07-16: the user set the four environment variables in
+Vercel and redeployed, and production has been answering with real DeepSeek
+since. This file is kept for its rollback path and for the `AR2_DB_TARGET`
+guard that stops local verification from writing to the production Neon
+database — not as a pending task. The header below described the pre-flip state
+and is left intact as the record of what was actually run.
 
 AR-2 changes no application code and grants Codex no authority to change Vercel
 or any other online environment. The temporary verifier below is local-only,
