@@ -5155,3 +5155,21 @@ the focused `ui-finishers` suite passes 7/7 with a green exit. The full browser
 suite reports all 13 cases `ok`; as in PL-1, the parallel Windows run then hangs
 while reclaiming its self-started Vite process and is terminated after all
 results print.
+
+## 2026-07-27 — 色值 token 收口 + 前端现状文档重写
+
+**Token 收口（`1812dba` + `442fee9`，计划见 `color-token-consolidation-plan.md`）**
+
+`UI_SPEC §1.1` 写着"组件内部禁止硬编码色值"，实际 `client/src` 里散着 32 处品牌色字面量，且每轮 UI 批次都在增加。外部锐评点出了这个数字（准确），但把成因判成"知道有 token 却偷懒"，并建议全部改用 `theme.colors.ac` —— 照做会砸掉浅色主题：`ac` 浅色是 `#5c7404`，而设计交接文档把品牌按钮 / FAB / Logo / Toast 列为两主题相同。
+
+真正缺的是**一个主题不变的品牌 token**。逐处分类后：21 处品牌不变色 → `BRAND_NEON` / `brandAlpha()`（零渲染变化，实测 computed style 与迁移前一致，并用临时 Playwright 探针确认切浅色后 FAB / Toast 描边 / 发送按钮仍是霓虹）；8 处双主题都刷霓虹的色底 → `accentAlpha()`（浅色可见变化，已截图）；3 处本来就主题感知、只是写成字面量 → `accentAlpha()`，顺带消灭一个 tokens 里不存在的第三种绿 `#4a8c00`。
+
+T-3 加了 ESLint `no-restricted-syntax`，字符串与模板块内的品牌字面量一律报错，仅豁免 `tokens.ts` 与钉值测试；**演示**过它有效（塞回一处 → lint 从 0 错变 1 错）。至此 §1.1 从一句话变成门禁。
+
+**前端现状文档重写（roadmap §8.2 E1）**
+
+`frontend-current-state.md` 542 行里 505 行是 2026-05-07 快照。它不只是过时 —— §10 是**有害**的：`UI_SPEC §8` 引用它当"重构不可破坏"的权威清单，而其中写着"不改 token 的内存保存逻辑、不把 token 写入 cookie"，与 D19 的 HttpOnly cookie 会话直接冲突；另有三条在保护已删除的东西（`TrainingSummaryPanel`、分析页的 `RecommendationContextPanel`、点选动作驱动 quick prompt 的旧联动）。
+
+重写为 82 行：现状速览（只记变化慢的结构性事实）+ 仍成立的约束（含从 D 系列提炼的诚实性条款）+ 保留的增量决策记录。明确声明**不再镜像代码** —— 上一版正是因为镜像代码才烂掉。同步修正 `UI_SPEC` 两处"第 10 节"引用与 `roadmap` 的 E1 状态和 Last updated 时间戳。
+
+顺带发现 `AthleteProfileButton.tsx` 已无人引用（档案入口随设计稿改版移进了个人 Tab 的 `ProfileView`），与 `AssistantStatusRail.tsx`、`AssistantToolCallCard.tsx` 一并记为待清理死代码。

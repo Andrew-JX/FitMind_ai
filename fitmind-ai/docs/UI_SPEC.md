@@ -3,7 +3,7 @@
 > **本文档是前端视觉与交互的唯一真相来源。**
 > 任何前端组件在编写前必须先读本文档（见 AGENTS.md 规则）。
 > 本文档只管「长什么样、怎么交互」，不改后端 API、不改数据流、不改状态机语义。
-> 逻辑约束详见 `docs/frontend-current-state.md` 第 10 节。
+> 逻辑约束详见 `docs/frontend-current-state.md` 第 2 节。
 
 ---
 
@@ -792,7 +792,7 @@ strokeLinejoin="round"
 
 ## 8. 不可更改的逻辑约束
 
-以下逻辑在 UI 重构中**必须保留**，完整列表见 `docs/frontend-current-state.md` 第 10 节。
+以下逻辑在 UI 重构中**必须保留**，完整列表见 `docs/frontend-current-state.md` 第 2 节。
 此处列出与 UI 直接相关的关键项：
 
 1. **Token 内存保存**：不写入 localStorage / sessionStorage / cookie
