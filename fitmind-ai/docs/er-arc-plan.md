@@ -307,10 +307,21 @@ Not built: date-range candidate buttons. The union arm is normalized and typed,
 but the server cannot emit a date clarification until ER-2B, so rendering it now
 would be unreachable UI. It belongs to ER-2C.
 
-### 5. ER-2A: pure date resolver — 2 code files
+### 5. ER-2A: pure date resolver — 2 code files — implemented, awaiting review
 
 Add the timezone-aware resolver and tests for Sunday boundaries, month starts,
 cross-month/year behavior, DST, invalid zones, and conflicting supported terms.
+
+Implemented 2026-07-27 as `assistant-date-resolver.ts` plus its test. The module
+is intentionally unwired — ER-2B owns the request contract and orchestrator
+call site. Two additions beyond the literal spec, both to keep a wrong range
+from being presented as a right one:
+
+- Shadowing guard: 上上周 / 上上个星期 / 下个星期 contain a supported variant as
+  a substring. They resolve to `absent` rather than to the variant they shadow.
+- An unusable IANA zone or invalid reference instant resolves to `absent`, so
+  the caller keeps its default window instead of computing a term against the
+  wrong calendar.
 
 ### 6. ER-2B: date request and server wiring — at most 5 code files
 
