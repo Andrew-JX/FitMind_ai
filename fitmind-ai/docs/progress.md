@@ -5128,3 +5128,30 @@ files / 491 tests. The complete browser suite reports all 10 cases `ok`,
 including the new regression; in this Windows sandbox the Playwright command
 then hangs while reclaiming its self-started Vite process and is terminated by
 the outer timeout after all results have printed.
+
+## 2026-07-27 PL-3: expired plan lifecycle and archive action
+
+Implemented client-side plan expiry without adding a UTC server lifecycle. A
+pure date-only classifier compares the plan's `endDate` with the device-local
+calendar date; yesterday is expired, today remains active, and month/year
+boundaries require no millisecond or DST arithmetic.
+
+Expired cards now read 「计划回顾」, carry an 「已过期」 status chip, preserve the
+plan's real date window and final adherence, and make 「归档」 the primary action
+while retaining 「放弃计划」. Archive writes `completed`, so the closed plan stays
+eligible for future D42 adherence context; the existing `/current` refresh then
+returns the established empty state.
+
+PL-1 review findings R1/R2 are included. Missing token/plan early returns now
+write a visible `actionError`. Accept, abandon, and archive only return a success
+signal after both their mutation and follow-up refresh complete, so a refresh
+failure leaves the card in place and cannot emit a success toast.
+
+Classifier unit tests pin yesterday/today/tomorrow, cross-month, cross-year, and
+timezone-independent string comparison. Playwright pins expired copy, the
+`completed` PATCH body, archive rejection without optimistic clearing, and the
+PATCH-success/refresh-failure path. `pnpm verify` passes 75 files / 497 tests;
+the focused `ui-finishers` suite passes 7/7 with a green exit. The full browser
+suite reports all 13 cases `ok`; as in PL-1, the parallel Windows run then hangs
+while reclaiming its self-started Vite process and is terminated after all
+results print.

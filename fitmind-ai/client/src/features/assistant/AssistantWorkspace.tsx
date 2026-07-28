@@ -45,6 +45,7 @@ export function AssistantWorkspace(props: AssistantWorkspaceProps) {
         actionError={currentPlan.actionError}
         isMutating={currentPlan.isMutating}
         onAbandon={currentPlan.abandon}
+        onArchive={currentPlan.archive}
         plan={currentPlan.plan}
         status={currentPlan.status}
       />

@@ -146,7 +146,7 @@ test("plan abandon reports the settled outcome without a false success", async (
   await expect(page.getByRole("status")).toHaveText(
     "放弃计划失败，请查看卡片中的错误信息。",
   );
-  await expect(page.getByText("已放弃本周计划")).toHaveCount(0);
+  await expect(page.getByText("计划已放弃")).toHaveCount(0);
   await expect(
     page
       .getByText(
@@ -159,11 +159,198 @@ test("plan abandon reports the settled outcome without a false success", async (
 
   await abandon.click();
 
-  await expect(page.getByRole("status")).toHaveText("已放弃本周计划");
+  await expect(page.getByRole("status")).toHaveText("计划已放弃");
   await expect(page.getByRole("status")).toHaveCount(1);
   await expect(page.getByText("还没有本周计划。")).toBeVisible();
   expect(patchCount).toBe(2);
   await page.close();
+});
+
+test("expired plan reads as expired and archives as completed", async ({
+  page,
+}) => {
+  await installApiMocks(page, { authenticated: true });
+
+  const expiredPlan = {
+    id: "33333333-3333-4333-8333-333333333333",
+    status: "active",
+    startDate: "2025-12-22",
+    endDate: "2025-12-28",
+    plan: {
+      strategy: "维持基线",
+      exercises: [],
+      notes: [],
+    },
+    sourceMessageId: null,
+    createdAt: "2025-12-22T08:00:00.000Z",
+    updatedAt: "2025-12-22T08:00:00.000Z",
+    adherence: {
+      planned_exercise_count: 1,
+      trained_exercise_count: 1,
+      extra_exercise_count: 0,
+      exercise_adherence_ratio: 1,
+      set_adherence_ratio: 0.75,
+      exercises: [],
+    },
+  };
+  let activePlan: typeof expiredPlan | null = expiredPlan;
+  let patchedStatus: string | null = null;
+
+  await page.route("**/api/planned-workouts/current", (route) =>
+    route.fulfill(jsonRoute({ plannedWorkout: activePlan })),
+  );
+  await page.route(
+    "**/api/planned-workouts/33333333-3333-4333-8333-333333333333",
+    async (route) => {
+      const body: unknown = route.request().postDataJSON();
+      patchedStatus =
+        typeof body === "object" &&
+        body !== null &&
+        "status" in body &&
+        typeof body.status === "string"
+          ? body.status
+          : null;
+      activePlan = null;
+
+      return route.fulfill(
+        jsonRoute({ plannedWorkout: { ...expiredPlan, status: "completed" } }),
+      );
+    },
+  );
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "AI 助手" }).click();
+
+  await expect(page.getByRole("heading", { name: "计划回顾" })).toBeVisible();
+  await expect(page.getByText("已过期", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "本周计划" })).toHaveCount(0);
+  await expect(page.getByText("2025-12-22 ~ 2025-12-28").last()).toBeVisible();
+
+  await page.getByRole("button", { name: "归档", exact: true }).click();
+
+  await expect(page.getByRole("status")).toHaveText("计划已归档");
+  await expect(page.getByText("还没有本周计划。")).toBeVisible();
+  expect(patchedStatus).toBe("completed");
+});
+
+test("archive failure keeps the expired card and surfaces the server error", async ({
+  page,
+}) => {
+  await installApiMocks(page, { authenticated: true });
+
+  const expiredPlan = {
+    id: "44444444-4444-4444-8444-444444444444",
+    status: "active",
+    startDate: "2025-12-22",
+    endDate: "2025-12-28",
+    plan: { strategy: "维持基线", exercises: [], notes: [] },
+    sourceMessageId: null,
+    createdAt: "2025-12-22T08:00:00.000Z",
+    updatedAt: "2025-12-22T08:00:00.000Z",
+    adherence: {
+      planned_exercise_count: 0,
+      trained_exercise_count: 0,
+      extra_exercise_count: 0,
+      exercise_adherence_ratio: 0,
+      set_adherence_ratio: 0,
+      exercises: [],
+    },
+  };
+
+  await page.route("**/api/planned-workouts/current", (route) =>
+    route.fulfill(jsonRoute({ plannedWorkout: expiredPlan })),
+  );
+  await page.route(
+    "**/api/planned-workouts/44444444-4444-4444-8444-444444444444",
+    (route) =>
+      route.fulfill({
+        body: JSON.stringify({
+          ok: false,
+          error: {
+            code: "INTERNAL_ERROR",
+            message: "Archive update failed.",
+          },
+        }),
+        contentType: "application/json",
+        status: 500,
+      }),
+  );
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "AI 助手" }).click();
+  await page.getByRole("button", { name: "归档", exact: true }).click();
+
+  await expect(page.getByRole("status")).toHaveText(
+    "归档失败，请查看卡片中的错误信息。",
+  );
+  await expect(page.getByText("计划已归档")).toHaveCount(0);
+  await expect(
+    page.getByText("请求失败（HTTP 500）：Archive update failed.").last(),
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "计划回顾" })).toBeVisible();
+});
+
+test("archive does not toast success when the follow-up refresh fails", async ({
+  page,
+}) => {
+  await installApiMocks(page, { authenticated: true });
+
+  const expiredPlan = {
+    id: "55555555-5555-4555-8555-555555555555",
+    status: "active",
+    startDate: "2025-12-22",
+    endDate: "2025-12-28",
+    plan: { strategy: "维持基线", exercises: [], notes: [] },
+    sourceMessageId: null,
+    createdAt: "2025-12-22T08:00:00.000Z",
+    updatedAt: "2025-12-22T08:00:00.000Z",
+    adherence: {
+      planned_exercise_count: 0,
+      trained_exercise_count: 0,
+      extra_exercise_count: 0,
+      exercise_adherence_ratio: 0,
+      set_adherence_ratio: 0,
+      exercises: [],
+    },
+  };
+  let currentRequestCount = 0;
+
+  await page.route("**/api/planned-workouts/current", (route) => {
+    currentRequestCount += 1;
+
+    if (currentRequestCount === 1) {
+      return route.fulfill(jsonRoute({ plannedWorkout: expiredPlan }));
+    }
+
+    return route.fulfill({
+      body: JSON.stringify({
+        ok: false,
+        error: { code: "INTERNAL_ERROR", message: "Refresh failed." },
+      }),
+      contentType: "application/json",
+      status: 500,
+    });
+  });
+  await page.route(
+    "**/api/planned-workouts/55555555-5555-4555-8555-555555555555",
+    (route) =>
+      route.fulfill(
+        jsonRoute({ plannedWorkout: { ...expiredPlan, status: "completed" } }),
+      ),
+  );
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "AI 助手" }).click();
+  await page.getByRole("button", { name: "归档", exact: true }).click();
+
+  await expect(page.getByRole("status")).toHaveText(
+    "归档失败，请查看卡片中的错误信息。",
+  );
+  await expect(page.getByText("计划已归档")).toHaveCount(0);
+  await expect(
+    page.getByText("请求失败（HTTP 500）：Refresh failed.").last(),
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "计划回顾" })).toBeVisible();
 });
 
 test("workout list pages through real server cursors", async ({ page }) => {

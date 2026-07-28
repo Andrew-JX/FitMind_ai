@@ -170,12 +170,34 @@ export async function abandonPlannedWorkout(
   token: string | null,
   planId: string,
 ): Promise<PlannedWorkout> {
+  return updatePlannedWorkoutStatus(token, planId, "abandoned");
+}
+
+/**
+ * Archives a planned workout while preserving it for future adherence context.
+ *
+ * @param token - In-memory auth token
+ * @param planId - The plan id to archive
+ * @returns The updated planned workout
+ */
+export async function archivePlannedWorkout(
+  token: string | null,
+  planId: string,
+): Promise<PlannedWorkout> {
+  return updatePlannedWorkoutStatus(token, planId, "completed");
+}
+
+async function updatePlannedWorkoutStatus(
+  token: string | null,
+  planId: string,
+  status: "abandoned" | "completed",
+): Promise<PlannedWorkout> {
   const data = await requestJson<
     { plannedWorkout: PlannedWorkout },
-    { status: "abandoned" }
+    { status: "abandoned" | "completed" }
   >(`/api/planned-workouts/${planId}`, {
     method: "PATCH",
-    body: { status: "abandoned" },
+    body: { status },
     token,
   });
 

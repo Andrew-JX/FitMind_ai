@@ -4,6 +4,7 @@ import { HttpClientError } from "../../services/http-client";
 import {
   abandonPlannedWorkout,
   acceptPlannedWorkout,
+  archivePlannedWorkout,
   getCurrentPlannedWorkout,
   type PlannedWorkoutWithAdherence,
 } from "./planned-workout-api";
@@ -16,12 +17,13 @@ export interface UseCurrentPlanResult {
   status: CurrentPlanStatus;
   isMutating: boolean;
   actionError: string | null;
-  refresh: () => Promise<void>;
+  refresh: () => Promise<boolean>;
   accept: (
     draft: AssistantPlanDraft,
     sourceMessageId?: string | undefined,
   ) => Promise<boolean>;
   abandon: () => Promise<boolean>;
+  archive: () => Promise<boolean>;
 }
 
 /**
@@ -29,7 +31,7 @@ export interface UseCurrentPlanResult {
  * persistent plan card.
  *
  * @param token - In-memory auth token
- * @returns The current plan, load status, and accept/abandon/refresh actions
+ * @returns The current plan, load status, and accept/abandon/archive/refresh actions
  */
 export function useCurrentPlan(token: string | null): UseCurrentPlanResult {
   const [plan, setPlan] = useState<PlannedWorkoutWithAdherence | null>(null);
@@ -37,12 +39,12 @@ export function useCurrentPlan(token: string | null): UseCurrentPlanResult {
   const [isMutating, setIsMutating] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const refresh = useCallback(async (): Promise<void> => {
+  const refresh = useCallback(async (): Promise<boolean> => {
     if (!token) {
       setPlan(null);
       setStatus("idle");
       setActionError(null);
-      return;
+      return true;
     }
 
     setStatus("loading");
@@ -52,11 +54,13 @@ export function useCurrentPlan(token: string | null): UseCurrentPlanResult {
       const current = await getCurrentPlannedWorkout(token);
       setPlan(current);
       setStatus("ready");
+      return true;
     } catch (error) {
       setActionError(
         getReadableErrorMessage(error, "本周计划加载失败，请稍后再试。"),
       );
       setStatus("error");
+      return false;
     }
   }, [token]);
 
@@ -70,6 +74,7 @@ export function useCurrentPlan(token: string | null): UseCurrentPlanResult {
       sourceMessageId?: string | undefined,
     ): Promise<boolean> => {
       if (!token) {
+        setActionError("当前会话不可用，请重新登录后再试。");
         return false;
       }
 
@@ -78,8 +83,7 @@ export function useCurrentPlan(token: string | null): UseCurrentPlanResult {
 
       try {
         await acceptPlannedWorkout(token, { plan: draft, sourceMessageId });
-        await refresh();
-        return true;
+        return await refresh();
       } catch (error) {
         setActionError(
           getReadableErrorMessage(error, "接受计划失败，请稍后再试。"),
@@ -94,6 +98,11 @@ export function useCurrentPlan(token: string | null): UseCurrentPlanResult {
 
   const abandon = useCallback(async (): Promise<boolean> => {
     if (!token || !plan) {
+      setActionError(
+        token
+          ? "当前没有可放弃的计划，请刷新后再试。"
+          : "当前会话不可用，请重新登录后再试。",
+      );
       return false;
     }
 
@@ -102,11 +111,36 @@ export function useCurrentPlan(token: string | null): UseCurrentPlanResult {
 
     try {
       await abandonPlannedWorkout(token, plan.id);
-      await refresh();
-      return true;
+      return await refresh();
     } catch (error) {
       setActionError(
         getReadableErrorMessage(error, "放弃计划失败，请稍后再试。"),
+      );
+      return false;
+    } finally {
+      setIsMutating(false);
+    }
+  }, [token, plan, refresh]);
+
+  const archive = useCallback(async (): Promise<boolean> => {
+    if (!token || !plan) {
+      setActionError(
+        token
+          ? "当前没有可归档的计划，请刷新后再试。"
+          : "当前会话不可用，请重新登录后再试。",
+      );
+      return false;
+    }
+
+    setIsMutating(true);
+    setActionError(null);
+
+    try {
+      await archivePlannedWorkout(token, plan.id);
+      return await refresh();
+    } catch (error) {
+      setActionError(
+        getReadableErrorMessage(error, "归档计划失败，请稍后再试。"),
       );
       return false;
     } finally {
@@ -122,6 +156,7 @@ export function useCurrentPlan(token: string | null): UseCurrentPlanResult {
     refresh,
     accept,
     abandon,
+    archive,
   };
 }
 

@@ -2,8 +2,9 @@
 
 Status: **in execution**. Authored 2026-07-27 after the user's first real-device
 pass over the finished UI (main at `2ac9411`). The one open decision it carried
-was resolved the same day and is folded into PL-3. PL-1 is implemented and
-reviewed; PL-2 went dormant when the failure stopped reproducing; PL-3 is next.
+was resolved the same day and is folded into PL-3. PL-1 and PL-3 are implemented
+and verified; PL-2 went dormant when the failure stopped reproducing; PL-4 is
+next.
 
 The trigger was two reports from that pass:
 
@@ -190,7 +191,7 @@ workaround.
 
 No batch may "fix" this by catching the error and pretending success.
 
-### PL-3 — expired plans read as expired and can be archived — at most 5 code files
+### PL-3 — implemented: expired plans read as expired and can be archived — five production code files
 
 Decision taken by the user on 2026-07-27: **归档**.
 
@@ -201,9 +202,11 @@ introduces — so a server-side lifecycle field should wait for that plumbing
 rather than inventing a second, UTC-only notion of "today" that would be off by
 a day for this user.
 
-Expected files: a pure lifecycle module beside `assistant-date-range.ts`, its
-test, `AssistantCurrentPlanCard.tsx`, `use-current-plan.ts`,
-`AssistantWorkspace.tsx`.
+Implemented production files: a pure lifecycle module beside
+`assistant-date-range.ts`, `planned-workout-api.ts`,
+`AssistantCurrentPlanCard.tsx`, `use-current-plan.ts`, and
+`AssistantWorkspace.tsx`. The classifier's unit test and the existing
+`ui-finishers.spec.ts` Playwright fixture are the two verification files.
 
 #### Classifier
 
@@ -323,7 +326,7 @@ Two cross-links worth honoring during execution:
 ## Recommended execution order
 
 ```
-PL-1 (done, awaiting merge)  →  PL-3  →  PL-4
+PL-1 (done)  →  PL-3 (done)  →  PL-4
       →  ER-1C  →  ER-1D  →  ER-2A  →  ER-2B  →  ER-2C  →  ER-3  →  ER-EVAL
 
 PL-2: dormant, reactivated only by a recurrence (see PL-2 for what to capture)

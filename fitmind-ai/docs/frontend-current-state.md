@@ -515,13 +515,14 @@ assistant 的 exercise progress quick prompt 复用逻辑。
 
 助手消息带结构化 `plan`（`next_week_plan` 草案）时，在消息气泡里（agent trace 之下、Evidence 之上）渲染 `AssistantPlanCard`：策略 chip + 动作行（名称 / 目标重量 / "N 组 × a~b 次" / basis）+ notes。`plan` 由 `mergeStructuredOutputIntoMessage` 的 `normalizePlan` 从 `structured_output.plan` 归一化到 `message.plan`。目标重量为 null 时显示"沿用上次重量"（不编造）。详见 `UI_SPEC.md §4.3.3`。
 
-## 本周计划 + 接受计划（2026-06-14，roadmap §8 FE-2）
+## 本周计划 + 接受计划（2026-06-14；2026-07-27 PL-3）
 
 心智模型=本周「目标动作集」：接受一次设为本周目标，常驻卡片哪天打开都在，真实训练按周自动匹配依从度（不强排到具体某天）。
 
-- `planned-workout-api.ts`：`getCurrentPlannedWorkout` / `acceptPlannedWorkout`（周期=今天起 7 天，client 端 `denormalizePlanDraft` 转回 snake_case）/ `abandonPlannedWorkout`。
-- `use-current-plan.ts`：hook，token 变化时拉 `GET /current`，暴露 `accept`/`abandon`/`refresh` + status/isMutating/actionError。`abandon` 返回 `Promise<boolean>`；三个请求路径都保留 `HttpClientError` 的 HTTP 状态和服务端 message，非 HTTP 错误才使用中文 fallback。
-- `AssistantCurrentPlanCard.tsx`：常驻在助手页顶部（`AssistantWorkspace` 内，IntroCard 之下）。计划 + 逐动作 done/partial/missed 状态 chip + 依从比例进度条 + 放弃按钮；空/加载/错误态齐全。放弃操作结算后才弹结果 toast，失败不报成功；mutation 期间放弃与展开/收起按钮同时禁用。
+- `planned-workout-api.ts`：`getCurrentPlannedWorkout` / `acceptPlannedWorkout`（周期=今天起 7 天，client 端 `denormalizePlanDraft` 转回 snake_case）/ `abandonPlannedWorkout` / `archivePlannedWorkout`。归档写 `completed`，放弃写 `abandoned`，两者语义不合并。
+- `assistant-plan-lifecycle.ts`：纯 date-only 分类器，注入 `today` 后用字典序判断；`endDate < today` 为 expired，结束当天仍 active。运行时 today 复用 `assistant-date-range.ts` 的设备本地日期格式化结果，不做 `Date` 毫秒运算。
+- `use-current-plan.ts`：hook，token 变化时拉 `GET /current`，暴露 `accept`/`abandon`/`archive`/`refresh` + status/isMutating/actionError。四个动作返回 `Promise<boolean>`；mutation 的成功信号包含后续 refresh，刷新失败不会发成功 toast。缺 token/plan 的早退也写 `actionError`。所有请求路径保留 `HttpClientError` 的 HTTP 状态和服务端 message，非 HTTP 错误才使用中文 fallback。
+- `AssistantCurrentPlanCard.tsx`：常驻在助手页顶部（`AssistantWorkspace` 内，IntroCard 之下）。active 计划保持「本周计划」；expired 计划显示「计划回顾」+「已过期」，保留真实周期、依从度和展开明细，以「归档」为主操作且仍可放弃。归档/放弃结算后才弹结果 toast，失败不报成功；mutation 期间三个操作与展开/收起同时禁用。
 - 接受按钮：`AssistantPlanCard` 底部「设为本周计划」，handler 在 `AssistantChatPanel`（accepting/accepted by message.id），drill 路径同 `onSaveInsight`（panel→list→bubble→plan card）；接受成功后 hook.accept 内部 refresh 顶部卡片。
 
 约束补充：accept 的周期窗口固定为接受当天起 7 天；目标重量为 null 的动作不编造数字。

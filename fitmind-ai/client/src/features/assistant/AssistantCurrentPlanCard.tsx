@@ -8,6 +8,10 @@ import type {
   PlanAdherenceExercise,
   PlanAdherenceStatus,
 } from "./planned-workout-api";
+import {
+  classifyPlanLifecycle,
+  getLocalPlanToday,
+} from "./assistant-plan-lifecycle";
 import type { CurrentPlanStatus } from "./use-current-plan";
 import type { PlannedWorkoutWithAdherence } from "./planned-workout-api";
 
@@ -17,6 +21,7 @@ export interface AssistantCurrentPlanCardProps {
   isMutating: boolean;
   actionError: string | null;
   onAbandon: () => Promise<boolean>;
+  onArchive: () => Promise<boolean>;
 }
 
 const STATUS_LABEL: Record<PlanAdherenceStatus, string> = {
@@ -38,7 +43,7 @@ const STATUS_TONE: Record<PlanAdherenceStatus, SemanticTone> = {
  * The design keeps the card collapsed to its one-line summary and puts the
  * exercise rows behind 展开, so the page can open on the insight cards.
  *
- * @param props - The current plan, load status, and abandon action
+ * @param props - The current plan, load status, and archive/abandon actions
  * @returns The plan card (with loading / empty / error states)
  */
 export function AssistantCurrentPlanCard(props: AssistantCurrentPlanCardProps) {
@@ -79,20 +84,60 @@ export function AssistantCurrentPlanCard(props: AssistantCurrentPlanCardProps) {
   }
 
   const setAdherencePct = Math.round(plan.adherence.set_adherence_ratio * 100);
+  const isExpired =
+    classifyPlanLifecycle({
+      endDate: plan.endDate,
+      today: getLocalPlanToday(),
+    }) === "expired";
+  const expiredTone = getToneColors(theme, "warning");
 
   return (
     <Card>
       <div style={bodyStyle}>
         <div style={headerRowStyle}>
-          <h3 style={titleStyle}>本周计划</h3>
+          <div style={titleRowStyle}>
+            <h3 style={titleStyle}>{isExpired ? "计划回顾" : "本周计划"}</h3>
+            {isExpired ? (
+              <span
+                style={{
+                  ...statusChipStyle,
+                  backgroundColor: expiredTone.background,
+                  borderColor: expiredTone.border,
+                  color: expiredTone.text,
+                }}
+              >
+                已过期
+              </span>
+            ) : null}
+          </div>
           <div style={actionRowStyle}>
+            {isExpired ? (
+              <button
+                disabled={props.isMutating}
+                onClick={() => {
+                  void props.onArchive().then((didArchive) => {
+                    showToast(
+                      didArchive
+                        ? "计划已归档"
+                        : "归档失败，请查看卡片中的错误信息。",
+                    );
+                  });
+                }}
+                style={archiveButtonStyle(theme, props.isMutating)}
+                type="button"
+              >
+                归档
+              </button>
+            ) : null}
             <button
               disabled={props.isMutating}
               onClick={() => {
                 void props.onAbandon().then((didAbandon) => {
                   showToast(
                     didAbandon
-                      ? "已放弃本周计划"
+                      ? // Deliberately window-free: this button also serves an
+                        // expired plan, which 本周 would misdescribe.
+                        "计划已放弃"
                       : "放弃计划失败，请查看卡片中的错误信息。",
                   );
                 });
@@ -179,10 +224,18 @@ const bodyStyle: React.CSSProperties = {
 };
 
 const headerRowStyle: React.CSSProperties = {
-  alignItems: "center",
+  alignItems: "flex-start",
   display: "flex",
   gap: 8,
   justifyContent: "space-between",
+};
+
+const titleRowStyle: React.CSSProperties = {
+  alignItems: "center",
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 6,
+  minWidth: 0,
 };
 
 const titleStyle: React.CSSProperties = {
@@ -195,8 +248,27 @@ const titleStyle: React.CSSProperties = {
 const actionRowStyle: React.CSSProperties = {
   display: "flex",
   flex: "0 0 auto",
+  flexWrap: "wrap",
   gap: 6,
+  justifyContent: "flex-end",
 };
+
+function archiveButtonStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+  disabled: boolean,
+): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.ac,
+    border: 0,
+    borderRadius: 8,
+    color: theme.colors.acText,
+    cursor: disabled ? "not-allowed" : "pointer",
+    fontSize: 11,
+    fontWeight: 700,
+    opacity: disabled ? 0.5 : 1,
+    padding: "5px 10px",
+  };
+}
 
 function abandonButtonStyle(
   theme: ReturnType<typeof useTheme>["theme"],
