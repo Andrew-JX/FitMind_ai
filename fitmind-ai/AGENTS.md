@@ -320,6 +320,7 @@ export async function getFatigueScore(
 
 | 改动区域 | 需要检查/更新的文档 |
 | --- | --- |
+| **不确定该读哪份文档** | `docs/INDEX.md`（按任务组织的总索引，先读它再定位） |
 | 产品定位 / 范围 / 阶段计划 / 重大能力 | `docs/PROJECT_BRIEF.md`、`README.md`、本文件第 11 节 |
 | API 路由 / 请求 / 响应 / 错误 / 鉴权 / SSE 事件 | `docs/api-contract.md`、受影响的 `shared/src/**` |
 | 数据库表 / 列 / 索引 / 迁移 / seed / 归属 | `docs/db-schema.md` |
