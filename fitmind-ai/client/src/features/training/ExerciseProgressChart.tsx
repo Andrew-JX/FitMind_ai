@@ -1,6 +1,7 @@
 import { StateNotice } from "../../components/StateNotice";
 import { useTheme } from "../../theme/ThemeContext";
 import { formatMonthDay } from "./analysis-range";
+import { BRAND_NEON } from "../../theme/tokens";
 import type {
   ExerciseProgress,
   ExerciseProgressSession,
@@ -227,7 +228,7 @@ function barStyle(
 ): React.CSSProperties {
   return {
     alignSelf: "end",
-    background: bar.isLatest ? "#c8f035" : theme.colors.bar,
+    background: bar.isLatest ? BRAND_NEON : theme.colors.bar,
     borderRadius: "8px 8px 4px 4px",
     height: `${bar.heightPercent}%`,
     transition: "height 0.6s cubic-bezier(0.65, 0, 0.35, 1)",

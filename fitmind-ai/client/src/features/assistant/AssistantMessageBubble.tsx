@@ -4,6 +4,7 @@ import { AssistantAgentTrace } from "./AssistantAgentTrace";
 import { AssistantPlanCard } from "./AssistantPlanCard";
 import { isAssistantMessageSaveEligible } from "./assistant-saved-insights";
 import type { AssistantChatMessage } from "./assistant-types";
+import { BRAND_NEON } from "../../theme/tokens";
 
 export interface AssistantMessageBubbleProps {
   isSaved?: boolean | undefined;
@@ -219,7 +220,7 @@ function bubbleStyle(
   isAssistant: boolean,
 ): React.CSSProperties {
   return {
-    background: isAssistant ? theme.colors.surf2 : "#c8f035",
+    background: isAssistant ? theme.colors.surf2 : BRAND_NEON,
     border:
       isAssistant && !theme.isDark
         ? `1px solid ${theme.colors.bdr}`

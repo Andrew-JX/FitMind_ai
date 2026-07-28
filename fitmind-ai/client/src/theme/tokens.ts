@@ -1,3 +1,41 @@
+/**
+ * The design's brand neon.
+ *
+ * @remarks
+ * Deliberately not a per-theme token. The handoff fixes this exact value in
+ * both themes for the brand button, the FAB, the logo, the toast outline and
+ * the highlighted chart bar. Reach for {@link ThemeColors.ac} instead whenever
+ * the element is supposed to darken in light mode.
+ */
+export const BRAND_NEON = "#c8f035";
+
+/** Foreground on a {@link BRAND_NEON} fill; also theme-invariant. */
+export const BRAND_NEON_TEXT = "#0f0f0f";
+
+/** RGB channels of {@link BRAND_NEON}, for translucent derivatives. */
+const BRAND_NEON_RGB = "200, 240, 53";
+
+/**
+ * Translucent brand neon, for rings, glows, and keyframes on brand chrome.
+ *
+ * @param alpha - Opacity between 0 and 1
+ * @returns An `rgba()` string that is identical in both themes
+ */
+export function brandAlpha(alpha: number): string {
+  return `rgba(${BRAND_NEON_RGB}, ${alpha})`;
+}
+
+/**
+ * Translucent accent, which unlike {@link brandAlpha} follows the theme.
+ *
+ * @param theme - Active theme
+ * @param alpha - Opacity between 0 and 1
+ * @returns An `rgba()` string built from the theme's accent channels
+ */
+export function accentAlpha(theme: Theme, alpha: number): string {
+  return `rgba(${theme.colors.accentRgb}, ${alpha})`;
+}
+
 export interface ThemeColors {
   bg: string;
   surf: string;
@@ -10,6 +48,8 @@ export interface ThemeColors {
   tx3: string;
   ac: string;
   acText: string;
+  /** RGB channels of {@link ThemeColors.ac}, consumed by `accentAlpha`. */
+  accentRgb: string;
   blue: string;
   red: string;
   orange: string;
@@ -106,8 +146,9 @@ export const darkTheme: Theme = {
     tx: "#f0f0f0",
     tx2: "#999999",
     tx3: "#555555",
-    ac: "#c8f035",
-    acText: "#0f0f0f",
+    ac: BRAND_NEON,
+    acText: BRAND_NEON_TEXT,
+    accentRgb: BRAND_NEON_RGB,
     blue: "#4a9eff",
     red: "#ff5c5c",
     orange: "#ff9b42",
@@ -158,6 +199,7 @@ export const lightTheme: Theme = {
     tx3: "#94949a",
     ac: "#5c7404",
     acText: "#ffffff",
+    accentRgb: "92, 116, 4",
     blue: "#1a6fd4",
     red: "#c93030",
     orange: "#c06010",

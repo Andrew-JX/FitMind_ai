@@ -5,6 +5,7 @@ import { StateNotice } from "../../components/StateNotice";
 import { useTheme } from "../../theme/ThemeContext";
 import { createWeeklyBuckets } from "./analysis-range";
 import { getTrainingSummary } from "./training-summary-api";
+import { BRAND_NEON, brandAlpha } from "../../theme/tokens";
 
 export interface WeeklyVolumeCardProps {
   refreshSignal: number;
@@ -228,9 +229,9 @@ function barStyle(
 
   return {
     alignSelf: "end",
-    background: bar.isCurrentWeek ? "#c8f035" : theme.colors.bar,
+    background: bar.isCurrentWeek ? BRAND_NEON : theme.colors.bar,
     borderRadius: "8px 8px 4px 4px",
-    boxShadow: bar.isCurrentWeek ? "0 0 16px rgba(200,240,53,0.25)" : "none",
+    boxShadow: bar.isCurrentWeek ? `0 0 16px ${brandAlpha(0.25)}` : "none",
     height: `${bar.totalVolume > 0 ? Math.max(Math.round(rawHeight), MIN_BAR_HEIGHT_PERCENT) : 0}%`,
     transition: "height 0.6s cubic-bezier(0.65, 0, 0.35, 1)",
     width: 30,

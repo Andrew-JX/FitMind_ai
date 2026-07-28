@@ -1,4 +1,5 @@
 import { useTheme } from "../../theme/ThemeContext";
+import { BRAND_NEON } from "../../theme/tokens";
 
 export interface AssistantComposerProps {
   canRetry: boolean;
@@ -113,7 +114,7 @@ const actionRowStyle: React.CSSProperties = {
 /** Design keeps the primary action neon in both themes. */
 function primaryButtonStyle(isDisabled: boolean): React.CSSProperties {
   return {
-    background: "#c8f035",
+    background: BRAND_NEON,
     border: "none",
     borderRadius: 12,
     color: "#0f0f0f",

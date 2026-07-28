@@ -19,6 +19,7 @@ import { WorkoutsPanel } from "./WorkoutsPanel";
 import { getWorkoutDetail } from "./workout-api";
 import { mapWorkoutIntakeDraftToSessionInitialDraft } from "./workout-intake-to-session-draft";
 import { mapWorkoutToSessionInitialDraft } from "./workout-to-session-draft";
+import { BRAND_NEON, brandAlpha } from "../../theme/tokens";
 
 export interface TrainingViewProps {
   currentPlan: UseCurrentPlanResult;
@@ -230,10 +231,10 @@ const recordActionsStyle: React.CSSProperties = {
 
 /** Design: neon-green voice record button (green stays fixed in both themes). */
 const voiceRecordButtonStyle: React.CSSProperties = {
-  background: "#c8f035",
+  background: BRAND_NEON,
   border: "none",
   borderRadius: 18,
-  boxShadow: "0 8px 20px rgba(200,240,53,0.2)",
+  boxShadow: `0 8px 20px ${brandAlpha(0.2)}`,
   color: "#0f0f0f",
   cursor: "pointer",
   display: "grid",

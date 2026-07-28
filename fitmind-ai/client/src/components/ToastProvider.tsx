@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { brandAlpha } from "../theme/tokens";
 
 export interface ToastContextValue {
   /** Shows one transient confirmation; a new call replaces the current toast. */
@@ -90,7 +91,7 @@ export function useToast(): ToastContextValue {
 /** Design: dark pill with a neon outline, floating above the bottom bar. */
 const toastStyle: React.CSSProperties = {
   background: "rgba(15,15,15,0.92)",
-  border: "1px solid rgba(200,240,53,0.4)",
+  border: `1px solid ${brandAlpha(0.4)}`,
   borderRadius: 999,
   bottom: "calc(96px + env(safe-area-inset-bottom, 0px))",
   boxShadow: "0 8px 24px rgba(0,0,0,0.5)",

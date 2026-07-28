@@ -1,6 +1,7 @@
 import { useTheme } from "../theme/ThemeContext";
 import { Icon, type IconName } from "./Icon";
 import { useToast } from "./ToastProvider";
+import { BRAND_NEON, brandAlpha } from "../theme/tokens";
 
 export type AppTabKey = "training" | "analysis" | "assistant" | "profile";
 
@@ -214,7 +215,7 @@ const logoMidStyle: React.CSSProperties = {
 
 const logoInnerStyle: React.CSSProperties = {
   alignItems: "center",
-  background: "#c8f035",
+  background: BRAND_NEON,
   borderRadius: 4,
   color: "#0f0f0f",
   display: "flex",
@@ -286,11 +287,11 @@ function navStyle(
 function assistantFabStyle(isAssistantActive: boolean): React.CSSProperties {
   return {
     alignItems: "center",
-    background: "#c8f035",
+    background: BRAND_NEON,
     border: "none",
     borderRadius: "50%",
     boxShadow: isAssistantActive
-      ? "0 8px 20px rgba(0,0,0,0.45), 0 0 0 3px rgba(200,240,53,0.35)"
+      ? `0 8px 20px rgba(0,0,0,0.45), 0 0 0 3px ${brandAlpha(0.35)}`
       : "0 8px 20px rgba(0,0,0,0.45)",
     color: "#0f0f0f",
     cursor: "pointer",

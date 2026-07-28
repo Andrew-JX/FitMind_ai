@@ -13,6 +13,7 @@ import { ExerciseLibraryScreen } from "./ExerciseLibraryScreen";
 import { getExerciseDisplayName } from "./exercise-display";
 import { appendSpeechTranscript } from "./speech-recognition-utils";
 import { useSpeechRecognition } from "./use-speech-recognition";
+import { BRAND_NEON, brandAlpha } from "../../theme/tokens";
 import {
   parseWorkoutIntake,
   type WorkoutIntakeDraft,
@@ -569,9 +570,9 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
               50% { transform: scaleY(1); opacity: 1; }
             }
             @keyframes fitmindMicPulse {
-              0% { box-shadow: 0 0 0 0 rgba(200,240,53,0.35); }
-              70% { box-shadow: 0 0 0 16px rgba(200,240,53,0); }
-              100% { box-shadow: 0 0 0 0 rgba(200,240,53,0); }
+              0% { box-shadow: 0 0 0 0 ${brandAlpha(0.35)}; }
+              70% { box-shadow: 0 0 0 16px ${brandAlpha(0)}; }
+              100% { box-shadow: 0 0 0 0 ${brandAlpha(0)}; }
             }
           `}
         </style>
@@ -793,10 +794,10 @@ function resolveLinkStyle(
 
 const micButtonStyle: React.CSSProperties = {
   alignItems: "center",
-  background: "#c8f035",
+  background: BRAND_NEON,
   border: "none",
   borderRadius: 18,
-  boxShadow: "0 8px 22px rgba(200,240,53,0.24)",
+  boxShadow: `0 8px 22px ${brandAlpha(0.24)}`,
   color: "#0f0f0f",
   cursor: "pointer",
   display: "grid",
@@ -860,7 +861,7 @@ const voiceContentStyle: React.CSSProperties = {
 
 const voiceMicRingStyle: React.CSSProperties = {
   alignItems: "center",
-  background: "#c8f035",
+  background: BRAND_NEON,
   borderRadius: "50%",
   color: "#0f0f0f",
   display: "flex",
