@@ -1,6 +1,7 @@
 import { Icon } from "../../components/Icon";
 import { useTheme } from "../../theme/ThemeContext";
 import type { UseCurrentPlanResult } from "../assistant/use-current-plan";
+import { accentAlpha } from "../../theme/tokens";
 
 export interface TrainingPlanCardProps {
   currentPlan: UseCurrentPlanResult;
@@ -72,10 +73,10 @@ function cardStyle(
   theme: ReturnType<typeof useTheme>["theme"],
 ): React.CSSProperties {
   return {
-    background: `linear-gradient(180deg, rgba(200,240,53,0.10), rgba(200,240,53,0.04)), ${theme.colors.surf}`,
-    border: "1px solid rgba(200,240,53,0.30)",
+    background: `linear-gradient(180deg, ${accentAlpha(theme, 0.1)}, ${accentAlpha(theme, 0.04)}), ${theme.colors.surf}`,
+    border: `1px solid ${accentAlpha(theme, 0.3)}`,
     borderRadius: theme.radius.card,
-    boxShadow: `inset 0 1px 0 rgba(200,240,53,0.12), 0 10px 24px ${theme.colors.sh25}`,
+    boxShadow: `inset 0 1px 0 ${accentAlpha(theme, 0.12)}, 0 10px 24px ${theme.colors.sh25}`,
     display: "grid",
     gap: 8,
     padding: 16,

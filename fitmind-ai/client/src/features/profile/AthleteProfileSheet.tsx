@@ -4,6 +4,7 @@ import { ActionSheet } from "../../components/ActionSheet";
 import { Button } from "../../components/Button";
 import { Input } from "../../components/Input";
 import { useTheme } from "../../theme/ThemeContext";
+import { accentAlpha } from "../../theme/tokens";
 import {
   EQUIPMENT_OPTIONS,
   TRAINING_GOALS,
@@ -263,9 +264,7 @@ function chipStyle(
 ): React.CSSProperties {
   return {
     backgroundColor: active
-      ? theme.isDark
-        ? "rgba(200, 240, 53, 0.18)"
-        : "rgba(74, 140, 0, 0.12)"
+      ? accentAlpha(theme, theme.isDark ? 0.18 : 0.12)
       : theme.colors.surf2,
     border: `1px solid ${active ? theme.colors.ac : theme.colors.bdr}`,
     borderRadius: theme.radius.pill,

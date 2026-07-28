@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import type { WorkoutSummaryDto } from "../../../../shared/src/training";
 
 import { useTheme } from "../../theme/ThemeContext";
+import { accentAlpha } from "../../theme/tokens";
 
 export interface WorkoutCalendarProps {
   workouts: WorkoutSummaryDto[];
@@ -224,8 +225,8 @@ function dayCellStyle(
   if (state.hasWorkout) {
     return {
       ...base,
-      background: "rgba(200,240,53,0.12)",
-      borderColor: "rgba(200,240,53,0.30)",
+      background: accentAlpha(theme, 0.12),
+      borderColor: accentAlpha(theme, 0.3),
       color: theme.colors.ac,
       fontWeight: 700,
     };

@@ -13,6 +13,7 @@ import {
   saveRememberedLoginEmail,
 } from "./remembered-login-email";
 import type { AuthStatus } from "./use-auth";
+import { accentAlpha, brandAlpha, BRAND_NEON } from "../../theme/tokens";
 
 type AuthMode = "login" | "register";
 
@@ -86,9 +87,10 @@ export function AuthScreen(props: AuthScreenProps) {
     <main
       style={{
         alignItems: "center",
-        background: `radial-gradient(circle at top, ${
-          theme.isDark ? "rgba(200,240,53,0.16)" : "rgba(92,116,4,0.12)"
-        }, transparent 32%), ${theme.colors.bg}`,
+        background: `radial-gradient(circle at top, ${accentAlpha(
+          theme,
+          theme.isDark ? 0.16 : 0.12,
+        )}, transparent 32%), ${theme.colors.bg}`,
         color: theme.colors.tx,
         display: "flex",
         justifyContent: "center",
@@ -285,7 +287,7 @@ export function AuthScreen(props: AuthScreenProps) {
                 cy="31"
                 fill="none"
                 r="28"
-                stroke="rgba(200,240,53,0.22)"
+                stroke={brandAlpha(0.22)}
                 strokeWidth="3"
               />
               <circle
@@ -293,7 +295,7 @@ export function AuthScreen(props: AuthScreenProps) {
                 cy="31"
                 fill="none"
                 r="28"
-                stroke="#c8f035"
+                stroke={BRAND_NEON}
                 strokeDasharray="44 176"
                 strokeLinecap="round"
                 strokeWidth="3"
@@ -347,7 +349,7 @@ const submitRowStyle: React.CSSProperties = {
 function submitButtonStyle(isMorphed: boolean): React.CSSProperties {
   return {
     alignItems: "center",
-    background: "#c8f035",
+    background: BRAND_NEON,
     border: "none",
     borderRadius: isMorphed ? 999 : 14,
     color: "#0f0f0f",
@@ -471,7 +473,7 @@ const logoMidStyle: React.CSSProperties = {
 
 const logoInnerStyle: React.CSSProperties = {
   alignItems: "center",
-  background: "#c8f035",
+  background: BRAND_NEON,
   borderRadius: 9,
   color: "#0f0f0f",
   display: "flex",

@@ -14,6 +14,7 @@ import {
 } from "./exercise-display";
 import { TrainingSessionExerciseActions } from "./TrainingSessionExerciseActions";
 import { TrainingSessionSetRow } from "./TrainingSessionSetRow";
+import { accentAlpha } from "../../theme/tokens";
 
 export interface TrainingSessionExerciseCardProps {
   draftExercise: DraftExercise;
@@ -381,9 +382,7 @@ function collapsedSetStyle(
   return {
     alignItems: "center",
     backgroundColor: isCompleted
-      ? theme.isDark
-        ? "rgba(200, 240, 53, 0.12)"
-        : "rgba(74, 140, 0, 0.12)"
+      ? accentAlpha(theme, 0.12)
       : theme.colors.surf2,
     border: `1px solid ${isCompleted ? theme.colors.ac : theme.colors.bdr}`,
     borderRadius: theme.radius.control,

@@ -2,6 +2,7 @@ import type { DraftSet, EffortLevel } from "./training-session-draft";
 
 import { Input } from "../../components/Input";
 import { useTheme } from "../../theme/ThemeContext";
+import { accentAlpha } from "../../theme/tokens";
 
 const EFFORT_OPTIONS: Array<{
   label: string;
@@ -160,8 +161,8 @@ function rowStyle(
     animation: isCompleted
       ? "fmjelly 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)"
       : "none",
-    background: isCompleted ? "rgba(200,240,53,0.08)" : theme.colors.soft,
-    border: `1px solid ${isCompleted ? "rgba(200,240,53,0.35)" : theme.colors.bdr}`,
+    background: isCompleted ? accentAlpha(theme, 0.08) : theme.colors.soft,
+    border: `1px solid ${isCompleted ? accentAlpha(theme, 0.35) : theme.colors.bdr}`,
     borderRadius: 12,
     display: "grid",
     gap: 8,
