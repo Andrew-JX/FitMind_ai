@@ -80,6 +80,7 @@ import {
 } from "./provider-config.js";
 import {
   composeKnowledgeAnswer,
+  composeDateRangeClarificationAnswer,
   composeExerciseClarificationAnswer,
   composeMixedToolRagAnswer,
   composeUnsupportedAnswer,
@@ -88,6 +89,17 @@ import {
   type AssistantAnswerEvidence,
   type AssistantStructuredAnswer,
 } from "./assistant-answer-composer.js";
+import {
+  ASSISTANT_DEFAULT_RANGE_DAYS,
+  resolveAssistantDateRequest,
+} from "./assistant-date-request.js";
+import { computeAssistantDefaultRange } from "./assistant-date-resolver.js";
+
+/**
+ * Zone used when a client sends none. UTC keeps "today" deterministic instead
+ * of inheriting whatever zone the server host happens to run in.
+ */
+const ASSISTANT_FALLBACK_TIME_ZONE = "UTC";
 import {
   resolveAssistantExerciseEntity,
   type AssistantExerciseEntityResolution,
@@ -134,17 +146,42 @@ const mockAssistantTurnSchema = z
     mode: assistantModeSchema,
     session_id: z.string().uuid().optional(),
     message: z.string().trim().min(1, "message is required."),
+    // ER-2B: optional. A client may still send an explicit window (that is how
+    // a tapped date clarification continues, and how pre-ER-2 clients keep
+    // working); otherwise the server resolves the range itself.
     start_date: z
       .string()
-      .refine(isValidDateOnly, "start_date must use YYYY-MM-DD."),
+      .refine(isValidDateOnly, "start_date must use YYYY-MM-DD.")
+      .optional(),
     end_date: z
       .string()
-      .refine(isValidDateOnly, "end_date must use YYYY-MM-DD."),
+      .refine(isValidDateOnly, "end_date must use YYYY-MM-DD.")
+      .optional(),
+    timezone: z.string().trim().min(1).optional(),
     exercise_id: z.string().uuid().optional(),
   })
   .strict()
   .superRefine((value, ctx) => {
-    if (value.start_date > value.end_date) {
+    const hasStart = value.start_date !== undefined;
+    const hasEnd = value.end_date !== undefined;
+
+    if (hasStart !== hasEnd) {
+      // Half a window is not a window. Accepting one side would silently pair
+      // it with a server-chosen other side and answer over a range nobody asked
+      // for.
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [hasStart ? "end_date" : "start_date"],
+        message: "start_date and end_date must be provided together.",
+      });
+      return;
+    }
+
+    if (
+      hasStart &&
+      hasEnd &&
+      (value.start_date as string) > (value.end_date as string)
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["end_date"],
@@ -349,6 +386,8 @@ export interface MockAssistantTurnInput {
   message: string;
   start_date: string;
   end_date: string;
+  /** IANA zone the client is in; used to read "today" and supported periods. */
+  timezone?: string | undefined;
   exercise_id?: string | undefined;
 }
 
@@ -1551,7 +1590,25 @@ export async function runMockAssistantTurn(
     state: "thinking",
   });
 
-  const requestInput = mockAssistantTurnSchema.parse(rawInput);
+  const parsedInput = mockAssistantTurnSchema.parse(rawInput);
+  const requestTimeZone = parsedInput.timezone ?? ASSISTANT_FALLBACK_TIME_ZONE;
+  const dateRequest = resolveAssistantDateRequest({
+    end_date: parsedInput.end_date,
+    message: parsedInput.message,
+    start_date: parsedInput.start_date,
+    timeZone: requestTimeZone,
+  });
+  // An ambiguous turn short-circuits below without running a tool, so the range
+  // carried here is only ever persisted beside an answer that cites no range.
+  const requestInput: MockAssistantTurnInput = {
+    ...parsedInput,
+    ...(dateRequest.status === "range"
+      ? dateRequest.range
+      : computeAssistantDefaultRange({
+          days: ASSISTANT_DEFAULT_RANGE_DAYS,
+          timeZone: requestTimeZone,
+        })),
+  };
   const resolvedSession = await resolveSession(
     userId,
     requestInput.session_id,
@@ -1614,6 +1671,60 @@ export async function runMockAssistantTurn(
         },
       };
     }
+  }
+
+  // ER-2B: two named periods in one message are a conflict, never a first
+  // match. This runs after safety and before intent routing, because the range
+  // is an input to everything downstream — and it costs no provider call.
+  if (dateRequest.status === "ambiguous") {
+    const clarification = assistantClarificationSchema.parse({
+      kind: "date_range",
+      reason: "ambiguous",
+      options: dateRequest.options.map((option) => ({
+        label: option.label,
+        start_date: option.start_date,
+        end_date: option.end_date,
+      })),
+    });
+
+    if (clarification.kind !== "date_range") {
+      throw new Error("ER-2 produced a non-date clarification.");
+    }
+
+    const answer = composeDateRangeClarificationAnswer(clarification);
+    await emitAnswerEvents(answer, options);
+
+    const response: MockAssistantTurnResponseData = {
+      session_id: resolvedSession.sessionId,
+      mode: requestInput.mode,
+      assistant_type: "deterministic_mock",
+      intent: "unsupported",
+      tool_calls: [],
+      answer,
+      clarification,
+    };
+    const messageId = await persistMockTurnMessages({
+      sessionId: resolvedSession.sessionId,
+      request: requestInput,
+      response,
+    });
+    response.message_id = messageId;
+
+    await emitEvent(options, { type: "structured_output", output: response });
+    await emitEvent(options, {
+      type: "done",
+      message_id: messageId,
+      session_id: resolvedSession.sessionId,
+    });
+
+    return {
+      response,
+      telemetry: {
+        ...(options?.assistantIpGuardDecision?.kind !== "fallback"
+          ? {}
+          : { budgetFallback: options.assistantIpGuardDecision.telemetry }),
+      },
+    };
   }
 
   const exerciseTurn = await resolveExerciseTurnInput({

@@ -109,6 +109,38 @@ export function resolveAssistantDateRange(input: {
   return { options: found, status: "ambiguous" };
 }
 
+/**
+ * The inclusive evidence window used when a turn names no supported period.
+ *
+ * Unlike {@link resolveAssistantDateRange}, this never degrades to "no range" —
+ * a turn always needs one. An unusable zone falls back to UTC rather than
+ * failing, and the answer still labels whatever range came back, so a
+ * zone-driven off-by-one day is visible rather than silent.
+ *
+ * @param input - Window length in days, IANA zone, injectable reference instant
+ * @returns Inclusive date-only range ending on the zone's today
+ */
+export function computeAssistantDefaultRange(input: {
+  days: number;
+  now?: Date | undefined;
+  timeZone: string;
+}): AssistantDateRange {
+  const instant = input.now ?? new Date();
+  const today =
+    readCivilDate(instant, input.timeZone) ??
+    readCivilDate(instant, "UTC") ??
+    readCivilDate(new Date(), "UTC");
+
+  if (!today) {
+    throw new Error("Unable to read a calendar date for the default range.");
+  }
+
+  return {
+    end_date: formatCivilDate(today),
+    start_date: formatCivilDate(addDays(today, -(Math.max(1, input.days) - 1))),
+  };
+}
+
 function findShadowedSpans(message: string): Array<[number, number]> {
   const spans: Array<[number, number]> = [];
 

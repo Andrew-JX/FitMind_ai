@@ -25,8 +25,11 @@ export type AssistantMode =
 export interface AssistantChatRequestPayload {
   mode: AssistantMode;
   message: string;
-  start_date: string;
-  end_date: string;
+  /** Omitted unless the user picked an explicit window; the server resolves it. */
+  start_date?: string | undefined;
+  end_date?: string | undefined;
+  /** IANA zone, so the server reads "今天" and 本周 on the user calendar. */
+  timezone?: string | undefined;
   exercise_id?: string | undefined;
   session_id?: string | undefined;
 }

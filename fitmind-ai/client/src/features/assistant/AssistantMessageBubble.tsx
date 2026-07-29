@@ -81,6 +81,25 @@ export function AssistantMessageBubble(props: AssistantMessageBubbleProps) {
         </div>
       ) : null}
 
+      {message.clarification?.kind === "date_range" &&
+      message.clarification.options.length > 0 ? (
+        <div style={candidateRowStyle}>
+          {message.clarification.options.map((option) => (
+            <button
+              disabled={props.isSending}
+              key={`${option.startDate}-${option.endDate}`}
+              onClick={() =>
+                props.onClarificationChoice?.({ kind: "date_range", option })
+              }
+              style={candidateStyle(theme, props.isSending ?? false)}
+              type="button"
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {hasFooter ? (
         <div style={footerStyle}>
           {message.isStreaming ? <Badge tone="info">生成中</Badge> : null}

@@ -323,16 +323,29 @@ from being presented as a right one:
   the caller keeps its default window instead of computing a term against the
   wrong calendar.
 
-### 6. ER-2B: date request and server wiring — at most 5 code files
+### 6. ER-2B: date request and server wiring — at most 5 code files — implemented, awaiting review
 
 Accept optional explicit dates plus timezone, compute the default range on the
 server, and add date clarification while retaining old explicit-range requests.
 
-### 7. ER-2C: client cutover and closed-loop regression — at most 3 code files
+### 7. ER-2C: client cutover and closed-loop regression — at most 3 code files — implemented, awaiting review
 
 Stop sending client-generated default dates and cover explicit precedence,
 supported terms, unknown-term default fallback, and clarification continuation.
 ER-2B and ER-2C must be reverted together if the client cutover is rolled back.
+
+Implemented 2026-07-27 in one commit for exactly that reason: the client stops
+sending a default window in the same change that teaches the server to compute
+one, and splitting them across commits would leave a revert window where no
+range exists at all.
+
+Two notes for review. First, ER-2B needed six files rather than five — the
+sixth is orchestrator regression coverage appended to the existing
+`weekly-report-orchestrator.test.ts`, which was preferred over shipping the
+short-circuit untested. Second, the date clarification deliberately persists no
+continuation context, unlike ER-1: each option carries its own explicit range,
+and an explicit range is already the highest-precedence input, so a tapped or
+typed answer resumes through the ordinary request path with no stored state.
 
 ### 8. ER-3: refusal and clarification copy — at most 5 code files
 

@@ -106,6 +106,42 @@ export function composeExerciseClarificationAnswer(
   };
 }
 
+/**
+ * Compose a deterministic date clarification answer.
+ *
+ * @remarks
+ * Unlike the exercise clarification, this needs no persisted continuation
+ * context: every option carries its own explicit range, and an explicit range
+ * is the highest-precedence input a turn can receive. A tapped option and a
+ * typed period therefore both resume through the ordinary request path.
+ *
+ * @param clarification - Validated date-range clarification payload.
+ * @returns Structured answer that claims no training evidence.
+ */
+export function composeDateRangeClarificationAnswer(
+  clarification: Extract<AssistantClarification, { kind: "date_range" }>,
+): AssistantStructuredAnswer {
+  const validated = assistantClarificationSchema.parse(clarification);
+
+  if (validated.kind !== "date_range") {
+    throw new Error("Date clarification composer received an exercise.");
+  }
+
+  return {
+    summary: "你提到了不止一个时间段，需要你确认一个后才能继续分析。",
+    bullets: validated.options.map(
+      (option) =>
+        `${option.label}（${option.start_date} 至 ${option.end_date}）`,
+    ),
+    conclusion: "我不会替你选时间段，也不会在时间段未确认时调用训练分析工具。",
+    recommendation: "点一个时间段，或直接回复其中一个，例如“本周”。",
+    evidence: emptyEvidence,
+    sources: [],
+    intent: "unsupported",
+    limitations: ["时间段确认完成前不会生成训练数据结论。"],
+  };
+}
+
 export const emptyEvidence: AssistantAnswerEvidence = {
   source: "deterministic_mock_provider",
   tool_names: [],

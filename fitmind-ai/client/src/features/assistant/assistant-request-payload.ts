@@ -12,11 +12,12 @@ export type AssistantClarificationChoice =
 
 export interface BuildAssistantRequestInput {
   choice?: AssistantClarificationChoice | undefined;
-  defaultRange: { end_date: string; start_date: string };
   message: string;
   mode: AssistantMode;
   selectedExerciseId?: string | null | undefined;
   sessionId?: string | null | undefined;
+  /** IANA zone; defaults to the device's. Injectable for tests. */
+  timeZone?: string | undefined;
 }
 
 /** Modes the server cannot answer without an exercise. */
@@ -29,26 +30,32 @@ const EXERCISE_MODES: readonly AssistantMode[] = [
  * Builds one assistant turn request.
  *
  * @remarks
- * The precedence rule this exists to enforce: a clarification the user just
- * answered outranks whatever exercise the analysis tab happens to have selected.
- * Without it, tapping 「杠铃卧推」 in a candidate list could still send the
- * stale id from a page the user visited earlier, and the assistant would answer
- * about the wrong exercise while looking like it obeyed.
+ * ER-2C: the client no longer computes a default window. It sends only what it
+ * actually knows — the message, the device's zone, and an explicit range when
+ * the user picked one — and the server applies the precedence rules. Sending a
+ * client-side default would have outranked the user's own words, because an
+ * explicit range is the highest-precedence input: "本周练得怎么样" would have
+ * been answered over 30 days.
  *
- * @param input - Message, mode, ranges, and the optional clarification choice
+ * A tapped clarification still sends an explicit range or exercise, which is
+ * exactly the precedence the server expects for a continuation. A clarification
+ * choice also outranks whatever exercise the analysis tab has selected, so
+ * answering "which exercise?" cannot be overridden by a stale id.
+ *
+ * @param input - Message, mode, zone, and the optional clarification choice
  * @returns The payload to post for this turn
  */
 export function buildAssistantRequestPayload(
   input: BuildAssistantRequestInput,
 ): AssistantChatRequestPayload {
   const choice = input.choice;
-  const range =
+  const explicitRange =
     choice?.kind === "date_range"
       ? {
           end_date: choice.option.endDate,
           start_date: choice.option.startDate,
         }
-      : input.defaultRange;
+      : undefined;
 
   const exerciseId =
     choice?.kind === "exercise"
@@ -58,13 +65,22 @@ export function buildAssistantRequestPayload(
         : undefined;
 
   return {
-    end_date: range.end_date,
     message: input.message,
     mode: input.mode,
-    start_date: range.start_date,
+    timezone: input.timeZone ?? readDeviceTimeZone(),
+    ...(explicitRange ?? {}),
     ...(exerciseId === undefined ? {} : { exercise_id: exerciseId }),
     ...(input.sessionId ? { session_id: input.sessionId } : {}),
   };
+}
+
+/**
+ * Reads the device's IANA zone.
+ *
+ * @returns The resolved zone, or UTC when the environment reports none
+ */
+function readDeviceTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 }
 
 /**

@@ -1443,4 +1443,60 @@ describe("runMockAssistantTurn provider budget gate (AR-1d commit 1)", () => {
     expect(guard.guardRealProviderAttempt).toHaveBeenCalledTimes(1);
     expect(guard.recordCost).toHaveBeenCalledWith(null);
   });
+
+  it("short-circuits two named periods as a date clarification before routing (ER-2B)", async () => {
+    mockedGetConfiguredAssistantProvider.mockReturnValue("groq");
+
+    const { response } = await runMockAssistantTurn("user-1", {
+      mode: "auto",
+      message: "本周和上周分别练了多少",
+      timezone: "Asia/Shanghai",
+    });
+
+    expect(response.clarification).toEqual({
+      kind: "date_range",
+      reason: "ambiguous",
+      options: [
+        expect.objectContaining({ label: "本周" }),
+        expect.objectContaining({ label: "上周" }),
+      ],
+    });
+    expect(response.tool_calls).toEqual([]);
+    expect(response.answer.recommendation).toContain("点一个时间段");
+
+    // Billing boundary: a clarification runs no tool, no tool-selection call
+    // and no phrasing call. Asserted per call type rather than as one blanket
+    // "no provider call", because guarded intent rescue may legitimately bill.
+    expect(mockedExecuteAiTool).not.toHaveBeenCalled();
+    expect(mockedRunAssistantProvider).not.toHaveBeenCalled();
+    expect(mockedRunAssistantAnswerPhrasing).not.toHaveBeenCalled();
+  });
+
+  it("lets an explicit range win over time language in the same message (ER-2B)", async () => {
+    mockedGetConfiguredAssistantProvider.mockReturnValue("groq");
+
+    const { response } = await runMockAssistantTurn("user-1", {
+      mode: "weekly_report",
+      message: "本周和上周分别练了多少",
+      start_date: "2026-05-19",
+      end_date: "2026-06-17",
+      timezone: "Asia/Shanghai",
+    });
+
+    // The conflict never surfaces: precedence rule 1 already answered it.
+    expect(response.clarification).toBeUndefined();
+  });
+
+  it("still accepts a turn that sends no dates at all (ER-2B)", async () => {
+    mockedGetConfiguredAssistantProvider.mockReturnValue("groq");
+
+    const { response } = await runMockAssistantTurn("user-1", {
+      mode: "weekly_report",
+      message: "帮我做一份本周训练报告",
+      timezone: "Asia/Shanghai",
+    });
+
+    expect(response.clarification).toBeUndefined();
+    expect(response.session_id).toBeTruthy();
+  });
 });

@@ -2,7 +2,6 @@ import { useState } from "react";
 
 import { StateNotice } from "../../components/StateNotice";
 import { useToast } from "../../components/ToastProvider";
-import { createDefaultAssistantRange } from "./assistant-date-range";
 import { AssistantComposer } from "./AssistantComposer";
 import { AssistantMessageList } from "./AssistantMessageList";
 import { AssistantQuickPrompts } from "./AssistantQuickPrompts";
@@ -79,7 +78,6 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
     }
 
     const payload = buildAssistantRequestPayload({
-      defaultRange: createDefaultAssistantRange(),
       message,
       mode,
       selectedExerciseId: props.selectedExerciseId,
@@ -111,7 +109,6 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
 
     const payload = buildAssistantRequestPayload({
       choice,
-      defaultRange: createDefaultAssistantRange(),
       message: buildClarificationChoiceMessage(choice),
       // The clarification carries the entity, not the intent: let the server
       // re-route the continuation the same way it would a typed answer.
