@@ -19,6 +19,7 @@
     "smoke:muscle-load": "pnpm --filter @fitmind/server run smoke:muscle-load",
     "smoke:training": "pnpm --filter @fitmind/server run smoke:training",
     "smoke:workout-intake": "pnpm --filter @fitmind/server run smoke:workout-intake",
+    "create:user": "pnpm --filter @fitmind/server run create:user",
     "seed:assistant-demo": "pnpm --filter @fitmind/server run seed:assistant-demo",
     "verify": "pnpm lint && pnpm format:check && pnpm type-check && pnpm test:unit",
     "db:migrate": "pnpm --filter @fitmind/server run db:migrate",

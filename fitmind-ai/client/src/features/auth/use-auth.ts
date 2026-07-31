@@ -6,7 +6,7 @@ import type {
   RegisterRequest,
 } from "../../../../shared/src/auth";
 
-import { HttpClientError } from "../../services/http-client";
+import { getReadableAuthErrorMessage } from "./auth-error-message";
 import {
   fetchCurrentUser,
   loginWithEmail,
@@ -255,29 +255,10 @@ function notify(): void {
   }
 }
 
-function getReadableErrorMessage(error: unknown): string {
-  if (error instanceof HttpClientError) {
-    if (
-      error.status === 409 ||
-      error.message === "An account with this email already exists."
-    ) {
-      return "这个邮箱已经注册过了，请直接登录或更换邮箱。";
-    }
-
-    if (error.message === "Invalid email or password.") {
-      return "邮箱或密码不正确。";
-    }
-
-    return error.message;
-  }
-
-  return "Authentication could not be verified.";
-}
-
 function handleAuthFailure(error: unknown): void {
   activeToken = null;
   activeUser = null;
   activeStatus = "error";
-  activeErrorMessage = getReadableErrorMessage(error);
+  activeErrorMessage = getReadableAuthErrorMessage(error);
   notify();
 }

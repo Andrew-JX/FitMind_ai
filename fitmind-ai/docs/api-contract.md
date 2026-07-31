@@ -94,6 +94,20 @@ GET /api/workouts?cursor=<id>&limit=20
 }
 ```
 
+**Response 403**：邀请制部署下自助注册关闭。闸门排在限流之前，被拒的请求不消耗限流额度。
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "REGISTRATION_CLOSED",
+    "message": "Registration is invite-only."
+  }
+}
+```
+
+由 `REGISTRATION_INVITE_ONLY` 控制，**失败即关闭**：未设置、留空、拼错都保持关闭，只有显式 `off/false/0/no` 才开放注册。理由与上线口径见 [`china-launch-plan.md`](./china-launch-plan.md) §3.2a。关闭期间建号用 `pnpm create:user -- --email <address>`（直连数据库，绕过本闸门）。
+
 ### POST /api/auth/login
 
 **Request**：
