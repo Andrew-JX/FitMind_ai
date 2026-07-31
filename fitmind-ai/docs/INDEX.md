@@ -38,12 +38,14 @@
 - [`assistant-usability-plan.md`](./assistant-usability-plan.md) — 计划卡生命周期。PL-1/PL-3 已完成，PL-2 休眠，PL-4 待做
 - [`ar-arc-plan.md`](./ar-arc-plan.md) — 让 AI 真实活过来 + 成本护栏。AR-0/1/2 已封板
 - [`color-token-consolidation-plan.md`](./color-token-consolidation-plan.md) — 色值 token 收口。已完成，留作分类依据
+- [`china-launch-plan.md`](./china-launch-plan.md) — 境内上线（个人备案 + 邀请制）。**未执行**，唯一功能改动是服务端关公开注册
 
 ## 我要上线 / 排查线上
 
 | 目的 | 读 |
 | --- | --- |
 | 上线前自查 | [`production-smoke-checklist.md`](./production-smoke-checklist.md) |
+| **在中国境内上线**（备案 / DeepSeek / nginx / 关公开注册） | [`china-launch-plan.md`](./china-launch-plan.md) |
 | AR-2 的回滚路径 | [`archive/ar-2-flip-checklist.md`](./archive/ar-2-flip-checklist.md) |
 
 ## 这些文档为什么会烂，以及怎么防
