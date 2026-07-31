@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { Card } from "../../components/Card";
 import { Icon } from "../../components/Icon";
+import { SiteFooter } from "../../components/SiteFooter";
 import { useTheme } from "../../theme/ThemeContext";
 import { AthleteProfileSheet } from "./AthleteProfileSheet";
 
@@ -107,6 +108,8 @@ export function ProfileView(props: ProfileViewProps) {
       <button onClick={props.onLogout} style={logoutStyle(theme)} type="button">
         退出登录
       </button>
+
+      <SiteFooter />
 
       <AthleteProfileSheet
         onClose={() => setIsProfileSheetOpen(false)}

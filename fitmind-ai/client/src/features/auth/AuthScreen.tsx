@@ -6,6 +6,7 @@ import type {
 } from "../../../../shared/src/auth";
 
 import { Icon } from "../../components/Icon";
+import { SiteFooter } from "../../components/SiteFooter";
 import { StateNotice } from "../../components/StateNotice";
 import { useTheme } from "../../theme/ThemeContext";
 import {
@@ -325,6 +326,8 @@ export function AuthScreen(props: AuthScreenProps) {
         >
           登录后会为你安全地保持登录状态，下次打开无需重新登录。
         </p>
+
+        <SiteFooter />
       </section>
     </main>
   );
