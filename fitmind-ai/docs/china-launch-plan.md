@@ -147,11 +147,13 @@ PIPL 要求提供注销途径，但没规定必须是自助按钮。当前只有
 - [ ] `VOYAGE_API_KEY` / `GROQ_API_KEY` / `ANTHROPIC_API_KEY` 全部留空 ← §3.2(d)
 - [ ] `ASSISTANT_SAFETY_GATE` 保持 on ← §3.3
 
-**代码层**
+**代码层**（分支 `china/launch-prep`，2026-07-31）
 
-- [ ] 服务端关闭公开注册 + 测试钉 ← §3.2(a)，**唯一的功能性改动**
-- [ ] footer 备案号（ICP 先上，公安号 30 日内补）← §3.2(b)
-- [ ] 隐私政策 + 用户协议两页 ← §3.2(c)
+- [x] 服务端关闭公开注册 + 测试钉 ← §3.2(a)。`f2f567d`
+- [x] 邀请制下的建号途径（`pnpm create:user`）+ 关闭注册的中文文案 ← `0c47c3a`
+- [x] 隐私政策 + 用户协议两页（`client/public/legal/`）← §3.2(c)。`65480ef`
+- [x] footer 组件与备案号接线 ← §3.2(b)。`d2ad3f7`
+      **备案号本身还没填**：`VITE_ICP_BEIAN_NUMBER` 未配置时 footer 只显示两条法律链接，不显示占位号码。号下来后配环境变量重新构建即可，无需改码。公安备案号在上线 30 日内补 `VITE_PUBLIC_SECURITY_BEIAN_NUMBER`。
 - [ ] `README.md` 生产 URL 与 PWA 指引改写 ← §1.3 / §4
 
 **运维层**
