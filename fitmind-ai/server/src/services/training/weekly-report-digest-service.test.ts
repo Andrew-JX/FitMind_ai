@@ -91,6 +91,7 @@ function createServerEnv(overrides: Partial<ServerEnv> = {}): ServerEnv {
     weeklyReportDeliveryEnabled: true,
     ragRerankingEnabled: false,
     assistantSafetyGate: true,
+    registrationInviteOnly: true,
     workoutIntakeLlmProvider: "mock",
     ...overrides,
   };

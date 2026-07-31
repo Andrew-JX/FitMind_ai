@@ -2,6 +2,7 @@ export type ErrorCode =
   | "VALIDATION_ERROR"
   | "UNAUTHORIZED"
   | "FORBIDDEN"
+  | "REGISTRATION_CLOSED"
   | "NOT_FOUND"
   | "RATE_LIMITED"
   | "AI_QUOTA_EXCEEDED"

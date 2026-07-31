@@ -87,6 +87,10 @@ const serverEnvSchema = z.object({
   // Slice 10: fail-safe medical boundary gate. Default on; only explicit
   // disable tokens turn it off for rollback.
   ASSISTANT_SAFETY_GATE: safetyFlagDefaultOn,
+  // China launch: self-service registration gate. Fail-safe closed, so a
+  // deployment that forgets to configure it stays invite-only rather than
+  // silently opening public sign-up (see docs/china-launch-plan.md §3.2a).
+  REGISTRATION_INVITE_ONLY: safetyFlagDefaultOn,
   WORKOUT_INTAKE_LLM_PROVIDER: z
     .enum(["off", "mock", "anthropic", "gemini", "groq", "openai_compatible"])
     .default("mock")
@@ -114,6 +118,7 @@ export interface ServerEnv {
   weeklyReportCronSecret?: string | undefined;
   ragRerankingEnabled: boolean;
   assistantSafetyGate: boolean;
+  registrationInviteOnly: boolean;
   workoutIntakeLlmProvider:
     | "off"
     | "mock"
@@ -149,6 +154,7 @@ export function loadServerEnv(
     weeklyReportCronSecret: parsed.WEEKLY_REPORT_CRON_SECRET,
     ragRerankingEnabled: parsed.RAG_RERANKING_ENABLED,
     assistantSafetyGate: parsed.ASSISTANT_SAFETY_GATE,
+    registrationInviteOnly: parsed.REGISTRATION_INVITE_ONLY,
     workoutIntakeLlmProvider: parsed.WORKOUT_INTAKE_LLM_PROVIDER,
     anthropicApiKey: parsed.ANTHROPIC_API_KEY,
     geminiApiKey: parsed.GEMINI_API_KEY,
