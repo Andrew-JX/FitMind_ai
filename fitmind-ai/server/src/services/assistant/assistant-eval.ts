@@ -93,6 +93,22 @@ export const assistantIntentEvalCases: AssistantIntentEvalCase[] = [
     mustCiteEvidence: true,
   },
   {
+    // 路由词表必须跟得上 ER-2 的日期词表：解析器认识"上周"和"本月"，
+    // 但路由不认识的话，问题在解析器有机会跑之前就被拒答了。
+    id: "summary-last-week",
+    message: "上周练得怎么样",
+    mode: "auto",
+    expectedIntent: "summary",
+    mustCiteEvidence: true,
+  },
+  {
+    id: "summary-this-month",
+    message: "本月练得怎么样",
+    mode: "auto",
+    expectedIntent: "summary",
+    mustCiteEvidence: true,
+  },
+  {
     id: "weekly_report",
     message: "帮我做一份本周训练报告",
     mode: "auto",
@@ -348,6 +364,286 @@ export const safetyEvalCases: SafetyEvalCase[] = [
 ];
 
 /**
+ * ER-EVAL 的参考时刻：2026-08-01（周六）12:00 Asia/Shanghai。
+ *
+ * 相对时间词的金标必须钉成绝对日期，否则用例会随"今天"漂移，或者退化成
+ * 用同一套日期数学去验证日期数学。探针必须把时钟固定到这一刻。
+ */
+export const ASSISTANT_ENTITY_EVAL_REFERENCE_ISO = "2026-08-01T04:00:00.000Z";
+
+/** ER-EVAL 用例的期望：要么落到某个工具实参，要么短路成澄清。 */
+export type AssistantEntityEvalExpectation =
+  | {
+      kind: "tool";
+      toolName: string;
+      args: {
+        start_date: string;
+        end_date: string;
+        exercise_id?: string | undefined;
+      };
+    }
+  | {
+      kind: "clarification";
+      clarificationKind: "date_range" | "exercise";
+      reason: string;
+      optionCount: number;
+    };
+
+/** 一条实体/范围 golden 用例：自然语言 → 精确解析结果。 */
+export interface AssistantEntityEvalCase {
+  id: string;
+  message: string;
+  mode: AssistantIntentMode;
+  timeZone: string;
+  expected: AssistantEntityEvalExpectation;
+}
+
+/** 探针从一次**真实 turn** 里观测到的东西（不含任何答案文案）。 */
+export interface AssistantEntityTurnObservation {
+  toolCalls: Array<{ toolName: string; args: Record<string, unknown> }>;
+  clarification: {
+    kind: string;
+    reason: string;
+    optionCount: number;
+  } | null;
+}
+
+/**
+ * 跑一次真实 turn 并回报观测结果。
+ *
+ * 没有默认实现：真实编排需要 mock 掉持久化与 provider，这只有在 vitest 里做得到，
+ * 所以门禁由 `pnpm verify` 承担，`pnpm eval` 在没有探针时跳过本项。
+ */
+export type AssistantEntityTurnProbe = (
+  testCase: AssistantEntityEvalCase,
+) => Promise<AssistantEntityTurnObservation>;
+
+/**
+ * 实体/范围 golden 数据集。
+ *
+ * 用例**不带** explicit start_date/end_date —— 显式范围优先级最高，带上就会把
+ * 时间词解析整个跳过，用例也就什么都没验证。
+ */
+export const assistantEntityEvalCases: AssistantEntityEvalCase[] = [
+  {
+    id: "entity-this-week",
+    message: "本周练得怎么样",
+    mode: "auto",
+    timeZone: "Asia/Shanghai",
+    expected: {
+      kind: "tool",
+      toolName: "get_training_summary",
+      args: { start_date: "2026-07-26", end_date: "2026-08-01" },
+    },
+  },
+  {
+    id: "entity-last-week",
+    message: "上周练得怎么样",
+    mode: "auto",
+    timeZone: "Asia/Shanghai",
+    expected: {
+      kind: "tool",
+      toolName: "get_training_summary",
+      args: { start_date: "2026-07-19", end_date: "2026-07-25" },
+    },
+  },
+  {
+    id: "entity-this-month",
+    message: "本月练得怎么样",
+    mode: "auto",
+    timeZone: "Asia/Shanghai",
+    expected: {
+      kind: "tool",
+      toolName: "get_training_summary",
+      args: { start_date: "2026-08-01", end_date: "2026-08-01" },
+    },
+  },
+  {
+    // 词表外的时间词退回 30 天默认窗口。这条钉的是"退回"本身：ER-2 的已知边界
+    // 是不解析它，而不是猜一个三个月的范围。
+    id: "entity-unsupported-term-falls-back",
+    message: "最近三个月练得怎么样",
+    mode: "auto",
+    timeZone: "Asia/Shanghai",
+    expected: {
+      kind: "tool",
+      toolName: "get_training_summary",
+      args: { start_date: "2026-07-03", end_date: "2026-08-01" },
+    },
+  },
+  {
+    // "上上周" 含有 "上周" 子串。钉住它退回默认窗口，而不是答成上周——
+    // 那正是"用正确的样子给出错误范围"的失败模式。
+    id: "entity-shadowed-term-falls-back",
+    message: "上上周练得怎么样",
+    mode: "auto",
+    timeZone: "Asia/Shanghai",
+    expected: {
+      kind: "tool",
+      toolName: "get_training_summary",
+      args: { start_date: "2026-07-03", end_date: "2026-08-01" },
+    },
+  },
+  {
+    id: "entity-two-terms-clarify",
+    message: "本周和上周分别练了多少",
+    mode: "auto",
+    timeZone: "Asia/Shanghai",
+    expected: {
+      kind: "clarification",
+      clarificationKind: "date_range",
+      reason: "ambiguous",
+      optionCount: 2,
+    },
+  },
+  {
+    id: "entity-exact-exercise-with-term",
+    message: "杠铃卧推本周有没有进步",
+    mode: "auto",
+    timeZone: "Asia/Shanghai",
+    expected: {
+      kind: "tool",
+      toolName: "get_exercise_progress",
+      args: {
+        start_date: "2026-07-26",
+        end_date: "2026-08-01",
+        exercise_id: "33333333-3333-4333-8333-333333333333",
+      },
+    },
+  },
+  {
+    id: "entity-ambiguous-exercise-clarify",
+    message: "卧推本周有没有进步",
+    mode: "auto",
+    timeZone: "Asia/Shanghai",
+    expected: {
+      kind: "clarification",
+      clarificationKind: "exercise",
+      reason: "ambiguous",
+      optionCount: 4,
+    },
+  },
+  {
+    id: "entity-unknown-exercise-clarify",
+    message: "北欧腿弯举有没有进步",
+    mode: "auto",
+    timeZone: "Asia/Shanghai",
+    expected: {
+      kind: "clarification",
+      clarificationKind: "exercise",
+      reason: "unresolved",
+      optionCount: 0,
+    },
+  },
+  {
+    id: "entity-missing-exercise-clarify",
+    message: "这个动作最近有进步吗",
+    mode: "auto",
+    timeZone: "Asia/Shanghai",
+    expected: {
+      kind: "clarification",
+      clarificationKind: "exercise",
+      reason: "missing",
+      optionCount: 0,
+    },
+  },
+];
+
+/**
+ * 评测实体/范围解析：对每条 golden 用例跑**真实 turn**，比对精确工具实参或澄清状态。
+ *
+ * @param cases - 实体/范围 golden 用例集
+ * @param probe - 跑真实 turn 并回报观测的探针
+ * @returns 实体/范围解析评测结果
+ *
+ * @remarks
+ * 硬纪律：只比对**解析后的精确日期与工具实参**，绝不拿答案里写了"本周"当依据。
+ * range 谎报那个 bug 能活下来，正是因为 eval 的黄金答案自己写着"本周共记录 4 次"，
+ * 把 bug 钉成了正确行为——文案说得对，实参是错的。
+ */
+export async function evaluateEntityResolution(
+  cases: AssistantEntityEvalCase[],
+  probe: AssistantEntityTurnProbe,
+): Promise<EvalCheckResult> {
+  const failures: string[] = [];
+
+  for (const testCase of cases) {
+    const observation = await probe(testCase);
+    const failure = findEntityCaseFailure(testCase, observation);
+
+    if (failure !== null) {
+      failures.push(`${testCase.id}: ${failure}`);
+    }
+  }
+
+  return buildCheckResult("entity_resolution", cases.length, failures);
+}
+
+function findEntityCaseFailure(
+  testCase: AssistantEntityEvalCase,
+  observation: AssistantEntityTurnObservation,
+): string | null {
+  if (testCase.expected.kind === "clarification") {
+    if (observation.toolCalls.length > 0) {
+      return `expected a clarification but ran ${observation.toolCalls.length} tool call(s)`;
+    }
+
+    const { clarification } = observation;
+
+    if (clarification === null) {
+      return "expected a clarification but the turn produced none";
+    }
+
+    if (clarification.kind !== testCase.expected.clarificationKind) {
+      return `expected ${testCase.expected.clarificationKind} clarification, got ${clarification.kind}`;
+    }
+
+    if (clarification.reason !== testCase.expected.reason) {
+      return `expected reason ${testCase.expected.reason}, got ${clarification.reason}`;
+    }
+
+    if (clarification.optionCount !== testCase.expected.optionCount) {
+      return `expected ${testCase.expected.optionCount} option(s), got ${clarification.optionCount}`;
+    }
+
+    return null;
+  }
+
+  const toolCall = observation.toolCalls[0];
+
+  if (toolCall === undefined) {
+    return "expected a tool call but the turn ran none";
+  }
+
+  if (toolCall.toolName !== testCase.expected.toolName) {
+    return `expected tool ${testCase.expected.toolName}, got ${toolCall.toolName}`;
+  }
+
+  const expectedArgs = testCase.expected.args;
+  const actualStart = toolCall.args["start_date"];
+  const actualEnd = toolCall.args["end_date"];
+  const actualExercise = toolCall.args["exercise_id"];
+
+  if (actualStart !== expectedArgs.start_date) {
+    return `expected start_date ${expectedArgs.start_date}, got ${String(actualStart)}`;
+  }
+
+  if (actualEnd !== expectedArgs.end_date) {
+    return `expected end_date ${expectedArgs.end_date}, got ${String(actualEnd)}`;
+  }
+
+  if (expectedArgs.exercise_id !== undefined) {
+    if (actualExercise !== expectedArgs.exercise_id) {
+      return `expected exercise_id ${expectedArgs.exercise_id}, got ${String(actualExercise)}`;
+    }
+  } else if (actualExercise !== undefined) {
+    return `expected no exercise_id, got ${String(actualExercise)}`;
+  }
+
+  return null;
+}
+
+/**
  * 评测 intent 路由准确率：对每条 golden 用例跑 `classifyAssistantIntent`，比对 expectedIntent。
  *
  * @param cases - intent golden 用例集
@@ -469,6 +765,7 @@ export function evaluateSafetyRegression(
  * @returns 完整评测报告；任一项未达 {@link REQUIRED_PASS_RATE} 则 `passed=false`
  */
 export async function runAssistantEval(options?: {
+  entityTurnProbe?: AssistantEntityTurnProbe;
   narrativeJudge?: NarrativeJudge;
 }): Promise<AssistantEvalReport> {
   const checks: EvalCheckResult[] = [
@@ -477,6 +774,15 @@ export async function runAssistantEval(options?: {
     evaluateFaithfulness(faithfulnessEvalCases),
     evaluateSafetyRegression(safetyEvalCases),
   ];
+
+  if (options?.entityTurnProbe) {
+    checks.push(
+      await evaluateEntityResolution(
+        assistantEntityEvalCases,
+        options.entityTurnProbe,
+      ),
+    );
+  }
 
   if (options?.narrativeJudge) {
     checks.push(

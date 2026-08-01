@@ -21,7 +21,19 @@ const UNSUPPORTED_PATTERN = /天气|笑话|新闻|股票|彩票|电影|音乐|�
 const KNOWLEDGE_PATTERN =
   /是什么|什么意思|怎么理解|原理|动作要点|常见错误|RPE|训练容量|训练量|渐进超负荷|deload|减量周|膝盖内扣|肩推|引体向上/u;
 const PROGRESS_PATTERN = /进步|没进步|停滞|平台|1RM|最大重量|卧推|深蹲|硬拉/u;
-const SUMMARY_PATTERN = /训练量|这周|本周|最近|总结|够吗|频率/u;
+/**
+ * Summary routing vocabulary.
+ *
+ * @remarks
+ * The time terms here must stay in step with the ER-2 date resolver. It
+ * understands 上周 and 本月, but this pattern did not, so "上周练得怎么样" was
+ * refused as unrecognized while the identically shaped "本周练得怎么样" worked —
+ * the resolver never got the chance to run. Routing sits after
+ * `PROGRESS_PATTERN`, so a message that names both a period and an exercise
+ * still routes to progress.
+ */
+const SUMMARY_PATTERN =
+  /训练量|这周|这个星期|本周|上周|上一周|上个星期|本月|这个月|最近|总结|够吗|频率/u;
 const IMBALANCE_PATTERN = /偏科|练太多|太少|均衡|胸|背|腿|肩/u;
 const RECOMMENDATION_PATTERN = /今天|下次|练什么|适合练|建议/u;
 const HISTORY_PATTERN = /上次|什么时候|历史|记录/u;

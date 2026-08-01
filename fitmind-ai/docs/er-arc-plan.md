@@ -382,10 +382,24 @@ Two decisions came out of review:
   a rollback would break pending clarifications. Persistence collapses the
   reason back and the context schema rejects the new value to keep it that way.
 
-### 9. ER-EVAL: offline entity goldens — 2 code files
+### 9. ER-EVAL: offline entity goldens — 3 code files — implemented
 
 Extend the assistant eval and its tests with exact entity/range expectations. The
 suite remains offline, mock-first, DB-free, network-free, and zero-cost.
+
+The goldens run against **real turns** through an injected probe and compare
+only resolved dates, tool arguments, and clarification state. Answer prose is
+never consulted: the range-label bug survived a green eval because a golden
+answer said “本周共记录 4 次训练” while the tool had run on 30 days.
+
+The probe lives in the vitest suite because module mocking is what makes a real
+turn reachable without a database, so `pnpm verify` is the gate for this check;
+`pnpm eval` supplies no probe and reports the four pure-function checks.
+
+Writing the goldens exposed a routing gap rather than confirming the resolver:
+`SUMMARY_PATTERN` knew 本周 but not 上周 or 本月, so “上周练得怎么样” was refused
+before the date resolver could run. The pattern now tracks the resolver’s
+vocabulary, and both phrasings are pinned in the intent goldens as well.
 
 Each implementation batch performs the normal documentation impact audit.
 Accepted runtime decisions go into `ai-decisions.md` when the corresponding code
