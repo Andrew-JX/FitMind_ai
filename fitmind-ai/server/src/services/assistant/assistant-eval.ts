@@ -371,7 +371,12 @@ export const safetyEvalCases: SafetyEvalCase[] = [
  */
 export const ASSISTANT_ENTITY_EVAL_REFERENCE_ISO = "2026-08-01T04:00:00.000Z";
 
-/** ER-EVAL 用例的期望：要么落到某个工具实参，要么短路成澄清。 */
+/**
+ * ER-EVAL 用例的期望：落到某个工具实参、短路成澄清，或者什么都不该做。
+ *
+ * `refusal` 是负向用例：既不能调工具也不能出澄清。没有它，"日期词单独就能
+ * 路由到 summary" 这类越权只会表现为"多跑了一次工具"，而没有任何金标会红。
+ */
 export type AssistantEntityEvalExpectation =
   | {
       kind: "tool";
@@ -387,7 +392,8 @@ export type AssistantEntityEvalExpectation =
       clarificationKind: "date_range" | "exercise";
       reason: string;
       optionCount: number;
-    };
+    }
+  | { kind: "refusal" };
 
 /** 一条实体/范围 golden 用例：自然语言 → 精确解析结果。 */
 export interface AssistantEntityEvalCase {
@@ -547,6 +553,22 @@ export const assistantEntityEvalCases: AssistantEntityEvalCase[] = [
       optionCount: 0,
     },
   },
+  {
+    // 负向：日期词不能单独证明训练意图。这两条一旦路由到 summary，就会绕过
+    // ER-3 的拒答直接花掉一次工具调用。
+    id: "entity-date-term-without-training-context",
+    message: "上周我女朋友生气了怎么办",
+    mode: "auto",
+    timeZone: "Asia/Shanghai",
+    expected: { kind: "refusal" },
+  },
+  {
+    id: "entity-date-term-with-unrelated-topic",
+    message: "本月工资是多少",
+    mode: "auto",
+    timeZone: "Asia/Shanghai",
+    expected: { kind: "refusal" },
+  },
 ];
 
 /**
@@ -583,6 +605,16 @@ function findEntityCaseFailure(
   testCase: AssistantEntityEvalCase,
   observation: AssistantEntityTurnObservation,
 ): string | null {
+  if (testCase.expected.kind === "refusal") {
+    if (observation.toolCalls.length > 0) {
+      return `expected no tool call but ran ${observation.toolCalls.map((call) => call.toolName).join(", ")}`;
+    }
+
+    return observation.clarification === null
+      ? null
+      : `expected no clarification but got ${observation.clarification.kind}`;
+  }
+
   if (testCase.expected.kind === "clarification") {
     if (observation.toolCalls.length > 0) {
       return `expected a clarification but ran ${observation.toolCalls.length} tool call(s)`;
@@ -609,35 +641,55 @@ function findEntityCaseFailure(
     return null;
   }
 
-  const toolCall = observation.toolCalls[0];
-
-  if (toolCall === undefined) {
-    return "expected a tool call but the turn ran none";
+  // The whole observation is the evidence, not just the first call: an extra
+  // argument, a second tool call, or a clarification riding alongside a correct
+  // first call all mean the turn did something the golden never described.
+  if (observation.clarification !== null) {
+    return `expected only a tool call but also got a ${observation.clarification.kind} clarification`;
   }
+
+  if (observation.toolCalls.length !== 1) {
+    return `expected exactly 1 tool call, got ${observation.toolCalls.length}`;
+  }
+
+  const toolCall = observation.toolCalls[0] as {
+    toolName: string;
+    args: Record<string, unknown>;
+  };
 
   if (toolCall.toolName !== testCase.expected.toolName) {
     return `expected tool ${testCase.expected.toolName}, got ${toolCall.toolName}`;
   }
 
-  const expectedArgs = testCase.expected.args;
-  const actualStart = toolCall.args["start_date"];
-  const actualEnd = toolCall.args["end_date"];
-  const actualExercise = toolCall.args["exercise_id"];
+  const expectedArgs: Record<string, string> = {
+    start_date: testCase.expected.args.start_date,
+    end_date: testCase.expected.args.end_date,
+    ...(testCase.expected.args.exercise_id === undefined
+      ? {}
+      : { exercise_id: testCase.expected.args.exercise_id }),
+  };
 
-  if (actualStart !== expectedArgs.start_date) {
-    return `expected start_date ${expectedArgs.start_date}, got ${String(actualStart)}`;
+  return findToolArgsFailure(expectedArgs, toolCall.args);
+}
+
+function findToolArgsFailure(
+  expectedArgs: Record<string, string>,
+  actualArgs: Record<string, unknown>,
+): string | null {
+  const unexpectedKeys = Object.keys(actualArgs).filter(
+    (key) => !(key in expectedArgs),
+  );
+
+  if (unexpectedKeys.length > 0) {
+    return `unexpected tool argument(s): ${unexpectedKeys.sort().join(", ")}`;
   }
 
-  if (actualEnd !== expectedArgs.end_date) {
-    return `expected end_date ${expectedArgs.end_date}, got ${String(actualEnd)}`;
-  }
+  for (const [key, expectedValue] of Object.entries(expectedArgs)) {
+    const actualValue = actualArgs[key];
 
-  if (expectedArgs.exercise_id !== undefined) {
-    if (actualExercise !== expectedArgs.exercise_id) {
-      return `expected exercise_id ${expectedArgs.exercise_id}, got ${String(actualExercise)}`;
+    if (actualValue !== expectedValue) {
+      return `expected ${key} ${expectedValue}, got ${String(actualValue)}`;
     }
-  } else if (actualExercise !== undefined) {
-    return `expected no exercise_id, got ${String(actualExercise)}`;
   }
 
   return null;

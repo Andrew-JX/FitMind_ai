@@ -275,4 +275,84 @@ describe("ER-EVAL — entity and range goldens on real turns", () => {
     expect(result.score).toBe(0);
     expect(result.failures[0]).toContain("expected start_date 2026-07-03");
   });
+
+  // A single-field comparison would pass every one of these: the first tool
+  // call is exactly right in all four, and the turn still did something the
+  // golden never described.
+  describe("the checker has no blind spot beyond the first tool call", () => {
+    const goldenCase: AssistantEntityEvalCase = {
+      id: "entity-blind-spot-probe",
+      message: "本周练得怎么样",
+      mode: "auto",
+      timeZone: "Asia/Shanghai",
+      expected: {
+        kind: "tool",
+        toolName: "get_training_summary",
+        args: { start_date: "2026-07-26", end_date: "2026-08-01" },
+      },
+    };
+    const correctCall = {
+      toolName: "get_training_summary",
+      args: { start_date: "2026-07-26", end_date: "2026-08-01" },
+    };
+
+    /**
+     * Feed the checker a fixed observation instead of running a turn.
+     *
+     * @param observation - Observation to evaluate
+     * @returns The check result for the single golden case
+     */
+    async function evaluateObservation(
+      observation: AssistantEntityTurnObservation,
+    ) {
+      return evaluateEntityResolution([goldenCase], async () => observation);
+    }
+
+    it("accepts the exact observation the golden describes", async () => {
+      const result = await evaluateObservation({
+        toolCalls: [correctCall],
+        clarification: null,
+      });
+
+      expect(result.failures).toEqual([]);
+    });
+
+    it("rejects an extra tool argument", async () => {
+      const result = await evaluateObservation({
+        toolCalls: [
+          {
+            toolName: "get_training_summary",
+            args: { ...correctCall.args, exercise_id: "leaked-id" },
+          },
+        ],
+        clarification: null,
+      });
+
+      expect(result.failures[0]).toContain("unexpected tool argument(s)");
+    });
+
+    it("rejects a second tool call", async () => {
+      const result = await evaluateObservation({
+        toolCalls: [
+          correctCall,
+          {
+            toolName: "get_exercise_progress",
+            args: { start_date: "2026-07-26", end_date: "2026-08-01" },
+          },
+        ],
+        clarification: null,
+      });
+
+      expect(result.failures[0]).toContain("expected exactly 1 tool call");
+    });
+
+    it("rejects a clarification riding alongside a correct tool call", async () => {
+      const result = await evaluateObservation({
+        toolCalls: [correctCall],
+        clarification: { kind: "exercise", reason: "missing", optionCount: 0 },
+      });
+
+      expect(result.failures[0]).toContain("also got a exercise clarification");
+    });
+  });
 });

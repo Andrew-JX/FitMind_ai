@@ -21,19 +21,30 @@ const UNSUPPORTED_PATTERN = /天气|笑话|新闻|股票|彩票|电影|音乐|�
 const KNOWLEDGE_PATTERN =
   /是什么|什么意思|怎么理解|原理|动作要点|常见错误|RPE|训练容量|训练量|渐进超负荷|deload|减量周|膝盖内扣|肩推|引体向上/u;
 const PROGRESS_PATTERN = /进步|没进步|停滞|平台|1RM|最大重量|卧推|深蹲|硬拉/u;
+/** Summary wording that carries training intent on its own. */
+const SUMMARY_PATTERN = /训练量|总结|够吗|频率/u;
 /**
- * Summary routing vocabulary.
+ * Time terms this router recognizes, kept in step with the ER-2 date resolver.
  *
  * @remarks
- * The time terms here must stay in step with the ER-2 date resolver. It
- * understands 上周 and 本月, but this pattern did not, so "上周练得怎么样" was
- * refused as unrecognized while the identically shaped "本周练得怎么样" worked —
- * the resolver never got the chance to run. Routing sits after
- * `PROGRESS_PATTERN`, so a message that names both a period and an exercise
- * still routes to progress.
+ * The resolver understands 上周 and 本月, but routing did not, so
+ * "上周练得怎么样" was refused as unrecognized while the identically shaped
+ * 本周 question worked — the resolver never got a chance to run.
  */
-const SUMMARY_PATTERN =
-  /训练量|这周|这个星期|本周|上周|上一周|上个星期|本月|这个月|最近|总结|够吗|频率/u;
+const DATE_TERM_PATTERN =
+  /这周|这个星期|本周|上周|上一周|上个星期|本月|这个月|最近/u;
+/**
+ * Training context required before a date term may route to summary.
+ *
+ * @remarks
+ * A period alone proves nothing about the subject: "上周我女朋友生气了怎么办"
+ * and "本月工资是多少" would otherwise reach a training tool and bypass the
+ * ER-3 refusals entirely. This is narrower than the refusal-scope lexicon in
+ * `assistant-refusal-scope.ts` on purpose — that one decides how to word a
+ * refusal, this one decides whether to spend a tool call.
+ */
+const TRAINING_CONTEXT_PATTERN =
+  /训练|练|健身|动作|组数|组|次数|重量|容量|强度|力量|肌|卧推|深蹲|硬拉|引体|推举|划船|下拉|有氧|哑铃|杠铃|器械|热身|状态|表现/u;
 const IMBALANCE_PATTERN = /偏科|练太多|太少|均衡|胸|背|腿|肩/u;
 const RECOMMENDATION_PATTERN = /今天|下次|练什么|适合练|建议/u;
 const HISTORY_PATTERN = /上次|什么时候|历史|记录/u;
@@ -154,7 +165,14 @@ export function classifyAssistantIntent(
     };
   }
 
-  if (SUMMARY_PATTERN.test(normalizedMessage)) {
+  const namesPeriodWithTrainingContext =
+    DATE_TERM_PATTERN.test(normalizedMessage) &&
+    TRAINING_CONTEXT_PATTERN.test(normalizedMessage);
+
+  if (
+    SUMMARY_PATTERN.test(normalizedMessage) ||
+    namesPeriodWithTrainingContext
+  ) {
     return {
       intent: "summary",
       reason: "The question asks for a training summary.",

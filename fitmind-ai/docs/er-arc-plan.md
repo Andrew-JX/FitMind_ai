@@ -401,6 +401,18 @@ Writing the goldens exposed a routing gap rather than confirming the resolver:
 before the date resolver could run. The pattern now tracks the resolver’s
 vocabulary, and both phrasings are pinned in the intent goldens as well.
 
+Review then closed two holes in that fix:
+
+- **A date term never establishes training intent on its own.** Routing on the
+  term alone sent “上周我女朋友生气了怎么办” to a training tool, bypassing the
+  ER-3 refusals — a pre-existing hazard through 最近 that the new terms widened.
+  A period now routes to summary only alongside training context, and two
+  negative goldens pin turns that must run no tool at all.
+- **The checker compares the whole observation.** Checking only the first tool
+  call's three fields let an extra argument, a second call, or a clarification
+  riding alongside a correct call all score 1. Argument sets must match exactly,
+  and four synthetic-probe cases pin each blind spot.
+
 Each implementation batch performs the normal documentation impact audit.
 Accepted runtime decisions go into `ai-decisions.md` when the corresponding code
 batch is reviewed; this docs-only kickoff does not pre-record unimplemented
