@@ -350,7 +350,8 @@ describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", ()
     });
 
     expect(response.answer.summary).toContain("总训练量约 4,800.5 kg");
-    expect(response.answer.bullets[0]).toContain("累计约 2,400.5 kg");
+    // bullets[0] is the ER-2D range label; the top-exercise volume follows it.
+    expect(response.answer.bullets[1]).toContain("累计约 2,400.5 kg");
     expect(response.faithfulness).toMatchObject({
       status: "verified",
       unverifiedClaims: [],

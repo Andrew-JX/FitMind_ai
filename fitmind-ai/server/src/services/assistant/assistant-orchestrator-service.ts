@@ -565,6 +565,26 @@ function buildEvidence(
   };
 }
 
+/**
+ * Render the exact tool-result range as an answer bullet.
+ *
+ * @param range - Inclusive date range carried by the tool result
+ * @returns The range label shown to the user
+ *
+ * @remarks
+ * Every data-bearing answer states the range it actually covers. The window is
+ * whatever the date resolver produced for this turn, so prose must never name a
+ * fixed window of its own: that is how "本周共记录 5 次" came to describe 30 days
+ * of data. Reading `result.range` keeps the label and the numbers from drifting
+ * apart.
+ */
+function formatStatRangeLabel(range: {
+  start_date: string;
+  end_date: string;
+}): string {
+  return `统计范围：${range.start_date} 到 ${range.end_date}`;
+}
+
 function buildMockProviderEvidence(): AssistantAnswerEvidence {
   return {
     source: "deterministic_mock_provider",
@@ -629,7 +649,7 @@ function buildTrainingOverviewAnswer(
       summary:
         "根据当前时间范围内的训练记录，你还没有可用的训练数据。先完成几次训练，助手才能给出更有意义的总览和建议。",
       bullets: [
-        `统计范围：${result.range.start_date} 到 ${result.range.end_date}`,
+        formatStatRangeLabel(result.range),
         "当前训练次数：0 次",
         "当前训练量：0 kg",
       ],
@@ -638,8 +658,9 @@ function buildTrainingOverviewAnswer(
   }
 
   return {
-    summary: `根据你最近这段时间的训练记录，你共训练了 ${result.totals.workout_count} 次，完成 ${result.totals.set_count} 组，累计 ${result.totals.total_reps} 次，总训练量约 ${formatMetricKg(result.totals.total_volume)}。`,
+    summary: `根据统计范围内的训练记录，你共训练了 ${result.totals.workout_count} 次，完成 ${result.totals.set_count} 组，累计 ${result.totals.total_reps} 次，总训练量约 ${formatMetricKg(result.totals.total_volume)}。`,
     bullets: [
+      formatStatRangeLabel(result.range),
       topExercise
         ? `当前训练量最集中的动作是 ${topExercise.exercise_name}，累计约 ${formatMetricKg(topExercise.total_volume)}。`
         : "当前时间范围内还没有明显集中的主要动作。",
@@ -659,7 +680,7 @@ function buildExerciseProgressAnswer(
     return {
       summary: `${exerciseName} 最近这段时间还没有训练记录，所以我暂时看不出这个动作的稳定进展。`,
       bullets: [
-        `统计范围：${result.range.start_date} 到 ${result.range.end_date}`,
+        formatStatRangeLabel(result.range),
         "当前训练次数：0 次",
         "你可以先记录这个动作，或者去“分析”页切换到已有数据的动作。",
       ],
@@ -668,9 +689,10 @@ function buildExerciseProgressAnswer(
   }
 
   return {
-    summary: `根据你最近的 ${exerciseName} 训练记录，当前估算 1RM 约为 ${formatMetricKg(result.totals.estimated_1rm_kg)}，观察到的最高训练重量约为 ${formatMetricKg(result.totals.max_weight_kg)}。`,
+    summary: `根据统计范围内的 ${exerciseName} 训练记录，当前估算 1RM 约为 ${formatMetricKg(result.totals.estimated_1rm_kg)}，观察到的最高训练重量约为 ${formatMetricKg(result.totals.max_weight_kg)}。`,
     bullets: [
-      `最近共纳入 ${result.totals.workout_count} 次训练、${result.totals.set_count} 条相关训练组。`,
+      formatStatRangeLabel(result.range),
+      `这个范围内共纳入 ${result.totals.workout_count} 次训练、${result.totals.set_count} 条相关训练组。`,
       `这个判断来自 ${result.evidence.workout_ids.length} 条 workout 和 ${result.evidence.set_ids.length} 条 set。`,
       "这里的 1RM 是训练信号，不是保证值，也不是医疗或专业教练建议。",
     ],
@@ -769,7 +791,7 @@ function buildRecommendationContextAnswer(
       summary:
         "当前还没有足够的训练记录可供判断。先记录几次训练后，我才能根据真实的 workout 和 set 给出更具体的解释。",
       bullets: [
-        `统计范围：${result.range.start_date} 到 ${result.range.end_date}`,
+        formatStatRangeLabel(result.range),
         "当前没有可用的训练量分布和最近训练记录。",
       ],
       evidence: buildEvidence("get_recommendation_context", result),
@@ -799,8 +821,9 @@ function buildNextTrainingFocusAnswer(
   const topExercise = result.summary.by_exercise[0];
 
   return {
-    summary: `根据你最近 30 天的训练记录，下一次训练可以优先补${resolveNextFocusSuggestion(dominantArea)}。`,
+    summary: `根据统计范围内的训练记录，下一次训练可以优先补${resolveNextFocusSuggestion(dominantArea)}。`,
     bullets: [
+      formatStatRangeLabel(result.range),
       topExercise
         ? `你当前训练量最集中的动作是 ${topExercise.exercise_name}。`
         : "当前时间范围内还没有明显集中的主要动作。",
@@ -829,10 +852,11 @@ function buildMuscleBalanceAnswer(
   return {
     summary: `${summary} 当前动作字典的肌群信息有限，所以这个判断主要基于动作名称和训练量分布。`,
     bullets: [
+      formatStatRangeLabel(result.range),
       topExercise
         ? `当前训练量最集中的动作是 ${topExercise.exercise_name}。`
         : "当前时间范围内没有明显排在最前的动作。",
-      `最近 30 天共参考 ${result.summary.workout_count} 次训练和 ${result.summary.set_count} 组记录。`,
+      `这个范围内共参考 ${result.summary.workout_count} 次训练和 ${result.summary.set_count} 组记录。`,
     ],
     evidence: buildEvidence("get_recommendation_context", result),
   };
@@ -858,10 +882,11 @@ function buildTrainingImbalanceAnswer(
         ? `最近训练量有一点集中在 ${firstExercise?.exercise_name ?? "少数动作"}，从分布上看存在一定偏科倾向。`
         : "最近训练量没有明显只堆在单一动作上，整体分布看起来还算相对均衡。",
     bullets: [
+      formatStatRangeLabel(result.range),
       firstExercise
         ? `Top 3 动作里，第一位约占 ${(firstRatio * 100).toFixed(0)}% 的训练量。`
         : "当前时间范围内还没有明显的 top exercise 分布。",
-      "这个判断主要来自最近 30 天 top exercises 的训练量集中度，而不是模型主观猜测。",
+      "这个判断主要来自统计范围内 top exercises 的训练量集中度，而不是模型主观猜测。",
     ],
     evidence: buildEvidence("get_recommendation_context", result),
   };
