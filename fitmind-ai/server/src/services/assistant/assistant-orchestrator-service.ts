@@ -109,6 +109,7 @@ import {
   isOutOfScopeMessage,
   type AssistantRoutedIntent,
 } from "./assistant-intent-router.js";
+import { classifyUnsupportedScope } from "./assistant-refusal-scope.js";
 import {
   filterRelevantKnowledgeChunks,
   retrieveKnowledgeChunks,
@@ -1329,6 +1330,28 @@ async function resolveExerciseTurnInput(input: {
   };
 }
 
+/**
+ * Map an entity-resolution status onto the clarification copy it deserves.
+ *
+ * @param status - Deterministic exercise entity status for this turn
+ * @returns The clarification reason the composer renders
+ *
+ * @remarks
+ * `absent` (the user named no exercise) and `unresolved` (they named one that
+ * is not in the dictionary) used to collapse into a single reason, so someone
+ * who typed a real but unknown exercise was told to "告诉我具体动作名" as if they
+ * had typed nothing — advice they had already followed.
+ */
+function resolveExerciseClarificationReason(
+  status: AssistantExerciseEntityResolution["status"],
+): "ambiguous" | "missing" | "unresolved" {
+  if (status === "ambiguous") {
+    return "ambiguous";
+  }
+
+  return status === "unresolved" ? "unresolved" : "missing";
+}
+
 function requiresExerciseEntity(intent: AssistantRoutedIntent): boolean {
   return intent === "progress" || intent === "plateau_diagnosis";
 }
@@ -1340,8 +1363,7 @@ function buildExerciseClarificationContext(input: {
 }): AssistantExerciseClarificationContext {
   const clarification = assistantClarificationSchema.parse({
     kind: "exercise",
-    reason:
-      input.resolution.status === "ambiguous" ? "ambiguous" : "unresolved",
+    reason: resolveExerciseClarificationReason(input.resolution.status),
     options: input.resolution.candidate_exercises.map((candidate) => ({
       exercise_id: candidate.exercise_id,
       exercise_name: candidate.exercise_name,
@@ -1851,7 +1873,18 @@ export async function runMockAssistantTurn(
     const canTryKnowledgeFallback =
       !isOutOfScopeMessage(input.message) &&
       tokenizeKnowledgeQuery(input.message).length > 0;
-    let answer = composeUnsupportedAnswer(input.message);
+    // ER-3: an understood-but-unanswerable topic and a training question we
+    // failed to parse are different failures, so they get different copy. The
+    // existing blocklist stays authoritative for the topics it names.
+    const unsupportedScope = isOutOfScopeMessage(input.message)
+      ? "out_of_scope"
+      : classifyUnsupportedScope({
+          message: input.message,
+          hasExerciseSignal:
+            exerciseTurn.entityResolution !== null &&
+            exerciseTurn.entityResolution.status !== "absent",
+        });
+    let answer = composeUnsupportedAnswer(unsupportedScope);
 
     if (canTryKnowledgeFallback) {
       await emitEvent(options, {

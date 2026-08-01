@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { AssistantRoutedIntent } from "./assistant-intent-router.js";
+import type { AssistantUnsupportedScope } from "./assistant-refusal-scope.js";
 import type { RetrievedKnowledgeChunk } from "../rag/knowledge-retriever.js";
 
 const assistantExerciseClarificationOptionSchema = z
@@ -14,7 +15,10 @@ export const assistantClarificationSchema = z.discriminatedUnion("kind", [
   z
     .object({
       kind: z.literal("exercise"),
-      reason: z.enum(["ambiguous", "unresolved"]),
+      // "missing" = no exercise named; "unresolved" = one was named but is not
+      // in the dictionary. Both used to persist as "unresolved", which is why
+      // the older value stays accepted for already-stored clarifications.
+      reason: z.enum(["ambiguous", "missing", "unresolved"]),
       options: z.array(assistantExerciseClarificationOptionSchema).max(5),
     })
     .strict(),
@@ -88,17 +92,26 @@ export function composeExerciseClarificationAnswer(
   const summary =
     validated.reason === "ambiguous"
       ? "我找到了多个可能的动作，需要你确认一个后才能继续分析。"
-      : "我已经理解你想分析动作，但还需要你告诉我具体动作名。";
+      : validated.reason === "unresolved"
+        ? "你说的这个动作不在当前动作库里，我没有找到能对上的记录。"
+        : "我已经理解你想分析动作，但还需要你告诉我具体动作名。";
 
   return {
     summary,
     bullets: hasOptions
       ? validated.options.map((option) => option.exercise_name)
-      : ["请直接回复完整动作名，例如“杠铃卧推”。"],
+      : validated.reason === "unresolved"
+        ? [
+            "可以换一个更完整或更常见的名称，例如“杠铃卧推”。",
+            "也可以先去“分析”页确认这个动作在不在动作库里。",
+          ]
+        : ["请直接回复完整动作名，例如“杠铃卧推”。"],
     conclusion: "我不会猜测动作，也不会在动作未确认时调用训练分析工具。",
     recommendation: hasOptions
       ? "点一个候选，或直接回复完整动作名即可；不需要去分析页选动作。"
-      : "直接回复完整动作名即可；不需要去分析页选动作。",
+      : validated.reason === "unresolved"
+        ? "回复一个动作库里的动作名即可；不需要去分析页选动作。"
+        : "直接回复完整动作名即可；不需要去分析页选动作。",
     evidence: emptyEvidence,
     sources: [],
     intent: "unsupported",
@@ -227,25 +240,69 @@ export function composeMixedToolRagAnswer(input: {
   };
 }
 
-export function composeUnsupportedAnswer(
-  message: string,
-): AssistantStructuredAnswer {
-  void message;
-
+/**
+ * Compose the refusal for a request outside the product.
+ *
+ * @returns Structured answer naming the boundary rather than blaming parsing.
+ *
+ * @remarks
+ * Separated from {@link composeUnrecognizedAnswer} because "我没听懂" is a lie
+ * when the request was understood perfectly and simply is not something a
+ * training log can answer. Saying so lets the user stop rephrasing.
+ */
+export function composeOutOfScopeAnswer(): AssistantStructuredAnswer {
   return {
     summary:
-      "我可以基于你的训练记录和训练知识，帮你做周训练报告、动作进展分析、平台期诊断和下周训练草案。这个问题我还没识别清楚，你可以换个说法，比如“帮我做本周训练报告”或“卧推平台期怎么诊断？”。",
+      "这个问题不在 FitMind 的范围内。我只解释你自己的训练记录，以及训练知识库里的内容，不提供饮食、医疗、心理或其他生活方面的建议。",
     bullets: [
-      "如果你想看数据复盘，可以问“帮我做一份本周训练报告”。",
-      "如果你想看训练问题定位，可以问“卧推平台期怎么诊断？”。",
+      "我能做的是：周训练报告、动作进展分析、平台期诊断、下周训练草案。",
+      "这些结论都会绑定你的真实训练记录，并给出可回溯的 Evidence。",
     ],
     conclusion:
-      "FitMind 当前专注于训练记录解释、训练知识 Sources 和可回溯的 Evidence。",
+      "换个说法也不会让这个话题进入范围，所以我不会硬答一个我没有依据的结论。",
     recommendation:
-      "换成周报、动作进展、平台期诊断或下周训练草案相关的问题，我会更有帮助。",
+      "如果你想问的其实和训练有关，可以直接说动作、时间范围或训练目标，比如“杠铃卧推最近有没有进步”。",
     evidence: emptyEvidence,
     sources: [],
     intent: "unsupported",
     limitations: ["这类问题不会调用训练工具，也不会生成泛化生活建议。"],
   };
+}
+
+/**
+ * Compose the refusal for a training request whose intent stayed unclear.
+ *
+ * @returns Structured answer with executable examples.
+ */
+export function composeUnrecognizedAnswer(): AssistantStructuredAnswer {
+  return {
+    summary:
+      "这个问题看起来和训练有关，但我还没识别出你想要哪种分析。换个更具体的说法我就能接上。",
+    bullets: [
+      "如果你想看数据复盘，可以问“帮我做一份本周训练报告”。",
+      "如果你想看单个动作，可以问“杠铃卧推最近有没有进步”。",
+      "如果你想看训练问题定位，可以问“卧推平台期怎么诊断？”。",
+    ],
+    conclusion:
+      "FitMind 当前专注于训练记录解释、训练知识 Sources 和可回溯的 Evidence。",
+    recommendation: "说清楚“哪个动作”或“哪段时间”，通常就足够我开始分析了。",
+    evidence: emptyEvidence,
+    sources: [],
+    intent: "unsupported",
+    limitations: ["这类问题不会调用训练工具，也不会生成泛化生活建议。"],
+  };
+}
+
+/**
+ * Compose the refusal matching this turn's scope.
+ *
+ * @param scope - Whether the request is outside the product or merely unclear
+ * @returns The layered refusal answer
+ */
+export function composeUnsupportedAnswer(
+  scope: AssistantUnsupportedScope,
+): AssistantStructuredAnswer {
+  return scope === "out_of_scope"
+    ? composeOutOfScopeAnswer()
+    : composeUnrecognizedAnswer();
 }

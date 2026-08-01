@@ -626,7 +626,9 @@ describe("runMockAssistantTurn — weekly report end-to-end (P1 regression)", ()
     expect(response.answer.recommendation).toContain("不需要去分析页");
     expect(response.clarification).toEqual({
       kind: "exercise",
-      reason: "unresolved",
+      // No exercise was named at all, which ER-3 separates from naming one the
+      // dictionary does not have.
+      reason: "missing",
       options: [],
     });
     expect(response.faithfulness).toBeUndefined();
@@ -1186,7 +1188,9 @@ describe("runMockAssistantTurn provider budget gate (AR-1d commit 1)", () => {
 
     expect(response.clarification).toEqual({
       kind: "exercise",
-      reason: "unresolved",
+      // No exercise was named at all, which ER-3 separates from naming one the
+      // dictionary does not have.
+      reason: "missing",
       options: [],
     });
     expect(classify).toHaveBeenCalledTimes(1);

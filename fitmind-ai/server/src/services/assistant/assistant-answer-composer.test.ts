@@ -63,16 +63,37 @@ describe("assistant answer composer", () => {
     expect(answer.sources[0]?.title).toContain("RPE");
   });
 
-  it("keeps unsupported answers scoped and evidence-free", () => {
-    const answer = composeUnsupportedAnswer("明天天气怎么样？");
+  it.each(["out_of_scope", "unrecognized"] as const)(
+    "keeps %s answers scoped and evidence-free",
+    (scope) => {
+      const answer = composeUnsupportedAnswer(scope);
 
-    expect(answer.intent).toBe("unsupported");
-    expect(answer.evidence.tool_names).toEqual([]);
-    expect(answer.sources).toEqual([]);
-    expect(answer.summary).toContain("训练记录");
-    expect(answer.summary).toContain("周训练报告");
-    expect(answer.summary).toContain("下周训练草案");
-    expect(answer.summary).not.toContain("unsupported");
-    expect(answer.limitations.join(" ")).not.toContain("unsupported");
+      expect(answer.intent).toBe("unsupported");
+      expect(answer.evidence.tool_names).toEqual([]);
+      expect(answer.sources).toEqual([]);
+      expect(answer.summary).not.toContain("unsupported");
+      expect(answer.limitations.join(" ")).not.toContain("unsupported");
+    },
+  );
+
+  // ER-3: the two refusals must not be interchangeable. Telling someone their
+  // understood-but-unanswerable question was "not understood" sends them off to
+  // rephrase something no rephrasing can fix.
+  it("tells an out-of-scope request that the topic is outside the product", () => {
+    const answer = composeUnsupportedAnswer("out_of_scope");
+
+    expect(answer.summary).toContain("不在 FitMind 的范围内");
+    expect(answer.summary).not.toContain("没识别");
+    expect(answer.conclusion).toContain("换个说法也不会");
+  });
+
+  it("tells an unrecognized training request what phrasing works", () => {
+    const answer = composeUnsupportedAnswer("unrecognized");
+
+    expect(answer.summary).toContain("和训练有关");
+    expect(answer.summary).toContain("没识别");
+    // Every example must be a request the assistant can actually execute.
+    expect(answer.bullets.join(" ")).toContain("本周训练报告");
+    expect(answer.bullets.join(" ")).toContain("杠铃卧推");
   });
 });
