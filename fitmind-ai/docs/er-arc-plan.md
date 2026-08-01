@@ -347,10 +347,28 @@ continuation context, unlike ER-1: each option carries its own explicit range,
 and an explicit range is already the highest-precedence input, so a tapped or
 typed answer resumes through the ordinary request path with no stored state.
 
-### 8. ER-3: refusal and clarification copy — at most 5 code files
+### 7.5. ER-2D: answers state their own range — 3 code files — implemented
+
+Added after real-machine verification of ER-2 could not confirm the resolved
+range, because no data-bearing answer named the window it ran on. Three
+recommendation-context answers asserted a fixed 最近 30 天 in prose regardless
+of the resolved range — the same defect class as the 本周 label fixed in
+`240c12f`, in three places that fix did not reach. Overview and exercise
+progress named no window at all, while their own zero-data branches did.
+
+All of them now render `result.range` through one shared label. The dates come
+from the tool output, so faithfulness accepts them unchanged.
+
+### 8. ER-3: refusal and clarification copy — 4 code files — implemented
 
 Separate out-of-scope, unrecognized, missing, ambiguous, and unresolved outcomes;
 pin “生酮饮食” as out of scope and keep safety behavior unchanged.
+
+Implemented as a deterministic scope classifier (`assistant-refusal-scope.ts`)
+plus split composers. The classifier leans toward `unrecognized`: misrouting a
+training question to “outside the product” costs more than asking a user to
+rephrase. `absent` and `unresolved` exercise states now carry different copy;
+the stored-clarification schema still accepts the pre-batch reason value.
 
 ### 9. ER-EVAL: offline entity goldens — 2 code files
 
