@@ -6,28 +6,42 @@ FitMind AI is an evidence-backed AI training analysis system that connects worko
 
 It is not a generic chatbot and not a pure CRUD app.
 
-## Production URL
+## Deployments
 
-- Live app: https://fitmind-ai-psi.vercel.app/
-- The deployed client uses relative `/api` requests by default. `VITE_API_BASE_URL` can stay empty on Vercel unless the API is hosted on a separate origin.
+Two targets are built from this repo. They differ in configuration only — same code, same build.
+
+| Target                       | Status                                   | Registration | Footer filing numbers |
+| ---------------------------- | ---------------------------------------- | ------------ | --------------------- |
+| Vercel demo (overseas)       | Live: https://fitmind-ai-psi.vercel.app/ | Open         | None                  |
+| Self-hosted (mainland China) | Not live — pending ICP filing            | Invite-only  | ICP + public security |
+
+- The deployed client uses relative `/api` requests by default. `VITE_API_BASE_URL` can stay empty unless the API is hosted on a separate origin.
+- The mainland target closes self-service registration (`REGISTRATION_INVITE_ONLY=on`) and displays its filing numbers in the footer. See [docs/china-launch-plan.md](docs/china-launch-plan.md) for the full configuration and the reasoning behind it.
+- The legal pages under `client/public/legal/` describe the **mainland** deployment, including in-country data storage. Do not serve them from a deployment that stores data elsewhere without adjusting that section.
 
 ## Mobile Install
 
-FitMind AI includes a minimal PWA install experience for mobile home screens.
+FitMind AI includes a minimal PWA install experience for mobile home screens. Substitute the deployment URL you are using below.
 
 iOS:
 
-1. Open https://fitmind-ai-psi.vercel.app/ in Safari.
+1. Open the app URL in Safari.
 2. Tap Share.
 3. Tap Add to Home Screen.
 4. Launch FitMind from the new home-screen icon.
 
 Android:
 
-1. Open https://fitmind-ai-psi.vercel.app/ in Chrome.
+1. Open the app URL in Chrome.
 2. Tap the browser menu.
 3. Tap Add to Home screen or Install app.
 4. Launch FitMind from the new home-screen icon.
+
+WeChat's in-app browser:
+
+- Links shared into WeChat open in its built-in browser, which has no "add to home screen" affordance. The steps above do not apply there.
+- Tell users to tap the menu and choose "open in browser" first, then install from Safari or Chrome.
+- SSE assistant streaming needs buffering disabled at the reverse proxy (`proxy_buffering off` plus `X-Accel-Buffering: no`); otherwise the answer arrives in one chunk instead of streaming.
 
 Offline note:
 
@@ -39,7 +53,7 @@ PWA troubleshooting:
 
 - To force a fresh app shell, open the site in Safari or Chrome and refresh once while online before launching from the home-screen icon again.
 - If the installed app keeps showing an older version, remove the FitMind home-screen icon and add it again from the browser.
-- If stale service worker data persists, clear site data for `fitmind-ai-psi.vercel.app` in browser settings, then reopen the production URL and reinstall.
+- If stale service worker data persists, clear site data for the app's origin in browser settings, then reopen the production URL and reinstall.
 - FitMind can remember only the last login email when selected. It does not store the password or persist the auth token.
 
 ## Core Idea
@@ -73,6 +87,7 @@ Backend:
 AI layer:
 
 - mock provider
+- OpenAI-compatible provider adapter path (DeepSeek, Groq, and similar)
 - Anthropic provider adapter path
 - Tool Calling
 - deterministic tools
@@ -85,6 +100,7 @@ AI layer:
 - Demo script: [docs/demo-script.md](docs/demo-script.md)
 - **Start here — doc index: [docs/INDEX.md](docs/INDEX.md)** (organized by task, not by filename)
 - Production smoke checklist: [docs/production-smoke-checklist.md](docs/production-smoke-checklist.md)
+- China launch plan (mainland deployment, filings, compliance): [docs/china-launch-plan.md](docs/china-launch-plan.md)
 - Project study guide: [docs/project-study-guide.md](docs/project-study-guide.md)
 - Progress log (current quarter; earlier quarters under `docs/archive/`): [docs/progress.md](docs/progress.md)
 - UI spec: [docs/UI_SPEC.md](docs/UI_SPEC.md)
@@ -94,28 +110,31 @@ AI layer:
 
 ## Current Limitations
 
-- RAG is currently an MVP skeleton: static seed corpus plus keyword retrieval, not embeddings or pgvector yet.
+- RAG retrieval runs on pgvector embeddings when `VOYAGE_API_KEY` is set, and degrades to keyword retrieval when it is not. There is no domestic embedding provider yet, so a mainland deployment runs on the keyword path.
 - No MCP.
 - No multi-tool agent loop.
 - No real Anthropic token streaming.
-- No second provider call after tool execution by default (an optional faithfulness-gated summary re-phrasing call runs only when `ASSISTANT_PHRASING=on` + `ASSISTANT_PROVIDER=groq`).
+- No second provider call after tool execution by default (an optional faithfulness-gated summary re-phrasing call runs only when `ASSISTANT_PHRASING=on` + `ASSISTANT_PROVIDER=groq` or `openai_compatible`).
 - Recommendation context is deterministic preview, not medical advice.
 - Browser E2E test has not been completed.
 
-## Vercel Environment Checklist
+## Deployment Environment Checklist
 
 Required:
 
 - `DATABASE_URL` - PostgreSQL connection string used by API routes and migrations.
 - `JWT_SECRET` - long random signing secret for auth tokens.
 - `ASSISTANT_PROVIDER` - use `mock` for stable demos unless a real provider is intentionally being tested.
-- `WORKOUT_INTAKE_LLM_PROVIDER` - use `mock` or `off` for stable demos; use `anthropic` only when the API key is configured.
+- `WORKOUT_INTAKE_LLM_PROVIDER` - use `mock` or `off` for stable demos. This is a **separate switch** from `ASSISTANT_PROVIDER`; changing the assistant provider alone leaves voice/text intake on the rule parser.
 
 Optional:
 
+- `REGISTRATION_INVITE_ONLY` - `on` closes `POST /api/auth/register` with `403 REGISTRATION_CLOSED`. Fail-safe: only an explicit `off`/`false`/`0`/`no` opens registration, so a typo keeps it closed. Accounts are then created with `pnpm create:user`.
+- `OPENAI_COMPAT_BASE_URL` / `OPENAI_COMPAT_MODEL` / `OPENAI_COMPAT_API_KEY` - OpenAI-compatible endpoint shared by the assistant and the intake parser. This is the path used for DeepSeek in mainland China, where `api.anthropic.com`, `api.groq.com`, and the Gemini endpoint are all unreachable.
 - `ANTHROPIC_API_KEY` - only required when `ASSISTANT_PROVIDER=anthropic` or `WORKOUT_INTAKE_LLM_PROVIDER=anthropic`.
-- `ASSISTANT_PHRASING` - `off` by default; set `on` to let the model re-phrase the answer summary. Only active when `ASSISTANT_PROVIDER=groq`; runtime faithfulness gates each rewrite (see `docs/ai-decisions.md` D39).
-- `VITE_API_BASE_URL` - leave empty for the current Vercel single-origin deployment.
+- `ASSISTANT_PHRASING` - `off` by default; set `on` to let the model re-phrase the answer summary. Only active when `ASSISTANT_PROVIDER=groq` or `openai_compatible`; runtime faithfulness gates each rewrite (see `docs/ai-decisions.md` D39).
+- `VITE_API_BASE_URL` - leave empty for a single-origin deployment.
+- `VITE_ICP_BEIAN_NUMBER` / `VITE_PUBLIC_SECURITY_BEIAN_NUMBER` - filing numbers rendered in the footer, read at **client build time**. Leave blank on deployments without a filing; the footer then shows only the agreement and privacy links.
 
 ## Verification
 
