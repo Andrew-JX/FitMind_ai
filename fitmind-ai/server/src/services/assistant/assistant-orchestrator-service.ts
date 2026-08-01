@@ -250,6 +250,22 @@ const assistantExerciseClarificationContextSchema = z
         path: ["clarification", "kind"],
         message: "ER-1 clarification context must target an exercise.",
       });
+
+      return;
+    }
+
+    // A `version: 1` context must stay readable by builds that predate ER-3.
+    // Those builds only accept ambiguous|unresolved and drop the whole context
+    // on any other value, which would silently break a pending clarification
+    // during a rollback or a rolling deploy. The layered reason belongs to the
+    // response, not to persisted state.
+    if (value.clarification.reason === "missing") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["clarification", "reason"],
+        message:
+          "Persisted v1 clarification context must use a pre-ER-3 reason.",
+      });
     }
   });
 
@@ -760,6 +776,7 @@ function buildPlateauDiagnosisAnswer(input: {
   return {
     summary: `${exerciseName} 的平台期诊断需要保持保守：我会先比较你的动作训练趋势，再结合训练知识 Sources 解释训练量、强度、恢复和渐进方式这些可能影响因素。`,
     bullets: [
+      formatStatRangeLabel(input.result.range),
       `Evidence：${input.result.totals.workout_count} 次相关训练，${input.result.totals.set_count} 组，最高重量 ${formatMetricKg(input.result.totals.max_weight_kg)}，估算 1RM ${formatMetricKg(input.result.totals.estimated_1rm_kg)}。`,
       input.result.totals.workout_count < 3
         ? "样本还偏少，所以不能直接判定为真正的平台期。"
@@ -911,6 +928,7 @@ function buildRecoveryCheckAnswer(
   return {
     summary: `${relationCopy} ${daysSince === null ? "" : `最近一次纳入参考的训练距离现在大约 ${daysSince} 天。 `}${RECOVERY_BOUNDARY_COPY}`,
     bullets: [
+      formatStatRangeLabel(result.range),
       "这类提醒主要依据最近训练时间和训练量分布，不包含疼痛、睡眠、主观疲劳等信息。",
       "如果你今天有明显 soreness、疲劳或不适，应该优先休息而不是继续硬顶训练。",
     ],
@@ -925,6 +943,7 @@ function buildEvidenceExplainAnswer(
     summary:
       "这些判断来自已记录的 workout、set 和 calculation rules，不是模型凭空猜测。",
     bullets: [
+      formatStatRangeLabel(result.range),
       `当前共参考 ${result.evidence.workout_ids.length} 条 workout、${result.evidence.set_ids.length} 条 set。`,
       `目前纳入 ${result.evidence.calculation_rules.length} 条 calculation rules。`,
       "如果当前动作字典的肌群信息不完整，我会更多依据动作名称、训练量和最近训练频率来解释。",
@@ -1352,6 +1371,18 @@ function resolveExerciseClarificationReason(
   return status === "unresolved" ? "unresolved" : "missing";
 }
 
+/**
+ * Collapse a layered reason back to the value set persisted contexts allow.
+ *
+ * @param reason - Reason shown to the user this turn
+ * @returns The pre-ER-3 reason safe to store in a `version: 1` context
+ */
+function toPersistedClarificationReason(
+  reason: "ambiguous" | "missing" | "unresolved",
+): "ambiguous" | "unresolved" {
+  return reason === "ambiguous" ? "ambiguous" : "unresolved";
+}
+
 function requiresExerciseEntity(intent: AssistantRoutedIntent): boolean {
   return intent === "progress" || intent === "plateau_diagnosis";
 }
@@ -1361,13 +1392,19 @@ function buildExerciseClarificationContext(input: {
   request: MockAssistantTurnInput;
   resolution: AssistantExerciseEntityResolution;
 }): AssistantExerciseClarificationContext {
+  const options = input.resolution.candidate_exercises.map((candidate) => ({
+    exercise_id: candidate.exercise_id,
+    exercise_name: candidate.exercise_name,
+  }));
+  // Persisted state stays on the pre-ER-3 value set; the layered reason is a
+  // response concern. Resuming a clarification matches on the options and the
+  // original request, never on this field.
   const clarification = assistantClarificationSchema.parse({
     kind: "exercise",
-    reason: resolveExerciseClarificationReason(input.resolution.status),
-    options: input.resolution.candidate_exercises.map((candidate) => ({
-      exercise_id: candidate.exercise_id,
-      exercise_name: candidate.exercise_name,
-    })),
+    reason: toPersistedClarificationReason(
+      resolveExerciseClarificationReason(input.resolution.status),
+    ),
+    options,
   });
 
   return assistantExerciseClarificationContextSchema.parse({
@@ -1820,11 +1857,20 @@ export async function runMockAssistantTurn(
       request: requestInput,
       resolution: exerciseTurn.entityResolution,
     });
-    const clarification = clarificationContext.clarification;
+    const persistedClarification = clarificationContext.clarification;
 
-    if (clarification.kind !== "exercise") {
+    if (persistedClarification.kind !== "exercise") {
       throw new Error("ER-1 produced a non-exercise clarification.");
     }
+
+    // The response carries the layered ER-3 reason; the stored context above
+    // keeps the pre-ER-3 one so an older build can still resume it.
+    const clarification = assistantClarificationSchema.parse({
+      ...persistedClarification,
+      reason: resolveExerciseClarificationReason(
+        exerciseTurn.entityResolution.status,
+      ),
+    }) as Extract<AssistantClarification, { kind: "exercise" }>;
 
     const answer = composeExerciseClarificationAnswer(clarification);
     await emitAnswerEvents(answer, options);
@@ -1880,9 +1926,15 @@ export async function runMockAssistantTurn(
       ? "out_of_scope"
       : classifyUnsupportedScope({
           message: input.message,
+          // Only a dictionary hit counts as a training signal. `unresolved`
+          // means an unknown phrase survived framing removal, which any
+          // off-topic message produces — treating that as evidence of training
+          // sent the spec's own reference case (生酮饮食) down the
+          // "unrecognized" path.
           hasExerciseSignal:
             exerciseTurn.entityResolution !== null &&
-            exerciseTurn.entityResolution.status !== "absent",
+            (exerciseTurn.entityResolution.status === "matched" ||
+              exerciseTurn.entityResolution.status === "ambiguous"),
         });
     let answer = composeUnsupportedAnswer(unsupportedScope);
 

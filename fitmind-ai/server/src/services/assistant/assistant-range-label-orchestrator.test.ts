@@ -106,6 +106,14 @@ vi.mock("../training/dictionary-service.js", () => ({
   searchDictionaryExercises: vi.fn(async () => ({ items: [] })),
 }));
 
+// Plateau diagnosis pairs tool evidence with RAG sources; this file is about
+// the range label, so retrieval is stubbed out rather than reaching a database.
+vi.mock("../rag/knowledge-retriever.js", () => ({
+  retrieveKnowledgeChunks: vi.fn(async () => []),
+  filterRelevantKnowledgeChunks: vi.fn(() => []),
+  tokenizeKnowledgeQuery: vi.fn(() => []),
+}));
+
 vi.mock("../athlete-profile-service.js", () => ({
   getAthleteProfile: vi.fn(async () => null),
 }));
@@ -171,12 +179,28 @@ describe("runMockAssistantTurn — answers state their real range (ER-2D)", () =
     expect(response.faithfulness?.status).toBe("verified");
   });
 
-  // The three recommendation-context answers are the ones that used to assert a
-  // 30-day window in prose while running on whatever range the turn resolved.
+  it("labels plateau diagnosis with the tool result range", async () => {
+    mockedExecuteAiTool.mockResolvedValue(CANNED_PROGRESS);
+
+    const { response } = await runMockAssistantTurn("user-1", {
+      mode: "plateau_diagnosis",
+      message: "杠铃卧推是不是平台期了",
+      exercise_id: CANNED_PROGRESS.exercise.exercise_id,
+      start_date: "2026-07-26",
+      end_date: "2026-08-01",
+    });
+
+    expect(readAnswerText(response.answer)).toContain(RANGE_LABEL);
+  });
+
+  // The first three used to assert a 30-day window in prose while running on
+  // whatever range the turn resolved; the last two named no window at all.
   it.each([
     ["next_training_focus"],
     ["muscle_balance"],
     ["training_imbalance"],
+    ["recovery_check"],
+    ["evidence_explain"],
   ] as const)(
     "labels the %s answer with the tool result range and claims no fixed window",
     async (mode) => {

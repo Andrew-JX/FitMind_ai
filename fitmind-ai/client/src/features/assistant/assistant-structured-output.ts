@@ -55,8 +55,12 @@ function normalizeClarification(
   }
 
   if (clarification.kind === "exercise") {
+    // Unknown future values fall back to "unresolved", the conservative
+    // "cannot proceed" bucket, rather than collapsing the known ones.
     const reason =
-      clarification.reason === "ambiguous" ? "ambiguous" : "unresolved";
+      clarification.reason === "ambiguous" || clarification.reason === "missing"
+        ? clarification.reason
+        : "unresolved";
     const options = (clarification.options ?? []).flatMap((option) =>
       option.exercise_id && option.exercise_name
         ? [

@@ -155,7 +155,10 @@ export interface AssistantDateRangeClarificationOption {
 export type AssistantClarification =
   | {
       kind: "exercise";
-      reason: "ambiguous" | "unresolved";
+      // "missing": no exercise was named. "unresolved": one was named but the
+      // dictionary does not have it. Collapsing them here would throw away the
+      // distinction the server composes different copy for.
+      reason: "ambiguous" | "missing" | "unresolved";
       options: AssistantExerciseClarificationOption[];
     }
   | {

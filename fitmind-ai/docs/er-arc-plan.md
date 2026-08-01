@@ -367,8 +367,20 @@ pin “生酮饮食” as out of scope and keep safety behavior unchanged.
 Implemented as a deterministic scope classifier (`assistant-refusal-scope.ts`)
 plus split composers. The classifier leans toward `unrecognized`: misrouting a
 training question to “outside the product” costs more than asking a user to
-rephrase. `absent` and `unresolved` exercise states now carry different copy;
-the stored-clarification schema still accepts the pre-batch reason value.
+rephrase. `absent` and `unresolved` exercise states now carry different copy.
+
+Two decisions came out of review:
+
+- **Only a dictionary hit counts as a training signal.** The entity resolver
+  labels any leftover unknown phrase `unresolved`, so passing “not absent” to
+  the classifier made every off-topic message look training-related — 生酮饮食,
+  the spec’s own reference case, came back as `unrecognized`. The unit test on
+  the classifier could not see this; the pin now runs a real turn.
+- **The layered reason is a response concern, not persisted state.** A
+  `version: 1` context must stay readable by builds that predate ER-3, which
+  accept only `ambiguous | unresolved` and drop the whole context otherwise, so
+  a rollback would break pending clarifications. Persistence collapses the
+  reason back and the context schema rejects the new value to keep it that way.
 
 ### 9. ER-EVAL: offline entity goldens — 2 code files
 
