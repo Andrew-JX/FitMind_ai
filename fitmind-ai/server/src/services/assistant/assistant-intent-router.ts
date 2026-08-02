@@ -53,11 +53,13 @@ const DATE_TERM_PATTERN =
  * "本月模型训练了几次" routed to summary while "本月模型训练成本" did not.
  *
  * Honest limit, and it is a real one: this blocked set is **not** closed. It is
- * a list of common compounds, extended when a false positive is found — 演练
- * and 磨练 are outside it today. A previous version of this comment claimed the
- * set was closed grammar; that was wrong, and the claim mattered because it
- * implied a guarantee the code does not provide. Closing the class for good
- * needs segmentation, which a deterministic keyword router is not.
+ * a list of common compounds, extended whenever a false positive turns up —
+ * 演 and 磨 were added exactly that way, and the next unlisted compound will
+ * splice until it too is reported. An earlier version of this comment called
+ * the set closed grammar; that was wrong, and the wrongness mattered more than
+ * the missing characters, because it promised a guarantee the code does not
+ * provide. Closing the class for good needs segmentation, which a deterministic
+ * keyword router is not.
  *
  * The residual is accepted because its cost is bounded: a splice spends one
  * deterministic tool call on the asker's own data and the answer labels the
