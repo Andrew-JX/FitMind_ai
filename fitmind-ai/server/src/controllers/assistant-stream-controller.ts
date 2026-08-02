@@ -119,6 +119,11 @@ export async function postAssistantStreamTurnController(
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
+  // nginx buffers proxied responses by default, which turns a stream into one
+  // late blob. The reverse proxy needs `proxy_buffering off` as well; this
+  // header is the half that travels with the deployment instead of living only
+  // in server config someone has to remember to copy.
+  res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders();
 
   let errorEventSent = false;

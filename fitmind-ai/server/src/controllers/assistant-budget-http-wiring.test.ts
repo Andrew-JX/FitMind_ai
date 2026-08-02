@@ -206,6 +206,23 @@ describe("assistant HTTP budget wiring", () => {
     expect(logFailedTurn).not.toHaveBeenCalled();
   });
 
+  // A proxy that buffers turns the stream into one late blob, which reads as
+  // "the assistant is slow" rather than as a misconfiguration.
+  it("tells the reverse proxy not to buffer the stream", async () => {
+    const { response } = createSseResponse();
+
+    await postAssistantStreamTurnController(
+      { body: { mode: "weekly_report" } } as Request,
+      response as unknown as Response<unknown, AssistantIpRateLimitLocals>,
+    );
+
+    expect(response.setHeader).toHaveBeenCalledWith(
+      "Content-Type",
+      "text/event-stream",
+    );
+    expect(response.setHeader).toHaveBeenCalledWith("X-Accel-Buffering", "no");
+  });
+
   it("passes budget telemetry to the turn logger without replacing provider fallback", async () => {
     const response = createJsonResponse();
 
