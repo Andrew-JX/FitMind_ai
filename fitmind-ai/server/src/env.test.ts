@@ -47,6 +47,42 @@ describe("loadServerEnv", () => {
     expect(env.assistantProvider).toBe("mock");
   });
 
+  // Node's --env-file trims, but a hosting dashboard, `docker -e` or a shell
+  // export does not. Untrimmed values fail these enums silently, because the
+  // schema catches its own default instead of throwing.
+  it("survives whitespace around provider values instead of degrading to mock", () => {
+    const env = loadServerEnv({
+      ASSISTANT_PROVIDER: "openai_compatible\t",
+      WORKOUT_INTAKE_LLM_PROVIDER: " openai_compatible ",
+    } as NodeJS.ProcessEnv);
+
+    expect(env.assistantProvider).toBe("openai_compatible");
+    expect(env.workoutIntakeLlmProvider).toBe("openai_compatible");
+  });
+
+  // This one was already safe: safetyFlagDefaultOn trims inside its own
+  // preprocess, so it passes with or without the load-time trim. Pinned anyway
+  // — a fail-safe flag that misreads "off " stays closed and locks the operator
+  // out of their own registration endpoint, and now two layers have to agree
+  // before that can happen.
+  it("recognizes a disable token that carries whitespace", () => {
+    const env = loadServerEnv({
+      REGISTRATION_INVITE_ONLY: "off\n",
+    } as NodeJS.ProcessEnv);
+
+    expect(env.registrationInviteOnly).toBe(false);
+  });
+
+  it("trims whitespace off secrets rather than sending it upstream", () => {
+    const env = loadServerEnv({
+      OPENAI_COMPAT_API_KEY: "  sk-compat-123  ",
+      OPENAI_COMPAT_MODEL: "deepseek-chat\r",
+    } as NodeJS.ProcessEnv);
+
+    expect(env.openAiCompatApiKey).toBe("sk-compat-123");
+    expect(env.openAiCompatModel).toBe("deepseek-chat");
+  });
+
   it("accepts the gemini intake provider", () => {
     const env = loadServerEnv({
       WORKOUT_INTAKE_LLM_PROVIDER: "gemini",

@@ -137,10 +137,40 @@ export interface ServerEnv {
   voyageApiKey?: string | undefined;
 }
 
+const SERVER_ENV_KEYS = Object.keys(serverEnvSchema.shape);
+
+/**
+ * Trim surrounding whitespace from the env vars this schema reads.
+ *
+ * @param source - Raw environment
+ * @returns A copy whose known keys have been trimmed
+ *
+ * @remarks
+ * Node's `--env-file` parser already trims, but nothing else does: a value
+ * pasted into a hosting dashboard, passed with `docker -e`, or exported from a
+ * shell keeps whatever whitespace came with it. That matters most for the enum
+ * flags, which `.catch()` their defaults — `"openai_compatible "` fails the
+ * enum and silently degrades the assistant to mock, with no error to notice.
+ * A stray space is never the intended value of any variable here.
+ */
+function trimKnownEnvValues(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const trimmed: NodeJS.ProcessEnv = { ...source };
+
+  for (const key of SERVER_ENV_KEYS) {
+    const value = source[key];
+
+    if (typeof value === "string") {
+      trimmed[key] = value.trim();
+    }
+  }
+
+  return trimmed;
+}
+
 export function loadServerEnv(
   source: NodeJS.ProcessEnv = process.env,
 ): ServerEnv {
-  const parsed = serverEnvSchema.parse(source);
+  const parsed = serverEnvSchema.parse(trimKnownEnvValues(source));
 
   return {
     nodeEnv: parsed.NODE_ENV,
