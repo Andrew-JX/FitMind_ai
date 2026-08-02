@@ -108,6 +108,72 @@ export async function createPlannedWorkout(
 }
 
 /**
+ * Inserts an accepted plan and completes the user's previous active plan(s) in
+ * one statement.
+ *
+ * @param input - Owner, date range, serialized plan snapshot, optional source message
+ * @param pool - Optional injected pool (owns and closes its own pool otherwise)
+ * @returns The newly persisted planned workout row
+ *
+ * @remarks
+ * A data-modifying CTE rather than BEGIN/COMMIT: {@link DbPoolLike} exposes
+ * only `query`, and a pool hands out a possibly different connection per call,
+ * so multi-statement transactions cannot be expressed through this seam. One
+ * statement is atomic regardless, which is what "supersede in the same
+ * transaction" actually requires.
+ *
+ * The UPDATE sees the snapshot taken when the statement began, so it can only
+ * reach plans that were already active — the row this statement inserts cannot
+ * complete itself.
+ *
+ * Superseded plans become `completed`, not `abandoned`: the row stays as
+ * history, and D42's planner context deliberately accepts completed plans while
+ * excluding abandoned ones.
+ */
+export async function createPlannedWorkoutSupersedingActive(
+  input: CreatePlannedWorkoutInput,
+  pool?: DbPoolLike,
+): Promise<PlannedWorkoutRow> {
+  const activePool = pool ?? (await createRepositoryPool());
+  const ownsPool = pool === undefined;
+
+  try {
+    const result = await activePool.query(
+      `
+        WITH superseded AS (
+          UPDATE planned_workouts
+          SET status = 'completed', updated_at = now()
+          WHERE user_id = $1 AND status = 'active'
+          RETURNING id
+        )
+        INSERT INTO planned_workouts (
+          user_id,
+          start_date,
+          end_date,
+          plan,
+          source_message_id
+        )
+        VALUES ($1, $2, $3, $4::jsonb, $5)
+        RETURNING ${RETURNED_COLUMNS}
+      `,
+      [
+        input.userId,
+        input.startDate,
+        input.endDate,
+        input.planJson,
+        input.sourceMessageId ?? null,
+      ],
+    );
+
+    return result.rows[0] as PlannedWorkoutRow;
+  } finally {
+    if (ownsPool) {
+      await activePool.end?.();
+    }
+  }
+}
+
+/**
  * Reads the most recent active planned workout for a user, or null when none.
  *
  * @param userId - Owner user id

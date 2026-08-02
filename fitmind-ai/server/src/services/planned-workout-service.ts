@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import {
-  createPlannedWorkout,
+  createPlannedWorkoutSupersedingActive,
   getActivePlannedWorkoutForUser,
   getLatestAcceptedPlannedWorkoutForUser,
   updatePlannedWorkoutStatus,
@@ -82,7 +82,7 @@ export interface PlannedWorkoutWithAdherenceDto extends PlannedWorkoutDto {
 }
 
 interface PlannedWorkoutDependencies {
-  createPlannedWorkout: typeof createPlannedWorkout;
+  createPlannedWorkoutSupersedingActive: typeof createPlannedWorkoutSupersedingActive;
   getActivePlannedWorkoutForUser: typeof getActivePlannedWorkoutForUser;
   getLatestAcceptedPlannedWorkoutForUser: typeof getLatestAcceptedPlannedWorkoutForUser;
   updatePlannedWorkoutStatus: typeof updatePlannedWorkoutStatus;
@@ -90,7 +90,7 @@ interface PlannedWorkoutDependencies {
 }
 
 const defaultDependencies: PlannedWorkoutDependencies = {
-  createPlannedWorkout,
+  createPlannedWorkoutSupersedingActive,
   getActivePlannedWorkoutForUser,
   getLatestAcceptedPlannedWorkoutForUser,
   updatePlannedWorkoutStatus,
@@ -98,20 +98,27 @@ const defaultDependencies: PlannedWorkoutDependencies = {
 };
 
 /**
- * Accepts a generated plan: validates the draft and persists it as the user's
- * active planned workout.
+ * Accepts a generated plan: validates the draft, completes any plan the user
+ * already had active, and persists the new one as their active plan.
  *
  * @param userId - Owner user id
  * @param input - Validated accept-plan payload (date range + plan draft)
  * @param dependencies - Injectable repository functions (for tests)
  * @returns The persisted planned workout DTO
+ *
+ * @remarks
+ * Accepting used to be a bare INSERT, so a user could hold several active
+ * plans at once. `/current` returns only the newest, which made the older rows
+ * invisible in the UI and therefore impossible to abandon — while D42's planner
+ * context could still read them and quietly base next week's plan on a plan the
+ * user had moved on from.
  */
 export async function acceptPlan(
   userId: string,
   input: AcceptPlanInput,
   dependencies: PlannedWorkoutDependencies = defaultDependencies,
 ): Promise<PlannedWorkoutDto> {
-  const row = await dependencies.createPlannedWorkout({
+  const row = await dependencies.createPlannedWorkoutSupersedingActive({
     userId,
     startDate: input.startDate,
     endDate: input.endDate,

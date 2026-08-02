@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { getLatestAcceptedPlannedWorkoutForUser } from "../db/planned-workout-repository.js";
+import {
+  createPlannedWorkoutSupersedingActive,
+  getLatestAcceptedPlannedWorkoutForUser,
+} from "../db/planned-workout-repository.js";
 import type { PlannedWorkoutRow } from "../db/planned-workout-repository.js";
 import type { TrainingSummaryRepositoryResult } from "../db/training-summary-repository.js";
 import type { NextWeekPlanDraft } from "./agent/react-planner-types.js";
@@ -85,7 +88,7 @@ function buildSummary(): TrainingSummaryRepositoryResult {
 
 function deps(overrides: Partial<Parameters<typeof acceptPlan>[2]> = {}) {
   return {
-    createPlannedWorkout: vi.fn(),
+    createPlannedWorkoutSupersedingActive: vi.fn(),
     getActivePlannedWorkoutForUser: vi.fn(),
     getLatestAcceptedPlannedWorkoutForUser: vi.fn(),
     updatePlannedWorkoutStatus: vi.fn(),
@@ -95,16 +98,18 @@ function deps(overrides: Partial<Parameters<typeof acceptPlan>[2]> = {}) {
 }
 
 describe("acceptPlan", () => {
-  it("serializes the plan and persists it as a planned workout", async () => {
-    const createPlannedWorkout = vi.fn().mockResolvedValue(buildRow());
+  it("serializes the plan and persists it through the superseding write", async () => {
+    const createPlannedWorkoutSupersedingActive = vi
+      .fn()
+      .mockResolvedValue(buildRow());
 
     const dto = await acceptPlan(
       "u1",
       { startDate: "2026-06-15", endDate: "2026-06-21", plan: planDraft },
-      deps({ createPlannedWorkout }),
+      deps({ createPlannedWorkoutSupersedingActive }),
     );
 
-    expect(createPlannedWorkout).toHaveBeenCalledWith({
+    expect(createPlannedWorkoutSupersedingActive).toHaveBeenCalledWith({
       userId: "u1",
       startDate: "2026-06-15",
       endDate: "2026-06-21",
@@ -113,6 +118,73 @@ describe("acceptPlan", () => {
     });
     expect(dto.status).toBe("active");
     expect(dto.plan.exercises).toHaveLength(2);
+  });
+});
+
+describe("createPlannedWorkoutSupersedingActive", () => {
+  function runWithMockedQuery() {
+    const query = vi.fn(async (sql: string, params?: readonly unknown[]) => {
+      void sql;
+      void params;
+
+      return { rows: [buildRow({ id: "plan-2" })] };
+    });
+
+    return {
+      query,
+      run: () =>
+        createPlannedWorkoutSupersedingActive(
+          {
+            userId: "u1",
+            startDate: "2026-06-22",
+            endDate: "2026-06-28",
+            planJson: JSON.stringify(planDraft),
+          },
+          { query },
+        ),
+    };
+  }
+
+  it("completes prior active plans and inserts the new one in one statement", async () => {
+    const { query, run } = runWithMockedQuery();
+
+    const row = await run();
+    const sql = query.mock.calls[0]?.[0] ?? "";
+
+    // One statement is the whole point: two calls could not be atomic through
+    // a pool that may hand out a different connection each time.
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(sql).toContain("UPDATE planned_workouts");
+    expect(sql).toContain("INSERT INTO planned_workouts");
+    expect(row.id).toBe("plan-2");
+  });
+
+  it("supersedes by completing, never by abandoning", async () => {
+    const { query, run } = runWithMockedQuery();
+
+    await run();
+    const sql = query.mock.calls[0]?.[0] ?? "";
+
+    // D42's planner context excludes abandoned plans; completing keeps the
+    // superseded plan readable as history.
+    expect(sql).toContain("SET status = 'completed'");
+    expect(sql).not.toContain("abandoned");
+  });
+
+  it("only supersedes the same user's active plans", async () => {
+    const { query, run } = runWithMockedQuery();
+
+    await run();
+    const sql = query.mock.calls[0]?.[0] ?? "";
+
+    expect(sql).toContain("WHERE user_id = $1 AND status = 'active'");
+    expect(query).toHaveBeenCalledWith(expect.any(String), [
+      "u1",
+      "2026-06-22",
+      "2026-06-28",
+      JSON.stringify(planDraft),
+      null,
+    ]);
   });
 });
 
@@ -262,9 +334,12 @@ describe("D42 planner context survives a superseded plan", () => {
   });
 
   it("keeps 'completed' inside the accepted status set of the query", async () => {
-    const query = vi.fn(async () => ({
-      rows: [buildRow({ status: "completed" })],
-    }));
+    const query = vi.fn(async (sql: string, params?: readonly unknown[]) => {
+      void sql;
+      void params;
+
+      return { rows: [buildRow({ status: "completed" })] };
+    });
 
     await getLatestAcceptedPlannedWorkoutForUser(
       { userId: "u1", startDate: "2026-06-15", endDate: "2026-06-21" },
