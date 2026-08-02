@@ -308,6 +308,50 @@ Also in scope: a decision (not code) on whether existing duplicate active rows
 in production need a one-off cleanup, and if so it becomes its own reviewed
 batch with a dry-run count first. No blind `UPDATE` across the table.
 
+#### Implemented (2026-08-01)
+
+`ce104b9` lands the D42 guard against unchanged write behaviour; `4fb2743`
+changes the write and shows the guard still passing.
+
+Superseding runs as one data-modifying CTE rather than `BEGIN`/`COMMIT`. The
+repository seam exposes only `query`, and a pool may hand out a different
+connection per call, so a multi-statement transaction cannot be expressed
+through it — one statement is atomic regardless, which is what this needs. The
+`UPDATE` sees the statement's opening snapshot, so the row being inserted
+cannot complete itself.
+
+#### Production duplicate rows — decision: count first, no cleanup yet
+
+The fix stops new duplicates; it does nothing about rows already there. Those
+predate this batch and are invisible in the UI, so nothing about them is
+urgent, and running an `UPDATE` against production on the assumption they exist
+is exactly what this plan forbids.
+
+Read-only count to run first (safe: no writes, no locks beyond a shared read):
+
+```sql
+SELECT user_id, count(*) AS active_plans, min(created_at) AS oldest, max(created_at) AS newest
+FROM planned_workouts
+WHERE status = 'active'
+GROUP BY user_id
+HAVING count(*) > 1
+ORDER BY active_plans DESC;
+```
+
+Decision rule for what follows:
+
+- **Zero rows** — nothing to clean; close this item and note the count date.
+- **A handful** — one reviewed batch that completes all but the newest active
+  plan per affected user, written as a single statement with the same
+  `status='completed'` semantics as `4fb2743`, run once and re-counted after.
+- **Many, or any user whose oldest duplicate is still inside its own date
+  range** — stop and look at how they were created before touching them; a
+  plan still inside its window may be the one the user actually follows, and
+  the newest row is not automatically the right survivor.
+
+Not run yet: this requires production database access, which this batch
+deliberately does not take.
+
 ### ER batches — unchanged, see `er-arc-plan.md`
 
 ER-1C, ER-1D, ER-2A, ER-2B, ER-2C, ER-3, ER-EVAL keep their existing
