@@ -122,16 +122,37 @@ describe("acceptPlan", () => {
 });
 
 describe("createPlannedWorkoutSupersedingActive", () => {
-  function runWithMockedQuery() {
-    const query = vi.fn(async (sql: string, params?: readonly unknown[]) => {
-      void sql;
-      void params;
+  function createTransactionalPool(
+    options: { lockRows?: unknown[]; failOnInsert?: boolean } = {},
+  ) {
+    const statements: string[] = [];
+    const params: Array<readonly unknown[] | undefined> = [];
+    const release = vi.fn();
 
-      return { rows: [buildRow({ id: "plan-2" })] };
+    const query = vi.fn(async (sql: string, args?: readonly unknown[]) => {
+      statements.push(sql.trim().split("\n")[0]?.trim() ?? "");
+      params.push(args);
+
+      if (sql.includes("FOR UPDATE")) {
+        return { rows: options.lockRows ?? [{ id: "u1" }] };
+      }
+
+      if (sql.includes("INSERT INTO planned_workouts")) {
+        if (options.failOnInsert === true) {
+          throw new Error("insert exploded");
+        }
+
+        return { rows: [buildRow({ id: "plan-2" })] };
+      }
+
+      return { rows: [] };
     });
 
     return {
       query,
+      release,
+      statements,
+      params,
       run: () =>
         createPlannedWorkoutSupersedingActive(
           {
@@ -140,51 +161,99 @@ describe("createPlannedWorkoutSupersedingActive", () => {
             endDate: "2026-06-28",
             planJson: JSON.stringify(planDraft),
           },
-          { query },
+          { query, connect: async () => ({ query, release }) },
         ),
     };
   }
 
-  it("completes prior active plans and inserts the new one in one statement", async () => {
-    const { query, run } = runWithMockedQuery();
+  // The order is the whole guarantee. Locking after the UPDATE would let two
+  // concurrent accepts read the same pre-insert snapshot and both stay active,
+  // which is exactly what the single-statement version did.
+  it("locks the user row before superseding and inserting", async () => {
+    const pool = createTransactionalPool();
 
-    const row = await run();
-    const sql = query.mock.calls[0]?.[0] ?? "";
+    const row = await pool.run();
 
-    // One statement is the whole point: two calls could not be atomic through
-    // a pool that may hand out a different connection each time.
-    expect(query).toHaveBeenCalledTimes(1);
-    expect(sql).toContain("UPDATE planned_workouts");
-    expect(sql).toContain("INSERT INTO planned_workouts");
+    expect(pool.statements).toEqual([
+      "BEGIN",
+      "SELECT id FROM users WHERE id = $1 FOR UPDATE",
+      "UPDATE planned_workouts",
+      "INSERT INTO planned_workouts (",
+      "COMMIT",
+    ]);
     expect(row.id).toBe("plan-2");
+    expect(pool.release).toHaveBeenCalledTimes(1);
   });
 
   it("supersedes by completing, never by abandoning", async () => {
-    const { query, run } = runWithMockedQuery();
+    const pool = createTransactionalPool();
 
-    await run();
-    const sql = query.mock.calls[0]?.[0] ?? "";
+    await pool.run();
+    const updateSql = pool.query.mock.calls.map(([sql]) => sql).join("\n");
 
     // D42's planner context excludes abandoned plans; completing keeps the
     // superseded plan readable as history.
-    expect(sql).toContain("SET status = 'completed'");
-    expect(sql).not.toContain("abandoned");
+    expect(updateSql).toContain("SET status = 'completed'");
+    expect(updateSql).not.toContain("abandoned");
   });
 
   it("only supersedes the same user's active plans", async () => {
-    const { query, run } = runWithMockedQuery();
+    const pool = createTransactionalPool();
 
-    await run();
-    const sql = query.mock.calls[0]?.[0] ?? "";
+    await pool.run();
+    const updateCall = pool.query.mock.calls.find(([sql]) =>
+      sql.includes("UPDATE planned_workouts"),
+    );
+    const insertCall = pool.query.mock.calls.find(([sql]) =>
+      sql.includes("INSERT INTO planned_workouts"),
+    );
 
-    expect(sql).toContain("WHERE user_id = $1 AND status = 'active'");
-    expect(query).toHaveBeenCalledWith(expect.any(String), [
+    expect(updateCall?.[0]).toContain(
+      "WHERE user_id = $1 AND status = 'active'",
+    );
+    expect(updateCall?.[1]).toEqual(["u1"]);
+    expect(insertCall?.[1]).toEqual([
       "u1",
       "2026-06-22",
       "2026-06-28",
       JSON.stringify(planDraft),
       null,
     ]);
+  });
+
+  it("rolls back and releases the client when the insert fails", async () => {
+    const pool = createTransactionalPool({ failOnInsert: true });
+
+    await expect(pool.run()).rejects.toThrow("insert exploded");
+    expect(pool.statements).toContain("ROLLBACK");
+    expect(pool.statements).not.toContain("COMMIT");
+    expect(pool.release).toHaveBeenCalledTimes(1);
+  });
+
+  // No user row means no lock, which would silently degrade to the racy write.
+  it("refuses to write when there is no user row to lock", async () => {
+    const pool = createTransactionalPool({ lockRows: [] });
+
+    await expect(pool.run()).rejects.toThrow("nothing to lock");
+    expect(pool.statements).not.toContain("INSERT INTO planned_workouts (");
+    expect(pool.statements).toContain("ROLLBACK");
+  });
+
+  it("rejects a pool that cannot open a transaction", async () => {
+    const query = vi.fn(async () => ({ rows: [] }));
+
+    await expect(
+      createPlannedWorkoutSupersedingActive(
+        {
+          userId: "u1",
+          startDate: "2026-06-22",
+          endDate: "2026-06-28",
+          planJson: JSON.stringify(planDraft),
+        },
+        { query },
+      ),
+    ).rejects.toThrow("transactional pool");
+    expect(query).not.toHaveBeenCalled();
   });
 });
 

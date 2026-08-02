@@ -313,16 +313,24 @@ batch with a dry-run count first. No blind `UPDATE` across the table.
 `ce104b9` lands the D42 guard against unchanged write behaviour; `4fb2743`
 changes the write and shows the guard still passing.
 
-Superseding runs as one data-modifying CTE rather than `BEGIN`/`COMMIT`. The
-repository seam exposes only `query`, and a pool may hand out a different
-connection per call, so a multi-statement transaction cannot be expressed
-through it — one statement is atomic regardless, which is what this needs. The
-`UPDATE` sees the statement's opening snapshot, so the row being inserted
-cannot complete itself.
+Superseding runs inside a transaction that takes the user row with
+`FOR UPDATE` before updating or inserting anything.
+
+The first attempt used a single data-modifying CTE on the argument that one
+statement is atomic. Atomic was the wrong property: two concurrent accepts each
+read a snapshot without the other's insert, each complete only what they can
+see, and each insert — two active rows again. With no prior active plan both
+`UPDATE`s simply match zero rows. Serializing needs a lock the second caller
+waits on, which is why the user row is locked first; the second accept then
+runs its `UPDATE` on a snapshot that already contains the first plan.
+
+The lock row must exist. Without it there is nothing to serialize on, so the
+write refuses rather than quietly degrading to the racy version.
 
 #### Production duplicate rows — decision: count first, no cleanup yet
 
-The fix stops new duplicates; it does nothing about rows already there. Those
+The fix stops new duplicates from this write path; it does nothing about rows
+already there. Those
 predate this batch and are invisible in the UI, so nothing about them is
 urgent, and running an `UPDATE` against production on the assumption they exist
 is exactly what this plan forbids.

@@ -2,11 +2,20 @@ import { createRequire } from "node:module";
 
 import { loadServerEnv } from "../env.js";
 
-interface DbPoolLike {
+interface DbQueryable {
   query: (
     sql: string,
     params?: readonly unknown[],
   ) => Promise<{ rows: unknown[] }>;
+}
+
+interface DbClientLike extends DbQueryable {
+  release: () => void;
+}
+
+interface DbPoolLike extends DbQueryable {
+  /** Present on real pools; required only by the transactional write below. */
+  connect?: () => Promise<DbClientLike>;
   end?: () => Promise<void>;
 }
 
@@ -108,23 +117,28 @@ export async function createPlannedWorkout(
 }
 
 /**
- * Inserts an accepted plan and completes the user's previous active plan(s) in
- * one statement.
+ * Inserts an accepted plan and completes the user's previous active plan(s),
+ * serialized against concurrent accepts by the same user.
  *
  * @param input - Owner, date range, serialized plan snapshot, optional source message
  * @param pool - Optional injected pool (owns and closes its own pool otherwise)
  * @returns The newly persisted planned workout row
  *
  * @remarks
- * A data-modifying CTE rather than BEGIN/COMMIT: {@link DbPoolLike} exposes
- * only `query`, and a pool hands out a possibly different connection per call,
- * so multi-statement transactions cannot be expressed through this seam. One
- * statement is atomic regardless, which is what "supersede in the same
- * transaction" actually requires.
+ * The first version of this used a single data-modifying CTE, reasoning that
+ * one statement is atomic. Atomic is not the property needed here. Two
+ * concurrent accepts each read a snapshot without the other's insert, each
+ * complete only the plans they can see, and each insert — leaving two active
+ * rows. With no prior active plan it is even plainer: both UPDATEs match zero
+ * rows and both INSERTs succeed.
  *
- * The UPDATE sees the snapshot taken when the statement began, so it can only
- * reach plans that were already active — the row this statement inserts cannot
- * complete itself.
+ * Serializing requires a lock the second caller has to wait on, so the write
+ * takes the user row with `FOR UPDATE` first. The second accept then blocks
+ * until the first commits, and its UPDATE runs on a snapshot that already
+ * contains the first plan, so it supersedes that one rather than missing it.
+ *
+ * The lock row must exist: without it there is nothing to serialize on, and the
+ * write would silently fall back to the racy behaviour above.
  *
  * Superseded plans become `completed`, not `abandoned`: the row stays as
  * history, and D42's planner context deliberately accepts completed plans while
@@ -137,15 +151,39 @@ export async function createPlannedWorkoutSupersedingActive(
   const activePool = pool ?? (await createRepositoryPool());
   const ownsPool = pool === undefined;
 
+  if (typeof activePool.connect !== "function") {
+    throw new Error(
+      "Accepting a plan requires a transactional pool that provides connect().",
+    );
+  }
+
+  const client = await activePool.connect();
+
   try {
-    const result = await activePool.query(
+    await client.query("BEGIN");
+
+    const lock = await client.query(
+      "SELECT id FROM users WHERE id = $1 FOR UPDATE",
+      [input.userId],
+    );
+
+    if (lock.rows.length === 0) {
+      throw new Error(
+        "Cannot accept a plan for a user that does not exist: nothing to lock.",
+      );
+    }
+
+    await client.query(
       `
-        WITH superseded AS (
-          UPDATE planned_workouts
-          SET status = 'completed', updated_at = now()
-          WHERE user_id = $1 AND status = 'active'
-          RETURNING id
-        )
+        UPDATE planned_workouts
+        SET status = 'completed', updated_at = now()
+        WHERE user_id = $1 AND status = 'active'
+      `,
+      [input.userId],
+    );
+
+    const result = await client.query(
+      `
         INSERT INTO planned_workouts (
           user_id,
           start_date,
@@ -165,8 +203,15 @@ export async function createPlannedWorkoutSupersedingActive(
       ],
     );
 
+    await client.query("COMMIT");
+
     return result.rows[0] as PlannedWorkoutRow;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
   } finally {
+    client.release();
+
     if (ownsPool) {
       await activePool.end?.();
     }
