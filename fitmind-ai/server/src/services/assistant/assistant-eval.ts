@@ -569,6 +569,21 @@ export const assistantEntityEvalCases: AssistantEntityEvalCase[] = [
     timeZone: "Asia/Shanghai",
     expected: { kind: "refusal" },
   },
+  {
+    // 泛词伪造训练语境：裸的"组""表现"在办公室中文里到处都是。
+    id: "entity-office-word-not-training-context",
+    message: "上周小组表现怎么样",
+    mode: "auto",
+    timeZone: "Asia/Shanghai",
+    expected: { kind: "refusal" },
+  },
+  {
+    id: "entity-org-word-not-training-context",
+    message: "本月组织调整情况",
+    mode: "auto",
+    timeZone: "Asia/Shanghai",
+    expected: { kind: "refusal" },
+  },
 ];
 
 /**

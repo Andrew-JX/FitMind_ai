@@ -406,8 +406,14 @@ Review then closed two holes in that fix:
 - **A date term never establishes training intent on its own.** Routing on the
   term alone sent “上周我女朋友生气了怎么办” to a training tool, bypassing the
   ER-3 refusals — a pre-existing hazard through 最近 that the new terms widened.
-  A period now routes to summary only alongside training context, and two
-  negative goldens pin turns that must run no tool at all.
+  A period now routes to summary only alongside training context, and negative
+  goldens pin turns that must run no tool at all.
+- **Training context must be training-specific as written.** The first version
+  of that lexicon carried bare 组, 肌, 状态, 表现 and 次数, which are substrings
+  of ordinary office Chinese: 上周小组表现怎么样 and 本月组织调整情况 both
+  routed to summary. Entries are now spelled out (组数, 肌群, 训练状态), with 练
+  documented as a knowingly accepted false-positive source since it carries the
+  arc's primary phrasing.
 - **The checker compares the whole observation.** Checking only the first tool
   call's three fields let an extra argument, a second call, or a clarification
   riding alongside a correct call all score 1. Argument sets must match exactly,

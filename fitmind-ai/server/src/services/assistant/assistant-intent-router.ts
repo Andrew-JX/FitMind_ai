@@ -42,9 +42,19 @@ const DATE_TERM_PATTERN =
  * ER-3 refusals entirely. This is narrower than the refusal-scope lexicon in
  * `assistant-refusal-scope.ts` on purpose — that one decides how to word a
  * refusal, this one decides whether to spend a tool call.
+ *
+ * Every entry must be training-specific as written. Bare 组, 肌, 状态, 表现 and
+ * 次数 read as training words in isolation but are substrings of ordinary
+ * office Chinese — 小组表现, 组织调整, 开会次数 — so they are spelled out as
+ * 组数, 肌群, 训练状态 and the like instead.
+ *
+ * Known residual: 练 also matches 排练 and 彩排-adjacent wording. It stays
+ * because "本周练得怎么样" is the arc's primary phrasing and no longer form
+ * covers it; a false positive there costs one deterministic tool call on the
+ * asker's own data, not a wrong answer.
  */
 const TRAINING_CONTEXT_PATTERN =
-  /训练|练|健身|动作|组数|组|次数|重量|容量|强度|力量|肌|卧推|深蹲|硬拉|引体|推举|划船|下拉|有氧|哑铃|杠铃|器械|热身|状态|表现/u;
+  /训练|练|健身|动作|组数|训练组|训练量|训练容量|训练强度|训练状态|训练表现|运动表现|肌肉|肌群|重量|卧推|深蹲|硬拉|引体|推举|划船|高位下拉|有氧|哑铃|杠铃|健身房|器械|热身/u;
 const IMBALANCE_PATTERN = /偏科|练太多|太少|均衡|胸|背|腿|肩/u;
 const RECOMMENDATION_PATTERN = /今天|下次|练什么|适合练|建议/u;
 const HISTORY_PATTERN = /上次|什么时候|历史|记录/u;
