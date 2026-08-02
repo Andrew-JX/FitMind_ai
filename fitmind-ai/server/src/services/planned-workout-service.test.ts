@@ -235,6 +235,49 @@ describe("getLatestAcceptedPlannedWorkoutForUser", () => {
   });
 });
 
+// PL-4 guard, written before acceptPlan started superseding old plans.
+//
+// Superseding flips a previous plan from active to completed. The D42 learning
+// loop reads its context through getLatestAcceptedPlannedWorkoutForUser, which
+// accepts active *and* completed, so the flip must leave that context intact.
+// If a later change ever narrows that query to active-only, or supersedes by
+// abandoning instead of completing, these two fail and say why.
+describe("D42 planner context survives a superseded plan", () => {
+  it("still builds adherence context from a completed plan", async () => {
+    const context = await getPlanAdherenceContextForPlanner(
+      "u1",
+      { startDate: "2026-06-15", endDate: "2026-06-21" },
+      deps({
+        getLatestAcceptedPlannedWorkoutForUser: vi
+          .fn()
+          .mockResolvedValue(buildRow({ status: "completed" })),
+        getTrainingSummary: vi.fn().mockResolvedValue(buildSummary()),
+      }),
+    );
+
+    expect(context).not.toBeNull();
+    expect(context?.startDate).toBe("2026-06-15");
+    expect(context?.exercises).toHaveLength(2);
+    expect(context?.exerciseAdherenceRatio).toBeGreaterThan(0);
+  });
+
+  it("keeps 'completed' inside the accepted status set of the query", async () => {
+    const query = vi.fn(async () => ({
+      rows: [buildRow({ status: "completed" })],
+    }));
+
+    await getLatestAcceptedPlannedWorkoutForUser(
+      { userId: "u1", startDate: "2026-06-15", endDate: "2026-06-21" },
+      { query },
+    );
+
+    const sql = query.mock.calls[0]?.[0] ?? "";
+
+    expect(sql).toContain("'completed'");
+    expect(sql).not.toContain("'abandoned'");
+  });
+});
+
 describe("setPlanStatus", () => {
   it("throws 404 when no matching plan exists", async () => {
     await expect(
