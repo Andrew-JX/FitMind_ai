@@ -583,6 +583,13 @@ export const assistantEntityEvalCases: AssistantEntityEvalCase[] = [
     // 动词形式顺带修掉的：排练/教练/熟练不再算训练动作。
     "上周排练怎么样",
     "本月教练说了什么",
+    // 后缀跨复合词拼接：动词分支单靠子串仍会从别的词尾巴上读出"练了/练得/练的"。
+    "上周排练了几次",
+    "本月教练得了奖",
+    "上周熟练的员工有几个",
+    // 裸 训练/健身 同样会被更长的复合词包住。
+    "本月模型训练成本",
+    "本月健身房营收",
   ].map((message, index) => ({
     id: `entity-non-training-noun-${index + 1}`,
     message,

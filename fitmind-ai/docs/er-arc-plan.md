@@ -408,6 +408,15 @@ Review then closed two holes in that fix:
   ER-3 refusals — a pre-existing hazard through 最近 that the new terms widened.
   A period now routes to summary only alongside training context, and negative
   goldens pin turns that must run no tool at all.
+- **The guard blocks compound splicing, because the real separator is a word
+  boundary.** Matching a verb form still read 练了 out of 排练了 and 训练 out of
+  模型训练: a bare substring test cannot tell 月练得 (two words) from 排练了
+  (one). The binding prefixes of 练 and the suffixes that turn 训练/健身 into a
+  different noun are blocked directly. That set is closed grammar, not domain
+  vocabulary — unlike the two lexicons, it does not grow as the product gains
+  features. It remains a heuristic rather than segmentation, and the doc comment
+  says so: an unblocked compound can still splice, costing one wasted tool call
+  on the asker's own data with the range honestly labelled.
 - **The guard matches a training action, not training nouns.** Two rounds were
   spent lengthening a noun lexicon — 组 → 组数, 表现 → 运动表现 — and each
   round a longer everyday word swallowed the new entry: 小组数量 contains 组数,

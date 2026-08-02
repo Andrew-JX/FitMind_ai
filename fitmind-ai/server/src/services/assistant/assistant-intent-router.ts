@@ -40,24 +40,31 @@ const DATE_TERM_PATTERN =
  * A period alone proves nothing about the subject: "上周我女朋友生气了怎么办"
  * would otherwise reach a training tool and bypass the ER-3 refusals entirely.
  *
- * This matches on the *action*, not on training nouns, because Chinese has no
- * word boundaries and a noun list cannot be made safe by lengthening its
- * entries. Every noun tried here turned out to be a substring of ordinary
- * office Chinese — 组 in 小组, then 组数 in 小组数量, 动作 in 动作片, 重量 in
- * 包裹重量, 器械 in 医疗器械. Each fix moved the collision one word further out
- * instead of removing it. Asking whether the user said they *trained* has no
- * such tail: 练得, 练了, 训练 and 健身 are verb-position forms that unrelated
- * questions do not produce.
+ * Two earlier shapes failed for the same structural reason. A training-noun
+ * list could not be made safe by lengthening it — 组 sits inside 小组, 组数
+ * inside 小组数量, 动作 inside 动作片, 重量 inside 包裹重量 — and switching to
+ * verb forms still spliced across compounds, because a bare substring test
+ * happily reads 练了 out of 排练了 and 训练 out of 模型训练.
  *
- * Requiring the verb form rather than bare 练 also drops the false positives
- * the previous version documented and accepted: 排练, 教练, 熟练 no longer
- * qualify.
+ * What actually separates them is a word boundary: 月练得 is two words while
+ * 排练了 is one. Chinese writes no boundary, so the compounds are blocked
+ * directly. The blocked set is closed grammar rather than domain vocabulary —
+ * the characters that bind in front of 练 (排, 教, 熟, 操) and the suffixes that
+ * turn 训练/健身 into a different noun (营, 班, 师, 房, 卡) do not grow as the
+ * product gains features, which is exactly what the two lexicons did.
+ *
+ * Honest limit: this is a boundary heuristic, not segmentation. A compound
+ * outside the blocked set can still splice, and only a real tokenizer would
+ * close that for good — out of scope for a deterministic keyword router. The
+ * failure it can still produce is one wasted tool call on the asker's own data
+ * with the range honestly labelled, never a wrong answer.
  *
  * Cost of the narrowing: a noun-only question such as "本周肌群分布" now asks
  * for clarification instead of running a tool. That is the safe direction —
  * this guard decides whether to spend a tool call on a stranger's question.
  */
-const TRAINING_ACTION_PATTERN = /训练|健身|练(?:得|的|了|多少|几次)|怎么练/u;
+const TRAINING_ACTION_PATTERN =
+  /(?<![排教熟操])练(?:得|的|了|多少|几次)|怎么练|(?<![模型])训练(?![营班师])|健身(?![房卡]|中心|器材)/u;
 const IMBALANCE_PATTERN = /偏科|练太多|太少|均衡|胸|背|腿|肩/u;
 const RECOMMENDATION_PATTERN = /今天|下次|练什么|适合练|建议/u;
 const HISTORY_PATTERN = /上次|什么时候|历史|记录/u;
