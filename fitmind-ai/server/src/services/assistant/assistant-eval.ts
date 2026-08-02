@@ -590,6 +590,12 @@ export const assistantEntityEvalCases: AssistantEntityEvalCase[] = [
     // 裸 训练/健身 同样会被更长的复合词包住。
     "本月模型训练成本",
     "本月健身房营收",
+    // 分支旁路：专用 训练 guard 挡住了"训练"，但"练了/练得/练多少"分支会从
+    // "训练了"内部起匹配，绕过它。这四条钉的是分支之间的漏洞，不是词表。
+    "本月模型训练了几次",
+    "本月模型训练得怎么样",
+    "本月模型训练多少次",
+    "上周演练了几次消防预案",
   ].map((message, index) => ({
     id: `entity-non-training-noun-${index + 1}`,
     message,

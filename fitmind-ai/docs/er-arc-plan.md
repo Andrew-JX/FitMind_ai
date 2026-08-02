@@ -412,11 +412,19 @@ Review then closed two holes in that fix:
   boundary.** Matching a verb form still read 练了 out of 排练了 and 训练 out of
   模型训练: a bare substring test cannot tell 月练得 (two words) from 排练了
   (one). The binding prefixes of 练 and the suffixes that turn 训练/健身 into a
-  different noun are blocked directly. That set is closed grammar, not domain
-  vocabulary — unlike the two lexicons, it does not grow as the product gains
-  features. It remains a heuristic rather than segmentation, and the doc comment
-  says so: an unblocked compound can still splice, costing one wasted tool call
-  on the asker's own data with the range honestly labelled.
+  different noun are blocked directly. 训 is among the blocked prefixes: without
+  it the 练 branch matches inside 训练了 and bypasses the dedicated 训练 guard
+  sitting beside it, so 本月模型训练成本 refused while 本月模型训练了几次 did
+  not — a hole between branches rather than in either one.
+
+  This blocked set is **not** closed, and an earlier version of this plan said
+  it was. 演练 and 磨练 were outside it; they are blocked now, and the next
+  unlisted compound will not be. The claim mattered because it implied a
+  guarantee the code does not give. The residual is accepted on cost, not on
+  completeness: a splice spends one deterministic tool call on the asker's own
+  data with the range honestly labelled, and cannot produce a wrong answer or
+  reach anyone else's data. Closing the class needs segmentation, which a
+  keyword router is not.
 - **The guard matches a training action, not training nouns.** Two rounds were
   spent lengthening a noun lexicon — 组 → 组数, 表现 → 运动表现 — and each
   round a longer everyday word swallowed the new entry: 小组数量 contains 组数,
