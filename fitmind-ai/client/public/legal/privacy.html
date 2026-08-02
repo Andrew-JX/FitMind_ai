@@ -57,6 +57,29 @@
         margin-bottom: 28px;
       }
 
+      table {
+        border-collapse: collapse;
+        display: block;
+        margin: 0 0 12px;
+        overflow-x: auto;
+        width: 100%;
+      }
+
+      th,
+      td {
+        border: 1px solid #2a2a2a;
+        color: #d0d0d0;
+        font-size: 13px;
+        line-height: 1.6;
+        padding: 8px 10px;
+        text-align: left;
+      }
+
+      th {
+        background: #1a1a1a;
+        color: #f0f0f0;
+      }
+
       .back {
         display: inline-block;
         font-size: 14px;
@@ -74,7 +97,7 @@
     </p>
 
     <p>
-      本服务目前有两个对外实例，数据存放地与调用的第三方服务不同，本政策中凡涉及差异之处都会分别说明：<strong>境内实例</strong>（部署在中国境内的服务器上）与<strong>海外演示实例</strong>（<code>fitmind-ai-psi.vercel.app</code>，用于作品展示）。你可以从浏览器地址栏判断自己正在使用哪一个。
+      本服务规划了两个部署目标，数据存放地与调用的第三方服务不同，本政策中凡涉及差异之处都会分别说明：<strong>海外演示实例</strong>（<code>fitmind-ai-psi.vercel.app</code>，用于作品展示）与<strong>境内实例</strong>（部署在中国境内的服务器上）。<strong>截至本政策生效日，只有海外演示实例已上线</strong>；境内实例尚在备案中，上线时本政策会同步更新。你可以从浏览器地址栏判断自己正在使用哪一个。
     </p>
 
     <h2>一、我们收集的信息</h2>
@@ -122,19 +145,38 @@
 
     <h2>四、AI 处理与第三方</h2>
     <p>
-      当你使用 AI
-      助手或语音/文本训练录入时，你的提问内容，以及为回答该问题所必需的训练数据摘要，会发送至第三方大模型服务商
-      DeepSeek（深度求索）的 API
-      以生成回答。相关数据的处理适用该服务商自身的条款与隐私政策。
+      两个部署目标调用同一家第三方模型服务商：<strong>DeepSeek（深度求索），其服务位于中国境内</strong>。
     </p>
+    <table>
+      <thead>
+        <tr>
+          <th>功能</th>
+          <th>调用的第三方</th>
+          <th>发送的内容</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>AI 助手对话</td>
+          <td>DeepSeek（深度求索）</td>
+          <td>你的提问原文，以及为回答该问题所必需的训练数据摘要</td>
+        </tr>
+        <tr>
+          <td>语音 / 文本训练录入</td>
+          <td>DeepSeek（深度求索）</td>
+          <td>你录入的那段话（动作、组数、次数、重量等）</td>
+        </tr>
+        <tr>
+          <td>训练知识检索</td>
+          <td>不调用第三方</td>
+          <td>—</td>
+        </tr>
+      </tbody>
+    </table>
     <p>
-      <strong>境内实例</strong>只调用境内的模型服务商，你的数据不会因此出境。
-    </p>
-    <p>
-      <strong>海外演示实例</strong
-      >在知识检索开启时，还会把你的<strong>提问原文</strong>发送至境外向量服务商
-      Voyage AI 用于检索相关训练知识。也就是说，在该实例上使用 AI
-      助手，你的提问会离开中国境内。如果你不希望数据出境，请使用境内实例。
+      相关数据的处理同时适用 DeepSeek 自身的条款与隐私政策。<strong
+        >本服务不向境外的模型或检索服务商发送你的数据。</strong
+      >
     </p>
     <p>
       除上述模型与检索调用外，本服务不与任何第三方共享你的个人信息，法律法规明确要求的情形除外。
@@ -143,7 +185,7 @@
     <h2>五、数据存储</h2>
     <p>
       你的数据存储在运行你所使用实例的服务器与 PostgreSQL
-      数据库中：<strong>境内实例</strong>的数据存放在中国境内；<strong>海外演示实例</strong>的数据存放在其托管服务商位于境外的机房。
+      数据库中：<strong>海外演示实例</strong>（当前唯一已上线的实例）的数据存放在其托管服务商位于境外的机房；<strong>境内实例</strong>上线后，其数据将存放在中国境内。
     </p>
     <p>
       我们采取访问控制、密码哈希、HttpOnly 会话 Cookie
@@ -175,7 +217,11 @@
     </p>
 
     <h2>九、政策变更</h2>
-    <p>本政策如有更新，我们会修改本页的生效日期。重大变更会在应用内提示。</p>
+    <p>
+      本政策如有更新，我们会修改本页顶部的生效日期。
+      <strong>本服务目前没有应用内变更提示机制</strong
+      >，所以请以本页内容为准；建议你在继续使用前查看生效日期是否有变化。
+    </p>
 
     <h2>十、联系我们</h2>
     <p>
