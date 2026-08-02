@@ -408,12 +408,17 @@ Review then closed two holes in that fix:
   ER-3 refusals — a pre-existing hazard through 最近 that the new terms widened.
   A period now routes to summary only alongside training context, and negative
   goldens pin turns that must run no tool at all.
-- **Training context must be training-specific as written.** The first version
-  of that lexicon carried bare 组, 肌, 状态, 表现 and 次数, which are substrings
-  of ordinary office Chinese: 上周小组表现怎么样 and 本月组织调整情况 both
-  routed to summary. Entries are now spelled out (组数, 肌群, 训练状态), with 练
-  documented as a knowingly accepted false-positive source since it carries the
-  arc's primary phrasing.
+- **The guard matches a training action, not training nouns.** Two rounds were
+  spent lengthening a noun lexicon — 组 → 组数, 表现 → 运动表现 — and each
+  round a longer everyday word swallowed the new entry: 小组数量 contains 组数,
+  动作片 contains 动作, 包裹重量 contains 重量, 医疗器械 contains 器械. Chinese
+  has no word boundaries, so no amount of lengthening makes a noun list safe;
+  the collisions were being moved, not removed. The rule now asks whether the
+  user said they *trained* (训练, 健身, 练得/练了/怎么练), which unrelated
+  questions do not produce. It also drops the 排练/教练 false positives the
+  noun version had documented and accepted. Cost: a noun-only question such as
+  “本周肌群分布” now clarifies instead of running a tool, which is the safe
+  direction for a guard that decides whether to spend a tool call.
 - **The checker compares the whole observation.** Checking only the first tool
   call's three fields let an extra argument, a second call, or a clarification
   riding alongside a correct call all score 1. Argument sets must match exactly,

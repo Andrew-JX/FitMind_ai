@@ -569,21 +569,27 @@ export const assistantEntityEvalCases: AssistantEntityEvalCase[] = [
     timeZone: "Asia/Shanghai",
     expected: { kind: "refusal" },
   },
-  {
-    // 泛词伪造训练语境：裸的"组""表现"在办公室中文里到处都是。
-    id: "entity-office-word-not-training-context",
-    message: "上周小组表现怎么样",
-    mode: "auto",
+  // 训练名词伪造训练语境。中文没有词边界，所以名词表怎么加长都会被更长的
+  // 日常词包住：组 ⊂ 小组、组数 ⊂ 小组数量、动作 ⊂ 动作片、重量 ⊂ 包裹重量、
+  // 器械 ⊂ 医疗器械。这一组用例钉的是"判据换成了训练动作"，不是"又补了几个词"。
+  ...[
+    "上周小组表现怎么样",
+    "本月组织调整情况",
+    "本月小组数量是多少",
+    "上周小组数据怎么样",
+    "本月动作片票房怎么样",
+    "上周包裹重量是多少",
+    "本月医疗器械采购情况",
+    // 动词形式顺带修掉的：排练/教练/熟练不再算训练动作。
+    "上周排练怎么样",
+    "本月教练说了什么",
+  ].map((message, index) => ({
+    id: `entity-non-training-noun-${index + 1}`,
+    message,
+    mode: "auto" as const,
     timeZone: "Asia/Shanghai",
-    expected: { kind: "refusal" },
-  },
-  {
-    id: "entity-org-word-not-training-context",
-    message: "本月组织调整情况",
-    mode: "auto",
-    timeZone: "Asia/Shanghai",
-    expected: { kind: "refusal" },
-  },
+    expected: { kind: "refusal" as const },
+  })),
 ];
 
 /**

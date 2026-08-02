@@ -34,27 +34,30 @@ const SUMMARY_PATTERN = /训练量|总结|够吗|频率/u;
 const DATE_TERM_PATTERN =
   /这周|这个星期|本周|上周|上一周|上个星期|本月|这个月|最近/u;
 /**
- * Training context required before a date term may route to summary.
+ * Training action required before a date term may route to summary.
  *
  * @remarks
  * A period alone proves nothing about the subject: "上周我女朋友生气了怎么办"
- * and "本月工资是多少" would otherwise reach a training tool and bypass the
- * ER-3 refusals entirely. This is narrower than the refusal-scope lexicon in
- * `assistant-refusal-scope.ts` on purpose — that one decides how to word a
- * refusal, this one decides whether to spend a tool call.
+ * would otherwise reach a training tool and bypass the ER-3 refusals entirely.
  *
- * Every entry must be training-specific as written. Bare 组, 肌, 状态, 表现 and
- * 次数 read as training words in isolation but are substrings of ordinary
- * office Chinese — 小组表现, 组织调整, 开会次数 — so they are spelled out as
- * 组数, 肌群, 训练状态 and the like instead.
+ * This matches on the *action*, not on training nouns, because Chinese has no
+ * word boundaries and a noun list cannot be made safe by lengthening its
+ * entries. Every noun tried here turned out to be a substring of ordinary
+ * office Chinese — 组 in 小组, then 组数 in 小组数量, 动作 in 动作片, 重量 in
+ * 包裹重量, 器械 in 医疗器械. Each fix moved the collision one word further out
+ * instead of removing it. Asking whether the user said they *trained* has no
+ * such tail: 练得, 练了, 训练 and 健身 are verb-position forms that unrelated
+ * questions do not produce.
  *
- * Known residual: 练 also matches 排练 and 彩排-adjacent wording. It stays
- * because "本周练得怎么样" is the arc's primary phrasing and no longer form
- * covers it; a false positive there costs one deterministic tool call on the
- * asker's own data, not a wrong answer.
+ * Requiring the verb form rather than bare 练 also drops the false positives
+ * the previous version documented and accepted: 排练, 教练, 熟练 no longer
+ * qualify.
+ *
+ * Cost of the narrowing: a noun-only question such as "本周肌群分布" now asks
+ * for clarification instead of running a tool. That is the safe direction —
+ * this guard decides whether to spend a tool call on a stranger's question.
  */
-const TRAINING_CONTEXT_PATTERN =
-  /训练|练|健身|动作|组数|训练组|训练量|训练容量|训练强度|训练状态|训练表现|运动表现|肌肉|肌群|重量|卧推|深蹲|硬拉|引体|推举|划船|高位下拉|有氧|哑铃|杠铃|健身房|器械|热身/u;
+const TRAINING_ACTION_PATTERN = /训练|健身|练(?:得|的|了|多少|几次)|怎么练/u;
 const IMBALANCE_PATTERN = /偏科|练太多|太少|均衡|胸|背|腿|肩/u;
 const RECOMMENDATION_PATTERN = /今天|下次|练什么|适合练|建议/u;
 const HISTORY_PATTERN = /上次|什么时候|历史|记录/u;
@@ -175,13 +178,13 @@ export function classifyAssistantIntent(
     };
   }
 
-  const namesPeriodWithTrainingContext =
+  const namesPeriodWithTrainingAction =
     DATE_TERM_PATTERN.test(normalizedMessage) &&
-    TRAINING_CONTEXT_PATTERN.test(normalizedMessage);
+    TRAINING_ACTION_PATTERN.test(normalizedMessage);
 
   if (
     SUMMARY_PATTERN.test(normalizedMessage) ||
-    namesPeriodWithTrainingContext
+    namesPeriodWithTrainingAction
   ) {
     return {
       intent: "summary",
