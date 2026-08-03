@@ -44,6 +44,9 @@ export function AuthScreen(props: AuthScreenProps) {
   const [rememberEmail, setRememberEmail] = useState(
     rememberedEmail.length > 0,
   );
+  // Cross-border consent is asked separately from the agreement, and starts
+  // unchecked: a pre-ticked box is not consent.
+  const [acceptedCrossBorder, setAcceptedCrossBorder] = useState(false);
   const [localErrorMessage, setLocalErrorMessage] = useState<string | null>(
     null,
   );
@@ -63,6 +66,13 @@ export function AuthScreen(props: AuthScreenProps) {
     if (mode === "register") {
       if (password !== confirmPassword) {
         setLocalErrorMessage("两次输入的密码不一致，请重新确认。");
+        return;
+      }
+
+      if (!acceptedCrossBorder) {
+        setLocalErrorMessage(
+          "请先阅读并勾选跨境存储同意项，再创建账号。你也可以不注册，直接关闭本页。",
+        );
         return;
       }
 
@@ -241,6 +251,42 @@ export function AuthScreen(props: AuthScreenProps) {
                 type="password"
                 value={confirmPassword}
               />
+            </label>
+          ) : null}
+
+          {mode === "register" ? (
+            <label style={consentStyle(theme)}>
+              <input
+                checked={acceptedCrossBorder}
+                disabled={isSubmitting}
+                onChange={(event) =>
+                  setAcceptedCrossBorder(event.target.checked)
+                }
+                style={{ marginTop: 3 }}
+                type="checkbox"
+              />
+              <span>
+                我已阅读
+                <a
+                  href="/legal/privacy.html"
+                  rel="noreferrer"
+                  style={consentLinkStyle(theme)}
+                  target="_blank"
+                >
+                  隐私政策
+                </a>
+                与
+                <a
+                  href="/legal/terms.html"
+                  rel="noreferrer"
+                  style={consentLinkStyle(theme)}
+                  target="_blank"
+                >
+                  用户协议
+                </a>
+                ，并同意本站将我的账号信息、训练记录与助手对话
+                <strong>存储在境外服务器</strong>（Vercel、Neon，均位于美国）。
+              </span>
             </label>
           ) : null}
 
@@ -494,6 +540,29 @@ function labelStyle(
     fontSize: 12,
     fontWeight: 600,
     gap: 6,
+  };
+}
+
+/** Cross-border consent row: checkbox stays top-aligned beside wrapped text. */
+function consentStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    alignItems: "flex-start",
+    color: theme.colors.tx2,
+    display: "flex",
+    fontSize: 12,
+    gap: 8,
+    lineHeight: 1.6,
+  };
+}
+
+function consentLinkStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    color: theme.colors.tx,
+    textDecoration: "underline",
   };
 }
 
