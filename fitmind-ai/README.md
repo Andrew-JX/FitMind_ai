@@ -17,7 +17,7 @@ Two targets are built from this repo. They differ in configuration only — same
 
 - The deployed client uses relative `/api` requests by default. `VITE_API_BASE_URL` can stay empty unless the API is hosted on a separate origin.
 - The mainland target closes self-service registration (`REGISTRATION_INVITE_ONLY=on`) and displays its filing numbers in the footer. See [docs/china-launch-plan.md](docs/china-launch-plan.md) for the full configuration and the reasoning behind it.
-- The legal pages under `client/public/legal/` describe the **mainland** deployment, including in-country data storage. Do not serve them from a deployment that stores data elsewhere without adjusting that section.
+- The legal pages under `client/public/legal/` are shared by both targets and state per-instance facts explicitly — registration status, third-party calls, and where data is stored. They are static HTML with no access to runtime config, so **any change to a deployment's registration state or providers has to be reflected there by hand**; nothing will fail if you forget.
 
 ## Mobile Install
 
