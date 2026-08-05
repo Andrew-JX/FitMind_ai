@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "fitmind",
+  "project_id": "3f5cc707-27f8-44b5-929f-ae244d858208"
+}
