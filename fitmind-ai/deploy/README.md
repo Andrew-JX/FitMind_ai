@@ -27,9 +27,10 @@ Changing `JWT_SECRET` invalidates existing login cookies by design.
 
 ## 2. Audit the preinstalled Nginx
 
-The confirmed host already has Nginx listening publicly on port 8080. Do not
-delete the Lighthouse firewall rule or replace its configuration until the
-owner is known.
+The confirmed host already has Nginx listening publicly on port 8080. The
+2026-08-07 `nginx -T` audit identified its owner as the independent static site
+`/etc/nginx/sites-enabled/mj-portfolio`, rooted at `/var/www/mj-portfolio`.
+Do not disable or replace that configuration as part of the FitMind deploy.
 
 Run on the Lighthouse terminal:
 
@@ -40,8 +41,9 @@ sudo nginx -T 2>&1 | grep -n -B 8 -A 20 'listen 8080'
 sudo docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Ports}}'
 ```
 
-Save the output. `nginx -T` prints a `configuration file ...` header before
-each file; that identifies which installed file owns port 8080.
+Save the output. The expected result is `mj-portfolio`; stop if the owner has
+changed. Port 8080 and its Lighthouse firewall rule remain a separate operator
+decision for that portfolio site.
 
 ## 3. Prepare the release checkout
 
@@ -138,17 +140,12 @@ The final Nginx configuration disables proxy buffering for `/api/`, including
 assistant SSE, and redirects every HTTP/`www` request to the canonical HTTPS
 domain.
 
-## 6. Retire port 8080 only after cutover
+## 6. Preserve the independent port 8080 site
 
-When the canonical HTTPS site and smoke checklist pass:
-
-1. disable only the preinstalled Nginx file that owns `listen 8080`;
-2. run `sudo nginx -t` and reload;
-3. confirm `sudo ss -lntp | grep ':8080'` prints nothing;
-4. only then delete the Lighthouse firewall rule for public port 8080.
-
-The FitMind Web container uses loopback port 8081; it never needs a Lighthouse
-firewall rule.
+`listen 8080` belongs to `mj-portfolio`, not FitMind. Leave its Nginx file and
+firewall rule unchanged unless the operator separately decides to retire that
+site. FitMind uses public ports 80/443 only; its Web container uses loopback
+port 8081 and never needs a Lighthouse firewall rule.
 
 ## 7. Roll back application images
 

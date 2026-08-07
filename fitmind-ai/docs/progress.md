@@ -865,8 +865,10 @@ Plan，AWS Singapore，因此应用服务器在境内并不改变数据跨境事
 只允许 `config --no-env-resolution --quiet`。**“只是看配置”也可能泄密，验证命令本身同样属于
 攻击面。**
 
-尚未执行任何线上迁移或容器替换。服务器当前已有一套 Nginx 监听公网 8080，必须先用
-`nginx -T` 找到归属配置；在新站点通过 smoke 之前不停止它，也不删除 8080 防火墙规则。
+尚未执行任何线上迁移或容器替换。2026-08-07 的 `nginx -T` 已确认公网 8080 归属于独立静态站点
+`/etc/nginx/sites-enabled/mj-portfolio`（站点根目录 `/var/www/mj-portfolio`），不是 FitMind
+残留。部署不得停止或覆盖它，也不得把删除其防火墙规则写进 FitMind 验收；FitMind 只使用公网
+80/443，容器 Web 端口 8081 只绑定 loopback，两者可以并存。
 
 ## 2026-08-07 — fitmind-cu6：Neon 生产事实与跨境披露收口
 

@@ -14,7 +14,8 @@ Use this checklist before sending the app to an interviewer, friend, or recruite
 - [ ] TLS covers both DNS names and `certbot renew --dry-run` succeeds.
 - [ ] `curl --fail https://fitmind.jimmyuuu.com/api/health` returns the wrapped `{ status: "ok" }` response.
 - [ ] `docker compose -f deploy/compose.yaml ps` reports both `api` and `web` healthy.
-- [ ] Public ports are limited to 22/80/443 (plus optional ICMP); 3000, 5432, 8080, and 8081 are not publicly reachable.
+- [ ] FitMind is reachable only through public 80/443; API 3000 and Web 8081 remain loopback-only, and PostgreSQL 5432 is not exposed.
+- [ ] Existing public 8080 still serves only `/etc/nginx/sites-enabled/mj-portfolio`; FitMind does not alter or depend on it.
 - [ ] Footer displays `苏ICP备2026054660号` and links to the MIIT filing query.
 - [ ] `DATA_RESIDENCY=overseas`; registration asks for separate cross-border consent because Neon is in AWS Singapore.
 - [ ] Privacy policy names the current contractual recipient and actual region before the site accepts real user data.
