@@ -19,6 +19,46 @@ import { HttpError, isHttpError } from "./utils/http-error.js";
 
 export interface CreateAppOptions {
   authRateLimiter?: AiRateLimiter;
+  unknownErrorLogger?: (entry: UnknownRequestErrorLog) => void;
+}
+
+export interface UnknownRequestErrorLog {
+  event: "unhandled_request_error";
+  method: string;
+  path: string;
+  errorType: string;
+  errorCode?: string;
+}
+
+function getSafeErrorToken(value: unknown, fallback: string) {
+  return typeof value === "string" && /^[a-z0-9_.-]{1,64}$/i.test(value)
+    ? value
+    : fallback;
+}
+
+function createUnknownRequestErrorLog(
+  error: unknown,
+  req: express.Request,
+): UnknownRequestErrorLog {
+  const errorRecord =
+    typeof error === "object" && error !== null
+      ? (error as Record<string, unknown>)
+      : undefined;
+  const errorType =
+    error instanceof Error
+      ? getSafeErrorToken(error.name, "Error")
+      : typeof error;
+  const errorCode = errorRecord?.code;
+
+  return {
+    event: "unhandled_request_error",
+    method: req.method,
+    path: req.path,
+    errorType,
+    ...(typeof errorCode === "string" && /^[a-z0-9_.-]{1,64}$/i.test(errorCode)
+      ? { errorCode }
+      : {}),
+  };
 }
 
 /**
@@ -29,6 +69,11 @@ export interface CreateAppOptions {
  */
 export function createApp(options?: CreateAppOptions) {
   const app = express();
+  const unknownErrorLogger =
+    options?.unknownErrorLogger ??
+    ((entry: UnknownRequestErrorLog) => {
+      console.error(JSON.stringify(entry));
+    });
 
   app.set("trust proxy", 1);
   app.use(express.json());
@@ -57,7 +102,7 @@ export function createApp(options?: CreateAppOptions) {
   app.use(
     (
       error: unknown,
-      _req: express.Request,
+      req: express.Request,
       res: express.Response,
       _next: express.NextFunction,
     ) => {
@@ -85,6 +130,12 @@ export function createApp(options?: CreateAppOptions) {
         return res
           .status(validationError.statusCode)
           .json(createErrorResponse(validationError.toApiError()));
+      }
+
+      try {
+        unknownErrorLogger(createUnknownRequestErrorLog(error, req));
+      } catch {
+        // Observability must never replace the original API response.
       }
 
       const fallbackError = new HttpError(

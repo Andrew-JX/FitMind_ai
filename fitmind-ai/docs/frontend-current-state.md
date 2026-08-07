@@ -49,6 +49,14 @@
 
 ## 3. 增量记录
 
+### 认证表单状态隔离（2026-08-07，fitmind-drl）
+
+- 登录与注册分别持有邮箱、密码 state；「记住邮箱」只初始化登录邮箱，注册表单不继承登录凭据。
+- `AuthScreen` 用 `submittedMode` 记录服务端错误由哪次实际提交产生。切换标签撤销错误归属，禁止
+  把一次登录 500 仅因当前标签变化显示为「注册失败」。本地表单校验错误仍只在当前标签显示。
+- Playwright 的失败登录回归同时检查 DOM 空值与请求计数：登录 500 后切到注册，三个注册凭据
+  为空且 `POST /api/auth/register` 调用数为零。
+
 ### 计划草案卡片（AssistantPlanCard，2026-06-14，roadmap §8 FE-1）
 
 助手消息带结构化 `plan`（`next_week_plan` 草案）时，在消息气泡内渲染 `AssistantPlanCard`：策略 chip + 动作行（名称 / 目标重量 / "N 组 × a~b 次" / basis）+ notes。`plan` 由 `mergeStructuredOutputIntoMessage` 的 `normalizePlan` 从 `structured_output.plan` 归一化。目标重量为 null 时显示"沿用上次重量"（不编造）。详见 `UI_SPEC §4.3.3`。

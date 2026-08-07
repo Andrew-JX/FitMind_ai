@@ -71,11 +71,15 @@ export interface ApiMockOptions {
    * leaving login working.
    */
   registrationPolicy?: RegistrationPolicyMock | "unavailable" | undefined;
+  /** Result returned by `POST /api/auth/login`. Defaults to success. */
+  loginResult?: "success" | "internal-error" | undefined;
   /** Consents the simulated account still owes, surfaced by `/me` and login. */
   pendingConsents?: PendingConsentMock[] | undefined;
 }
 
 export interface ApiMocks {
+  /** How many times `POST /api/auth/login` was called. */
+  getLoginCalls: () => number;
   /** Body of the last `POST /api/auth/register`, or null if never called. */
   getRegisterBody: () => Record<string, unknown> | null;
   /** Bodies of every `POST /api/auth/consents` in call order. */
@@ -123,6 +127,7 @@ export async function installApiMocks(
   options: ApiMockOptions,
 ): Promise<ApiMocks> {
   let authenticated = options.authenticated;
+  let loginCalls = 0;
   let pendingConsents = options.pendingConsents ?? [];
   let registerBody: Record<string, unknown> | null = null;
   const consentBodies: Record<string, unknown>[] = [];
@@ -172,6 +177,15 @@ export async function installApiMocks(
   });
 
   await page.route("**/api/auth/login", (route) => {
+    loginCalls += 1;
+
+    if (options.loginResult === "internal-error") {
+      return respondJson(route, 500, {
+        ok: false,
+        error: { code: "INTERNAL_ERROR", message: "Internal server error." },
+      });
+    }
+
     authenticated = true;
 
     return respondJson(route, 200, {
@@ -321,6 +335,7 @@ export async function installApiMocks(
   });
 
   return {
+    getLoginCalls: () => loginCalls,
     getRegisterBody: () => registerBody,
     getConsentBodies: () => consentBodies,
     getDeleteAccountCalls: () => deleteAccountCalls,

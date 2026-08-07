@@ -13,6 +13,31 @@ const PROFILE_TAB = "个人";
 const CONSENT_CHECKBOX = /存储在中国境外的服务器/;
 
 test.describe("registration policy drives the sign-up form", () => {
+  test("does not carry a failed login into the registration form", async ({
+    page,
+  }) => {
+    const mocks = await installApiMocks(page, {
+      authenticated: false,
+      loginResult: "internal-error",
+    });
+    await page.goto("/");
+
+    await page.getByLabel("邮箱", { exact: true }).fill("demo@fitmind.ai");
+    await page.getByLabel("密码", { exact: true }).fill("password123");
+    await page.getByLabel(/记住邮箱/).check();
+    await page.getByRole("button", { name: LOGIN_SUBMIT }).click();
+
+    await expect(page.getByText("登录失败")).toBeVisible();
+    await page.getByRole("button", { name: REGISTER_TAB }).click();
+
+    await expect(page.getByText("注册失败")).toHaveCount(0);
+    await expect(page.getByLabel("邮箱", { exact: true })).toHaveValue("");
+    await expect(page.getByLabel("密码", { exact: true })).toHaveValue("");
+    await expect(page.getByLabel("确认密码", { exact: true })).toHaveValue("");
+    expect(mocks.getLoginCalls()).toBe(1);
+    expect(mocks.getRegisterBody()).toBeNull();
+  });
+
   test("sends the cross-border consent with the register request", async ({
     page,
   }) => {

@@ -37,14 +37,15 @@ export interface AuthScreenProps {
 export function AuthScreen(props: AuthScreenProps) {
   const { errorMessage, onLogin, onRegister, status } = props;
   const { theme } = useTheme();
-  const rememberedEmail = getRememberedLoginEmail();
   const [mode, setMode] = useState<AuthMode>("login");
-  const [email, setEmail] = useState(rememberedEmail);
-  const [password, setPassword] = useState("");
+  const [loginEmail, setLoginEmail] = useState(getRememberedLoginEmail);
+  const [loginPassword, setLoginPassword] = useState("");
+  const [registrationEmail, setRegistrationEmail] = useState("");
+  const [registrationPassword, setRegistrationPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [rememberEmail, setRememberEmail] = useState(
-    rememberedEmail.length > 0,
+    () => getRememberedLoginEmail().length > 0,
   );
   // Cross-border consent is asked separately from the agreement, and starts
   // unchecked: a pre-ticked box is not consent.
@@ -52,6 +53,10 @@ export function AuthScreen(props: AuthScreenProps) {
   const [localErrorMessage, setLocalErrorMessage] = useState<string | null>(
     null,
   );
+  // Server auth errors belong to the form that actually submitted them. Without
+  // this owner, switching tabs relabels a failed login as "registration failed"
+  // even though no registration request was sent.
+  const [submittedMode, setSubmittedMode] = useState<AuthMode | null>(null);
   // What this instance actually does, read from the server rather than assumed.
   // `null` means the answer has not arrived; `policyFailed` means it will not.
   const [policy, setPolicy] = useState<RegistrationPolicyData | null>(null);
@@ -91,13 +96,17 @@ export function AuthScreen(props: AuthScreenProps) {
   const isSucceeded = props.isAuthenticated === true;
   // Design: the button shrinks to a circle for both the spinner and the check.
   const isMorphed = isSubmitting || isSucceeded;
-  const visibleErrorMessage = localErrorMessage ?? errorMessage;
+  const email = mode === "login" ? loginEmail : registrationEmail;
+  const password = mode === "login" ? loginPassword : registrationPassword;
+  const visibleErrorMessage =
+    localErrorMessage ?? (submittedMode === mode ? errorMessage : null);
 
   async function handleSubmit(
     event: React.FormEvent<HTMLFormElement>,
   ): Promise<void> {
     event.preventDefault();
     setLocalErrorMessage(null);
+    setSubmittedMode(mode);
 
     if (mode === "register") {
       // Every check below is repeated on the server, which is where the real
@@ -137,13 +146,13 @@ export function AuthScreen(props: AuthScreenProps) {
     }
 
     if (rememberEmail) {
-      saveRememberedLoginEmail(email);
+      saveRememberedLoginEmail(loginEmail);
     } else {
       saveRememberedLoginEmail("");
     }
 
     props.onSubmitStart?.();
-    await onLogin({ email, password });
+    await onLogin({ email: loginEmail, password: loginPassword });
   }
 
   return (
@@ -210,6 +219,7 @@ export function AuthScreen(props: AuthScreenProps) {
             disabled={isSubmitting}
             onClick={() => {
               setLocalErrorMessage(null);
+              setSubmittedMode(null);
               setMode("login");
             }}
             style={toggleButtonStyle(theme, mode === "login")}
@@ -221,6 +231,7 @@ export function AuthScreen(props: AuthScreenProps) {
             disabled={isSubmitting || isPolicyLoading || !isRegistrationOpen}
             onClick={() => {
               setLocalErrorMessage(null);
+              setSubmittedMode(null);
               setMode("register");
             }}
             style={toggleButtonStyle(theme, mode === "register")}
@@ -269,7 +280,15 @@ export function AuthScreen(props: AuthScreenProps) {
             <input
               autoComplete="email"
               disabled={isSubmitting}
-              onChange={(event) => setEmail(event.target.value)}
+              key={`${mode}-email`}
+              name={mode === "login" ? "login-email" : "registration-email"}
+              onChange={(event) => {
+                if (mode === "login") {
+                  setLoginEmail(event.target.value);
+                } else {
+                  setRegistrationEmail(event.target.value);
+                }
+              }}
               placeholder="you@example.com"
               required
               style={fieldStyle(theme)}
@@ -285,8 +304,18 @@ export function AuthScreen(props: AuthScreenProps) {
                 mode === "login" ? "current-password" : "new-password"
               }
               disabled={isSubmitting}
+              key={`${mode}-password`}
               minLength={8}
-              onChange={(event) => setPassword(event.target.value)}
+              name={
+                mode === "login" ? "login-password" : "registration-password"
+              }
+              onChange={(event) => {
+                if (mode === "login") {
+                  setLoginPassword(event.target.value);
+                } else {
+                  setRegistrationPassword(event.target.value);
+                }
+              }}
               placeholder="至少 8 位"
               required
               style={fieldStyle(theme)}

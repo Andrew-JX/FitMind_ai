@@ -73,6 +73,51 @@ describe("createApp", () => {
     expect(app.get("trust proxy")).toBe(1);
   });
 
+  it("logs unknown request failures without messages or request data", async () => {
+    const entries: unknown[] = [];
+    const loggingApp = createApp({
+      authRateLimiter: createAiRateLimiter({
+        perMinute: 1_000,
+        perDay: 100_000,
+        now: () => 0,
+      }),
+      unknownErrorLogger: (entry) => entries.push(entry),
+    });
+    const loggingServer = loggingApp.listen(0);
+
+    try {
+      const address = loggingServer.address();
+
+      if (address === null || typeof address === "string") {
+        throw new Error("Expected the test server to bind to a TCP port");
+      }
+
+      const response = await fetch(
+        `http://127.0.0.1:${address.port}/api/auth/login`,
+        {
+          body: '{"password":"must-not-appear"',
+          headers: {
+            "content-type": "application/json",
+          },
+          method: "POST",
+        },
+      );
+
+      expect(response.status).toBe(500);
+      expect(entries).toEqual([
+        {
+          event: "unhandled_request_error",
+          method: "POST",
+          path: "/api/auth/login",
+          errorType: "SyntaxError",
+        },
+      ]);
+      expect(JSON.stringify(entries)).not.toContain("must-not-appear");
+    } finally {
+      loggingServer.close();
+    }
+  });
+
   it("rejects unauthenticated access to /api/auth/me", async () => {
     const response = await request("/api/auth/me");
     const payload = await response.json();
