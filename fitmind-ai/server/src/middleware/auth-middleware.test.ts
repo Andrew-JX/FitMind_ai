@@ -231,7 +231,7 @@ describe("consent gate", () => {
   it("refuses an authenticated caller who still owes a consent", async () => {
     mockedVerifyJwt.mockResolvedValueOnce({ userId: "u1" });
     mockedGetPendingConsents.mockResolvedValueOnce([
-      { consent_type: "cross_border_transfer", policy_version: "2026-08-04" },
+      { consent_type: "cross_border_transfer", policy_version: "2026-08-07" },
     ]);
 
     const result = await makeRequest("Bearer valid-token");
@@ -245,7 +245,7 @@ describe("consent gate", () => {
           pending_consents: [
             {
               consent_type: "cross_border_transfer",
-              policy_version: "2026-08-04",
+              policy_version: "2026-08-07",
             },
           ],
         },
@@ -267,7 +267,7 @@ describe("consent gate", () => {
   it("does not gate the middleware built for the catch-up endpoints", async () => {
     mockedVerifyJwt.mockResolvedValueOnce({ userId: "u1" });
     mockedGetPendingConsents.mockResolvedValueOnce([
-      { consent_type: "cross_border_transfer", policy_version: "2026-08-04" },
+      { consent_type: "cross_border_transfer", policy_version: "2026-08-07" },
     ]);
 
     const result = await makeRequest("Bearer valid-token", undefined, {

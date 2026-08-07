@@ -50,7 +50,7 @@ const { Pool } = require("pg") as {
   };
 };
 
-const POLICY = "2026-08-04";
+const POLICY = "2026-08-07";
 
 let failures = 0;
 

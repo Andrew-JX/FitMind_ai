@@ -318,6 +318,24 @@ Accepted workaround:
 - 本地前端端口以当前仓库代码为准，是 `5173`，不是任务描述里曾出现过的 `5174`。
 - 本批没有改后端 API、assistant SSE contract、quick prompt mode、训练 CRUD 或 `set_index` 逻辑。
 
+## 12. Tencent Cloud production
+
+生产环境不是在本地 Windows 终端启动。已确认的目标是 Ubuntu 24.04 腾讯云轻量应用服务器，
+API 与静态客户端由 Docker Compose 管理，宿主机 Nginx 负责 80/443 与 TLS。完整步骤见
+[`deploy/README.md`](../deploy/README.md)。
+
+两个数据库连接串用途不同：运行时 `DATABASE_URL` 使用 Neon pooler；
+`MIGRATION_DATABASE_URL` 使用 direct connection。生产数据库位于 AWS Singapore，故即便应用服务器
+在上海，`DATA_RESIDENCY` 仍必须是 `overseas`。
+
+Compose 配置只允许用下面的无泄密检查：
+
+```bash
+docker compose -f deploy/compose.yaml config --no-env-resolution --quiet
+```
+
+普通 `docker compose config` 会把 `.env` 内容展开到输出，禁止用于生产配置检查、工单或聊天记录。
+
 ### 2026-07-01 OpenAI-Compatible BYO
 
 - `ASSISTANT_PROVIDER` supports `mock`, `anthropic`, `groq`, and `openai_compatible`; default is still `mock`.

@@ -70,7 +70,7 @@ const { Pool } = require("pg") as {
   Pool: new (config: PoolConfig) => Pool;
 };
 
-const POLICY = "2026-08-04";
+const POLICY = "2026-08-07";
 const CONSENT = { accepted: true, policy_version: POLICY };
 /** Barrier ceiling: exceeding it is a failure, never a pass. */
 const BARRIER_TIMEOUT_MS = 5_000;

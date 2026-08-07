@@ -16,7 +16,7 @@ const userRow = {
 
 const consent = {
   consentType: "cross_border_transfer" as const,
-  policyVersion: "2026-08-04",
+  policyVersion: "2026-08-07",
   source: "registration" as const,
 };
 

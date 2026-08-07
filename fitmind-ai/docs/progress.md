@@ -843,3 +843,45 @@ stdout/stderr 与进程句柄、以 `unkillable` 结果 finish 并让夹具退�
 仅供验证）：让所有强杀变空操作、ceiling 设 5 秒 → 夹具 **11 秒退出、打印 UNKILLABLE、退出码 1**，
 并提示手工清理它留下的那轮。第一次做这个验证时 ceiling 设了 20 秒，而整轮只跑 12 秒，看门狗
 压根没触发——**又一次差点用一个没执行到的分支充当证据**，缩短 ceiling 后才真正验到。
+
+## 2026-08-07 — fitmind-650：腾讯云 Lighthouse 部署骨架
+
+确认的目标环境：腾讯云轻量应用服务器（上海五区），Ubuntu 24.04、Docker 29.6.2、Compose
+5.3.1、4 核 4GB、40GB 系统盘；正式域名 `fitmind.jimmyuuu.com`。数据库继续使用 Neon Free
+Plan，AWS Singapore，因此应用服务器在境内并不改变数据跨境事实，生产值固定为
+`DATA_RESIDENCY=overseas`。
+
+部署拆成宿主机与容器两层：API 和静态站点容器只绑定 `127.0.0.1:3000` / `127.0.0.1:8081`；
+宿主机 Nginx 是唯一公网入口，负责 80/443、证书、canonical redirect 和 `/api` 反代。SSE 路径
+关闭 proxy buffering。镜像按 Git SHA 打标签；迁移先于新 API 启动，并在替换容器前验证
+`vector` 扩展和 `user_consents` 表。
+
+本地证据：Compose 安全模式配置校验通过；API 与 Web 镜像实际构建成功；临时容器中
+`GET /api/health` 返回 200，Web `/healthz` 返回 `ok`，任意 SPA 深链接回落到含
+`<title>FitMind AI</title>` 的首页；HTTP 与 HTTPS 两份宿主机 Nginx 配置均通过 `nginx -t`。
+
+一条安全事故必须保留：第一次验证用了普通 `docker compose config`，Compose 把本地 `.env`
+里的 Neon、模型与 JWT 凭据展开到了输出。所有这些凭据必须轮换；部署文档和 Compose 顶部现在
+只允许 `config --no-env-resolution --quiet`。**“只是看配置”也可能泄密，验证命令本身同样属于
+攻击面。**
+
+尚未执行任何线上迁移或容器替换。服务器当前已有一套 Nginx 监听公网 8080，必须先用
+`nginx -T` 找到归属配置；在新站点通过 smoke 之前不停止它，也不删除 8080 防火墙规则。
+
+## 2026-08-07 — fitmind-cu6：Neon 生产事实与跨境披露收口
+
+用户从 Neon 控制台确认生产项目 `FitMind-ai`（`raspy-hall-57794539`）位于 AWS Asia
+Pacific 1 (Singapore)，并在 Billing 页面确认使用 Free Plan；账号级事实的脱敏记录见
+`docs/evidence/neon-production-facts.md`。记录不包含数据库主机、角色、密码或连接串，正式公开上线
+前仍应把同时显示 Region 与 Plan 的控制台截图导出到发布证据库。
+
+官方事实重新核对后，旧披露有三处实质错误：腾讯云上海只承载应用与 API，并不会把 Neon
+数据库搬回境内；Neon 现行自助产品条款的签约主体是 Databricks, Inc.，Neon, LLC 可能代表其
+计费；Free Plan 的时间点恢复上限是 6 小时或 1 GB 数据变更（以先达到者为准），不能笼统写成
+“一段时间的备份”。隐私政策据此升级到 `2026-08-07`，两个代码常量、API 示例、E2E mock 与
+真实数据库验证脚本同步提版，存量用户会按既有补签机制重新确认。
+
+当前部署没有“不出境”选项：Vercel 演示实例经美国应用/API 访问新加坡数据库，腾讯云正式实例
+经上海应用/API 访问同一个新加坡数据库。生产继续使用 Neon 是已确认方案，但必须保持
+`DATA_RESIDENCY=overseas`、跨境同意与敏感健康信息单独同意；如果未来要求数据不出境，才需要
+另行迁移到境内 PostgreSQL，而不是本批的上线前提。

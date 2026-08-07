@@ -20,7 +20,7 @@ function respondJson(
 }
 
 /** Policy version the mocks agree on; matches `shared/src/consent.ts`. */
-export const MOCK_POLICY_VERSION = "2026-08-04";
+export const MOCK_POLICY_VERSION = "2026-08-07";
 
 export interface PendingConsentMock {
   consent_type: "cross_border_transfer" | "sensitive_health_data";

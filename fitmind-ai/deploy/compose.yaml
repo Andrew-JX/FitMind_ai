@@ -1,0 +1,87 @@
+name: fitmind
+
+# Do not run plain `docker compose config`: Compose expands service env_file
+# values into its output. Validate without disclosing secrets instead:
+# docker compose -f deploy/compose.yaml config --no-env-resolution --quiet
+
+x-api-environment: &api-environment
+  NODE_ENV: production
+  PORT: 3000
+  DATA_RESIDENCY: overseas
+  REGISTRATION_INVITE_ONLY: "on"
+
+x-api-service: &api-service
+  image: fitmind-api:${FITMIND_IMAGE_TAG:-local}
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile.api
+  env_file:
+    - path: ../.env
+      required: false
+  environment: *api-environment
+  init: true
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+
+services:
+  migrate:
+    <<: *api-service
+    profiles: ["tools"]
+    restart: "no"
+    command:
+      - sh
+      - -eu
+      - -c
+      - |
+        : "$${MIGRATION_DATABASE_URL:?MIGRATION_DATABASE_URL must be set to the direct Neon URL in fitmind-ai/.env}"
+        export DATABASE_URL="$${MIGRATION_DATABASE_URL}"
+        exec node server/node_modules/node-pg-migrate/bin/node-pg-migrate.js \
+          -m server/migrations -t pgmigrations up
+
+  api:
+    <<: *api-service
+    command:
+      - sh
+      - -eu
+      - -c
+      - |
+        : "$${DATABASE_URL:?DATABASE_URL must be set in fitmind-ai/.env}"
+        : "$${JWT_SECRET:?JWT_SECRET must be set in fitmind-ai/.env}"
+        exec node server/dist/server.js
+    ports:
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  web:
+    image: fitmind-web:${FITMIND_IMAGE_TAG:-local}
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+      args:
+        VITE_API_BASE_URL: ""
+        VITE_ICP_BEIAN_NUMBER: ${VITE_ICP_BEIAN_NUMBER:-苏ICP备2026054660号}
+        VITE_PUBLIC_SECURITY_BEIAN_NUMBER: ${VITE_PUBLIC_SECURITY_BEIAN_NUMBER:-}
+    init: true
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "127.0.0.1:8081:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s

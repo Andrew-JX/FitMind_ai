@@ -12,7 +12,7 @@
  * The value is also rendered in the policy page footer, so the string a user
  * sees and the string stored against their consent can be compared by eye.
  */
-export const CURRENT_PRIVACY_POLICY_VERSION = "2026-08-04";
+export const CURRENT_PRIVACY_POLICY_VERSION = "2026-08-07";
 
 /**
  * Consents tracked separately because they are asked separately.

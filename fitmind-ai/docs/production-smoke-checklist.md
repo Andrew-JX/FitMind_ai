@@ -1,12 +1,27 @@
 # Production Smoke Checklist
 
-Production URL: https://fitmind-ai-psi.vercel.app/
+Production targets:
+
+- Mainland invite-only candidate: `https://fitmind.jimmyuuu.com/`
+- Overseas portfolio demo: `https://fitmind-ai-psi.vercel.app/`
 
 Use this checklist before sending the app to an interviewer, friend, or recruiter. Mark an item passed only after it has been checked in the live app.
 
+## Infrastructure preflight (Tencent Cloud target)
+
+- [ ] `fitmind.jimmyuuu.com` resolves to `115.159.102.34`.
+- [ ] `https://www.jimmyuuu.com/` redirects to `https://fitmind.jimmyuuu.com/`.
+- [ ] TLS covers both DNS names and `certbot renew --dry-run` succeeds.
+- [ ] `curl --fail https://fitmind.jimmyuuu.com/api/health` returns the wrapped `{ status: "ok" }` response.
+- [ ] `docker compose -f deploy/compose.yaml ps` reports both `api` and `web` healthy.
+- [ ] Public ports are limited to 22/80/443 (plus optional ICMP); 3000, 5432, 8080, and 8081 are not publicly reachable.
+- [ ] Footer displays `苏ICP备2026054660号` and links to the MIIT filing query.
+- [ ] `DATA_RESIDENCY=overseas`; registration asks for separate cross-border consent because Neon is in AWS Singapore.
+- [ ] Privacy policy names the current contractual recipient and actual region before the site accepts real user data.
+
 ## Browser Setup
 
-- [ ] Open `https://fitmind-ai-psi.vercel.app/` in a normal browser tab.
+- [ ] Open the target URL in a normal browser tab.
 - [ ] Open the same URL in a mobile viewport or on a phone.
 - [ ] Confirm the app loads without a blank screen.
 - [ ] Confirm there is no horizontal overflow on the login screen.

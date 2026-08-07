@@ -6,7 +6,7 @@ import {
 } from "./user-health-data-repository.js";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
-const POLICY = "2026-08-04";
+const POLICY = "2026-08-07";
 
 const profileRow = {
   user_id: USER_ID,

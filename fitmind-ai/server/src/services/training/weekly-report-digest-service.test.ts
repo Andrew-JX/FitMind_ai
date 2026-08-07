@@ -113,7 +113,7 @@ function createDependencies() {
     getPendingConsentsFor: vi.fn(async (): Promise<PendingConsent[]> => []),
     getPolicy: vi.fn(() => ({
       registration_open: true,
-      policy_version: "2026-08-04",
+      policy_version: "2026-08-07",
       data_residency: "overseas" as const,
       cross_border_consent_required: true,
     })),
@@ -166,7 +166,7 @@ describe("weekly-report-digest-service", () => {
     const result = await runWeeklyReportDigestCron(dependencies);
 
     expect(dependencies.listActiveUsers).toHaveBeenCalledWith("2026-06-01", {
-      policyVersion: "2026-08-04",
+      policyVersion: "2026-08-07",
       crossBorderRequired: true,
     });
     expect(dependencies.getReport).toHaveBeenCalledWith(USER_ID, {
@@ -280,7 +280,7 @@ describe("weekly digest consent gate", () => {
     dependencies.getPendingConsentsFor.mockResolvedValueOnce([
       {
         consent_type: "cross_border_transfer" as const,
-        policy_version: "2026-08-04",
+        policy_version: "2026-08-07",
       },
     ]);
 
@@ -310,7 +310,7 @@ describe("weekly digest consent gate", () => {
 
     expect(dependencies.listActiveUsers).toHaveBeenCalledWith(
       expect.any(String),
-      { policyVersion: "2026-08-04", crossBorderRequired: true },
+      { policyVersion: "2026-08-07", crossBorderRequired: true },
     );
   });
 });

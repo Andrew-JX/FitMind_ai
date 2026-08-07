@@ -79,7 +79,7 @@ GET /api/workouts?cursor=<id>&limit=20
   "ok": true,
   "data": {
     "registration_open": true,
-    "policy_version": "2026-08-04",
+    "policy_version": "2026-08-07",
     "data_residency": "overseas",
     "cross_border_consent_required": true
   }
@@ -102,7 +102,7 @@ GET /api/workouts?cursor=<id>&limit=20
   "email": "user@example.com",
   "password": "atleast8chars",
   "display_name": "Andrew",
-  "cross_border_consent": { "accepted": true, "policy_version": "2026-08-04" }
+  "cross_border_consent": { "accepted": true, "policy_version": "2026-08-07" }
 }
 ```
 
@@ -146,7 +146,7 @@ GET /api/workouts?cursor=<id>&limit=20
     "message": "Creating an account on this instance requires consent to storing your data outside mainland China.",
     "details": {
       "consent_type": "cross_border_transfer",
-      "expected_policy_version": "2026-08-04"
+      "expected_policy_version": "2026-08-07"
     }
   }
 }
@@ -199,7 +199,7 @@ When exceeded, both endpoints return:
   "data": {
     "user": { "id": "uuid", "email": "...", "display_name": "Andrew" },
     "pending_consents": [
-      { "consent_type": "cross_border_transfer", "policy_version": "2026-08-04" }
+      { "consent_type": "cross_border_transfer", "policy_version": "2026-08-07" }
     ]
   }
 }
@@ -269,7 +269,7 @@ When exceeded, both endpoints return:
 {
   "consent_type": "cross_border_transfer",
   "accepted": true,
-  "policy_version": "2026-08-04"
+  "policy_version": "2026-08-07"
 }
 ```
 
@@ -948,7 +948,7 @@ Validates (zod, `.strict()`) and upserts the profile. Body:
   "weeklyDays": 1,
   "availableEquipment": ["barbell", "dumbbell", "machine", "cable", "bodyweight", "kettlebell"],
   "injuryConstraints": ["knee"],
-  "sensitiveHealthConsent": { "accepted": true, "policy_version": "2026-08-04" }
+  "sensitiveHealthConsent": { "accepted": true, "policy_version": "2026-08-07" }
 }
 ```
 

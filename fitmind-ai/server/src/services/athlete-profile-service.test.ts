@@ -74,7 +74,7 @@ describe("getAthleteProfile", () => {
 });
 
 describe("saveAthleteProfile", () => {
-  const healthConsent = { accepted: true, policy_version: "2026-08-04" };
+  const healthConsent = { accepted: true, policy_version: "2026-08-07" };
 
   function saved(): SaveProfileResult {
     return { status: "saved", row: buildRow() };
@@ -102,7 +102,7 @@ describe("saveAthleteProfile", () => {
         userId: "u1",
         availableEquipment: ["barbell", "machine"],
         injuryConstraints: ["knee", "shoulder"],
-        policyVersion: "2026-08-04",
+        policyVersion: "2026-08-07",
         consentDecision: healthConsent,
       }),
     );
@@ -198,7 +198,7 @@ describe("saveAthleteProfile", () => {
     ).rejects.toMatchObject({
       statusCode: 422,
       code: "CONSENT_REQUIRED",
-      details: { expected_policy_version: "2026-08-04" },
+      details: { expected_policy_version: "2026-08-07" },
     });
   });
 });

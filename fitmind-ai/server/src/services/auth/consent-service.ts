@@ -19,7 +19,7 @@ import { HttpError } from "../../utils/http-error.js";
  * fresh consent for those changes, and a stored consent is only meaningful
  * next to the text it was given for.
  */
-export const CURRENT_PRIVACY_POLICY_VERSION = "2026-08-04";
+export const CURRENT_PRIVACY_POLICY_VERSION = "2026-08-07";
 
 export type DataResidency = "overseas" | "mainland";
 
