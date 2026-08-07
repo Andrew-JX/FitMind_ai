@@ -9,7 +9,7 @@ import { authMiddleware } from "../middleware/auth-middleware.js";
 
 export const plannedWorkoutsRouter = Router();
 
-plannedWorkoutsRouter.use(authMiddleware);
+plannedWorkoutsRouter.use("/planned-workouts", authMiddleware);
 plannedWorkoutsRouter.post("/planned-workouts", postAcceptPlanController);
 plannedWorkoutsRouter.get(
   "/planned-workouts/current",

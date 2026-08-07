@@ -78,6 +78,17 @@ export default tseslint.config(
     },
   },
   {
+    // Client-side tooling that runs in Node, not in the browser. Without this
+    // the browser block above claims these files and every `process`/`console`
+    // is an undefined global.
+    files: ["client/scripts/**/*.{js,mjs,cjs}"],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
+  {
     files: ["server/pgmigrate.config.cjs"],
     languageOptions: {
       globals: {

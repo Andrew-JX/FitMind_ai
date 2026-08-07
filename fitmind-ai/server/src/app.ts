@@ -2,7 +2,10 @@ import express from "express";
 import { ZodError } from "zod";
 
 import { assistantRouter } from "./routes/assistant.js";
-import { athleteProfileRouter } from "./routes/athlete-profile.js";
+import {
+  athleteProfileRouter,
+  injuryWithdrawalRouter,
+} from "./routes/athlete-profile.js";
 import { createAuthRouter } from "./routes/auth.js";
 import { feedbackRouter } from "./routes/feedback.js";
 import { healthRouter } from "./routes/health.js";
@@ -35,6 +38,14 @@ export function createApp(options?: CreateAppOptions) {
     createAuthRouter({ authRateLimiter: options?.authRateLimiter }),
   );
   app.use("/api/health", healthRouter);
+
+  // Mount order matters here. Every router below gates itself with a path-less
+  // `router.use(authMiddleware)`, which Express runs for *all* requests routed
+  // into it — including ones it has no handler for. So a consent-exempt route
+  // has to be reached before any of them, or the first router in the chain
+  // returns 403 and the exemption never applies. Covered by an HTTP test.
+  app.use("/api", injuryWithdrawalRouter);
+
   app.use("/api", apiRouter);
   app.use("/api", assistantRouter);
   app.use("/api", feedbackRouter);

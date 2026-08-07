@@ -18,7 +18,7 @@ export const assistantRouter = Router();
 const assistantIpRateLimitMiddleware =
   getDefaultAssistantIpRateLimitMiddleware();
 
-assistantRouter.use(authMiddleware);
+assistantRouter.use("/assistant", authMiddleware);
 
 assistantRouter.post(
   "/assistant/insights",

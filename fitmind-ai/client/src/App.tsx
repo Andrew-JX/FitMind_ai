@@ -3,6 +3,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell, type AppTabKey } from "./components/AppShell";
 import { AssistantWorkspace } from "./features/assistant/AssistantWorkspace";
 import { AuthScreen } from "./features/auth/AuthScreen";
+import { ConsentCatchupScreen } from "./features/auth/ConsentCatchupScreen";
+import { clearPendingConsent } from "./features/auth/use-auth";
+import { withdrawInjuryConstraints } from "./features/profile/athlete-profile-api";
 import {
   bootstrap,
   clearAuth,
@@ -136,6 +139,33 @@ export function App() {
           isInteractiveLoginRef.current = true;
         }}
         status={auth.status}
+      />
+    );
+  }
+
+  // Blocks the app for accounts that predate the consent seam. Placed after the
+  // auth gate and before everything else on purpose: these users are correctly
+  // signed in, and the missing thing is permission, not authentication.
+  if (auth.pendingConsents.length > 0) {
+    return (
+      <ConsentCatchupScreen
+        onAccept={auth.acceptPendingConsent}
+        onDecline={auth.logout}
+        onDeleteAccount={auth.deleteAccount}
+        onWithdrawHealthData={async () => {
+          // Only the deletion is awaited, so only the deletion can report a
+          // failure. Following it with `refreshAuth()` used to mean a momentary
+          // `/me` hiccup logged the user out with an authentication error
+          // straight after they exercised a privacy right — the server had done
+          // exactly what was asked, and the app punished them for it.
+          await withdrawInjuryConstraints();
+
+          // The debt is gone because its subject is gone: with no injury data
+          // stored there is nothing sensitive to consent to. The server reaches
+          // the same conclusion on the next request.
+          clearPendingConsent("sensitive_health_data");
+        }}
+        pendingConsents={auth.pendingConsents}
       />
     );
   }

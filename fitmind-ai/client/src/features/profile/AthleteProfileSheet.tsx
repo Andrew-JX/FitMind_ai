@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+import { CURRENT_PRIVACY_POLICY_VERSION } from "../../../../shared/src/consent";
+
 import { ActionSheet } from "../../components/ActionSheet";
 import { Button } from "../../components/Button";
 import { Input } from "../../components/Input";
@@ -11,6 +13,7 @@ import {
   getAthleteProfile,
   parseInjuryTags,
   saveAthleteProfile,
+  withdrawInjuryConstraints,
   type Equipment,
   type TrainingGoal,
 } from "./athlete-profile-api";
@@ -58,6 +61,38 @@ export function AthleteProfileSheet(props: AthleteProfileSheetProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Whether the server already holds art. 29 consent for this user. Starts
+  // true so the checkbox does not flash in before the profile loads.
+  const [hasStoredHealthConsent, setHasStoredHealthConsent] = useState(true);
+  const [acceptedHealthConsent, setAcceptedHealthConsent] = useState(false);
+  // What the server actually holds, as opposed to what is currently typed in
+  // the box. Withdrawal is about stored data, so a draft edit must not make the
+  // control appear or disappear.
+  const [storedInjuryCount, setStoredInjuryCount] = useState(0);
+  // Starts false, unlike `hasStoredHealthConsent`: an optimistic default here
+  // would flash a withdrawal control at users who have nothing to withdraw,
+  // which is the worse of the two wrong first frames.
+  const [hasWithdrawableConsent, setHasWithdrawableConsent] = useState(false);
+  const [isProfileLoaded, setIsProfileLoaded] = useState(false);
+  const [isConfirmingWithdraw, setIsConfirmingWithdraw] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+
+  const injuryTags = parseInjuryTags(injuryText);
+  const hasInjuryTags = injuryTags.length > 0;
+  const needsHealthConsent = hasInjuryTags && !hasStoredHealthConsent;
+  // Shown whenever there is something to withdraw: stored injury data, or a
+  // live consent with no data behind it (which is still a permission the user
+  // is entitled to take back). Gated on the load having happened, because
+  // `hasStoredHealthConsent` starts optimistically true to stop the consent
+  // checkbox flashing in.
+  //
+  // Driven by `withdrawableHealthConsent`, not `hasStoredHealthConsent`. The
+  // latter is version-scoped, so a consent given under superseded wording read
+  // as "nothing to withdraw" while the server would happily have revoked it —
+  // the same permission, two different judgements. The server now answers this
+  // question with the predicate the revocation itself uses.
+  const canWithdrawHealthData =
+    isProfileLoaded && (storedInjuryCount > 0 || hasWithdrawableConsent);
 
   useEffect(() => {
     if (!props.open || !props.token) {
@@ -67,17 +102,27 @@ export function AthleteProfileSheet(props: AthleteProfileSheetProps) {
     let isActive = true;
     setError(null);
     setIsLoading(true);
+    setIsConfirmingWithdraw(false);
 
     void getAthleteProfile(props.token)
-      .then((profile) => {
-        if (!isActive || !profile) {
+      .then((state) => {
+        if (!isActive) {
           return;
         }
 
-        setGoal(profile.goal);
-        setWeeklyDays(profile.weeklyDays);
-        setEquipment(new Set(profile.availableEquipment));
-        setInjuryText(profile.injuryConstraints.join("、"));
+        setHasStoredHealthConsent(state.healthConsentOnFile);
+        setHasWithdrawableConsent(state.withdrawableHealthConsent);
+        setStoredInjuryCount(state.profile?.injuryConstraints.length ?? 0);
+        setIsProfileLoaded(true);
+
+        if (!state.profile) {
+          return;
+        }
+
+        setGoal(state.profile.goal);
+        setWeeklyDays(state.profile.weeklyDays);
+        setEquipment(new Set(state.profile.availableEquipment));
+        setInjuryText(state.profile.injuryConstraints.join("、"));
       })
       .catch(() => {
         if (isActive) {
@@ -112,6 +157,13 @@ export function AthleteProfileSheet(props: AthleteProfileSheetProps) {
       return;
     }
 
+    if (needsHealthConsent && !acceptedHealthConsent) {
+      setError(
+        "伤病信息属于敏感个人信息，请先勾选同意，或清空伤病约束后保存。",
+      );
+      return;
+    }
+
     setIsSaving(true);
     setError(null);
 
@@ -120,7 +172,10 @@ export function AthleteProfileSheet(props: AthleteProfileSheetProps) {
         goal,
         weeklyDays,
         availableEquipment: [...equipment],
-        injuryConstraints: parseInjuryTags(injuryText),
+        injuryConstraints: injuryTags,
+        sensitiveHealthConsent: needsHealthConsent
+          ? { accepted: true, policy_version: CURRENT_PRIVACY_POLICY_VERSION }
+          : undefined,
       });
       props.onSaved?.("训练档案已保存。");
       props.onClose();
@@ -128,6 +183,85 @@ export function AthleteProfileSheet(props: AthleteProfileSheetProps) {
       setError("保存失败，请稍后再试。");
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  /**
+   * Reset only the injury-related state to its withdrawn values.
+   *
+   * @remarks
+   * Goal, weekly days and equipment keep any edits in progress, and nothing
+   * here touches training history or the account: withdrawing one category
+   * must not cost the user everything else.
+   *
+   * Shared by the ordinary success path and the "committed but the response
+   * was lost" path, so the two cannot end up leaving the form in different
+   * states after the same thing happened on the server.
+   */
+  function applyWithdrawnState(): void {
+    setInjuryText("");
+    setStoredInjuryCount(0);
+    setHasStoredHealthConsent(false);
+    setHasWithdrawableConsent(false);
+    setAcceptedHealthConsent(false);
+    setIsConfirmingWithdraw(false);
+  }
+
+  /**
+   * Withdraw the stored injury data and the consent that covered it.
+   *
+   * @returns Resolves once the sheet reflects what the server actually holds
+   *
+   * @remarks
+   * Deliberately not a substitute for the server rule: clearing the box by hand
+   * and pressing Save revokes the consent too (fitmind-lmy). This button exists
+   * because a right the user cannot find is not a right they have — the only
+   * entry point used to be the catch-up screen, which an account with its
+   * consents settled never sees.
+   */
+  async function handleWithdraw(): Promise<void> {
+    setIsWithdrawing(true);
+    setError(null);
+
+    try {
+      await withdrawInjuryConstraints(props.token);
+      applyWithdrawnState();
+      props.onSaved?.("伤病信息与相关同意已撤回。");
+    } catch {
+      // "Your data was not changed" is not something this catch block knows.
+      // The transaction is atomic, so a *refusal* means nothing moved — but a
+      // request can also fail after the server committed: a dropped connection,
+      // a timeout, a proxy giving up on the response. Those land here too, and
+      // in them the withdrawal succeeded and the reassurance would be a lie
+      // about the one thing the user most needs to be true.
+      //
+      // So ask the server what actually happened rather than inferring it.
+      try {
+        const state = await getAthleteProfile(props.token);
+        const stillStored = state.profile?.injuryConstraints.length ?? 0;
+
+        if (stillStored === 0 && !state.withdrawableHealthConsent) {
+          // The write landed; only the response was lost.
+          applyWithdrawnState();
+          props.onSaved?.("伤病信息与相关同意已撤回。");
+          return;
+        }
+
+        setStoredInjuryCount(stillStored);
+        setHasStoredHealthConsent(state.healthConsentOnFile);
+        setHasWithdrawableConsent(state.withdrawableHealthConsent);
+        // A snapshot of now, stated as a snapshot of now. "Your data was not
+        // changed" is a claim about history, and this read cannot support it:
+        // the withdrawal may have committed and another session may have saved
+        // injury data again afterwards. What the read does establish is that
+        // the data is there at this moment, so the withdrawal is not done.
+        setError("当前仍检测到伤病信息或相关同意，撤回尚未完成，请重试。");
+      } catch {
+        // Two failures in a row: the honest answer is that we do not know.
+        setError("撤回结果暂时无法确认，请稍后重新打开档案查看。");
+      }
+    } finally {
+      setIsWithdrawing(false);
     }
   }
 
@@ -218,15 +352,144 @@ export function AthleteProfileSheet(props: AthleteProfileSheetProps) {
         />
       </label>
 
+      {/* Asked here, at the moment the field is actually filled in, rather than
+          bundled into the sign-up form. Injury data is sensitive personal
+          information under PIPL art. 28, and art. 29 wants consent for the
+          handling that is really happening — at registration there is no health
+          data yet, so agreeing then would be agreeing to a hypothetical.
+
+          Appears only when there is something to consent to, and disappears
+          once the consent is on file, so it is not a checkbox users learn to
+          tick past. */}
+      {needsHealthConsent ? (
+        <label style={healthConsentStyle(theme)}>
+          <input
+            checked={acceptedHealthConsent}
+            onChange={(event) => setAcceptedHealthConsent(event.target.checked)}
+            style={{ marginTop: 3 }}
+            type="checkbox"
+          />
+          <span>
+            伤病信息属于<strong>敏感个人信息</strong>
+            。我同意本站存储并使用它，用于在训练计划中规避相关动作；用途仅此一项，详见
+            <a
+              href="/legal/privacy.html"
+              rel="noreferrer"
+              style={{ color: theme.colors.ac }}
+              target="_blank"
+            >
+              隐私政策
+            </a>
+            。不填写伤病约束不影响其他功能。（政策版本{" "}
+            {CURRENT_PRIVACY_POLICY_VERSION}）
+          </span>
+        </label>
+      ) : null}
+
+      {/* PIPL art. 15: withdrawal has to be as easy to reach as consent was.
+          Kept visually quiet but plainly worded — it is a normal setting, not a
+          danger zone, and dressing it up as one discourages people from using a
+          right they have. The two-step confirm is there because the action is
+          not undoable, not because it is discouraged. */}
+      {canWithdrawHealthData ? (
+        <div style={withdrawBlockStyle(theme)}>
+          <span>
+            <strong>撤回伤病信息</strong>
+            ：删除已存储的伤病约束，并撤销对应的敏感信息同意。训练记录、其余档案设置与账号都不受影响；之后再填写伤病会重新询问一次同意。
+          </span>
+          {isConfirmingWithdraw ? (
+            <div style={withdrawActionRowStyle}>
+              <Button
+                disabled={isWithdrawing}
+                onClick={() => setIsConfirmingWithdraw(false)}
+                type="button"
+                variant="secondary"
+              >
+                取消
+              </Button>
+              <Button
+                disabled={isWithdrawing}
+                onClick={() => void handleWithdraw()}
+                type="button"
+              >
+                {isWithdrawing ? "撤回中…" : "确认撤回"}
+              </Button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsConfirmingWithdraw(true)}
+              style={withdrawTriggerStyle(theme)}
+              type="button"
+            >
+              撤回伤病信息
+            </button>
+          )}
+        </div>
+      ) : null}
+
       {error ? <p style={errorStyle(theme)}>{error}</p> : null}
     </ActionSheet>
   );
+}
+
+function withdrawBlockStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    backgroundColor: theme.colors.surf2,
+    border: `1px solid ${theme.colors.bdr}`,
+    borderRadius: 12,
+    color: theme.colors.tx2,
+    display: "grid",
+    fontSize: 12,
+    gap: 10,
+    lineHeight: 1.6,
+    padding: "10px 12px",
+  };
+}
+
+const withdrawActionRowStyle: React.CSSProperties = {
+  display: "flex",
+  gap: 8,
+};
+
+function withdrawTriggerStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    backgroundColor: "transparent",
+    border: `1px solid ${theme.colors.bdr}`,
+    borderRadius: theme.radius.control,
+    color: theme.colors.tx,
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 600,
+    justifySelf: "start",
+    padding: "6px 12px",
+  };
 }
 
 const fieldStyle: React.CSSProperties = {
   display: "grid",
   gap: 6,
 };
+
+function healthConsentStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    alignItems: "flex-start",
+    backgroundColor: theme.colors.surf2,
+    border: `1px solid ${theme.colors.bdr}`,
+    borderRadius: 12,
+    color: theme.colors.tx2,
+    display: "flex",
+    fontSize: 12,
+    gap: 8,
+    lineHeight: 1.6,
+    padding: "10px 12px",
+  };
+}
 
 function labelStyle(
   theme: ReturnType<typeof useTheme>["theme"],

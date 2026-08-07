@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { WeeklyReportDigestRow } from "../../db/weekly-report-digest-repository.js";
 import type { ServerEnv } from "../../env.js";
+import type { PendingConsent } from "../auth/consent-service.js";
 import {
   buildWeeklyReportDigestSnapshot,
   dismissWeeklyReportDigest,
@@ -92,6 +93,7 @@ function createServerEnv(overrides: Partial<ServerEnv> = {}): ServerEnv {
     ragRerankingEnabled: false,
     assistantSafetyGate: true,
     registrationInviteOnly: true,
+    dataResidency: "overseas",
     workoutIntakeLlmProvider: "mock",
     ...overrides,
   };
@@ -105,6 +107,16 @@ function createDependencies() {
 
   return {
     getReport: vi.fn(async () => createReport()),
+    // Defaults to "owes nothing"; the gate tests override it. The cron cannot
+    // rely on the HTTP consent gate, so this is one of the two places that
+    // stops an unconsented account from being processed in the background.
+    getPendingConsentsFor: vi.fn(async (): Promise<PendingConsent[]> => []),
+    getPolicy: vi.fn(() => ({
+      registration_open: true,
+      policy_version: "2026-08-04",
+      data_residency: "overseas" as const,
+      cross_border_consent_required: true,
+    })),
     listActiveUsers: vi.fn(async () => [USER_ID]),
     loadEnv: vi.fn(() => createServerEnv()),
     now: () => new Date("2026-07-01T12:00:00.000Z"),
@@ -153,7 +165,10 @@ describe("weekly-report-digest-service", () => {
 
     const result = await runWeeklyReportDigestCron(dependencies);
 
-    expect(dependencies.listActiveUsers).toHaveBeenCalledWith("2026-06-01");
+    expect(dependencies.listActiveUsers).toHaveBeenCalledWith("2026-06-01", {
+      policyVersion: "2026-08-04",
+      crossBorderRequired: true,
+    });
     expect(dependencies.getReport).toHaveBeenCalledWith(USER_ID, {
       start_date: "2026-06-22",
       end_date: "2026-06-28",
@@ -252,5 +267,50 @@ describe("weekly-report-digest-service", () => {
       code: "NOT_FOUND",
       statusCode: 404,
     });
+  });
+});
+
+describe("weekly digest consent gate", () => {
+  // The HTTP gate cannot reach a cron run — there is no request to refuse — so
+  // an account blocked from every endpoint for owing a consent would still have
+  // had its training data read and a report built from it. The flag defaulting
+  // to off only kept that dormant.
+  it("skips a user who still owes a consent", async () => {
+    const dependencies = createDependencies();
+    dependencies.getPendingConsentsFor.mockResolvedValueOnce([
+      {
+        consent_type: "cross_border_transfer" as const,
+        policy_version: "2026-08-04",
+      },
+    ]);
+
+    const result = await runWeeklyReportDigestCron(dependencies);
+
+    expect(dependencies.getReport).not.toHaveBeenCalled();
+    expect(dependencies.upsertDigest).not.toHaveBeenCalled();
+    expect(result.skipped).toBe(1);
+    expect(result.created).toBe(0);
+  });
+
+  it("processes a user who owes nothing", async () => {
+    const dependencies = createDependencies();
+
+    const result = await runWeeklyReportDigestCron(dependencies);
+
+    expect(dependencies.getReport).toHaveBeenCalled();
+    expect(result.created).toBe(1);
+  });
+
+  // The SQL filter is the first line; this asserts it is actually asked for the
+  // right policy rather than left to a default.
+  it("passes the current policy to the user query", async () => {
+    const dependencies = createDependencies();
+
+    await runWeeklyReportDigestCron(dependencies);
+
+    expect(dependencies.listActiveUsers).toHaveBeenCalledWith(
+      expect.any(String),
+      { policyVersion: "2026-08-04", crossBorderRequired: true },
+    );
   });
 });

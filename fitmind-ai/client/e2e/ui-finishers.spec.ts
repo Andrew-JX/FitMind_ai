@@ -32,7 +32,11 @@ test("login submit morphs into a circle while the request runs", async ({
   await page.route("**/api/auth/login", async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 900));
     await route.fulfill(
-      jsonRoute({ user: MOCK_USER, token: "e2e-token" }) as never,
+      jsonRoute({
+        user: MOCK_USER,
+        token: "e2e-token",
+        pending_consents: [],
+      }) as never,
     );
   });
 

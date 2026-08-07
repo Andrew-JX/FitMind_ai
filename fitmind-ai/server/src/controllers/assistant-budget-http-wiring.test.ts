@@ -144,7 +144,9 @@ describe("assistant HTTP budget wiring", () => {
     const layers = (assistantRouter as unknown as { stack: RouterLayerView[] })
       .stack;
 
-    expect(layers[0]?.name).toBe("authMiddleware");
+    // Names the gated variant specifically: this asserts the assistant routes
+    // sit behind the consent gate, not merely behind some auth middleware.
+    expect(layers[0]?.name).toBe("authenticateWithConsentGate");
     expect(routeHandlerNames("/assistant/mock-turn")).toEqual([
       "aiRateLimit",
       "assistantIpRateLimit",

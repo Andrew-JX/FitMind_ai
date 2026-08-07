@@ -1,5 +1,5 @@
 import express from "express";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createErrorResponse } from "../utils/api-response.js";
 import { HttpError, isHttpError } from "../utils/http-error.js";
@@ -8,21 +8,36 @@ vi.mock("../services/auth/jwt.js", () => ({
   verifyJwt: vi.fn(),
 }));
 
+// The default middleware now also refuses callers who owe a consent, which
+// would otherwise reach the database from these unit tests. Stubbed to "owes
+// nothing" here; the gate itself is covered in `app.test.ts` over real HTTP.
+vi.mock("../services/auth/consent-service.js", () => ({
+  getPendingConsents: vi.fn(),
+}));
+
+import { getPendingConsents } from "../services/auth/consent-service.js";
 import { verifyJwt } from "../services/auth/jwt.js";
-import { authMiddleware } from "./auth-middleware.js";
+import {
+  authMiddleware,
+  authMiddlewareAllowingPendingConsents,
+} from "./auth-middleware.js";
 
 const mockedVerifyJwt = vi.mocked(verifyJwt);
+const mockedGetPendingConsents = vi.mocked(getPendingConsents);
+
+mockedGetPendingConsents.mockResolvedValue([]);
 
 async function makeRequest(
   authorizationHeader?: string | undefined,
   cookieHeader?: string | undefined,
+  options?: { middleware?: typeof authMiddleware },
 ): Promise<{
   status: number;
   payload: unknown;
 }> {
   const app = express();
 
-  app.get("/secure", authMiddleware, (_req, res) => {
+  app.get("/secure", options?.middleware ?? authMiddleware, (_req, res) => {
     return res.status(200).json({
       ok: true,
       data: {
@@ -91,6 +106,10 @@ async function makeRequest(
 }
 
 describe("auth-middleware", () => {
+  beforeEach(() => {
+    mockedGetPendingConsents.mockResolvedValue([]);
+  });
+
   afterEach(() => {
     vi.clearAllMocks();
   });
@@ -196,6 +215,65 @@ describe("auth-middleware", () => {
     );
 
     expect(mockedVerifyJwt).toHaveBeenCalledWith("cookie-token");
+    expect(result.status).toBe(200);
+  });
+});
+
+describe("consent gate", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // The hole this closes: before it, `authMiddleware` verified the JWT and
+  // stopped there, so an account that owed a consent reached every business
+  // endpoint with a valid cookie or bearer token. The block existed only in
+  // `App.tsx`, which is not a control — it is a rendering decision.
+  it("refuses an authenticated caller who still owes a consent", async () => {
+    mockedVerifyJwt.mockResolvedValueOnce({ userId: "u1" });
+    mockedGetPendingConsents.mockResolvedValueOnce([
+      { consent_type: "cross_border_transfer", policy_version: "2026-08-04" },
+    ]);
+
+    const result = await makeRequest("Bearer valid-token");
+
+    expect(result.status).toBe(403);
+    expect(result.payload).toMatchObject({
+      ok: false,
+      error: {
+        code: "CONSENT_REQUIRED",
+        details: {
+          pending_consents: [
+            {
+              consent_type: "cross_border_transfer",
+              policy_version: "2026-08-04",
+            },
+          ],
+        },
+      },
+    });
+  });
+
+  it("lets the same caller through once nothing is outstanding", async () => {
+    mockedVerifyJwt.mockResolvedValueOnce({ userId: "u1" });
+    mockedGetPendingConsents.mockResolvedValueOnce([]);
+
+    const result = await makeRequest("Bearer valid-token");
+
+    expect(result.status).toBe(200);
+  });
+
+  // The catch-up endpoints must stay reachable while a consent is outstanding,
+  // or the user can neither learn what they owe nor settle it.
+  it("does not gate the middleware built for the catch-up endpoints", async () => {
+    mockedVerifyJwt.mockResolvedValueOnce({ userId: "u1" });
+    mockedGetPendingConsents.mockResolvedValueOnce([
+      { consent_type: "cross_border_transfer", policy_version: "2026-08-04" },
+    ]);
+
+    const result = await makeRequest("Bearer valid-token", undefined, {
+      middleware: authMiddlewareAllowingPendingConsents,
+    });
+
     expect(result.status).toBe(200);
   });
 });

@@ -91,6 +91,18 @@ const serverEnvSchema = z.object({
   // deployment that forgets to configure it stays invite-only rather than
   // silently opening public sign-up (see docs/china-launch-plan.md §3.2a).
   REGISTRATION_INVITE_ONLY: safetyFlagDefaultOn,
+  // Where this instance stores personal information. Drives whether the art.
+  // 39 cross-border consent is demanded before an account can be created.
+  //
+  // Defaults to `overseas`, and `.catch()`es to it, because the two ways of
+  // being wrong are not symmetric: demanding a consent a mainland instance
+  // does not need costs one checkbox, while skipping it on an instance that
+  // does export data is the violation this whole seam exists to prevent. An
+  // unset or misspelled value therefore lands on the cautious side.
+  DATA_RESIDENCY: z
+    .enum(["overseas", "mainland"])
+    .default("overseas")
+    .catch("overseas"),
   WORKOUT_INTAKE_LLM_PROVIDER: z
     .enum(["off", "mock", "anthropic", "gemini", "groq", "openai_compatible"])
     .default("mock")
@@ -119,6 +131,7 @@ export interface ServerEnv {
   ragRerankingEnabled: boolean;
   assistantSafetyGate: boolean;
   registrationInviteOnly: boolean;
+  dataResidency: "overseas" | "mainland";
   workoutIntakeLlmProvider:
     | "off"
     | "mock"
@@ -137,26 +150,56 @@ export interface ServerEnv {
   voyageApiKey?: string | undefined;
 }
 
-const SERVER_ENV_KEYS = Object.keys(serverEnvSchema.shape);
+/**
+ * Env vars whose surrounding whitespace is safe to discard at load time.
+ *
+ * @remarks
+ * Deliberately an allowlist, not "every schema key minus the secrets": a
+ * variable added later defaults to being left alone, which is the harmless
+ * direction to be wrong in.
+ *
+ * Members are values drawn from a fixed vocabulary — enum flags and the model
+ * identifiers sent upstream. None of them can meaningfully contain whitespace,
+ * and for the two provider enums a stray space is actively dangerous, because
+ * they `.catch()` their defaults: `"openai_compatible "` fails the enum and
+ * silently degrades the assistant to mock with no error to notice.
+ *
+ * Everything omitted is either an opaque credential or already normalized
+ * inside its own schema preprocess (`booleanFlag`, `safetyFlagDefaultOn` and
+ * `optionalHttpsUrl` all trim before comparing).
+ */
+const TRIMMED_ENV_KEYS = [
+  "NODE_ENV",
+  "ASSISTANT_PROVIDER",
+  "WORKOUT_INTAKE_LLM_PROVIDER",
+  "DATA_RESIDENCY",
+  "GEMINI_MODEL",
+  "GROQ_MODEL",
+  "OPENAI_COMPAT_MODEL",
+] as const;
 
 /**
- * Trim surrounding whitespace from the env vars this schema reads.
+ * Trim surrounding whitespace from the env vars listed in
+ * {@link TRIMMED_ENV_KEYS}, leaving every other value byte-for-byte.
  *
  * @param source - Raw environment
- * @returns A copy whose known keys have been trimmed
+ * @returns A copy whose vocabulary-valued keys have been trimmed
  *
  * @remarks
  * Node's `--env-file` parser already trims, but nothing else does: a value
  * pasted into a hosting dashboard, passed with `docker -e`, or exported from a
- * shell keeps whatever whitespace came with it. That matters most for the enum
- * flags, which `.catch()` their defaults — `"openai_compatible "` fails the
- * enum and silently degrades the assistant to mock, with no error to notice.
- * A stray space is never the intended value of any variable here.
+ * shell keeps whatever whitespace came with it.
+ *
+ * Secrets are excluded on purpose. Rewriting a credential's bytes trades a
+ * loud failure for a silent one — a `DATABASE_URL` with a trailing newline
+ * fails to connect and says so, whereas a trimmed `JWT_SECRET` signs with a
+ * different key than the one that issued the live cookies, logging every user
+ * out at deploy with nothing in the logs to explain it.
  */
 function trimKnownEnvValues(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const trimmed: NodeJS.ProcessEnv = { ...source };
 
-  for (const key of SERVER_ENV_KEYS) {
+  for (const key of TRIMMED_ENV_KEYS) {
     const value = source[key];
 
     if (typeof value === "string") {
@@ -185,6 +228,7 @@ export function loadServerEnv(
     ragRerankingEnabled: parsed.RAG_RERANKING_ENABLED,
     assistantSafetyGate: parsed.ASSISTANT_SAFETY_GATE,
     registrationInviteOnly: parsed.REGISTRATION_INVITE_ONLY,
+    dataResidency: parsed.DATA_RESIDENCY,
     workoutIntakeLlmProvider: parsed.WORKOUT_INTAKE_LLM_PROVIDER,
     anthropicApiKey: parsed.ANTHROPIC_API_KEY,
     geminiApiKey: parsed.GEMINI_API_KEY,

@@ -9,6 +9,10 @@ import {
 import { loadServerEnv } from "../../env.js";
 import { HttpError } from "../../utils/http-error.js";
 import {
+  getPendingConsents,
+  getRegistrationPolicy,
+} from "../auth/consent-service.js";
+import {
   getUserWeeklyTrainingReport,
   type WeeklyTrainingReportResponseData,
 } from "./weekly-training-report-service.js";
@@ -47,6 +51,8 @@ export interface IsoWeekRange {
 
 interface WeeklyReportDigestDependencies {
   getReport: typeof getUserWeeklyTrainingReport;
+  getPendingConsentsFor: typeof getPendingConsents;
+  getPolicy: typeof getRegistrationPolicy;
   listActiveUsers: typeof listUsersWithRecentWorkouts;
   loadEnv: typeof loadServerEnv;
   now: () => Date;
@@ -57,6 +63,8 @@ interface WeeklyReportDigestDependencies {
 
 const defaultDependencies: WeeklyReportDigestDependencies = {
   getReport: getUserWeeklyTrainingReport,
+  getPendingConsentsFor: getPendingConsents,
+  getPolicy: getRegistrationPolicy,
   listActiveUsers: listUsersWithRecentWorkouts,
   loadEnv: loadServerEnv,
   now: () => new Date(),
@@ -98,7 +106,11 @@ export async function runWeeklyReportDigestCron(
         ACTIVE_USER_LOOKBACK_DAYS * MS_PER_DAY,
     ),
   );
-  const userIds = await dependencies.listActiveUsers(activeSinceDate);
+  const policy = dependencies.getPolicy();
+  const userIds = await dependencies.listActiveUsers(activeSinceDate, {
+    policyVersion: policy.policy_version,
+    crossBorderRequired: policy.cross_border_consent_required,
+  });
   const counts = {
     enabled: true,
     attempted: 0,
@@ -112,6 +124,20 @@ export async function runWeeklyReportDigestCron(
     counts.attempted += 1;
 
     try {
+      // Second line of defence, independent of the query above. The HTTP gate
+      // cannot protect a cron run — there is no request to refuse — so the only
+      // thing standing between an unconsented account and having its training
+      // data read is this code. One filter in one SQL string is a single point
+      // of failure for a compliance control; a caller that passes the wrong
+      // policy, or a future refactor that drops the WHERE clause, would fail
+      // silently and produce reports that look perfectly normal.
+      const pending = await dependencies.getPendingConsentsFor(userId);
+
+      if (pending.length > 0) {
+        counts.skipped += 1;
+        continue;
+      }
+
       const report = await dependencies.getReport(userId, {
         start_date: targetWeek.startDate,
         end_date: targetWeek.endDate,

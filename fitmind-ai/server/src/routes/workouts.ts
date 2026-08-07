@@ -21,7 +21,7 @@ import { authMiddleware } from "../middleware/auth-middleware.js";
 
 export const workoutsRouter = Router();
 
-workoutsRouter.use(authMiddleware);
+workoutsRouter.use(["/workouts", "/sets", "/training"], authMiddleware);
 
 workoutsRouter.get("/workouts", listWorkoutsController);
 workoutsRouter.get(

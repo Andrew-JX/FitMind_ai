@@ -5,12 +5,15 @@ import type {
   LoginRequest,
   RegisterRequest,
 } from "../../../../shared/src/auth";
+import type { PendingConsentDto } from "../../../../shared/src/consent";
 
 import { getReadableAuthErrorMessage } from "./auth-error-message";
 import {
+  deleteAccountRequest,
   fetchCurrentUser,
   loginWithEmail,
   logoutRequest,
+  recordConsent,
   registerWithEmail,
 } from "./auth-api";
 
@@ -25,10 +28,18 @@ export interface AuthState {
   token: string | null;
   user: AuthUserDto | null;
   errorMessage: string | null;
+  /**
+   * Consents the signed-in account still owes. Non-empty only for accounts
+   * created before the consent seam existed; the app blocks on it rather than
+   * letting them keep using a service they never agreed to the terms of.
+   */
+  pendingConsents: PendingConsentDto[];
 }
 
 export interface UseAuthResult extends AuthState {
+  acceptPendingConsent: (consent: PendingConsentDto) => Promise<void>;
   bootstrap: () => Promise<void>;
+  deleteAccount: (password: string) => Promise<void>;
   clearAuth: () => void;
   login: (input: LoginRequest) => Promise<void>;
   logout: () => Promise<void>;
@@ -53,6 +64,7 @@ let activeToken: string | null = null;
 let activeUser: AuthUserDto | null = null;
 let activeStatus: AuthStatus = "anonymous";
 let activeErrorMessage: string | null = null;
+let activePendingConsents: PendingConsentDto[] = [];
 
 const listeners = new Set<(state: AuthState) => void>();
 
@@ -79,7 +91,9 @@ export function useAuth(): UseAuthResult {
 
   return {
     ...state,
+    acceptPendingConsent,
     bootstrap,
+    deleteAccount,
     clearAuth,
     login,
     logout,
@@ -110,6 +124,7 @@ export async function bootstrap(): Promise<void> {
     // that gate on a truthy token still load while the cookie carries auth.
     activeToken = COOKIE_SESSION_TOKEN;
     activeUser = response.user;
+    activePendingConsents = readPendingConsents(response);
     activeStatus = "authenticated";
     activeErrorMessage = null;
     notify();
@@ -160,6 +175,7 @@ export async function setToken(nextToken: string): Promise<void> {
 export function clearAuth(): void {
   activeToken = null;
   activeUser = null;
+  activePendingConsents = [];
   activeStatus = "anonymous";
   activeErrorMessage = null;
   notify();
@@ -180,6 +196,7 @@ export async function register(input: RegisterRequest): Promise<void> {
     const response = await registerWithEmail(input);
     activeToken = response.token;
     activeUser = response.user;
+    activePendingConsents = readPendingConsents(response);
     activeStatus = "authenticated";
     activeErrorMessage = null;
     notify();
@@ -203,6 +220,7 @@ export async function login(input: LoginRequest): Promise<void> {
     const response = await loginWithEmail(input);
     activeToken = response.token;
     activeUser = response.user;
+    activePendingConsents = readPendingConsents(response);
     activeStatus = "authenticated";
     activeErrorMessage = null;
     notify();
@@ -230,6 +248,7 @@ export async function refreshAuth(): Promise<void> {
     const response = await fetchCurrentUser(activeToken);
 
     activeUser = response.user;
+    activePendingConsents = readPendingConsents(response);
     activeStatus = "authenticated";
     activeErrorMessage = null;
     notify();
@@ -238,12 +257,104 @@ export async function refreshAuth(): Promise<void> {
   }
 }
 
+/**
+ * Deletes the signed-in account and returns the app to the anonymous state.
+ *
+ * @returns Resolves once the server confirms deletion
+ *
+ * @remarks
+ * Local state is cleared only after the request succeeds. Clearing first would
+ * show the login screen whether or not anything was actually deleted, which is
+ * the exact class of lie this batch has been unwinding.
+ */
+export async function deleteAccount(password: string): Promise<void> {
+  await deleteAccountRequest(password);
+  clearAuth();
+}
+
+/**
+ * Records one outstanding consent for the signed-in user.
+ *
+ * @param consent - The pending consent the user just agreed to
+ * @returns Resolves once the server has stored it and local state is updated
+ *
+ * @remarks
+ * Only ever called from an explicit user action. There is no code path that
+ * records a consent the user did not perform, which is why accounts predating
+ * this seam are asked rather than backfilled.
+ *
+ * The version submitted is the one the server said was outstanding, so a stale
+ * tab cannot record agreement to superseded wording — and if it somehow does,
+ * the server rejects it.
+ */
+export async function acceptPendingConsent(
+  consent: PendingConsentDto,
+): Promise<void> {
+  await recordConsent({
+    consent_type: consent.consent_type,
+    accepted: true,
+    policy_version: consent.policy_version,
+  });
+
+  activePendingConsents = activePendingConsents.filter(
+    (pending) => pending.consent_type !== consent.consent_type,
+  );
+  notify();
+}
+
+/**
+ * Reads `pending_consents` from an auth response, tolerating its absence.
+ *
+ * @param response - An auth or session response from the API
+ * @returns The outstanding consents, or an empty list when the field is missing
+ *
+ * @remarks
+ * Defaulting to empty rather than crashing is safe because the server refuses
+ * independently: an account that owes a consent gets `403 CONSENT_REQUIRED`
+ * from every business endpoint, whatever this client believes. Missing the
+ * prompt therefore degrades into a visibly broken app rather than into silent
+ * unconsented processing.
+ *
+ * An earlier version of this comment claimed the server enforced this while no
+ * such gate existed — the block was only in `App.tsx`. Keep the two in step: if
+ * `createAuthMiddleware`'s gate is ever removed, this default becomes a hole.
+ */
+function readPendingConsents(response: {
+  pending_consents?: PendingConsentDto[] | undefined;
+}): PendingConsentDto[] {
+  return response.pending_consents ?? [];
+}
+
+/**
+ * Drops one consent from the local outstanding list.
+ *
+ * @param consentType - The consent that no longer applies
+ *
+ * @remarks
+ * Used after withdrawing the sensitive data, where the debt disappears because
+ * its subject is gone rather than because it was settled.
+ *
+ * Deliberately not a `refreshAuth()`. That call cannot fail loudly — it
+ * swallows errors into `handleAuthFailure`, which clears the session — so a
+ * momentary `/me` failure right after a successful withdrawal would log the
+ * user out and show an authentication error, immediately after they exercised
+ * a privacy right. The server re-checks on the very next request anyway, so
+ * there is nothing to gain by asking it again here.
+ */
+export function clearPendingConsent(consentType: string): void {
+  activePendingConsents = activePendingConsents.filter(
+    (pending) => pending.consent_type !== consentType,
+  );
+  notify();
+}
+
 function getSnapshot(): AuthState {
   return {
     status: activeStatus,
     token: activeToken,
     user: activeUser,
     errorMessage: activeErrorMessage,
+    pendingConsents: activePendingConsents,
   };
 }
 

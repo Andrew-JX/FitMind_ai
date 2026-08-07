@@ -13,10 +13,24 @@ vi.mock("../services/athlete-profile-service.js", async () => {
   };
 });
 
+// Partial mock: the profile service imports `CURRENT_PRIVACY_POLICY_VERSION`
+// from this module too, and replacing the whole module would strip it.
+vi.mock("../services/auth/consent-service.js", async () => {
+  const actual = await vi.importActual<
+    typeof import("../services/auth/consent-service.js")
+  >("../services/auth/consent-service.js");
+
+  return {
+    ...actual,
+    getHealthConsentFlags: vi.fn(),
+  };
+});
+
 import {
   getAthleteProfile,
   saveAthleteProfile,
 } from "../services/athlete-profile-service.js";
+import { getHealthConsentFlags } from "../services/auth/consent-service.js";
 import {
   getAthleteProfileController,
   putAthleteProfileController,
@@ -24,6 +38,21 @@ import {
 
 const mockedGet = vi.mocked(getAthleteProfile);
 const mockedSave = vi.mocked(saveAthleteProfile);
+const mockedHealthFlags = vi.mocked(getHealthConsentFlags);
+
+/**
+ * Both flags at once, because the controller now reads them as one fact.
+ *
+ * @param onFile - Whether consent to the current policy exists
+ * @param withdrawable - Whether any live consent exists; defaults to onFile
+ * @returns The flag pair the service resolves with
+ */
+function flags(onFile: boolean, withdrawable = onFile) {
+  return {
+    health_consent_on_file: onFile,
+    withdrawable_health_consent: withdrawable,
+  };
+}
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -49,6 +78,7 @@ describe("athlete-profile-controller", () => {
 
   it("returns the stored profile (or null) on GET", async () => {
     mockedGet.mockResolvedValueOnce(null);
+    mockedHealthFlags.mockResolvedValueOnce(flags(false));
     const response = createResponse();
 
     await getAthleteProfileController(createRequest(undefined), response);
@@ -57,11 +87,28 @@ describe("athlete-profile-controller", () => {
     expect(response.status).toHaveBeenCalledWith(200);
     expect(response.json).toHaveBeenCalledWith({
       ok: true,
-      data: { profile: null },
+      data: { profile: null, ...flags(false) },
+    });
+  });
+
+  // The form asks for health consent exactly once. It can only do that if the
+  // server tells it whether the consent is already held; otherwise it either
+  // re-asks on every save or assumes an answer it cannot know.
+  it("reports an existing health consent on GET", async () => {
+    mockedGet.mockResolvedValueOnce(null);
+    mockedHealthFlags.mockResolvedValueOnce(flags(true));
+    const response = createResponse();
+
+    await getAthleteProfileController(createRequest(undefined), response);
+
+    expect(response.json).toHaveBeenCalledWith({
+      ok: true,
+      data: { profile: null, ...flags(true) },
     });
   });
 
   it("validates and saves the profile on PUT", async () => {
+    mockedHealthFlags.mockResolvedValueOnce(flags(true));
     mockedSave.mockResolvedValueOnce({
       goal: "strength",
       weeklyDays: 3,

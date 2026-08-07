@@ -73,14 +73,45 @@ describe("loadServerEnv", () => {
     expect(env.registrationInviteOnly).toBe(false);
   });
 
-  it("trims whitespace off secrets rather than sending it upstream", () => {
+  it("trims whitespace off model identifiers rather than sending it upstream", () => {
     const env = loadServerEnv({
-      OPENAI_COMPAT_API_KEY: "  sk-compat-123  ",
+      GEMINI_MODEL: " gemini-2.0-flash\n",
+      GROQ_MODEL: "llama-3.3-70b\t",
       OPENAI_COMPAT_MODEL: "deepseek-chat\r",
     } as NodeJS.ProcessEnv);
 
-    expect(env.openAiCompatApiKey).toBe("sk-compat-123");
+    expect(env.geminiModel).toBe("gemini-2.0-flash");
+    expect(env.groqModel).toBe("llama-3.3-70b");
     expect(env.openAiCompatModel).toBe("deepseek-chat");
+  });
+
+  // The counterpart to the trimming above, and the reason it is an allowlist.
+  // Whitespace is not valid in a model name, so removing it can only help; a
+  // credential is opaque, so removing it is a guess about someone else's
+  // format. Guessing wrong on JWT_SECRET signs tokens with a key that does not
+  // match the live cookies and logs every user out at deploy, silently — a far
+  // worse outcome than the connection error an untrimmed value would have
+  // raised. Any secret added to the schema later must stay out of the list too.
+  it("leaves opaque secrets byte-for-byte, whitespace included", () => {
+    const env = loadServerEnv({
+      DATABASE_URL: "postgres://u:p@host/db ",
+      JWT_SECRET: " jwt-secret-value\n",
+      WEEKLY_REPORT_CRON_SECRET: "cron-secret\t",
+      ANTHROPIC_API_KEY: "  sk-ant-123  ",
+      GEMINI_API_KEY: "gem-123\r",
+      GROQ_API_KEY: " gsk-123",
+      OPENAI_COMPAT_API_KEY: "  sk-compat-123  ",
+      VOYAGE_API_KEY: "pa-123 ",
+    } as NodeJS.ProcessEnv);
+
+    expect(env.databaseUrl).toBe("postgres://u:p@host/db ");
+    expect(env.jwtSecret).toBe(" jwt-secret-value\n");
+    expect(env.weeklyReportCronSecret).toBe("cron-secret\t");
+    expect(env.anthropicApiKey).toBe("  sk-ant-123  ");
+    expect(env.geminiApiKey).toBe("gem-123\r");
+    expect(env.groqApiKey).toBe(" gsk-123");
+    expect(env.openAiCompatApiKey).toBe("  sk-compat-123  ");
+    expect(env.voyageApiKey).toBe("pa-123 ");
   });
 
   it("accepts the gemini intake provider", () => {

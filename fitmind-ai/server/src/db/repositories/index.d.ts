@@ -14,6 +14,7 @@ export declare function createUser(input: {
   passwordHash: string;
   displayName?: string | null | undefined;
 }): Promise<UserRow>;
+export declare function deleteUserById(userId: string): Promise<boolean>;
 
 export interface MuscleGroupRow {
   id: string;

@@ -68,6 +68,29 @@ GET /api/workouts?cursor=<id>&limit=20
 
 ## 2. 认证模块
 
+### GET /api/auth/registration-policy
+
+返回本实例当前的注册政策。**无需鉴权**——客户端要在还没有账号时读它，才能如实渲染注册入口，而不是收完表单再回 `403`。
+
+**Response 200**：
+
+```json
+{
+  "ok": true,
+  "data": {
+    "registration_open": true,
+    "policy_version": "2026-08-04",
+    "data_residency": "overseas",
+    "cross_border_consent_required": true
+  }
+}
+```
+
+- `registration_open`：`REGISTRATION_INVITE_ONLY` 的反面。
+- `data_residency`：由 `DATA_RESIDENCY` 决定（`overseas` / `mainland`），**失败即境外**：未设置或拼错都按境外处理。两种错法代价不对称——境内实例多问一次同意只是多一个勾选框，境外实例漏问就是出境无单独同意。
+- `cross_border_consent_required`：`data_residency === "overseas"`。
+- `policy_version`：客户端提交同意时必须原样带回；服务端只接受当前版本，见下。
+
 ### POST /api/auth/register
 
 注册新用户。
@@ -78,9 +101,14 @@ GET /api/workouts?cursor=<id>&limit=20
 {
   "email": "user@example.com",
   "password": "atleast8chars",
-  "display_name": "Andrew"
+  "display_name": "Andrew",
+  "cross_border_consent": { "accepted": true, "policy_version": "2026-08-04" }
 }
 ```
+
+`cross_border_consent` 在 `cross_border_consent_required` 为 `true` 的实例上**必填**。这条校验在服务端，不在浏览器：此前它只存在于 `AuthScreen` 的提交函数里，直接 `POST` 本端点可以完全绕过。
+
+用户行与同意记录**在同一个事务里写入**（`user_consents`）。同意写失败则用户一并回滚——否则会留下一个「账号存在、但没有任何记录证明当初被允许创建」的状态，而且从用户视角完全看不出来。
 
 **Response 201**：同时通过 `Set-Cookie` 写入 HttpOnly 会话 cookie（`fitmind_token`，`HttpOnly; SameSite=Lax; Path=/`，生产环境追加 `Secure`，有效期 7 天）。响应体仍返回 `token` 供非浏览器客户端使用。
 
@@ -107,6 +135,24 @@ GET /api/workouts?cursor=<id>&limit=20
 ```
 
 由 `REGISTRATION_INVITE_ONLY` 控制，**失败即关闭**：未设置、留空、拼错都保持关闭，只有显式 `off/false/0/no` 才开放注册。理由与上线口径见 [`china-launch-plan.md`](./china-launch-plan.md) §3.2a。关闭期间建号用 `pnpm create:user -- --email <address>`（直连数据库，绕过本闸门）。
+
+**Response 422**：本实例要求跨境同意，而请求缺少同意、明确拒绝、或带的是已被取代的政策版本。
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "CONSENT_REQUIRED",
+    "message": "Creating an account on this instance requires consent to storing your data outside mainland China.",
+    "details": {
+      "consent_type": "cross_border_transfer",
+      "expected_policy_version": "2026-08-04"
+    }
+  }
+}
+```
+
+版本过期一律拒绝，不做「收下再升级」：缓存了旧 JS 的客户端否则会提交对一段已经不再展示的文案的同意，存下来的记录会声称用户同意了他从没看过的内容。`expected_policy_version` 只在版本不符时出现。
 
 ### POST /api/auth/login
 
@@ -148,8 +194,90 @@ When exceeded, both endpoints return:
 **Response 200**：
 
 ```json
-{ "ok": true, "data": { "user": { ... } } }
+{
+  "ok": true,
+  "data": {
+    "user": { "id": "uuid", "email": "...", "display_name": "Andrew" },
+    "pending_consents": [
+      { "consent_type": "cross_border_transfer", "policy_version": "2026-08-04" }
+    ]
+  }
+}
 ```
+
+**服务端强制**：`pending_consents` 非空的账号，调用**任何**鉴权端点都返回 `403 CONSENT_REQUIRED`（`error.details.pending_consents` 带上欠的项）。闸门做在 `authMiddleware` 里且**默认开启**，此前这个拦截只存在于 `App.tsx`，也就是根本不存在。
+
+豁免清单**只有四条**，每条都是补签流程自身需要的，显式用 `authMiddlewareAllowingPendingConsents`：
+
+| 端点 | 为什么必须豁免 |
+| --- | --- |
+| `GET /api/auth/me` | 不豁免就看不到自己欠什么 |
+| `POST /api/auth/consents` | 不豁免就没法签 |
+| `DELETE /api/auth/account` | 不豁免则拒绝的人既不能同意也不能离开 |
+| `DELETE /api/athlete-profile/injury-constraints` | 不豁免则欠健康同意的人无法撤回伤病数据，只剩「同意/退出/删号」 |
+| `POST /api/auth/logout` | 本来就不鉴权 |
+
+默认开启是要点：新加的业务路由只要用 `authMiddleware` 就自动带闸门，**不存在「忘了加」这种失败方式**，只存在「显式写了豁免」这种需要被 review 的动作。
+
+`pending_consents` 是本实例当前政策下**这个账号还欠的同意**，注册后建的账号恒为空数组。它存在是为了处理同意接缝之前建的老账号：**不做回填迁移**——替他们插一条同意记录等于替他们签字。他们在这里浮出来，然后在应用内被问一次。
+
+`sensitive_health_data` 只对**确实存了伤病约束**的用户出现。没填过健康数据的人不该被要求为一件没发生的事情签字。
+
+### DELETE /api/auth/account
+
+从**活动数据库**删除当前账号及其数据（鉴权 + **重新认证**）。级联删除 9 张引用 `users` 的表，含 `user_consents` 本身——人和数据都不在了，同意记录没有留存的依据。
+
+**Request**：`{ "password": "<当前密码>" }`
+
+**重新认证是必需的，不是装饰。** 会话 token 有效期 7 天，没有这一层的话，一个泄露的 cookie 就足以永久摧毁一个账号——这是本 API 里**唯一没有撤销、事后也查不到痕迹**的动作。UI 上的二次确认保护不了任何直接调 API 的场景，因为攻击者用的不是 UI。密码不符返回 `401`，缺字段返回 `400`，两种情况都不会删任何东西。
+
+**Response 200**：`{ "ok": true, "data": { "success": true } }`，同时清除会话 cookie（留着会让浏览器每个后续请求都 401 且无从解释）。
+
+**这个端点删的是活动库，不是所有副本。** `DELETE FROM users` 走完之后，托管商的历史/时间点恢复窗口内仍可能存在副本（Neon 的 history retention 最长可达 30 天，实际值需从项目控制台确认）。因此对外文案只能说「从活动数据库删除并停止业务处理，备份与历史副本在保留期届满后清除」——**不能说「立即永久删除、无法恢复」**，那句话本代码证明不了。
+
+### DELETE /api/athlete-profile/injury-constraints
+
+只删除已存的伤病约束，不动档案里的其他字段（鉴权）。
+
+**Response 200**：`{ "ok": true, "data": { "success": true } }`。幂等：本来就没有伤病数据时也返回 200，那正是调用方想要的状态。
+
+**两个撤回入口，一个撤回操作。** 这个端点和「清空后保存 `PUT`」走的是仓储层同一个私有撤回函数，在同一把 `users` 行锁、同一个事务、同一个连接上执行同一条 `UPDATE`。不是两份彼此对齐的实现——今天对齐的两份实现，就是明天会分叉的两份实现。UI 入口见 `docs/UI_SPEC.md` §11。
+
+**豁免同意闸门。** 欠健康同意的用户被闸门挡在 `PUT /api/athlete-profile` 之外，也就无法把 `injuryConstraints` 清空；如果这条也挂闸门，他们就只剩三个选项：违心同意、退出但数据照存、删掉整个账号连同全部训练历史。那正是 PIPL 第 15 条（便捷撤回）与第 16 条（不得因拒绝无关同意而拒绝服务）要防的陷阱。
+
+**范围严格受限**：服务端只把 `injury_constraints` 置空，训练目标、每周天数、可用器械原样保留——那些是用户同意过的一般个人信息，顺手一起删会让撤回的代价高于它应有的样子。
+
+删完之后 `pending_consents` 里的 `sensitive_health_data` 自动消失：不再存储敏感信息，也就没有要征求的同意了。
+
+**与同意闸门的关系**：本端点用 `authMiddlewareAllowingPendingConsents`，**欠同意时也能调用**。这是补签页「不同意」的真实出口——只退出登录不会停止任何处理，数据仍在境外库里；只有删除会。把删除挡在闸门后面，等于让拒绝的人既不能同意也不能离开。
+
+**重复删除返回 `401`，不是 200。** 账号已经不存在，所以密码校验前的用户查找拿不到人，请求按未鉴权拒绝。这是对的行为，但要写清楚——本节此前写着「幂等，返回 200」，而唯一支撑它的测试其实模拟的是「查到用户后被并发删掉」，不是第二次请求。**一个只在假场景下成立的断言，比没有断言更糟。**
+
+**撤回会同时撤销同意**：清空 `injury_constraints` 的同时给 `user_consents` 里那条 `sensitive_health_data` 盖上 `revoked_at`。只清数据不撤同意的话，用户下次再填伤病时 `saveProfileWithHealthConsent` 的锁内同意重读会看到那条仍然有效的同意直接放行——一次会自己解除的撤回。行本身保留不删：它仍然是「在这段时间里处理是被允许的」的证据，删掉会让撤回和从未同意过变得无法区分。
+
+### POST /api/auth/consents
+
+**只用于补签**：记录本账号**当前确实欠着**的同意（鉴权）。注册走 register 请求内嵌的字段，以便和用户行共享事务；**填写档案时的健康同意走 PUT `/api/athlete-profile` 内嵌的 `sensitiveHealthConsent`，不走本端点**。
+
+本端点会先算一遍 `pending_consents`，请求的 `consent_type` 不在其中就返回 `422`。这条限制是要点不是修饰：没有它，客户端可以凭空 POST 一条 `sensitive_health_data` 同意、**之后**再保存伤病数据，于是「填写那一刻单独问」退化成「调用方想什么时候问就什么时候问」——同意与它所授权的处理脱钩，正是 29 条单独同意要防的事。
+
+因此**新产生**的健康数据无法从这里取得同意；本端点覆盖的是补签场景：同意接缝之前就已存在的伤病数据。「欠不欠」由数据库回答（已存的伤病行、已有的同意行），不由请求声明。
+
+**Request**：
+
+```json
+{
+  "consent_type": "cross_border_transfer",
+  "accepted": true,
+  "policy_version": "2026-08-04"
+}
+```
+
+**Response 201**：返回存下的同意行。
+
+同一 `(user_id, consent_type, policy_version)` 重复提交会因为「已经不欠了」而返回 `422`；即便绕过该检查，仓储层的 upsert 也返回原记录且**不刷新 `accepted_at`**：那个时间戳记的是他何时同意，不是他何时又打开了一次页面。
+
+`accepted: false` 返回 `422 CONSENT_REQUIRED` 而不是存一行 `accepted = false`。本表里「有一行」就是「给过许可」的证据，拒绝是这个证据的缺席；把拒绝也存成行，会让整张表的含义从「行是否存在」变成「要去读某一列」。拒绝的人继续欠着，应用继续问。
 
 ### POST /api/auth/logout
 
@@ -798,10 +926,17 @@ Response 200:
       "availableEquipment": ["barbell", "dumbbell"],
       "injuryConstraints": ["knee"],
       "updatedAt": "2026-06-14T00:00:00.000Z"
-    }
+    },
+    "health_consent_on_file": true
   }
 }
 ```
+
+`health_consent_on_file`：该用户在**当前政策版本**下是否已给出 `sensitive_health_data` 同意。表单靠它决定要不要问——没有这个标志，客户端只能每次保存都重复问（把用户训练成闭眼勾），或者凭空假设一个它无从知道的答案。
+
+`withdrawable_health_consent`：该用户是否存在**任意版本**的有效 `sensitive_health_data` 同意，即是否有一项权限可供撤回。**和上一个标志是两个问题，不能合并**：在旧版本措辞下同意过的用户，今天不构成存储伤病数据的许可（所以表单必须重新问），但那条同意仍然有效、用户有权收回（所以撤回入口必须出现）。合并成一个布尔值，要么压掉勾选框、让保存以一个用户没被提醒过的 422 失败，要么藏掉撤回入口——后者就是 fitmind-lmy 换了个位置重演。
+
+服务端这个标志与撤回语句共用同一个 SQL 谓词（`db-schema.md` §13.0），所以「界面提供撤回的范围」和「撤回实际撤掉的范围」不会各走各的。
 
 ### PUT /api/athlete-profile
 
@@ -812,13 +947,31 @@ Validates (zod, `.strict()`) and upserts the profile. Body:
   "goal": "strength | hypertrophy | endurance | general_fitness",
   "weeklyDays": 1,
   "availableEquipment": ["barbell", "dumbbell", "machine", "cable", "bodyweight", "kettlebell"],
-  "injuryConstraints": ["knee"]
+  "injuryConstraints": ["knee"],
+  "sensitiveHealthConsent": { "accepted": true, "policy_version": "2026-08-04" }
 }
 ```
 
 - `weeklyDays` 1–7；`goal` 受控枚举；`availableEquipment` 受控词表；`injuryConstraints` 自由标签（service 归一化小写 + 去重，≤10 个 / 每个 ≤40 字）。
 - 不接受请求体里的 `user_id` 等额外字段（`.strict()` 拒绝）。
-- Response 200 返回与 GET 相同的 `{ profile }` 结构。
+- Response 200 返回与 GET 相同的 `{ profile, health_consent_on_file }` 结构。
+
+**`sensitiveHealthConsent`**：`injuryConstraints` 归一化后**非空**且用户尚无当前版本的健康同意时**必填**，否则返回 `422 CONSENT_REQUIRED`。伤病约束是 PIPL 第 28 条定义的敏感个人信息，第 29 条要求单独同意。
+
+判定用的是**归一化之后**的列表，所以一份伤病标签全部被 trim 成空的请求，按空列表处理，不会为「存了个寂寞」索要同意。
+
+**同意与档案在同一个事务、同一把锁内落地**（`saveProfileWithHealthConsent`）。此前这里写的是「同意先写、档案后写，刻意不放在同一个事务里」，理由是两个方向的失败不等价。理由没错，但它默认两条路径不会交错，而撤回同意是并发路径：保存读到同意有效 → 撤回在缝隙里提交 → 保存把伤病数据写回去，两个事务各自原子，合起来就是「存了敏感数据却没有授权」。现在读同意、写同意、写档案都在 `users` 行锁内的同一个客户端上完成，见 `docs/db-schema.md` §13.0（fitmind-9yz）。
+
+**归一化后为空的 `injuryConstraints` 就是一次撤回**（fitmind-lmy）。同一个事务里清空伤病字段，并给该用户**所有仍有效的** `sensitive_health_data` 同意盖上 `revoked_at`：
+
+- 不按政策版本过滤——用户撤回的是这个**类别**，留下一条旧版本的有效同意，下次保存的锁内重读就会放行。
+- 不影响 `cross_border_transfer` 或其他类型的同意。
+- 幂等：`revoked_at IS NULL` 保证重复的空保存不新增行、也不覆盖原来的撤回时间戳（撤回**发生在何时**正是这行要记录的事实）。
+- 之后再填伤病，锁内重读发现无有效同意，返回 `422 CONSENT_REQUIRED`；带上新的当前版本同意才能存，且旧的已撤回行作为历史保留。
+
+这条规则不是给按钮做的补充，而是相反：用户清空输入框再点保存，这个动作本身就该被理解成「别再留着了」。此前它只清数据不撤同意，于是下次填写会直接复用那条仍然有效的同意——**一次会自己解除的撤回**。
+
+**这是新伤病数据取得健康同意的唯一路径。** `POST /api/auth/consents` 只处理补签，且会拒绝没有已存伤病数据的账号，所以「先写一条同意再存数据」这条绕路不成立。
 
 ## Slice 5 Addition - Planned Workouts (accept plan + adherence)
 

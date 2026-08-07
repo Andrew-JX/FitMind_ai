@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type {
   LoginRequest,
   RegisterRequest,
 } from "../../../../shared/src/auth";
+import type { RegistrationPolicyData } from "../../../../shared/src/consent";
 
+import { fetchRegistrationPolicy } from "./auth-api";
 import { Icon } from "../../components/Icon";
 import { SiteFooter } from "../../components/SiteFooter";
 import { StateNotice } from "../../components/StateNotice";
@@ -50,6 +52,40 @@ export function AuthScreen(props: AuthScreenProps) {
   const [localErrorMessage, setLocalErrorMessage] = useState<string | null>(
     null,
   );
+  // What this instance actually does, read from the server rather than assumed.
+  // `null` means the answer has not arrived; `policyFailed` means it will not.
+  const [policy, setPolicy] = useState<RegistrationPolicyData | null>(null);
+  const [policyFailed, setPolicyFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchRegistrationPolicy()
+      .then((data) => {
+        if (!cancelled) {
+          setPolicy(data);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPolicyFailed(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const isPolicyLoading = policy === null && !policyFailed;
+  // Fail closed: an instance whose policy could not be read must not accept
+  // sign-ups, because the consent it requires is one of the unknowns. Login is
+  // deliberately unaffected — an existing user has already consented, and
+  // locking them out over a failed policy read would turn a legal control into
+  // an availability incident.
+  const isRegistrationOpen = policy?.registration_open === true;
+  const requiresCrossBorderConsent =
+    policy?.cross_border_consent_required === true;
 
   const isSubmitting = status === "authenticating";
   const isSucceeded = props.isAuthenticated === true;
@@ -64,12 +100,25 @@ export function AuthScreen(props: AuthScreenProps) {
     setLocalErrorMessage(null);
 
     if (mode === "register") {
+      // Every check below is repeated on the server, which is where the real
+      // gate lives. These exist to explain the refusal in place rather than to
+      // enforce it: the previous version enforced consent only here, so
+      // anything that was not this form could register without it.
+      if (!isRegistrationOpen || policy === null) {
+        setLocalErrorMessage(
+          policyFailed
+            ? "无法读取本站的注册政策，暂时不能创建账号。登录不受影响，请稍后再试。"
+            : "本站当前不开放自助注册。",
+        );
+        return;
+      }
+
       if (password !== confirmPassword) {
         setLocalErrorMessage("两次输入的密码不一致，请重新确认。");
         return;
       }
 
-      if (!acceptedCrossBorder) {
+      if (requiresCrossBorderConsent && !acceptedCrossBorder) {
         setLocalErrorMessage(
           "请先阅读并勾选跨境存储同意项，再创建账号。你也可以不注册，直接关闭本页。",
         );
@@ -80,6 +129,9 @@ export function AuthScreen(props: AuthScreenProps) {
         email,
         password,
         display_name: displayName.trim() || undefined,
+        cross_border_consent: requiresCrossBorderConsent
+          ? { accepted: true, policy_version: policy.policy_version }
+          : undefined,
       });
       return;
     }
@@ -166,7 +218,7 @@ export function AuthScreen(props: AuthScreenProps) {
             登录
           </button>
           <button
-            disabled={isSubmitting}
+            disabled={isSubmitting || isPolicyLoading || !isRegistrationOpen}
             onClick={() => {
               setLocalErrorMessage(null);
               setMode("register");
@@ -177,6 +229,24 @@ export function AuthScreen(props: AuthScreenProps) {
             注册
           </button>
         </div>
+
+        {/* Says why the sign-up tab is unavailable instead of leaving a dead
+            control. The mainland instance is invite-only, and until this the
+            only way to discover that was to fill the form in and be refused. */}
+        {mode === "login" && !isPolicyLoading && !isRegistrationOpen ? (
+          <div style={{ marginBottom: 16 }}>
+            <StateNotice
+              description={
+                policyFailed
+                  ? "无法读取本站的注册政策，注册暂时关闭。登录不受影响。"
+                  : "本站账号由管理员邀请创建。如需账号，请联系站点邮箱。"
+              }
+              icon={policyFailed ? "refresh" : "user"}
+              title={policyFailed ? "注册暂不可用" : "当前为邀请制"}
+              tone={policyFailed ? "warning" : "default"}
+            />
+          </div>
+        ) : null}
 
         <form onSubmit={handleSubmit} style={{ display: "grid", gap: 12 }}>
           {mode === "register" ? (
@@ -254,7 +324,23 @@ export function AuthScreen(props: AuthScreenProps) {
             </label>
           ) : null}
 
-          {mode === "register" ? (
+          {/* Rendered only where it applies. A mainland instance stores nothing
+              abroad, and asking it to agree to cross-border storage would be
+              asking for consent to something that does not happen.
+
+              The categories listed are the ones actually written to the
+              database, checked against the migrations rather than recalled:
+              the earlier wording said "account, workouts and chat" and left
+              out the training profile and the feedback form's user agent.
+
+              No country is named here. Which countries hold the data is a fact
+              about deployment configuration that this bundle cannot verify —
+              it shipped identically to both targets while asserting "Vercel and
+              Neon, both in the United States". "Outside mainland China" is what
+              the server actually told us; the named recipients, their countries
+              and their contact details live in the privacy policy, which is one
+              page and can be kept correct. */}
+          {mode === "register" && requiresCrossBorderConsent ? (
             <label style={consentStyle(theme)}>
               <input
                 checked={acceptedCrossBorder}
@@ -284,8 +370,17 @@ export function AuthScreen(props: AuthScreenProps) {
                 >
                   用户协议
                 </a>
-                ，并同意本站将我的账号信息、训练记录与助手对话
-                <strong>存储在境外服务器</strong>（Vercel、Neon，均位于美国）。
+                ，并同意本站将我的账号信息、训练记录与计划、训练档案（训练目标、可用器械、伤病约束）、助手对话，以及我提交的反馈（含提交页面与浏览器标识）
+                <strong>存储在中国境外的服务器</strong>
+                。接收方名称、所在国与联系方式见隐私政策第五节。
+                <br />
+                其中伤病信息属于敏感个人信息，将在你填写训练档案时
+                <strong>另行单独征求同意</strong>，不包含在本项之内。
+                <br />
+                {/* Shown because the policy page tells users they can compare
+                    this against the version printed there. It said so before
+                    anything but the catch-up screen actually displayed it. */}
+                （政策版本 {policy.policy_version}）
               </span>
             </label>
           ) : null}

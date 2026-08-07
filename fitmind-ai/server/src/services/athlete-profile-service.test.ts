@@ -1,9 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type {
-  AthleteProfileRow,
-  UpsertAthleteProfileInput,
-} from "../db/athlete-profile-repository.js";
+import type { AthleteProfileRow } from "../db/athlete-profile-repository.js";
+import type { SaveProfileResult } from "../db/user-health-data-repository.js";
 import {
   athleteProfileInputSchema,
   getAthleteProfile,
@@ -53,7 +51,7 @@ describe("getAthleteProfile", () => {
   it("returns null when no profile exists", async () => {
     const profile = await getAthleteProfile("u1", {
       getByUserId: vi.fn().mockResolvedValue(null),
-      upsert: vi.fn(),
+      saveWithConsent: vi.fn(),
     });
 
     expect(profile).toBeNull();
@@ -62,7 +60,7 @@ describe("getAthleteProfile", () => {
   it("maps a stored row to a DTO", async () => {
     const profile = await getAthleteProfile("u1", {
       getByUserId: vi.fn().mockResolvedValue(buildRow()),
-      upsert: vi.fn(),
+      saveWithConsent: vi.fn(),
     });
 
     expect(profile).toEqual({
@@ -76,10 +74,16 @@ describe("getAthleteProfile", () => {
 });
 
 describe("saveAthleteProfile", () => {
-  it("dedupes and lowercases tags before upserting", async () => {
-    const upsert = vi
-      .fn<(input: UpsertAthleteProfileInput) => Promise<AthleteProfileRow>>()
-      .mockResolvedValue(buildRow());
+  const healthConsent = { accepted: true, policy_version: "2026-08-04" };
+
+  function saved(): SaveProfileResult {
+    return { status: "saved", row: buildRow() };
+  }
+
+  it("normalizes tags before handing the write to the repository", async () => {
+    const saveWithConsent = vi
+      .fn<(input: unknown) => Promise<SaveProfileResult>>()
+      .mockResolvedValue(saved());
 
     await saveAthleteProfile(
       "u1",
@@ -88,16 +92,113 @@ describe("saveAthleteProfile", () => {
         weeklyDays: 3,
         availableEquipment: ["barbell", "barbell", "machine"],
         injuryConstraints: ["Knee", "knee", "Shoulder"],
+        sensitiveHealthConsent: healthConsent,
       },
-      { getByUserId: vi.fn(), upsert },
+      { getByUserId: vi.fn(), saveWithConsent },
     );
 
-    expect(upsert).toHaveBeenCalledWith({
-      userId: "u1",
-      goal: "strength",
-      weeklyDays: 3,
-      availableEquipment: ["barbell", "machine"],
-      injuryConstraints: ["knee", "shoulder"],
+    expect(saveWithConsent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "u1",
+        availableEquipment: ["barbell", "machine"],
+        injuryConstraints: ["knee", "shoulder"],
+        policyVersion: "2026-08-04",
+        consentDecision: healthConsent,
+      }),
+    );
+  });
+
+  // The consent decision and the write go to the repository together. Deciding
+  // here and writing there meant two connections, and a withdrawal committing
+  // between them left injury data behind with no live consent (fitmind-9yz).
+  it("passes the consent decision with the write rather than checking first", async () => {
+    const saveWithConsent = vi
+      .fn<(input: unknown) => Promise<SaveProfileResult>>()
+      .mockResolvedValue(saved());
+
+    await saveAthleteProfile(
+      "u1",
+      {
+        goal: "strength",
+        weeklyDays: 3,
+        availableEquipment: [],
+        injuryConstraints: ["knee"],
+        sensitiveHealthConsent: healthConsent,
+      },
+      { getByUserId: vi.fn(), saveWithConsent },
+    );
+
+    expect(saveWithConsent).toHaveBeenCalledTimes(1);
+  });
+
+  it("omits the consent decision when the client sent none", async () => {
+    const saveWithConsent = vi
+      .fn<(input: unknown) => Promise<SaveProfileResult>>()
+      .mockResolvedValue(saved());
+
+    await saveAthleteProfile(
+      "u1",
+      {
+        goal: "strength",
+        weeklyDays: 3,
+        availableEquipment: [],
+        injuryConstraints: [],
+      },
+      { getByUserId: vi.fn(), saveWithConsent },
+    );
+
+    expect(saveWithConsent).toHaveBeenCalledWith(
+      expect.not.objectContaining({ consentDecision: expect.anything() }),
+    );
+  });
+
+  it("raises 422 when the repository reports missing consent", async () => {
+    const saveWithConsent = vi
+      .fn<(input: unknown) => Promise<SaveProfileResult>>()
+      .mockResolvedValue({ status: "consent_missing" });
+
+    await expect(
+      saveAthleteProfile(
+        "u1",
+        {
+          goal: "strength",
+          weeklyDays: 3,
+          availableEquipment: [],
+          injuryConstraints: ["knee"],
+        },
+        { getByUserId: vi.fn(), saveWithConsent },
+      ),
+    ).rejects.toMatchObject({
+      statusCode: 422,
+      code: "CONSENT_REQUIRED",
+      details: { consent_type: "sensitive_health_data" },
+    });
+  });
+
+  it("raises 422 with the expected version when the consent is stale", async () => {
+    const saveWithConsent = vi
+      .fn<(input: unknown) => Promise<SaveProfileResult>>()
+      .mockResolvedValue({ status: "consent_stale" });
+
+    await expect(
+      saveAthleteProfile(
+        "u1",
+        {
+          goal: "strength",
+          weeklyDays: 3,
+          availableEquipment: [],
+          injuryConstraints: ["knee"],
+          sensitiveHealthConsent: {
+            accepted: true,
+            policy_version: "2026-01-01",
+          },
+        },
+        { getByUserId: vi.fn(), saveWithConsent },
+      ),
+    ).rejects.toMatchObject({
+      statusCode: 422,
+      code: "CONSENT_REQUIRED",
+      details: { expected_policy_version: "2026-08-04" },
     });
   });
 });

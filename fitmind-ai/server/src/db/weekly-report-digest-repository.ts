@@ -88,15 +88,37 @@ const RETURNED_COLUMNS = `
   updated_at::text AS updated_at
 `;
 
+export interface ActiveUserConsentFilter {
+  /** Policy version consents must match exactly. */
+  policyVersion: string;
+  /** Whether this instance requires art. 39 cross-border consent. */
+  crossBorderRequired: boolean;
+}
+
 /**
- * Lists users with at least one workout on or after the active-since date.
+ * Lists users with a recent workout who do not owe any outstanding consent.
  *
  * @param activeSinceDate - Inclusive UTC date-only lower bound.
+ * @param consentFilter - Policy version and residency-derived requirements.
  * @param pool - Optional injected database pool.
  * @returns User ids ordered stably for deterministic batch behavior.
+ *
+ * @remarks
+ * The consent filter lives here, in the query that picks who gets processed,
+ * because the HTTP gate cannot help: a cron run has no request to refuse. It
+ * enumerates users directly, so an account that is blocked from every endpoint
+ * for owing a consent would still have had its training data read and a report
+ * generated from it. `WEEKLY_REPORT_DELIVERY_ENABLED` defaulting to `off` only
+ * kept that dormant.
+ *
+ * Mirrors `getConsentStatus`'s rules: cross-border consent when the instance
+ * requires it, and health consent only for users who actually store injury
+ * constraints. `weekly-report-digest-service` re-checks the same thing before
+ * generating, so a future caller that forgets this filter is still stopped.
  */
 export async function listUsersWithRecentWorkouts(
   activeSinceDate: string,
+  consentFilter: ActiveUserConsentFilter,
   pool?: DbPoolLike,
 ): Promise<string[]> {
   const activePool = pool ?? createDbPool();
@@ -113,9 +135,37 @@ export async function listUsersWithRecentWorkouts(
           WHERE w.user_id = u.id
             AND w.performed_at >= $1::date
         )
+        AND (
+          NOT $2::boolean
+          OR EXISTS (
+            SELECT 1 FROM user_consents c
+            WHERE c.user_id = u.id
+              AND c.policy_version = $3
+              AND c.consent_type = 'cross_border_transfer'
+              AND c.revoked_at IS NULL
+          )
+        )
+        AND NOT (
+          EXISTS (
+            SELECT 1 FROM athlete_profiles ap
+            WHERE ap.user_id = u.id
+              AND coalesce(array_length(ap.injury_constraints, 1), 0) > 0
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM user_consents c
+            WHERE c.user_id = u.id
+              AND c.policy_version = $3
+              AND c.consent_type = 'sensitive_health_data'
+              AND c.revoked_at IS NULL
+          )
+        )
         ORDER BY u.id ASC
       `,
-      [activeSinceDate],
+      [
+        activeSinceDate,
+        consentFilter.crossBorderRequired,
+        consentFilter.policyVersion,
+      ],
     );
 
     return result.rows.map((row) => activeUserRowSchema.parse(row).id);

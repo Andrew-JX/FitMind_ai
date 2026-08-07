@@ -2,9 +2,14 @@ import { z } from "zod";
 
 import {
   getAthleteProfileByUserId,
-  upsertAthleteProfile,
   type AthleteProfileRow,
 } from "../db/athlete-profile-repository.js";
+import {
+  saveProfileWithHealthConsent,
+  withdrawSensitiveHealthData,
+} from "../db/user-health-data-repository.js";
+import { CURRENT_PRIVACY_POLICY_VERSION } from "./auth/consent-service.js";
+import { HttpError } from "../utils/http-error.js";
 
 /** Training goals drive the rep/intensity scheme injected into the planner. */
 export const TRAINING_GOALS = [
@@ -48,6 +53,16 @@ export const athleteProfileInputSchema = z
     injuryConstraints: z
       .array(z.string().trim().min(1).max(MAX_INJURY_TAG_LENGTH))
       .max(MAX_INJURY_TAGS),
+    // Art. 29 consent, required only when injury constraints are actually
+    // being stored. Optional in the shape because a profile without them
+    // stores no sensitive information and needs no separate consent; whether
+    // it was required is decided below, not here.
+    sensitiveHealthConsent: z
+      .object({
+        accepted: z.boolean(),
+        policy_version: z.string().trim().min(1),
+      })
+      .optional(),
   })
   .strict();
 
@@ -55,12 +70,12 @@ export type AthleteProfileInput = z.infer<typeof athleteProfileInputSchema>;
 
 interface AthleteProfileDependencies {
   getByUserId: typeof getAthleteProfileByUserId;
-  upsert: typeof upsertAthleteProfile;
+  saveWithConsent: typeof saveProfileWithHealthConsent;
 }
 
 const defaultDependencies: AthleteProfileDependencies = {
   getByUserId: getAthleteProfileByUserId,
-  upsert: upsertAthleteProfile,
+  saveWithConsent: saveProfileWithHealthConsent,
 };
 
 /**
@@ -86,23 +101,65 @@ export async function getAthleteProfile(
  * @param input - Profile fields (already-parsed shape; normalized here)
  * @param dependencies - Injectable repository functions (for tests)
  * @returns The persisted profile DTO
+ * @throws HttpError 422 CONSENT_REQUIRED when injury constraints are supplied
+ *   without the separate health-data consent art. 29 requires
+ *
+ * @remarks
+ * The consent check runs on the normalized list, after trimming and deduping,
+ * so a payload whose injury tags all collapse to nothing is treated as the
+ * empty list it effectively is rather than demanding consent for storing
+ * nothing.
+ *
+ * The check and the write are handed to the repository as one unit rather than
+ * being sequenced here. Doing it here meant two connections: the consent read
+ * could see a live consent, a withdrawal could commit in the gap, and the
+ * upsert would then restore injury data no live consent covered. The decision
+ * has to be made under the same lock as the write, and only the repository can
+ * hold that.
  */
 export async function saveAthleteProfile(
   userId: string,
   input: AthleteProfileInput,
   dependencies: AthleteProfileDependencies = defaultDependencies,
 ): Promise<AthleteProfileDto> {
-  const row = await dependencies.upsert({
+  const injuryConstraints = dedupe(
+    input.injuryConstraints.map((tag) => tag.trim().toLowerCase()),
+  );
+
+  const result = await dependencies.saveWithConsent({
     userId,
     goal: input.goal,
     weeklyDays: input.weeklyDays,
     availableEquipment: dedupe(input.availableEquipment),
-    injuryConstraints: dedupe(
-      input.injuryConstraints.map((tag) => tag.trim().toLowerCase()),
-    ),
+    injuryConstraints,
+    policyVersion: CURRENT_PRIVACY_POLICY_VERSION,
+    ...(input.sensitiveHealthConsent === undefined
+      ? {}
+      : { consentDecision: input.sensitiveHealthConsent }),
   });
 
-  return mapProfileRow(row);
+  if (result.status === "consent_missing") {
+    throw new HttpError(
+      422,
+      "CONSENT_REQUIRED",
+      "Storing injury constraints requires separate consent to processing sensitive health information.",
+      { consent_type: "sensitive_health_data" },
+    );
+  }
+
+  if (result.status === "consent_stale") {
+    throw new HttpError(
+      422,
+      "CONSENT_REQUIRED",
+      "The privacy policy has changed since this page was loaded. Reload and read the current version before consenting.",
+      {
+        consent_type: "sensitive_health_data",
+        expected_policy_version: CURRENT_PRIVACY_POLICY_VERSION,
+      },
+    );
+  }
+
+  return mapProfileRow(result.row);
 }
 
 function dedupe<T>(values: T[]): T[] {
@@ -131,4 +188,42 @@ function normalizeEquipment(values: string[]): Equipment[] {
   return values.filter((value): value is Equipment =>
     (AVAILABLE_EQUIPMENT as readonly string[]).includes(value),
   );
+}
+
+/**
+ * Withdraws the sensitive health data and the consent that covered it, in one
+ * transaction.
+ *
+ * @param userId - Owner user id
+ * @param withdraw - Injectable repository function (for tests)
+ * @returns Resolves once the injury constraints and the consent are withdrawn
+ *
+ * @remarks
+ * Revoking the consent is not bookkeeping. Clearing the field alone left a live
+ * `sensitive_health_data` consent behind, so the next time the user typed an
+ * injury in, the profile save would find that consent and store
+ * it without asking — a withdrawal that silently un-withdrew itself. PIPL art.
+ * 15 wants withdrawal to mean the permission is gone, not just the current row.
+ *
+ * Both writes commit together. As two separate statements, a failure in between
+ * deleted the data, left the consent live, and returned an error — telling the
+ * user nothing had changed when their sensitive data was already gone.
+ *
+ * @remarks
+ * The third option this seam was missing. A user who declined the art. 29
+ * health-data consent previously had only bad choices: agree anyway, log out
+ * while the data stayed put, or delete the whole account including years of
+ * training history. None of those is the withdrawal art. 15 requires, and the
+ * last one is the "refuse service over an unrelated consent" that art. 16
+ * prohibits.
+ *
+ * Removing the data settles the debt by removing its subject: once no injury
+ * constraints are stored, `getPendingConsents` stops asking, because there is
+ * no longer any sensitive information being processed to ask about.
+ */
+export async function withdrawInjuryConstraints(
+  userId: string,
+  withdraw: typeof withdrawSensitiveHealthData = withdrawSensitiveHealthData,
+): Promise<void> {
+  await withdraw(userId);
 }

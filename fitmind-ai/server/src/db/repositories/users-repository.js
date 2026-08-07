@@ -112,3 +112,38 @@ export async function createUser(input, pool) {
     }
   }
 }
+
+/**
+ * Delete a user row, cascading to everything that references it.
+ *
+ * @param {string} userId
+ *   User id.
+ * @param {{ query: (sql: string, params?: readonly unknown[]) => Promise<{ rows: unknown[], rowCount?: number | null }> } | undefined} pool
+ *   Optional shared database pool.
+ * @returns {Promise<boolean>} True when a row was deleted, false when the id was already gone.
+ *
+ * @remarks
+ * Every table that references `users` is `ON DELETE CASCADE`, so this single
+ * statement removes the workouts, chat, profile, feedback and consent rows too.
+ * That includes `user_consents`: once the person and their data are gone there
+ * is nothing left for a consent record to be evidence about.
+ *
+ * Returns a boolean rather than throwing on a missing row so a double-submit
+ * from the client is idempotent instead of a 500.
+ */
+export async function deleteUserById(userId, pool) {
+  const activePool = pool ?? createDbPool();
+  const ownsPool = pool === undefined;
+
+  try {
+    const result = await activePool.query(`DELETE FROM users WHERE id = $1`, [
+      userId,
+    ]);
+
+    return (result.rowCount ?? 0) > 0;
+  } finally {
+    if (ownsPool) {
+      await activePool.end();
+    }
+  }
+}
