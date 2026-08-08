@@ -92,11 +92,12 @@ bash deploy/scripts/deploy.sh
 The script deliberately performs this order:
 
 1. validate Compose without expanding `env_file` secrets;
-2. build commit-tagged API and Web images;
+2. build commit-tagged API, Web, and one-shot dictionary seed images;
 3. run every database migration through the direct Neon connection;
-4. verify both `vector` and `public.user_consents` exist;
-5. replace the API/Web containers;
-6. require healthy loopback responses on ports 3000 and 8081.
+4. idempotently seed the production muscle/exercise dictionaries;
+5. verify both `vector` and `public.user_consents` exist;
+6. replace the API/Web containers;
+7. require healthy loopback responses on ports 3000 and 8081.
 
 Do not run plain `docker compose config`: it renders `.env` values into stdout.
 The safe validation command is:

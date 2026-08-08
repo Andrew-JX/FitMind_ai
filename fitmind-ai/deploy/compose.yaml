@@ -39,6 +39,24 @@ services:
         exec node server/node_modules/node-pg-migrate/bin/node-pg-migrate.js \
           -m server/migrations -t pgmigrations up
 
+  seed:
+    <<: *api-service
+    image: fitmind-seed:${FITMIND_IMAGE_TAG:-local}
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+      target: build
+    profiles: ["tools"]
+    restart: "no"
+    user: node
+    command:
+      - pnpm
+      - --filter
+      - "@fitmind/server"
+      - exec
+      - tsx
+      - scripts/seed.ts
+
   api:
     <<: *api-service
     command:

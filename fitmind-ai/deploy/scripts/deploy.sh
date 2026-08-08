@@ -29,13 +29,14 @@ compose=(docker compose -f "$compose_file")
 
 # Plain `docker compose config` expands env_file values and prints secrets.
 "${compose[@]}" config --no-env-resolution --quiet
-"${compose[@]}" build api web
+"${compose[@]}" build api web seed
 
 # The consent gate reads user_consents on every authenticated request. A failed
 # migration must stop the deploy before the new API container is replaced.
 "${compose[@]}" run --rm --no-deps migrate
+"${compose[@]}" run --rm --no-deps seed
 
-"${compose[@]}" run --rm --no-deps api node -e '
+"${compose[@]}" run --rm --no-deps --workdir /app/server api node -e '
 const { Client } = require("pg");
 const client = new Client({ connectionString: process.env.DATABASE_URL });
 client.connect()
