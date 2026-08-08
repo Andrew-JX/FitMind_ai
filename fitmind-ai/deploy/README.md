@@ -47,7 +47,7 @@ decision for that portfolio site.
 
 ## 3. Prepare the release checkout
 
-Deploy an reviewed commit or tag, never an uncommitted working tree:
+Deploy a reviewed commit or tag, never an uncommitted working tree:
 
 ```bash
 git clone https://github.com/Andrew-JX/FitMind_ai.git
@@ -56,6 +56,11 @@ git checkout <reviewed-release-ref>
 cp .env.production.example .env
 chmod 600 .env
 ```
+
+`deploy.sh` enforces a clean Git worktree before assigning the current commit
+SHA to the images. The existing repository `.dockerignore` excludes `.env`,
+logs, dependency trees, build outputs, and test artifacts from both image build
+contexts. Do not bypass either guard with an ad-hoc build command.
 
 Edit `.env` only on the server. Required distinctions:
 

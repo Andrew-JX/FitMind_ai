@@ -12,6 +12,16 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
+# Images are tagged with HEAD below, so a dirty checkout would make that tag a
+# lie and could not be reproduced during rollback. `.env` is ignored by Git and
+# is therefore intentionally absent from this check.
+if [[ -n "$(git status --porcelain --untracked-files=all)" ]]; then
+  echo "Deploy refused: the release checkout contains uncommitted or untracked files." >&2
+  echo "Commit, remove, or explicitly ignore them before deploying." >&2
+  git status --short >&2
+  exit 1
+fi
+
 image_tag="$(git rev-parse --short=12 HEAD)"
 export FITMIND_IMAGE_TAG="$image_tag"
 
