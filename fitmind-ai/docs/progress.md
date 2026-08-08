@@ -921,3 +921,19 @@ Docker 构建上下文之外；第一遍检查因隐藏文件未列出而误判�
 `deploy.sh` 会把脏工作树构建出的内容标成当前 Git SHA。现在脚本在构建前拒绝任何未提交或未跟踪
 文件（被 Git 忽略的服务器 `.env` 不受影响）。长期存在的客户端 `debug.log` 仍保留在本机，但已
 由 Git 忽略，不再污染发布工作树。
+
+## 2026-08-08 — fitmind-650：腾讯云 Lighthouse 正式上线
+
+腾讯云 `ubuntu@115.159.102.34` 的发布前审计确认 Docker 29.6.2、Compose 5.3.1、免密 sudo、
+磁盘和内存余量满足部署；既有 `mj-portfolio` 继续独占公网 8080，FitMind 容器只绑定
+`127.0.0.1:3000/8081`。固定提交 `5c499f3` 补齐一次性字典 seed 镜像，并修复数据库先决
+条件校验从错误的 `/app` 工作目录加载 `pg` 的问题。`pnpm verify` 通过 92 个测试文件、733
+个测试，Compose 与腾讯云原生 Bash 校验通过。
+
+Neon `production/neondb` 从空库完整执行 14 个迁移，`vector` 与 `user_consents` 校验通过；
+幂等字典 seed 落入 17 个肌群、43 个动作和 92 条唯一动作-肌群映射，生产库仍为 0 用户。
+API/Web 容器均为 healthy。主机 Nginx 已启用 80/443，HTTP 与 `www` 均 301 到
+`https://fitmind.jimmyuuu.com`，HTTPS 首页和 `/api/health` 返回 200，公开字典 API 返回
+17/43 条，注册策略保持 invite-only、`overseas` 与单独跨境同意。Let's Encrypt 双域名证书
+有效期至 2026-11-06，`certbot.timer` enabled/active，续期 dry-run 成功；DeepSeek 凭据鉴权
+探测返回 200。8080 站点与其 Nginx 配置未改动。
