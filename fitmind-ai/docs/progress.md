@@ -930,9 +930,11 @@ Docker 构建上下文之外；第一遍检查因隐藏文件未列出而误判�
 条件校验从错误的 `/app` 工作目录加载 `pg` 的问题。`pnpm verify` 通过 92 个测试文件、733
 个测试，Compose 与腾讯云原生 Bash 校验通过。
 
-Neon `production/neondb` 从空库完整执行 14 个迁移，`vector` 与 `user_consents` 校验通过；
-幂等字典 seed 落入 17 个肌群、43 个动作和 92 条唯一动作-肌群映射，生产库仍为 0 用户。
-API/Web 容器均为 healthy。主机 Nginx 已启用 80/443，HTTP 与 `www` 均 301 到
+首次部署填写的 Neon URL 误指向一个空 `neondb`，因此在那里完整执行了 14 个迁移，并幂等
+写入 17 个肌群、43 个动作和 92 条唯一动作-肌群映射；该库始终为 0 用户，没有覆盖账号数据。
+URL 随后改回原生产库：只读审计确认 PostgreSQL 18.4、14 条迁移、`vector`、`user_consents`、
+2 个用户、20 条训练及 17/43 字典数据均存在。切换时只重建 API 容器加载新连接，没有对原库
+重跑迁移或 seed。API/Web 容器均为 healthy。主机 Nginx 已启用 80/443，HTTP 与 `www` 均 301 到
 `https://fitmind.jimmyuuu.com`，HTTPS 首页和 `/api/health` 返回 200，公开字典 API 返回
 17/43 条，注册策略保持 invite-only、`overseas` 与单独跨境同意。Let's Encrypt 双域名证书
 有效期至 2026-11-06，`certbot.timer` enabled/active，续期 dry-run 成功；DeepSeek 凭据鉴权
