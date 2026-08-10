@@ -191,19 +191,17 @@ function normalizeEquipment(values: string[]): Equipment[] {
 }
 
 /**
- * Withdraws the sensitive health data and the consent that covered it, in one
+ * Deletes injury constraints and re-evaluates the shared health consent in one
  * transaction.
  *
  * @param userId - Owner user id
  * @param withdraw - Injectable repository function (for tests)
- * @returns Resolves once the injury constraints and the consent are withdrawn
+ * @returns Resolves once the injury constraints are deleted
  *
  * @remarks
- * Revoking the consent is not bookkeeping. Clearing the field alone left a live
- * `sensitive_health_data` consent behind, so the next time the user typed an
- * injury in, the profile save would find that consent and store
- * it without asking — a withdrawal that silently un-withdrew itself. PIPL art.
- * 15 wants withdrawal to mean the permission is gone, not just the current row.
+ * The consent is revoked only when no other supported health record remains.
+ * Menstrual and body-measurement tools share the same consent category, so an
+ * injury-only delete must leave their lawful basis intact.
  *
  * Both writes commit together. As two separate statements, a failure in between
  * deleted the data, left the consent live, and returned an error — telling the

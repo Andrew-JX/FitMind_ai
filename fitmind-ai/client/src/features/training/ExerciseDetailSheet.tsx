@@ -98,6 +98,7 @@ export function ExerciseDetailSheet(props: ExerciseDetailSheetProps) {
       }
       onClose={props.onClose}
       open
+      showCloseButton
       title={getExerciseDisplayName(exercise)}
     >
       <section style={sectionStyle}>

@@ -25,6 +25,7 @@ import { createDbPool } from "../pool.js";
  *   duration_minutes: number | null;
  *   notes: string | null;
  *   sets_count: number;
+ *   total_volume: number;
  *   muscle_groups: string[];
  * }} WorkoutSummaryRow
  */
@@ -129,7 +130,15 @@ export async function listWorkoutsByUser(filters, pool) {
           w.ended_at,
           w.duration_minutes,
           w.notes,
-          COUNT(s.id)::int AS sets_count,
+          COUNT(DISTINCT s.id)::int AS sets_count,
+          COALESCE(
+            (
+              SELECT SUM(workout_set.weight_kg * workout_set.reps)::float8
+              FROM sets workout_set
+              WHERE workout_set.workout_id = w.id
+            ),
+            0::float8
+          ) AS total_volume,
           COALESCE(
             ARRAY_AGG(DISTINCT mg.code) FILTER (WHERE mg.code IS NOT NULL),
             ARRAY[]::text[]

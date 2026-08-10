@@ -81,6 +81,9 @@ export async function deleteInjuryConstraintsController(
   res: Response<unknown, AuthLocals>,
 ) {
   await withdrawInjuryConstraints(res.locals.userId);
+  const flags = await getHealthConsentFlags(res.locals.userId);
 
-  return res.status(200).json(createSuccessResponse({ success: true }));
+  return res
+    .status(200)
+    .json(createSuccessResponse({ success: true, ...flags }));
 }

@@ -2,23 +2,20 @@ import { useState } from "react";
 
 import type { ExercisePickerProps } from "./ExercisePicker";
 import type { WorkoutFormProps } from "./WorkoutForm";
-import type { WorkoutsPanelProps } from "./WorkoutsPanel";
 import type { TrainingSummary } from "./training-summary-api";
 import type { TrainingSessionInitialDraft } from "./training-session-draft";
 import type { UseCurrentPlanResult } from "../assistant/use-current-plan";
 
 import { ActionSheet } from "../../components/ActionSheet";
 import { Card } from "../../components/Card";
+import { Icon } from "../../components/Icon";
 import { useTheme } from "../../theme/ThemeContext";
 import { ExercisePicker } from "./ExercisePicker";
 import { TrainingPlanCard } from "./TrainingPlanCard";
 import { TrainingSessionComposer } from "./TrainingSessionComposer";
 import { TrainingStatsStrip } from "./TrainingStatsStrip";
 import { WorkoutIntakePanel } from "./WorkoutIntakePanel";
-import { WorkoutsPanel } from "./WorkoutsPanel";
-import { getWorkoutDetail } from "./workout-api";
 import { mapWorkoutIntakeDraftToSessionInitialDraft } from "./workout-intake-to-session-draft";
-import { mapWorkoutToSessionInitialDraft } from "./workout-to-session-draft";
 import { BRAND_NEON, brandAlpha } from "../../theme/tokens";
 
 export interface TrainingViewProps {
@@ -28,18 +25,18 @@ export interface TrainingViewProps {
   summary: TrainingSummary | null;
   summaryLoading: boolean;
   workoutFormProps: WorkoutFormProps;
-  workoutsProps: Omit<WorkoutsPanelProps, "onEditWorkout">;
 }
 
 export function TrainingView(props: TrainingViewProps) {
   const { theme } = useTheme();
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [isDictionaryOpen, setIsDictionaryOpen] = useState(false);
-  const [isIntakeSheetOpen, setIsIntakeSheetOpen] = useState(false);
+  const [intakeEntryMode, setIntakeEntryMode] = useState<
+    "text" | "voice" | null
+  >(null);
   const [composerMode, setComposerMode] = useState<
-    "create_active" | "create_from_intake" | "edit_existing"
+    "create_active" | "create_from_intake"
   >("create_active");
-  const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null);
   const [pendingInitialDraft, setPendingInitialDraft] =
     useState<TrainingSessionInitialDraft | null>(null);
 
@@ -60,7 +57,7 @@ export function TrainingView(props: TrainingViewProps) {
       {!isComposerOpen ? (
         <div style={recordActionsStyle}>
           <button
-            onClick={() => setIsIntakeSheetOpen(true)}
+            onClick={() => setIntakeEntryMode("voice")}
             style={voiceRecordButtonStyle}
             type="button"
           >
@@ -80,6 +77,14 @@ export function TrainingView(props: TrainingViewProps) {
               <path d="M12 19v3" />
             </svg>
             <strong style={recordButtonLabelStyle}>语音记录训练</strong>
+          </button>
+          <button
+            onClick={() => setIntakeEntryMode("text")}
+            style={manualRecordButtonStyle(theme)}
+            type="button"
+          >
+            <Icon name="copy" size={20} />
+            <strong style={recordButtonLabelStyle}>文本录入训练</strong>
           </button>
           <button
             onClick={() => {
@@ -110,13 +115,19 @@ export function TrainingView(props: TrainingViewProps) {
       ) : null}
 
       <ActionSheet
-        description="说出动作、重量、次数和组数，识别后先确认文字，再生成训练记录。"
-        onClose={() => setIsIntakeSheetOpen(false)}
-        open={isIntakeSheetOpen}
-        title="语音记录训练"
+        description={
+          intakeEntryMode === "text"
+            ? "粘贴或输入包含动作、重量、次数和组数的训练笔记，识别后先确认再生成训练记录。"
+            : "说出动作、重量、次数和组数，识别后先确认文字，再生成训练记录。"
+        }
+        onClose={() => setIntakeEntryMode(null)}
+        open={intakeEntryMode !== null}
+        title={intakeEntryMode === "text" ? "文本录入训练" : "语音记录训练"}
       >
         <WorkoutIntakePanel
+          entryMode={intakeEntryMode ?? "voice"}
           exerciseLibraryProps={props.exercisePickerProps}
+          onCancel={() => setIntakeEntryMode(null)}
           onDraftParsed={(draft) => {
             setPendingInitialDraft(
               mapWorkoutIntakeDraftToSessionInitialDraft(
@@ -126,16 +137,11 @@ export function TrainingView(props: TrainingViewProps) {
             );
             setComposerMode("create_from_intake");
             setIsComposerOpen(true);
-            setIsIntakeSheetOpen(false);
+            setIntakeEntryMode(null);
           }}
           token={props.workoutFormProps.token}
         />
       </ActionSheet>
-
-      <WorkoutsPanel
-        {...props.workoutsProps}
-        onEditWorkout={(workoutId) => void handleEditWorkout(workoutId)}
-      />
 
       <Card>
         <div style={dictionaryHeaderStyle}>
@@ -171,20 +177,12 @@ export function TrainingView(props: TrainingViewProps) {
         mode={composerMode}
         onCancel={() => {
           setIsComposerOpen(false);
-          setEditingWorkoutId(null);
           setPendingInitialDraft(null);
           setComposerMode("create_active");
         }}
         onCreated={async () => {
-          if (composerMode === "edit_existing" && editingWorkoutId) {
-            await props.workoutsProps.onRefresh();
-            await props.workoutsProps.onSelectWorkout(editingWorkoutId);
-            await props.workoutFormProps.onCreated?.();
-          } else {
-            await props.workoutFormProps.onCreated?.();
-          }
+          await props.workoutFormProps.onCreated?.();
           setIsComposerOpen(false);
-          setEditingWorkoutId(null);
           setPendingInitialDraft(null);
           setComposerMode("create_active");
         }}
@@ -192,30 +190,6 @@ export function TrainingView(props: TrainingViewProps) {
       />
     </section>
   );
-
-  async function handleEditWorkout(workoutId: string): Promise<void> {
-    const token = props.workoutFormProps.token;
-
-    if (!token) {
-      return;
-    }
-
-    const detail =
-      props.workoutsProps.selectedWorkoutId === workoutId &&
-      props.workoutsProps.selectedWorkout
-        ? props.workoutsProps.selectedWorkout
-        : await getWorkoutDetail(token, workoutId);
-
-    setPendingInitialDraft(
-      mapWorkoutToSessionInitialDraft(
-        detail,
-        props.exercisePickerProps.exercises,
-      ),
-    );
-    setEditingWorkoutId(workoutId);
-    setComposerMode("edit_existing");
-    setIsComposerOpen(true);
-  }
 }
 
 const viewStyle: React.CSSProperties = {
@@ -226,7 +200,7 @@ const viewStyle: React.CSSProperties = {
 const recordActionsStyle: React.CSSProperties = {
   display: "grid",
   gap: 8,
-  gridTemplateColumns: "1fr 1fr",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
 };
 
 /** Design: neon-green voice record button (green stays fixed in both themes). */
@@ -244,8 +218,10 @@ const voiceRecordButtonStyle: React.CSSProperties = {
 };
 
 const recordButtonLabelStyle: React.CSSProperties = {
-  fontSize: 13,
+  fontSize: 12,
   fontWeight: 800,
+  lineHeight: 1.35,
+  textAlign: "center",
 };
 
 /** Design: neutral card-gradient manual record button. */

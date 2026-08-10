@@ -46,7 +46,7 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
   const [pendingDeleteWorkoutId, setPendingDeleteWorkoutId] = useState<
     string | null
   >(null);
-  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [viewMode, setViewMode] = useState<"list" | "calendar">("calendar");
   const [isListExpanded, setIsListExpanded] = useState(false);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<
     string | null
@@ -174,6 +174,7 @@ export function WorkoutsPanel(props: WorkoutsPanelProps) {
           <WorkoutCalendar
             onSelectDate={setSelectedCalendarDate}
             selectedDate={selectedCalendarDate}
+            token={props.token}
             workouts={props.workouts}
           />
           {selectedCalendarDate ? (

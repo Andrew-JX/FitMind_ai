@@ -23,6 +23,7 @@ export interface WorkoutSummaryRow {
   duration_minutes: number | null;
   notes: string | null;
   sets_count: number;
+  total_volume: number;
   muscle_groups: string[];
 }
 

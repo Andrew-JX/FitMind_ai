@@ -1,9 +1,11 @@
+import type { AppTabKey } from "../app-navigation";
+
 import { useTheme } from "../theme/ThemeContext";
 import { Icon, type IconName } from "./Icon";
 import { useToast } from "./ToastProvider";
 import { BRAND_NEON, brandAlpha } from "../theme/tokens";
 
-export type AppTabKey = "training" | "analysis" | "assistant" | "profile";
+export type { AppTabKey } from "../app-navigation";
 
 export interface AppShellProps {
   activeTab: AppTabKey;
@@ -111,10 +113,10 @@ export function AppShell(props: AppShellProps) {
             onClick={() => props.onSelectTab("training")}
           />
           <TabButton
-            active={props.activeTab === "analysis"}
-            icon="chart"
-            label="分析"
-            onClick={() => props.onSelectTab("analysis")}
+            active={props.activeTab === "history"}
+            icon="clock"
+            label="历史"
+            onClick={() => props.onSelectTab("history")}
           />
           <TabButton
             active={props.activeTab === "profile"}
@@ -305,7 +307,7 @@ function assistantFabStyle(isAssistantActive: boolean): React.CSSProperties {
   };
 }
 
-const NAV_TAB_ORDER: AppTabKey[] = ["training", "analysis", "profile"];
+const NAV_TAB_ORDER: AppTabKey[] = ["training", "history", "profile"];
 
 /**
  * Sliding glass pill that marks the active tab (design segmented-control range).

@@ -26,7 +26,9 @@ type ExerciseResolution =
   | { type: "remove" };
 
 export interface WorkoutIntakePanelProps {
+  entryMode?: "text" | "voice" | undefined;
   exerciseLibraryProps: ExercisePickerProps;
+  onCancel?: (() => void) | undefined;
   onDraftParsed: (draft: WorkoutIntakeDraft) => void;
   token: string | null;
 }
@@ -52,7 +54,9 @@ const COPY = {
   resolveEmpty: "没有可加入的动作，请至少确认一个，或点取消。",
   parse: "生成训练记录",
   parsing: "识别中...",
-  placeholder: "例如：今天杠铃卧推三组 60x10 65x8 70x6，高位下拉两组 45x12。",
+  placeholder: "例如：我今天练了胸，杠铃卧推 80 公斤，5 组，每组 8 次。",
+  textHelp:
+    "把训练笔记直接粘贴到下方。系统会先识别动作和组数，再让你确认后保存。",
   speechContinue: "继续说",
   speechFallback: "当前浏览器暂不支持语音识别，请换用支持语音识别的浏览器。",
   speechListening: "正在听你说训练内容",
@@ -84,6 +88,7 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
   const speechRecognition = useSpeechRecognition();
 
   const isBusy = status === "parsing";
+  const isTextEntry = props.entryMode === "text";
   const voicePreviewText = appendSpeechTranscript(
     text,
     speechRecognition.transcript,
@@ -272,6 +277,16 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
     resetIntakeState();
   }
 
+  function handleTextCancel() {
+    if (isBusy) {
+      return;
+    }
+
+    speechRecognition.stopListening();
+    resetIntakeState();
+    props.onCancel?.();
+  }
+
   function resetIntakeState() {
     setErrorMessage(null);
     setStatus("idle");
@@ -281,26 +296,81 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
 
   return (
     <>
-      <div style={triggerActionsStyle}>
-        <button
-          aria-label={COPY.speechTrigger}
-          disabled={isBusy}
-          onClick={handleVoiceStart}
-          style={micButtonStyle}
-          title={COPY.speechTrigger}
-          type="button"
-        >
-          <span style={micIconRingStyle} aria-hidden="true">
-            <Icon name="mic" size={22} />
-          </span>
-          <span style={{ fontSize: 14, fontWeight: 800 }}>
-            {COPY.speechTriggerLong}
-          </span>
-          <span style={micHintStyle}>说动作、重量、次数和组数</span>
-        </button>
-      </div>
+      {isTextEntry ? (
+        <div style={textEntryStyle}>
+          <p style={{ ...copyStyle, color: theme.colors.tx2 }}>
+            {COPY.textHelp}
+          </p>
+          <label style={{ ...labelStyle, color: theme.colors.tx2 }}>
+            {COPY.inputLabel}
+            <textarea
+              autoFocus
+              disabled={isBusy}
+              onChange={(event) => {
+                setText(event.target.value);
+                setErrorMessage(null);
+              }}
+              placeholder={COPY.placeholder}
+              style={{
+                ...textareaStyle,
+                backgroundColor: theme.colors.surf2,
+                border: `1px solid ${theme.colors.bdr}`,
+                borderRadius: theme.radius.control,
+                color: theme.colors.tx,
+                fontFamily: theme.fonts.body,
+              }}
+              value={text}
+            />
+          </label>
 
-      {errorMessage && !isModalOpen ? (
+          {errorMessage ? (
+            <StateNotice
+              description={errorMessage}
+              title={COPY.errorTitle}
+              tone="error"
+            />
+          ) : null}
+
+          <div style={textEntryActionsStyle}>
+            <Button
+              disabled={isBusy}
+              onClick={handleTextCancel}
+              type="button"
+              variant="secondary"
+            >
+              {COPY.cancel}
+            </Button>
+            <Button
+              disabled={!canParse || isBusy}
+              onClick={handleParse}
+              type="button"
+            >
+              {status === "parsing" ? COPY.parsing : COPY.parse}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div style={triggerActionsStyle}>
+          <button
+            aria-label={COPY.speechTrigger}
+            disabled={isBusy}
+            onClick={handleVoiceStart}
+            style={micButtonStyle}
+            title={COPY.speechTrigger}
+            type="button"
+          >
+            <span style={micIconRingStyle} aria-hidden="true">
+              <Icon name="mic" size={22} />
+            </span>
+            <span style={{ fontSize: 14, fontWeight: 800 }}>
+              {COPY.speechTriggerLong}
+            </span>
+            <span style={micHintStyle}>说动作、重量、次数和组数</span>
+          </button>
+        </div>
+      )}
+
+      {errorMessage && !isTextEntry && !isModalOpen ? (
         <StateNotice
           description={errorMessage}
           title={COPY.errorTitle}
@@ -342,7 +412,7 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
           </div>
         }
         onClose={handleModalCancel}
-        open={isModalOpen}
+        open={!isTextEntry && isModalOpen}
         title={COPY.modalTitle}
       >
         {!speechRecognition.isSupported ? (
@@ -560,7 +630,7 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
           </div>
         }
         onClose={handleVoiceCancel}
-        open={isVoiceOverlayOpen}
+        open={!isTextEntry && isVoiceOverlayOpen}
         title={COPY.speechListening}
       >
         <style>
@@ -613,7 +683,7 @@ export function WorkoutIntakePanel(props: WorkoutIntakePanelProps) {
             <textarea
               aria-live="polite"
               readOnly
-              placeholder="开始说训练内容后，这里会实时出现识别结果。"
+              placeholder={COPY.placeholder}
               style={{
                 ...textareaStyle,
                 backgroundColor: theme.colors.surf2,
@@ -724,6 +794,17 @@ const triggerActionsStyle: React.CSSProperties = {
   display: "grid",
   gap: 10,
   gridTemplateColumns: "minmax(0, 1fr)",
+};
+
+const textEntryStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 14,
+};
+
+const textEntryActionsStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 10,
+  gridTemplateColumns: "1fr 1fr",
 };
 
 const resolveListStyle: React.CSSProperties = {

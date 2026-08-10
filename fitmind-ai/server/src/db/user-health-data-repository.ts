@@ -132,7 +132,7 @@ async function lockUserRow(client: DbQueryable, userId: string): Promise<void> {
  * original timestamp, so repeated empty saves cannot rewrite when the
  * withdrawal happened.
  */
-async function revokeLiveHealthConsents(
+export async function revokeLiveHealthConsentsIfNoStoredData(
   client: DbQueryable,
   userId: string,
 ): Promise<void> {
@@ -142,12 +142,25 @@ async function revokeLiveHealthConsents(
       SET revoked_at = now()
       WHERE user_id = $1
         AND ${LIVE_HEALTH_CONSENT_PREDICATE}
+        AND NOT EXISTS (
+          SELECT 1 FROM athlete_profiles
+          WHERE user_id = $1
+            AND coalesce(array_length(injury_constraints, 1), 0) > 0
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM menstrual_records
+          WHERE user_id = $1
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM body_measurements
+          WHERE user_id = $1
+        )
     `,
     [userId],
   );
 }
 
-async function withLockedUser<T>(
+export async function withLockedUser<T>(
   userId: string,
   pool: DbPoolLike | undefined,
   work: (client: DbQueryable) => Promise<T>,
@@ -184,6 +197,66 @@ async function withLockedUser<T>(
   }
 }
 
+export type EnsureHealthConsentResult =
+  | { status: "available" }
+  | { status: "consent_missing" }
+  | { status: "consent_stale" };
+
+/** Check or collect the current health consent while the caller holds the user lock. */
+export async function ensureCurrentHealthConsent(
+  client: DbQueryable,
+  input: {
+    userId: string;
+    policyVersion: string;
+    source: "profile_form" | "health_tool";
+    consentDecision?: HealthConsentDecision | undefined;
+  },
+): Promise<EnsureHealthConsentResult> {
+  const existing = await client.query(
+    `
+      SELECT 1 FROM user_consents
+      WHERE user_id = $1
+        AND consent_type = 'sensitive_health_data'
+        AND policy_version = $2
+        AND revoked_at IS NULL
+      LIMIT 1
+    `,
+    [input.userId, input.policyVersion],
+  );
+
+  if (existing.rows.length > 0) {
+    return { status: "available" };
+  }
+
+  const decision = input.consentDecision;
+
+  if (decision === undefined || !decision.accepted) {
+    return { status: "consent_missing" };
+  }
+
+  if (decision.policy_version !== input.policyVersion) {
+    return { status: "consent_stale" };
+  }
+
+  await client.query(
+    `
+      INSERT INTO user_consents (
+        user_id,
+        consent_type,
+        policy_version,
+        source
+      )
+      VALUES ($1, 'sensitive_health_data', $2, $3)
+      ON CONFLICT (user_id, consent_type, policy_version)
+        WHERE revoked_at IS NULL
+      DO UPDATE SET source = user_consents.source
+    `,
+    [input.userId, input.policyVersion, input.source],
+  );
+
+  return { status: "available" };
+}
+
 /**
  * Save an athlete profile, taking any required health consent with it.
  *
@@ -202,12 +275,10 @@ async function withLockedUser<T>(
  * in the request, which is what makes a save that started before a withdrawal
  * still see that withdrawal.
  *
- * A save whose normalized injury list is **empty is a withdrawal**, not a
- * neutral upsert: it clears the field and revokes the live health consent in
- * the same transaction. Clearing the text and pressing Save is what a user
- * reasonably reads as "stop keeping this", and leaving the consent live behind
- * it produced a withdrawal that undid itself — the next injury they typed would
- * be stored without asking, because the old consent was still on file.
+ * A save whose normalized injury list is empty clears that sensitive field.
+ * The live health consent is revoked in the same transaction only when no
+ * menstrual or body-measurement data remains. Clearing one health category
+ * must not silently revoke permission still needed by another category.
  *
  * No consent is *requested* on that path, though: nothing sensitive is being
  * stored, so there is nothing to have permission for.
@@ -220,44 +291,17 @@ export async function saveProfileWithHealthConsent(
     const needsConsent = input.injuryConstraints.length > 0;
 
     if (needsConsent) {
-      const existing = await client.query(
-        `
-          SELECT 1 FROM user_consents
-          WHERE user_id = $1
-            AND consent_type = 'sensitive_health_data'
-            AND policy_version = $2
-            AND revoked_at IS NULL
-          LIMIT 1
-        `,
-        [input.userId, input.policyVersion],
-      );
+      const consent = await ensureCurrentHealthConsent(client, {
+        userId: input.userId,
+        policyVersion: input.policyVersion,
+        source: "profile_form",
+        ...(input.consentDecision === undefined
+          ? {}
+          : { consentDecision: input.consentDecision }),
+      });
 
-      if (existing.rows.length === 0) {
-        const decision = input.consentDecision;
-
-        if (decision === undefined || !decision.accepted) {
-          return { status: "consent_missing" } as const;
-        }
-
-        if (decision.policy_version !== input.policyVersion) {
-          return { status: "consent_stale" } as const;
-        }
-
-        await client.query(
-          `
-            INSERT INTO user_consents (
-              user_id,
-              consent_type,
-              policy_version,
-              source
-            )
-            VALUES ($1, 'sensitive_health_data', $2, 'profile_form')
-            ON CONFLICT (user_id, consent_type, policy_version)
-              WHERE revoked_at IS NULL
-            DO UPDATE SET source = user_consents.source
-          `,
-          [input.userId, input.policyVersion],
-        );
+      if (consent.status !== "available") {
+        return consent;
       }
     }
 
@@ -290,7 +334,7 @@ export async function saveProfileWithHealthConsent(
     );
 
     if (!needsConsent) {
-      await revokeLiveHealthConsents(client, input.userId);
+      await revokeLiveHealthConsentsIfNoStoredData(client, input.userId);
     }
 
     return {
@@ -301,11 +345,11 @@ export async function saveProfileWithHealthConsent(
 }
 
 /**
- * Clear a user's injury constraints and close their health consent together.
+ * Clear a user's injury constraints and conditionally close health consent.
  *
  * @param userId - Owner user id
  * @param pool - Optional injected pool (owns and closes its own pool otherwise)
- * @returns Resolves once both writes have committed
+ * @returns Resolves once the data deletion and consent re-evaluation commit
  *
  * @remarks
  * Takes the same lock, in the same order, as
@@ -313,10 +357,10 @@ export async function saveProfileWithHealthConsent(
  * not enough — the two could still interleave — so they serialize against each
  * other on the `users` row.
  *
- * Shares {@link revokeLiveHealthConsents} with the empty-list save path. One
- * revocation operation, not two implementations that have to be kept agreeing:
- * the explicit endpoint and clearing the form must mean the same thing, and the
- * cheapest way to guarantee that is for them to run the same statement.
+ * Shares {@link revokeLiveHealthConsentsIfNoStoredData} with the empty-list
+ * save path. The helper checks every supported sensitive health table before
+ * stamping consent rows, so deleting injury data cannot affect body or cycle
+ * records.
  */
 export async function withdrawSensitiveHealthData(
   userId: string,
@@ -332,6 +376,6 @@ export async function withdrawSensitiveHealthData(
       [userId],
     );
 
-    await revokeLiveHealthConsents(client, userId);
+    await revokeLiveHealthConsentsIfNoStoredData(client, userId);
   });
 }

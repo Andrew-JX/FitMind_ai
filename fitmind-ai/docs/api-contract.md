@@ -79,7 +79,7 @@ GET /api/workouts?cursor=<id>&limit=20
   "ok": true,
   "data": {
     "registration_open": true,
-    "policy_version": "2026-08-07",
+    "policy_version": "2026-08-09",
     "data_residency": "overseas",
     "cross_border_consent_required": true
   }
@@ -102,7 +102,7 @@ GET /api/workouts?cursor=<id>&limit=20
   "email": "user@example.com",
   "password": "atleast8chars",
   "display_name": "Andrew",
-  "cross_border_consent": { "accepted": true, "policy_version": "2026-08-07" }
+  "cross_border_consent": { "accepted": true, "policy_version": "2026-08-09" }
 }
 ```
 
@@ -146,7 +146,7 @@ GET /api/workouts?cursor=<id>&limit=20
     "message": "Creating an account on this instance requires consent to storing your data outside mainland China.",
     "details": {
       "consent_type": "cross_border_transfer",
-      "expected_policy_version": "2026-08-07"
+      "expected_policy_version": "2026-08-09"
     }
   }
 }
@@ -199,7 +199,7 @@ When exceeded, both endpoints return:
   "data": {
     "user": { "id": "uuid", "email": "...", "display_name": "Andrew" },
     "pending_consents": [
-      { "consent_type": "cross_border_transfer", "policy_version": "2026-08-07" }
+      { "consent_type": "cross_border_transfer", "policy_version": "2026-08-09" }
     ]
   }
 }
@@ -221,7 +221,7 @@ When exceeded, both endpoints return:
 
 `pending_consents` 是本实例当前政策下**这个账号还欠的同意**，注册后建的账号恒为空数组。它存在是为了处理同意接缝之前建的老账号：**不做回填迁移**——替他们插一条同意记录等于替他们签字。他们在这里浮出来，然后在应用内被问一次。
 
-`sensitive_health_data` 只对**确实存了伤病约束**的用户出现。没填过健康数据的人不该被要求为一件没发生的事情签字。
+`sensitive_health_data` 只对**确实存了伤病约束、经期日期或身体测量数据**的用户出现。没填过健康数据的人不该被要求为一件没发生的事情签字。
 
 ### DELETE /api/auth/account
 
@@ -261,7 +261,7 @@ When exceeded, both endpoints return:
 
 本端点会先算一遍 `pending_consents`，请求的 `consent_type` 不在其中就返回 `422`。这条限制是要点不是修饰：没有它，客户端可以凭空 POST 一条 `sensitive_health_data` 同意、**之后**再保存伤病数据，于是「填写那一刻单独问」退化成「调用方想什么时候问就什么时候问」——同意与它所授权的处理脱钩，正是 29 条单独同意要防的事。
 
-因此**新产生**的健康数据无法从这里取得同意；本端点覆盖的是补签场景：同意接缝之前就已存在的伤病数据。「欠不欠」由数据库回答（已存的伤病行、已有的同意行），不由请求声明。
+因此**新产生**的健康数据无法从这里取得同意；本端点覆盖的是补签场景：当前政策版本生效前就已存在的伤病、经期或身体测量数据。「欠不欠」由数据库回答（已存的健康数据、已有的同意行），不由请求声明。
 
 **Request**：
 
@@ -269,7 +269,7 @@ When exceeded, both endpoints return:
 {
   "consent_type": "cross_border_transfer",
   "accepted": true,
-  "policy_version": "2026-08-07"
+  "policy_version": "2026-08-09"
 }
 ```
 
@@ -948,7 +948,7 @@ Validates (zod, `.strict()`) and upserts the profile. Body:
   "weeklyDays": 1,
   "availableEquipment": ["barbell", "dumbbell", "machine", "cable", "bodyweight", "kettlebell"],
   "injuryConstraints": ["knee"],
-  "sensitiveHealthConsent": { "accepted": true, "policy_version": "2026-08-07" }
+  "sensitiveHealthConsent": { "accepted": true, "policy_version": "2026-08-09" }
 }
 ```
 
@@ -1116,3 +1116,46 @@ Response 200 data:
 ```
 
 Rejects cross-user ids and unknown ids with `404 NOT_FOUND`.
+
+## Personal tools
+
+All routes below are authenticated and user-scoped. Health writes that create
+sensitive data accept `sensitiveHealthConsent: { accepted, policy_version }`
+when the current policy has not already been accepted. The consent check,
+consent insert, and health-data write share one transaction and per-user lock.
+
+### Menstrual records
+
+- `GET /api/menstrual-records?month=YYYY-MM` returns `dates`,
+  `showInHistory`, and the current health-consent flags.
+- `PUT /api/menstrual-records/:date` accepts `{ isPeriod }` plus the optional
+  consent object. `date` is an ISO calendar date.
+- `PATCH /api/menstrual-records/settings` accepts `{ showInHistory }`.
+- `DELETE /api/menstrual-records` deletes every menstrual date for the user.
+
+### Body measurements
+
+- `GET /api/body-measurements` returns up to 366 dated measurements, newest
+  first, plus the current health-consent flags.
+- `PUT /api/body-measurements` creates or replaces the record for
+  `measuredOn`. Supported optional values are weight, target weight, body-fat
+  percentage, neck/shoulder/chest/waist/hip, and bilateral upper-arm, thigh,
+  and calf measurements. At least one value is required.
+- `DELETE /api/body-measurements/:id` deletes one owned measurement.
+- `DELETE /api/body-measurements` deletes all body measurements.
+
+### Training memos
+
+- `GET /api/training-memos` lists memos, pinned first and then newest first.
+- `POST /api/training-memos` accepts `title`, `content`, and optional
+  `isPinned`.
+- `PATCH /api/training-memos/:id` updates any of those fields.
+- `DELETE /api/training-memos/:id` deletes one owned memo.
+
+### Health-data withdrawal
+
+- `DELETE /api/personal-health-data` is authenticated but consent-exempt so a
+  user can decline a catch-up request. It deletes injury constraints,
+  menstrual dates, and body measurements in one transaction, then revokes all
+  live `sensitive_health_data` consent rows. Account data, workouts, memos, and
+  assistant history remain.

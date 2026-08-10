@@ -53,6 +53,7 @@ export interface WorkoutSummaryDto {
   duration_minutes: number | null;
   notes: string | null;
   sets_count: number;
+  total_volume: number;
   muscle_groups: string[];
 }
 
@@ -143,6 +144,7 @@ const workoutSummaryDtoSchema = z.object({
   duration_minutes: z.number().int().positive().nullable(),
   notes: z.string().nullable(),
   sets_count: z.number().int().nonnegative(),
+  total_volume: z.preprocess(normalizeNumericValue, z.number().nonnegative()),
   muscle_groups: z.array(z.string()),
 });
 

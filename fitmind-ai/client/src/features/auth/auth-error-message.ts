@@ -26,11 +26,15 @@ export function getReadableAuthErrorMessage(error: unknown): string {
     }
 
     if (error.message === "Invalid email or password.") {
-      return "邮箱或密码不正确。";
+      return "账号或密码错误，请重新输入。";
+    }
+
+    if (error.status !== undefined && error.status >= 500) {
+      return "暂时无法登录，请稍后重试。";
     }
 
     return error.message;
   }
 
-  return "Authentication could not be verified.";
+  return "暂时无法登录，请检查网络后重试。";
 }

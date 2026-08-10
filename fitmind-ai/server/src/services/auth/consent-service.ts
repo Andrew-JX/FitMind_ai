@@ -19,7 +19,7 @@ import { HttpError } from "../../utils/http-error.js";
  * fresh consent for those changes, and a stored consent is only meaningful
  * next to the text it was given for.
  */
-export const CURRENT_PRIVACY_POLICY_VERSION = "2026-08-07";
+export const CURRENT_PRIVACY_POLICY_VERSION = "2026-08-09";
 
 export type DataResidency = "overseas" | "mainland";
 
@@ -140,10 +140,10 @@ interface PendingConsentDeps {
  * notified is a different act from agreeing. So they surface here and are
  * asked, once, in the app.
  *
- * `sensitive_health_data` is listed only for users who actually stored injury
- * constraints. Demanding it from someone who never entered health data would
- * be asking them to consent to something that has not happened, which is the
- * same mistake as bundling it into registration.
+ * `sensitive_health_data` is listed only for users who actually stored injury,
+ * menstrual, or body-measurement data. Demanding it from someone who never
+ * entered health data would be asking them to consent to something that has
+ * not happened, which is the same mistake as bundling it into registration.
  */
 export async function getPendingConsents(
   userId: string,
@@ -162,7 +162,10 @@ export async function getPendingConsents(
     });
   }
 
-  if (status.hasStoredInjuryData && !status.hasHealthConsent) {
+  if (
+    (status.hasStoredHealthData ?? status.hasStoredInjuryData) &&
+    !status.hasHealthConsent
+  ) {
     pending.push({
       consent_type: "sensitive_health_data",
       policy_version: policy.policy_version,

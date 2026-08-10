@@ -10,16 +10,22 @@ It is not a generic chatbot and not a pure CRUD app.
 
 Two targets are built from this repo. They differ in configuration only — same code, same build.
 
-| Target                 | Status                                    | Registration | `DATA_RESIDENCY` | Footer filing numbers               |
-| ---------------------- | ----------------------------------------- | ------------ | ---------------- | ----------------------------------- |
-| Vercel demo (overseas) | Live: https://fitmind-ai-psi.vercel.app/  | Open         | `overseas`       | None                                |
-| Tencent Cloud + Neon   | Not live — ICP issued, deployment pending | Invite-only  | `overseas`       | ICP issued; public security pending |
+| Target                 | Status                                   | Registration | `DATA_RESIDENCY` | Footer filing numbers               |
+| ---------------------- | ---------------------------------------- | ------------ | ---------------- | ----------------------------------- |
+| Vercel demo (overseas) | Live: https://fitmind-ai-psi.vercel.app/ | Open         | `overseas`       | None                                |
+| Tencent Cloud + Neon   | Live: https://fitmind.jimmyuuu.com/      | Invite-only  | `overseas`       | ICP issued; public security pending |
 
 - The deployed client uses relative `/api` requests by default. `VITE_API_BASE_URL` can stay empty unless the API is hosted on a separate origin.
 - The Tencent Cloud target closes self-service registration (`REGISTRATION_INVITE_ONLY=on`) and displays its filing numbers in the footer. Its application server is in mainland China, but Neon remains overseas, so `DATA_RESIDENCY=overseas` and separate cross-border consent remain required. See [docs/china-launch-plan.md](docs/china-launch-plan.md) for the full configuration and the reasoning behind it.
 - **Because it is the same build, the client cannot hardcode anything that differs between the two.** It asks `GET /api/auth/registration-policy` at load and renders from the answer — whether sign-up is open, and whether cross-border consent is required. The previous version hardcoded both, and asserted "Vercel and Neon, both in the United States" in a consent checkbox that the mainland bundle would have shown verbatim.
 - `DATA_RESIDENCY` is fail-safe `overseas`: unset or misspelled means the app demands cross-border consent. Asking a mainland user for an unnecessary consent costs one checkbox; skipping it on an instance that does export data is the violation.
-- The legal pages under `client/public/legal/` are shared by both targets and state per-instance facts explicitly — registration status, third-party calls, and where data is stored. They are static HTML with no access to runtime config, so **any change to a deployment's registration state or providers has to be reflected there by hand**; nothing will fail if you forget. The page carries a version string (`2026-08-07`) that must be kept in step with `CURRENT_PRIVACY_POLICY_VERSION` in both `shared/src/consent.ts` and `server/src/services/auth/consent-service.ts`; a test in `consent-service.test.ts` fails if they drift. Bumping it invalidates stored consents and re-asks every user, which is the intended behaviour when the policy materially changes — and the corollary is the rule that matters: **once a version has been released, do not edit substantive text under it.** A stored consent is only evidence if the text it names is fixed.
+- The legal pages under `client/public/legal/` are shared by both targets and state per-instance facts explicitly — registration status, third-party calls, and where data is stored. They are static HTML with no access to runtime config, so **any change to a deployment's registration state or providers has to be reflected there by hand**; nothing will fail if you forget. The page carries a version string (`2026-08-09`) that must be kept in step with `CURRENT_PRIVACY_POLICY_VERSION` in both `shared/src/consent.ts` and `server/src/services/auth/consent-service.ts`; a test in `consent-service.test.ts` fails if they drift. Bumping it invalidates stored consents and re-asks every user, which is the intended behaviour when the policy materially changes — and the corollary is the rule that matters: **once a version has been released, do not edit substantive text under it.** A stored consent is only evidence if the text it names is fixed.
+
+### Release behavior
+
+- The Vercel project is linked to GitHub. A push to `main` triggers a production deployment; pushes to other branches create preview deployments. Updating a Vercel environment variable still requires a new deployment before the running application reads it.
+- `fitmind.jimmyuuu.com` is a self-hosted Tencent Cloud release and does **not** update from a Git push alone. The server release checkout must move to the reviewed commit and run `deploy/scripts/deploy.sh`.
+- Local `.env` changes do not synchronize to Vercel or Tencent Cloud. Each hosted environment keeps its own secrets and runtime configuration.
 
 ### Tencent Cloud deployment
 
@@ -78,6 +84,14 @@ Workout logs
 -> SSE assistant stream  
 -> frontend assistant state machine  
 -> evidence-backed answer UI
+
+## Current Product Surface
+
+- Log workouts by voice, free-form text, or a structured manual form, then review parsed sets before saving.
+- Browse workout history in list and calendar views, with daily volume, notes, and detailed exercise records; switch to the analysis view for trends and summaries.
+- Use the personal tab for training-profile management, menstrual records, dated body measurements, an RM calculator, and cloud-synced training memos.
+- Injury constraints, menstrual records, and body measurements share the separately consented sensitive-health-data category. Users can delete an individual category or withdraw consent and delete all stored health data.
+- Menstrual and body data sync through the authenticated API. The RM calculator runs locally and does not persist its inputs.
 
 ## Tech Stack
 

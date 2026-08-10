@@ -123,8 +123,15 @@ export async function getAthleteProfile(
  */
 export async function withdrawInjuryConstraints(
   token?: string | null,
-): Promise<unknown> {
-  return requestJson<unknown>("/api/athlete-profile/injury-constraints", {
+): Promise<{
+  health_consent_on_file: boolean;
+  withdrawable_health_consent: boolean;
+}> {
+  return requestJson<{
+    success: boolean;
+    health_consent_on_file: boolean;
+    withdrawable_health_consent: boolean;
+  }>("/api/athlete-profile/injury-constraints", {
     method: "DELETE",
     token,
   });

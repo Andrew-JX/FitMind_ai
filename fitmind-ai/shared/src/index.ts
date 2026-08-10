@@ -18,6 +18,18 @@ export type {
 } from "./consent";
 export type { ApiError, ErrorCode } from "./errors";
 export type {
+  BodyMeasurementDto,
+  BodyMeasurementsDto,
+  HealthConsentStateDto,
+  MenstrualOverviewDto,
+  SaveBodyMeasurementRequest,
+  SaveTrainingMemoRequest,
+  SetMenstrualDateRequest,
+  TrainingMemoDto,
+  UpdateMenstrualSettingsRequest,
+  UpdateTrainingMemoRequest,
+} from "./personal-tools";
+export type {
   AddWorkoutSetRequest,
   CreateWorkoutRequest,
   DeleteEntityResponseData,

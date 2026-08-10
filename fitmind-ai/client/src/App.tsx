@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { AppShell, type AppTabKey } from "./components/AppShell";
+import {
+  getFeedbackSourceRoute,
+  type AppTabKey,
+  type HistoryViewMode,
+} from "./app-navigation";
+import { AppShell } from "./components/AppShell";
 import { AssistantWorkspace } from "./features/assistant/AssistantWorkspace";
 import { AuthScreen } from "./features/auth/AuthScreen";
 import { ConsentCatchupScreen } from "./features/auth/ConsentCatchupScreen";
 import { clearPendingConsent } from "./features/auth/use-auth";
-import { withdrawInjuryConstraints } from "./features/profile/athlete-profile-api";
+import { withdrawAllHealthData } from "./features/profile/personal-tools-api";
 import {
   bootstrap,
   clearAuth,
@@ -19,7 +24,7 @@ import { useCurrentPlan } from "./features/assistant/use-current-plan";
 import { FeedbackButton } from "./features/feedback/FeedbackButton";
 import { ProfileView } from "./features/profile/ProfileView";
 import { createAnalysisRange } from "./features/training/analysis-range";
-import { AnalysisView } from "./features/training/AnalysisView";
+import { HistoryView } from "./features/training/HistoryView";
 import { TrainingView } from "./features/training/TrainingView";
 import { useExerciseSearch } from "./features/training/use-exercise-search";
 import { useTrainingSummary } from "./features/training/use-training-summary";
@@ -51,6 +56,7 @@ export function App() {
   const workouts = useWorkouts(auth.token);
   const currentPlan = useCurrentPlan(auth.token);
   const [activeTab, setActiveTab] = useState<AppTabKey>("training");
+  const [historyMode, setHistoryMode] = useState<HistoryViewMode>("history");
   const [selectedProgressExerciseId, setSelectedProgressExerciseId] = useState<
     string | null
   >(null);
@@ -158,11 +164,10 @@ export function App() {
           // `/me` hiccup logged the user out with an authentication error
           // straight after they exercised a privacy right — the server had done
           // exactly what was asked, and the app punished them for it.
-          await withdrawInjuryConstraints();
+          await withdrawAllHealthData();
 
-          // The debt is gone because its subject is gone: with no injury data
-          // stored there is nothing sensitive to consent to. The server reaches
-          // the same conclusion on the next request.
+          // The debt is gone because all of its subjects are gone: injury,
+          // menstrual, and body-measurement data are deleted together.
           clearPendingConsent("sensitive_health_data");
         }}
         pendingConsents={auth.pendingConsents}
@@ -176,7 +181,7 @@ export function App() {
       onSelectTab={setActiveTab}
       secondaryAction={
         <FeedbackButton
-          sourceRoute={getSourceRoute(activeTab)}
+          sourceRoute={getFeedbackSourceRoute(activeTab, historyMode)}
           token={auth.token ?? ""}
         />
       }
@@ -200,6 +205,27 @@ export function App() {
             onCreated: handleWorkoutCreated,
             token: auth.token,
           }}
+        />
+      </section>
+
+      <section style={tabSectionStyle(activeTab === "history")}>
+        <HistoryView
+          analysisProps={{
+            onExerciseSelect: handleExerciseSelect,
+            refreshSignal: analysisRefreshSignal,
+            selectedExerciseId: selectedProgressExerciseId,
+            token: auth.token,
+          }}
+          exercisePickerProps={{
+            exercises: exerciseSearch.exercises,
+            isLoadingExercises: exerciseSearch.isLoadingExercises,
+            isLoadingMuscleGroups: exerciseSearch.isLoadingMuscleGroups,
+            muscleGroups: exerciseSearch.muscleGroups,
+            onSearch: exerciseSearch.searchExercises,
+            searchError: exerciseSearch.searchError,
+          }}
+          onModeChange={setHistoryMode}
+          token={auth.token}
           workoutsProps={{
             deleteError: workouts.deleteError,
             deletingWorkoutId: workouts.deletingWorkoutId,
@@ -219,15 +245,6 @@ export function App() {
             token: auth.token,
             workouts: workouts.workouts,
           }}
-        />
-      </section>
-
-      <section style={tabSectionStyle(activeTab === "analysis")}>
-        <AnalysisView
-          onExerciseSelect={handleExerciseSelect}
-          refreshSignal={analysisRefreshSignal}
-          selectedExerciseId={selectedProgressExerciseId}
-          token={auth.token}
         />
       </section>
 
@@ -287,22 +304,6 @@ export function App() {
     setSelectedProgressExerciseId(exerciseId);
     setSelectedProgressExerciseName(exerciseName);
   }
-}
-
-function getSourceRoute(activeTab: AppTabKey): string {
-  if (activeTab === "analysis") {
-    return "/analysis";
-  }
-
-  if (activeTab === "assistant") {
-    return "/assistant";
-  }
-
-  if (activeTab === "profile") {
-    return "/profile";
-  }
-
-  return "/training";
 }
 
 function tabSectionStyle(isActive: boolean): React.CSSProperties {

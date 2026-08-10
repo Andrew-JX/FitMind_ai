@@ -7,6 +7,7 @@ import {
   getAthleteProfile,
   saveAthleteProfile,
 } from "./athlete-profile-service.js";
+import { CURRENT_PRIVACY_POLICY_VERSION } from "./auth/consent-service.js";
 
 function buildRow(
   overrides: Partial<AthleteProfileRow> = {},
@@ -74,7 +75,10 @@ describe("getAthleteProfile", () => {
 });
 
 describe("saveAthleteProfile", () => {
-  const healthConsent = { accepted: true, policy_version: "2026-08-07" };
+  const healthConsent = {
+    accepted: true,
+    policy_version: CURRENT_PRIVACY_POLICY_VERSION,
+  };
 
   function saved(): SaveProfileResult {
     return { status: "saved", row: buildRow() };
@@ -102,7 +106,7 @@ describe("saveAthleteProfile", () => {
         userId: "u1",
         availableEquipment: ["barbell", "machine"],
         injuryConstraints: ["knee", "shoulder"],
-        policyVersion: "2026-08-07",
+        policyVersion: CURRENT_PRIVACY_POLICY_VERSION,
         consentDecision: healthConsent,
       }),
     );
@@ -198,7 +202,7 @@ describe("saveAthleteProfile", () => {
     ).rejects.toMatchObject({
       statusCode: 422,
       code: "CONSENT_REQUIRED",
-      details: { expected_policy_version: "2026-08-07" },
+      details: { expected_policy_version: CURRENT_PRIVACY_POLICY_VERSION },
     });
   });
 });

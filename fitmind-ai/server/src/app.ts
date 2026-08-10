@@ -11,6 +11,10 @@ import { feedbackRouter } from "./routes/feedback.js";
 import { healthRouter } from "./routes/health.js";
 import { apiRouter } from "./routes/api.js";
 import { plannedWorkoutsRouter } from "./routes/planned-workouts.js";
+import {
+  personalHealthWithdrawalRouter,
+  personalToolsRouter,
+} from "./routes/personal-tools.js";
 import { weeklyReportDigestRouter } from "./routes/weekly-report-digests.js";
 import { workoutsRouter } from "./routes/workouts.js";
 import type { AiRateLimiter } from "./services/assistant/ai-rate-limiter.js";
@@ -90,12 +94,14 @@ export function createApp(options?: CreateAppOptions) {
   // has to be reached before any of them, or the first router in the chain
   // returns 403 and the exemption never applies. Covered by an HTTP test.
   app.use("/api", injuryWithdrawalRouter);
+  app.use("/api", personalHealthWithdrawalRouter);
 
   app.use("/api", apiRouter);
   app.use("/api", assistantRouter);
   app.use("/api", feedbackRouter);
   app.use("/api", athleteProfileRouter);
   app.use("/api", plannedWorkoutsRouter);
+  app.use("/api", personalToolsRouter);
   app.use("/api", weeklyReportDigestRouter);
   app.use("/api", workoutsRouter);
 

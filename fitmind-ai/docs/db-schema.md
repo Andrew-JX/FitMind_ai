@@ -15,6 +15,10 @@ users ──┬─< workouts ──< sets >── exercises >─< exercise_muscl
 
 (扩展阶段)
 knowledge_chunks（动作百科 RAG）
+users ──┬─< menstrual_records
+        ├─< body_measurements
+        ├─< training_memos
+        └── personal_health_settings
 ```
 
 **关键关系**：
@@ -566,13 +570,13 @@ COMMIT;
 两条路径都在 `server/src/db/user-health-data-repository.ts`，**同一个文件、同一个
 `withLockedUser`**——锁顺序是一个可复查的事实，而不是要从两个调用点拼出来的东西：
 
-- `saveProfileWithHealthConsent`：档案写入（含随行的健康同意）；**伤病列表归一化后为空时
-  同时撤销同意**
-- `withdrawSensitiveHealthData`：清空伤病 + 盖 `revoked_at`
+- `saveProfileWithHealthConsent`：档案写入（含随行的健康同意）；伤病列表归一化后为空时清空该字段，
+  仅在经期和身体数据也为空时撤销同意
+- `withdrawSensitiveHealthData`：清空伤病，并在三类健康数据都为空时盖 `revoked_at`
 
 **两个撤回入口共用一个撤回操作（fitmind-lmy）。** 「清空后保存」与显式的
 `DELETE /api/athlete-profile/injury-constraints` 都调用同一个私有的
-`revokeLiveHealthConsents(client, userId)`：它接收的是**客户端**而不是连接池，因为两条路径都
+`revokeLiveHealthConsentsIfNoStoredData(client, userId)`：它接收的是**客户端**而不是连接池，因为两条路径都
 必须在已经持锁的那个连接上撤销。任何在这里自己开连接的写法都是第二个锁顺序，也就是绕过
 `lockUserRow` 的后门。
 
@@ -690,3 +694,19 @@ CONSENT_SQL_TEST_DATABASE_URL=postgres://postgres:postgres@127.0.0.1:55432/fitmi
 > 一个副产物：**第一版回退演示不是失败，是挂死**——测试自己持锁，未串行化的写排在它后面，
 > 清理又排在那些写后面，全链锁住。已给连接加 `lock_timeout` / `statement_timeout`。
 > **一个在守卫被拆掉时会挂死的回归测试不算门禁**，因为没人分得清挂死和机器慢。
+
+## 14. 个人页健康与训练工具（2026-08-09）
+
+迁移 `20260809120000_create_personal_tools.js` 新增四张用户级表：
+
+- `menstrual_records`：`(user_id, period_date)` 复合主键，只保存用户主动标记的实际经期日期；
+- `personal_health_settings`：一人一行，保存是否在训练历史日历显示经期标记；
+- `body_measurements`：一人每天最多一条，保存可空的体重、目标体重、体脂率及各项围度；
+- `training_memos`：标题、正文、置顶状态与时间戳，按 `is_pinned DESC, updated_at DESC` 索引。
+
+经期日期、身体测量和 `athlete_profiles.injury_constraints` 共用
+`sensitive_health_data` 同意类别。首次保存经期或身体数据时，
+`ensureCurrentHealthConsent` 与数据写入在 `withLockedUser` 的同一事务内执行；删除某一类健康数据后，
+只有在三类敏感数据都为空时才撤销同意。`DELETE /api/personal-health-data` 则在同一事务中删除三类数据并撤销全部有效健康同意。
+
+`training_memos` 不是健康数据，不触发敏感信息同意；它仍按 `user_id` 隔离并随账号级联删除。

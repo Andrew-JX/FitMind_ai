@@ -14,8 +14,7 @@ export interface ConsentCatchupScreenProps {
   /** Deletes the account from the active database. Requires the password. */
   onDeleteAccount: (password: string) => Promise<void>;
   /**
-   * Deletes only the stored injury constraints, keeping the account. Offered
-   * for `sensitive_health_data` so declining does not cost the whole account.
+   * Deletes all stored health data, keeping the account and training history.
    */
   onWithdrawHealthData: () => Promise<void>;
 }
@@ -191,7 +190,7 @@ export function ConsentCatchupScreen(props: ConsentCatchupScreenProps) {
                   .onWithdrawHealthData()
                   .catch(() => {
                     setErrorMessage(
-                      "删除失败，你的伤病信息没有被改动。请稍后重试。",
+                      "删除失败，你的健康数据没有被改动。请稍后重试。",
                     );
                   })
                   .finally(() => {
@@ -209,7 +208,7 @@ export function ConsentCatchupScreen(props: ConsentCatchupScreenProps) {
               }}
               type="button"
             >
-              不同意，请删除我的伤病信息（保留账号与训练记录）
+              不同意，请删除全部健康数据（保留账号与训练记录）
             </button>
           ) : null}
 
@@ -400,23 +399,23 @@ function getConsentCopy(
 
   if (consent.consent_type === "sensitive_health_data") {
     return {
-      title: "需要你单独确认：伤病信息",
+      title: "需要你单独确认：健康数据",
       body: (
         <>
           <p style={{ margin: 0 }}>
-            你的训练档案里填写过<strong>伤病约束</strong>
-            。这属于《个人信息保护法》定义的<strong>敏感个人信息</strong>
+            你的账号中保存了<strong>伤病约束、经期日期或身体测量数据</strong>
+            。这些属于《个人信息保护法》定义的<strong>敏感个人信息</strong>
             ，需要取得你的单独同意才能继续处理。
           </p>
           <p style={{ margin: 0 }}>
-            它被用于：让助手在生成训练计划时避开相关动作。用途仅此一项。详见
+            它们只用于训练安全提示，以及你主动使用的健康记录、趋势和日历展示。详见
             {privacyLink}。
           </p>
         </>
       ),
       checkboxLabel: (
         <>
-          我同意本站处理我填写的伤病信息，用于在训练计划中规避相关动作。（政策版本{" "}
+          我同意本站处理我主动填写的健康数据，用于训练安全提示和健康记录功能。（政策版本{" "}
           {consent.policy_version}）
         </>
       ),

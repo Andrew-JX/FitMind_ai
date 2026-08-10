@@ -1,6 +1,7 @@
 import { createPortal } from "react-dom";
 
 import { useTheme } from "../theme/ThemeContext";
+import { Icon } from "./Icon";
 
 export interface ActionSheetProps {
   children: React.ReactNode;
@@ -9,6 +10,7 @@ export interface ActionSheetProps {
   footer?: React.ReactNode | undefined;
   onClose: () => void;
   open: boolean;
+  showCloseButton?: boolean | undefined;
   title: string;
   tone?: "default" | "danger" | undefined;
 }
@@ -44,7 +46,20 @@ export function ActionSheet(props: ActionSheetProps) {
         style={sheetStyle(theme)}
       >
         <header style={headerStyle(theme)}>
-          <h2 style={titleStyle(theme, props.tone)}>{props.title}</h2>
+          <div style={headerTitleRowStyle}>
+            <h2 style={titleStyle(theme, props.tone)}>{props.title}</h2>
+            {props.showCloseButton ? (
+              <button
+                aria-label="关闭"
+                onClick={props.onClose}
+                style={closeButtonStyle(theme)}
+                title="关闭"
+                type="button"
+              >
+                <Icon name="x" size={16} />
+              </button>
+            ) : null}
+          </div>
           {props.description ? (
             <p style={descriptionStyle(theme)}>{props.description}</p>
           ) : null}
@@ -59,6 +74,32 @@ export function ActionSheet(props: ActionSheetProps) {
     </div>,
     document.body,
   );
+}
+
+const headerTitleRowStyle: React.CSSProperties = {
+  alignItems: "center",
+  display: "flex",
+  gap: 12,
+  justifyContent: "space-between",
+};
+
+function closeButtonStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    alignItems: "center",
+    backgroundColor: theme.colors.surf2,
+    border: `1px solid ${theme.colors.bdr}`,
+    borderRadius: 10,
+    color: theme.colors.tx2,
+    cursor: "pointer",
+    display: "flex",
+    flex: "0 0 auto",
+    height: 32,
+    justifyContent: "center",
+    padding: 0,
+    width: 32,
+  };
 }
 
 function backdropStyle(

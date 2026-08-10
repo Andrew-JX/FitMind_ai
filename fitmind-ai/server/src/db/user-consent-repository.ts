@@ -27,13 +27,18 @@ export interface DbPoolLike extends DbQueryable {
 /**
  * Consents tracked separately because they are asked separately: art. 39
  * cross-border storage at registration, art. 28/29 health data when the injury
- * field is filled in. Mirrors `shared/src/consent.ts`, which the server does
- * not import — see `utils/http-error.ts` for the same deliberate duplication.
+ * field or personal health tool is first saved. Mirrors
+ * `shared/src/consent.ts`, which the server does not import — see
+ * `utils/http-error.ts` for the same deliberate duplication.
  */
 export type ConsentType = "cross_border_transfer" | "sensitive_health_data";
 
 /** Where a consent was collected. Mirrors the `source` column's check. */
-export type ConsentSource = "registration" | "profile_form" | "consent_catchup";
+export type ConsentSource =
+  | "registration"
+  | "profile_form"
+  | "health_tool"
+  | "consent_catchup";
 
 export interface UserConsentRow {
   id: string;
@@ -265,12 +270,14 @@ export interface ConsentStatus {
    * Distinct from `hasHealthConsent` on purpose, and the two must not be
    * merged. `hasHealthConsent` answers "may we store injury data under the
    * text we serve today", so it stays version-scoped — a stale consent must
-   * still make the form ask again. This one answers "is there a permission on
+   * still make a health form ask again. This one answers "is there a permission on
    * file the user could take back", which is version-independent.
    */
   hasWithdrawableHealthConsent: boolean;
   /** Whether the user actually has injury constraints stored right now. */
   hasStoredInjuryData: boolean;
+  /** Whether any supported sensitive health record is stored right now. */
+  hasStoredHealthData?: boolean | undefined;
 }
 
 /**
@@ -336,7 +343,22 @@ export async function getConsentStatus(
             SELECT 1 FROM athlete_profiles
             WHERE user_id = $1
               AND coalesce(array_length(injury_constraints, 1), 0) > 0
-          ) AS "hasStoredInjuryData"
+          ) AS "hasStoredInjuryData",
+          (
+            EXISTS (
+              SELECT 1 FROM athlete_profiles
+              WHERE user_id = $1
+                AND coalesce(array_length(injury_constraints, 1), 0) > 0
+            )
+            OR EXISTS (
+              SELECT 1 FROM menstrual_records
+              WHERE user_id = $1
+            )
+            OR EXISTS (
+              SELECT 1 FROM body_measurements
+              WHERE user_id = $1
+            )
+          ) AS "hasStoredHealthData"
       `,
       [userId, policyVersion],
     );

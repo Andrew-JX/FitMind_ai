@@ -377,7 +377,7 @@ export function AuthScreen(props: AuthScreenProps) {
                 onChange={(event) =>
                   setAcceptedCrossBorder(event.target.checked)
                 }
-                style={{ marginTop: 3 }}
+                style={consentCheckboxStyle(theme)}
                 type="checkbox"
               />
               <span>
@@ -678,6 +678,20 @@ function consentStyle(
     fontSize: 12,
     gap: 8,
     lineHeight: 1.6,
+  };
+}
+
+/** A comfortably tappable native checkbox with a quiet grey check state. */
+function consentCheckboxStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    accentColor: theme.colors.tx2,
+    cursor: "pointer",
+    flex: "0 0 auto",
+    height: 18,
+    margin: "2px 0 0",
+    width: 18,
   };
 }
 

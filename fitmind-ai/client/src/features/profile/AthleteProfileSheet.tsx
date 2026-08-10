@@ -72,7 +72,6 @@ export function AthleteProfileSheet(props: AthleteProfileSheetProps) {
   // Starts false, unlike `hasStoredHealthConsent`: an optimistic default here
   // would flash a withdrawal control at users who have nothing to withdraw,
   // which is the worse of the two wrong first frames.
-  const [hasWithdrawableConsent, setHasWithdrawableConsent] = useState(false);
   const [isProfileLoaded, setIsProfileLoaded] = useState(false);
   const [isConfirmingWithdraw, setIsConfirmingWithdraw] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
@@ -80,19 +79,10 @@ export function AthleteProfileSheet(props: AthleteProfileSheetProps) {
   const injuryTags = parseInjuryTags(injuryText);
   const hasInjuryTags = injuryTags.length > 0;
   const needsHealthConsent = hasInjuryTags && !hasStoredHealthConsent;
-  // Shown whenever there is something to withdraw: stored injury data, or a
-  // live consent with no data behind it (which is still a permission the user
-  // is entitled to take back). Gated on the load having happened, because
-  // `hasStoredHealthConsent` starts optimistically true to stop the consent
-  // checkbox flashing in.
-  //
-  // Driven by `withdrawableHealthConsent`, not `hasStoredHealthConsent`. The
-  // latter is version-scoped, so a consent given under superseded wording read
-  // as "nothing to withdraw" while the server would happily have revoked it —
-  // the same permission, two different judgements. The server now answers this
-  // question with the predicate the revocation itself uses.
-  const canWithdrawHealthData =
-    isProfileLoaded && (storedInjuryCount > 0 || hasWithdrawableConsent);
+  // This control owns only the injury field. Other health records have their
+  // own deletion controls, so a consent kept alive by body/menstrual data must
+  // not make an empty injury form advertise a destructive action it cannot do.
+  const canWithdrawHealthData = isProfileLoaded && storedInjuryCount > 0;
 
   useEffect(() => {
     if (!props.open || !props.token) {
@@ -111,7 +101,6 @@ export function AthleteProfileSheet(props: AthleteProfileSheetProps) {
         }
 
         setHasStoredHealthConsent(state.healthConsentOnFile);
-        setHasWithdrawableConsent(state.withdrawableHealthConsent);
         setStoredInjuryCount(state.profile?.injuryConstraints.length ?? 0);
         setIsProfileLoaded(true);
 
@@ -198,11 +187,10 @@ export function AthleteProfileSheet(props: AthleteProfileSheetProps) {
    * was lost" path, so the two cannot end up leaving the form in different
    * states after the same thing happened on the server.
    */
-  function applyWithdrawnState(): void {
+  function applyWithdrawnState(flags?: { healthConsentOnFile: boolean }): void {
     setInjuryText("");
     setStoredInjuryCount(0);
-    setHasStoredHealthConsent(false);
-    setHasWithdrawableConsent(false);
+    setHasStoredHealthConsent(flags?.healthConsentOnFile ?? false);
     setAcceptedHealthConsent(false);
     setIsConfirmingWithdraw(false);
   }
@@ -224,9 +212,11 @@ export function AthleteProfileSheet(props: AthleteProfileSheetProps) {
     setError(null);
 
     try {
-      await withdrawInjuryConstraints(props.token);
-      applyWithdrawnState();
-      props.onSaved?.("伤病信息与相关同意已撤回。");
+      const result = await withdrawInjuryConstraints(props.token);
+      applyWithdrawnState({
+        healthConsentOnFile: result.health_consent_on_file,
+      });
+      props.onSaved?.("伤病信息已删除；其他健康数据不受影响。");
     } catch {
       // "Your data was not changed" is not something this catch block knows.
       // The transaction is atomic, so a *refusal* means nothing moved — but a
@@ -240,22 +230,23 @@ export function AthleteProfileSheet(props: AthleteProfileSheetProps) {
         const state = await getAthleteProfile(props.token);
         const stillStored = state.profile?.injuryConstraints.length ?? 0;
 
-        if (stillStored === 0 && !state.withdrawableHealthConsent) {
+        if (stillStored === 0) {
           // The write landed; only the response was lost.
-          applyWithdrawnState();
-          props.onSaved?.("伤病信息与相关同意已撤回。");
+          applyWithdrawnState({
+            healthConsentOnFile: state.healthConsentOnFile,
+          });
+          props.onSaved?.("伤病信息已删除；其他健康数据不受影响。");
           return;
         }
 
         setStoredInjuryCount(stillStored);
         setHasStoredHealthConsent(state.healthConsentOnFile);
-        setHasWithdrawableConsent(state.withdrawableHealthConsent);
         // A snapshot of now, stated as a snapshot of now. "Your data was not
         // changed" is a claim about history, and this read cannot support it:
         // the withdrawal may have committed and another session may have saved
         // injury data again afterwards. What the read does establish is that
         // the data is there at this moment, so the withdrawal is not done.
-        setError("当前仍检测到伤病信息或相关同意，撤回尚未完成，请重试。");
+        setError("当前仍检测到伤病信息，删除尚未完成，请重试。");
       } catch {
         // Two failures in a row: the honest answer is that we do not know.
         setError("撤回结果暂时无法确认，请稍后重新打开档案查看。");
@@ -394,8 +385,8 @@ export function AthleteProfileSheet(props: AthleteProfileSheetProps) {
       {canWithdrawHealthData ? (
         <div style={withdrawBlockStyle(theme)}>
           <span>
-            <strong>撤回伤病信息</strong>
-            ：删除已存储的伤病约束，并撤销对应的敏感信息同意。训练记录、其余档案设置与账号都不受影响；之后再填写伤病会重新询问一次同意。
+            <strong>删除伤病信息</strong>
+            ：删除已存储的伤病约束。训练记录、身体数据、经期记录、其余档案设置与账号都不受影响；如果已无其他健康数据，相关同意也会一并撤回。
           </span>
           {isConfirmingWithdraw ? (
             <div style={withdrawActionRowStyle}>
@@ -412,7 +403,7 @@ export function AthleteProfileSheet(props: AthleteProfileSheetProps) {
                 onClick={() => void handleWithdraw()}
                 type="button"
               >
-                {isWithdrawing ? "撤回中…" : "确认撤回"}
+                {isWithdrawing ? "删除中…" : "确认删除"}
               </Button>
             </div>
           ) : (
@@ -421,7 +412,7 @@ export function AthleteProfileSheet(props: AthleteProfileSheetProps) {
               style={withdrawTriggerStyle(theme)}
               type="button"
             >
-              撤回伤病信息
+              删除伤病信息
             </button>
           )}
         </div>

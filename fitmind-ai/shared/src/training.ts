@@ -22,6 +22,8 @@ export interface WorkoutSummaryDto {
   duration_minutes: number | null;
   notes: string | null;
   sets_count: number;
+  /** Present on APIs that include list-level volume aggregation. */
+  total_volume?: number | undefined;
   muscle_groups: string[];
 }
 

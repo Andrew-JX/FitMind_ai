@@ -41,10 +41,10 @@ describe("getReadableAuthErrorMessage", () => {
       }),
     );
 
-    expect(message).toBe("邮箱或密码不正确。");
+    expect(message).toBe("账号或密码错误，请重新输入。");
   });
 
-  it("falls back to the server message for unmapped failures", () => {
+  it("uses product-safe copy for server failures", () => {
     const message = getReadableAuthErrorMessage(
       new HttpClientError({
         status: 500,
@@ -53,12 +53,12 @@ describe("getReadableAuthErrorMessage", () => {
       }),
     );
 
-    expect(message).toBe("Internal server error.");
+    expect(message).toBe("暂时无法登录，请稍后重试。");
   });
 
   it("falls back to a generic message for non-HTTP rejections", () => {
     expect(getReadableAuthErrorMessage(new Error("boom"))).toBe(
-      "Authentication could not be verified.",
+      "暂时无法登录，请检查网络后重试。",
     );
   });
 });

@@ -12,22 +12,26 @@
  * The value is also rendered in the policy page footer, so the string a user
  * sees and the string stored against their consent can be compared by eye.
  */
-export const CURRENT_PRIVACY_POLICY_VERSION = "2026-08-07";
+export const CURRENT_PRIVACY_POLICY_VERSION = "2026-08-09";
 
 /**
  * Consents tracked separately because they are asked separately.
  *
  * - `cross_border_transfer` — art. 39, storing personal information abroad.
  *   Asked at registration, because that is the moment data starts existing.
- * - `sensitive_health_data` — art. 28/29, injury constraints in the training
- *   profile. Asked in the profile form at the moment the field is filled in,
+ * - `sensitive_health_data` — art. 28/29, injury constraints, menstrual dates,
+ *   and body measurements. Asked at the moment the first such value is saved,
  *   not bundled into registration: at registration there is no health data yet
  *   and consent to a hypothetical is not consent.
  */
 export type ConsentType = "cross_border_transfer" | "sensitive_health_data";
 
 /** Where the consent was collected. Mirrors the `source` column. */
-export type ConsentSource = "registration" | "profile_form" | "consent_catchup";
+export type ConsentSource =
+  | "registration"
+  | "profile_form"
+  | "health_tool"
+  | "consent_catchup";
 
 /**
  * A consent as submitted by a client.
