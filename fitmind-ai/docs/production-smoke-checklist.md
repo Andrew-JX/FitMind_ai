@@ -32,6 +32,17 @@ Use this checklist before sending the app to an interviewer, friend, or recruite
 - [ ] From the pending-consent screen,「删除全部健康数据」works and removes the pending health consent without deleting workouts, memos, or the account.
 - [ ] Refusing catch-up still allows category deletion: all menstrual dates, all body measurements, or one owned body measurement can be deleted; reads and writes remain blocked until consent is settled.
 
+## GitHub Actions to Tencent release gate
+
+- [ ] The repository has encrypted `TENCENT_HOST`, `TENCENT_USER`, `TENCENT_DEPLOY_KEY`, and `TENCENT_KNOWN_HOSTS` Secrets; no value appears in Git, workflow output, screenshots, or shell history.
+- [ ] The dedicated public key comment is `github-actions-fitmind`, and its one `authorized_keys` line contains the forced `/usr/local/sbin/deploy-fitmind-from-github` command plus `restrict`.
+- [ ] `bash fitmind-ai/deploy/scripts/test-deploy-from-github.sh` reports all command rejection, non-main, rollback, and lock assertions passed.
+- [ ] The workflow run corresponds to the exact `main` SHA being released and ends with `DEPLOY_OK <40-character-SHA>`.
+- [ ] `git ls-remote origin refs/heads/main` reports that SHA; a successful local `git push` message alone is not deployment evidence.
+- [ ] After the workflow succeeds, Tencent `api` and `web` containers carry the 12-character prefix of that SHA and are healthy.
+- [ ] The public health and registration-policy checks pass before calling the automatic deployment complete.
+- [ ] Triggering `shell`, `deploy <sha> extra`, an uppercase SHA, or a commit outside `origin/main` is rejected before `deploy.sh` runs.
+
 ## Browser Setup
 
 - [ ] Open the target URL in a normal browser tab.

@@ -1,0 +1,80 @@
+name: Deploy FitMind to Tencent Cloud
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fitmind-tencent-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Verify and deploy production release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DEPLOY_HOST: ${{ secrets.TENCENT_HOST }}
+      DEPLOY_USER: ${{ secrets.TENCENT_USER }}
+      RELEASE_SHA: ${{ github.sha }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: fitmind-ai/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: fitmind-ai
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify repository
+        working-directory: fitmind-ai
+        run: pnpm verify
+
+      - name: Build production applications
+        working-directory: fitmind-ai
+        run: |
+          pnpm --filter @fitmind/server build
+          pnpm --filter @fitmind/client build
+
+      - name: Configure restricted deployment key
+        env:
+          DEPLOY_KEY: ${{ secrets.TENCENT_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ secrets.TENCENT_KNOWN_HOSTS }}
+        run: |
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_KEY"
+          test -n "$KNOWN_HOSTS"
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/tencent_fitmind_deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/tencent_fitmind_deploy ~/.ssh/known_hosts
+
+      - name: Deploy reviewed commit and verify containers
+        run: |
+          ssh \
+            -i ~/.ssh/tencent_fitmind_deploy \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile=~/.ssh/known_hosts \
+            -o ServerAliveInterval=30 \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "deploy ${RELEASE_SHA}"

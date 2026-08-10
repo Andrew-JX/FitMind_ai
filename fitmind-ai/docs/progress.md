@@ -1019,3 +1019,18 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
   既有 pgvector embedding 迁移外的 14 条迁移（包含四张个人工具表），现有 consent SQL 套件全绿；
   新增 `verify:personal-tools-sql` 真实验证经期、身体数据、备忘录、分类删除与全量撤回的持久化和同意
   语义。生产目标库迁移与 live smoke 仍须在发布时单独执行，不能用本地结果冒充线上已部署。
+
+## 2026-08-10 — 腾讯云受限自动部署（本地候选，尚未启用）
+
+- 参考已上线的 `mj-portfolio` 三件套，为 FitMind 新增独立 GitHub Actions 工作流、服务器强制命令
+  入口和受限公钥安装脚本；没有复用静态站私钥，也没有把服务器 `.env`、数据库 URL 或 Docker
+  权限交给 GitHub。
+- 工作流仅在 `main` push 或手动触发时运行，先执行全仓验证与生产构建，再通过严格 known-host
+  校验发送固定的 `deploy <40位SHA>`。服务器只接受这一种命令，并验证提交确实属于最新抓取的
+  `origin/main`，非 main 提交、额外参数、任意 shell 和并发部署都在运行 `deploy.sh` 前拒绝。
+- 自动入口继续复用既有迁移优先 `deploy.sh`；失败后恢复旧 checkout，并仅在旧 API/Web 镜像都
+  存在时调用既有 image-only rollback。数据库绝不自动 down，破坏性迁移仍需独立扩展/收缩方案。
+- 隔离临时 Git 远端测试已命中 10 个正负分支，包括无命令、任意 shell、额外参数、大写 SHA、
+  非 main commit、部署失败恢复 checkout、镜像回滚调用与部署锁竞争。GitHub Secrets、服务器公钥
+  安装器另有 4 个断言覆盖强制命令、幂等安装、错误密钥类型和禁止静默换钥。GitHub Secrets、
+  服务器公钥安装、push、首次 Actions 运行和生产健康检查尚未执行，不能声称腾讯云已经自动更新。
