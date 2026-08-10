@@ -15,6 +15,7 @@
     "import:knowledge": "tsx scripts/import-knowledge.ts",
     "eval": "tsx scripts/rag-eval.ts",
     "verify:consent-sql": "tsx scripts/verify-consent-sql.ts",
+    "verify:personal-tools-sql": "tsx scripts/verify-personal-tools-sql.ts",
     "verify:consent-concurrency": "tsx scripts/verify-consent-concurrency.ts",
     "smoke:auth": "tsx scripts/auth-register-smoke.ts",
     "smoke:assistant-auth": "pnpm run smoke:auth",

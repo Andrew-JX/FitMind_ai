@@ -162,10 +162,7 @@ export async function getPendingConsents(
     });
   }
 
-  if (
-    (status.hasStoredHealthData ?? status.hasStoredInjuryData) &&
-    !status.hasHealthConsent
-  ) {
+  if (status.hasStoredHealthData && !status.hasHealthConsent) {
     pending.push({
       consent_type: "sensitive_health_data",
       policy_version: policy.policy_version,

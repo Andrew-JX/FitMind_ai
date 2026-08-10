@@ -1441,3 +1441,55 @@ Tests cover fractional 1RM, maximum weight, weekly total/action volume, and
 training-overview total/action volume. They assert rounded prose, unchanged raw
 objects, and `faithfulness.status:"verified"` with no unverified claims. Full
 `pnpm verify` passes 74 files / 483 tests; offline `pnpm eval` remains 100%.
+
+## [D54] One health-consent category spans injury, menstrual, and body data
+
+- **Date**: 2026-08-09
+- **Status**: Accepted / implemented
+
+The personal tools add menstrual dates and body measurements beside the
+existing injury constraints. These are all treated as the same
+`sensitive_health_data` processing category instead of inventing one consent
+type per screen. Consent is still collected separately at the moment the first
+record in that category is saved, under the current immutable policy text.
+
+Clearing injury constraints no longer revokes the category consent when
+menstrual or body data still exists. Revocation occurs only when all supported
+health-data categories are empty, or when the user explicitly deletes all
+health data. Category deletes remain separately available and do not erase
+unrelated health categories. They are authenticated but exempt from the
+pending-consent gate so a user can refuse a catch-up request and still delete
+only the category they choose.
+
+The privacy policy moved from `2026-08-07` to `2026-08-09` because the
+processing description materially added menstrual and body data. Consent
+lookups match the version exactly, so users who already store health data must
+review and accept the new text on their next authenticated session. This is a
+deliberate user-visible release effect, not a migration side effect.
+
+## [D55] Expand/contract compatibility does not replace migration-first release
+
+- **Date**: 2026-08-10
+- **Status**: Accepted / implemented
+
+The consent gate runs during login and authenticated requests. A release that
+references a newly added health table before that table exists can therefore
+turn valid credentials into a 500. `getConsentStatus` now catches only
+PostgreSQL `42P01` from the new personal-health-table query and retries the
+legacy injury-only query. It does not swallow connection failures, permission
+errors, or a missing pre-existing consent table. This narrow compatibility seam
+keeps login available during an expand/contract window; personal-tool writes
+still require the migration.
+
+Release order remains migration first. Vercel does not run migrations, so the
+target Neon schema must be migrated and checked before a `main` push triggers
+the new build. Tencent's deploy script verifies exact expected runtime host,
+migration host, database name, and `current_database()` before migration, then
+checks all four personal-tool tables before switching containers. A table check
+performed only after migration is not an identity check: an empty wrong
+database would pass because the migration just created the tables.
+
+Application rollback remains image-only for this additive migration. Future
+destructive schema changes require an explicit expand/contract plan; an
+automatic down migration is not an acceptable generic rollback because it can
+destroy data.

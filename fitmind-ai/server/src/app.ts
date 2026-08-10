@@ -40,6 +40,16 @@ function getSafeErrorToken(value: unknown, fallback: string) {
     : fallback;
 }
 
+/** Keep route shape in logs without recording health dates or record IDs. */
+export function normalizeRequestPathForLog(path: string): string {
+  return path
+    .replace(
+      /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi,
+      ":id",
+    )
+    .replace(/\b\d{4}-\d{2}-\d{2}\b/g, ":date");
+}
+
 function createUnknownRequestErrorLog(
   error: unknown,
   req: express.Request,
@@ -57,7 +67,7 @@ function createUnknownRequestErrorLog(
   return {
     event: "unhandled_request_error",
     method: req.method,
-    path: req.path,
+    path: normalizeRequestPathForLog(req.path),
     errorType,
     ...(typeof errorCode === "string" && /^[a-z0-9_.-]{1,64}$/i.test(errorCode)
       ? { errorCode }

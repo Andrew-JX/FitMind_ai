@@ -31,6 +31,49 @@ compose=(docker compose -f "$compose_file")
 "${compose[@]}" config --no-env-resolution --quiet
 "${compose[@]}" build api web seed
 
+# Prove this checkout is pointed at the intended database before any migration
+# can change schema. Table-existence checks after migration cannot distinguish
+# the production database from a newly created empty database, because the
+# migration itself creates those tables.
+"${compose[@]}" run --rm --no-deps --workdir /app/server api node -e '
+const { Client } = require("pg");
+
+function required(name) {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`${name} must be set in fitmind-ai/.env`);
+  return value;
+}
+
+const runtimeUrl = new URL(required("DATABASE_URL"));
+const migrationUrl = new URL(required("MIGRATION_DATABASE_URL"));
+const expectedRuntimeHost = required("EXPECTED_DATABASE_HOST").toLowerCase();
+const expectedMigrationHost = required("EXPECTED_MIGRATION_DATABASE_HOST").toLowerCase();
+const expectedDatabase = required("EXPECTED_DATABASE_NAME");
+const runtimeDatabase = decodeURIComponent(runtimeUrl.pathname.slice(1));
+const migrationDatabase = decodeURIComponent(migrationUrl.pathname.slice(1));
+
+if (runtimeUrl.hostname.toLowerCase() !== expectedRuntimeHost) {
+  throw new Error("DATABASE_URL host does not match EXPECTED_DATABASE_HOST");
+}
+if (migrationUrl.hostname.toLowerCase() !== expectedMigrationHost) {
+  throw new Error("MIGRATION_DATABASE_URL host does not match EXPECTED_MIGRATION_DATABASE_HOST");
+}
+if (runtimeDatabase !== expectedDatabase || migrationDatabase !== expectedDatabase) {
+  throw new Error("Configured database name does not match EXPECTED_DATABASE_NAME");
+}
+
+const client = new Client({ connectionString: migrationUrl.toString() });
+client.connect()
+  .then(() => client.query("SELECT current_database() AS database_name"))
+  .then(({ rows }) => {
+    if (rows[0]?.database_name !== expectedDatabase) {
+      throw new Error("Connected database identity does not match EXPECTED_DATABASE_NAME");
+    }
+    console.log(`Database target verified before migration: ${expectedMigrationHost}/${expectedDatabase}`);
+  })
+  .finally(() => client.end());
+'
+
 # The consent gate reads user_consents on every authenticated request. A failed
 # migration must stop the deploy before the new API container is replaced.
 "${compose[@]}" run --rm --no-deps migrate
@@ -43,14 +86,25 @@ client.connect()
   .then(() => client.query(`
     SELECT
       EXISTS (SELECT 1 FROM pg_extension WHERE extname = $$vector$$) AS has_vector,
-      to_regclass($$public.user_consents$$) IS NOT NULL AS has_user_consents
+      to_regclass($$public.user_consents$$) IS NOT NULL AS has_user_consents,
+      to_regclass($$public.menstrual_records$$) IS NOT NULL AS has_menstrual_records,
+      to_regclass($$public.personal_health_settings$$) IS NOT NULL AS has_personal_health_settings,
+      to_regclass($$public.body_measurements$$) IS NOT NULL AS has_body_measurements,
+      to_regclass($$public.training_memos$$) IS NOT NULL AS has_training_memos
   `))
   .then(({ rows }) => {
     const result = rows[0];
-    if (!result?.has_vector || !result?.has_user_consents) {
+    if (
+      !result?.has_vector ||
+      !result?.has_user_consents ||
+      !result?.has_menstrual_records ||
+      !result?.has_personal_health_settings ||
+      !result?.has_body_measurements ||
+      !result?.has_training_memos
+    ) {
       throw new Error(`Database prerequisites missing: ${JSON.stringify(result)}`);
     }
-    console.log("Database prerequisites verified: vector + user_consents");
+    console.log("Database prerequisites verified: vector, consent, and personal-tool tables");
   })
   .finally(() => client.end());
 '

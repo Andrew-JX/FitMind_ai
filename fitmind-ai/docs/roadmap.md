@@ -3,11 +3,11 @@
 > 前瞻文档：记录"接下来要做什么"。与 `docs/progress.md`（回顾，逐批次记录已做的事）配成一对。
 > 阶段编号沿用 `PROJECT_BRIEF.md §7` 与 `docs/progress.md` 的 Phase 体系。
 >
-> Last updated: 2026-07-27
+> Last updated: 2026-08-10
 
 ---
 
-## 1. 现状速览（截至 Phase 5.2A.1）
+## 1. 现状速览（截至 2026-08-10）
 
 主线 100% + RAG 扩展 100% + 一层产品化已上线：<https://fitmind-ai-psi.vercel.app/>
 
@@ -16,6 +16,7 @@
 - 阶段 0–5 主线：训练日志 CRUD、确定性计算层（summary / exercise-progress / muscle-load / recommendation-context）、Tool Calling 循环、SSE + 前端四态状态机、结构化输出 + Evidence/Sources 卡片。
 - 扩展 A（RAG）：DB 知识 chunk + Voyage `voyage-4-lite` + pgvector + 混合打分 + 确定性 eval。
 - 计划外产品化：自然语言 / 语音训练录入（LLM 结构化兜底）、PWA + 移动端打磨、动作详情与历史、教练化（周报 / 平台期诊断 / 下周计划）、收藏洞察、产品反馈。
+- FitMind UI 优化：语音 / 文本 / 手动三类录入，历史 / 分析双视图与训练月历，个人页经期记录、身体数据、RM 计算器和训练备忘录。腾讯云邀请制实例已经上线，但新个人工具版本尚需按迁移优先顺序更新。
 
 尚未完成（本路线图的目标）：
 
@@ -23,6 +24,10 @@
 - 扩展 C（多步 ReAct 训练计划）——只做了单轮版本，缺多步循环 + trace 可视化。
 - 打磨阶段——`§11` 性能精确数字未回填（主观达标）。
 - ~~语音录入"记录页内"入口 + 手势 FAB~~ ✅ 2026-06-13 完成（待办 B，见 §1.5 / `progress.md`）。
+- **发布硬化 P0**：个人工具迁移与 repository 已在专用本地 PostgreSQL 通过真实 SQL 持久化验收，13 个端点已过 Express HTTP 契约测试；剩余门禁是发布时在目标 Neon 执行迁移与 live smoke。Vercel 迁移必须在 `main` push 前执行，腾讯云必须通过目标库身份检查。
+- **发布硬化 P1**：把每次 repository 调用新建 / 销毁 `pg.Pool` 改成进程级共享池，并为 Neon 连接上限建立可观测指标。
+- **维护性 P2**：拆分 `BodyMeasurementsView` 与 `WorkoutCalendar`；个人工具上线稳定后删除仅用于迁移窗口的 `42P01` 兼容分支。
+- **隐私卫生决策**：当前 `design-qa.md` 已移除微信内部账号路径；远端旧提交仍含历史路径。只有仓库确定公开且协作者同意时才单独评估历史重写，不能把 force-push 混进普通功能修复。
 
 ---
 

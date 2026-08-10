@@ -1,7 +1,7 @@
 # History Navigation Design QA
 
-- Source visual truth 1: `G:\ChatData\WeChat\xwechat_files\wxid_qnfcchsh76d812_915f\temp\RWTemp\2026-08\56aa2560edb70871bfe5c5390469104c\0ae4dd18e6d52e30f7ff4bdc59c1d701.jpg`
-- Source visual truth 2: `G:\ChatData\WeChat\xwechat_files\wxid_qnfcchsh76d812_915f\temp\RWTemp\2026-08\56aa2560edb70871bfe5c5390469104c\1d14cc86f7e4fe08e8a74a4fd4ad8847.jpg`
+- Source visual truth 1: user-provided history-calendar reference screenshot
+- Source visual truth 2: user-provided statistics reference screenshot
 - History implementation: `C:\Users\15942\.codex\visualizations\2026\08\09\019fe52c-ce02-7d43-bd8c-c8400d0628ee\fitmind-history-calendar.png`
 - Analysis implementation: `C:\Users\15942\.codex\visualizations\2026\08\09\019fe52c-ce02-7d43-bd8c-c8400d0628ee\fitmind-history-analysis.png`
 - State: authenticated FitMind mobile view at 711 × 1270, dark theme, real August 2026 workout data.
@@ -31,11 +31,11 @@ The source app's unrelated light palette, five-item navigation, training categor
 
 ## Personal Tools Design QA
 
-- Personal-menu reference: `G:\ChatData\WeChat\xwechat_files\wxid_qnfcchsh76d812_915f\temp\RWTemp\2026-08\9e20f478899dc29eb19741386f9343c8\f441da896ca3d1fd10273e549bc0dbef.jpg`
-- Menstrual reference: `G:\ChatData\WeChat\xwechat_files\wxid_qnfcchsh76d812_915f\temp\RWTemp\2026-08\9e20f478899dc29eb19741386f9343c8\065de8cd11d989ae774752da739778ba.jpg`
-- Body-data reference: `G:\ChatData\WeChat\xwechat_files\wxid_qnfcchsh76d812_915f\temp\RWTemp\2026-08\9e20f478899dc29eb19741386f9343c8\00748d14267a6f01cc8d7c7a7980ad6d.jpg`
-- RM reference: `G:\ChatData\WeChat\xwechat_files\wxid_qnfcchsh76d812_915f\temp\RWTemp\2026-08\9e20f478899dc29eb19741386f9343c8\f341f30d713a8948fbd45f34a53e67e5.jpg`
-- Memo reference: `G:\ChatData\WeChat\xwechat_files\wxid_qnfcchsh76d812_915f\temp\RWTemp\2026-08\9e20f478899dc29eb19741386f9343c8\d5e56b5f4f13e350474d2ac2c048150c.jpg`
+- Personal-menu reference: user-provided personal-menu screenshot
+- Menstrual reference: user-provided menstrual-calendar screenshot
+- Body-data reference: user-provided body-data screenshot
+- RM reference: user-provided RM-calculator screenshot
+- Memo reference: user-provided training-memo screenshot
 - Implementation captures: `C:\Users\15942\.codex\visualizations\2026\08\09\019fe52c-ce02-7d43-bd8c-c8400d0628ee\fitmind-personal-tools-menu.png`, `fitmind-menstrual.png`, `fitmind-body-form.png`, `fitmind-rm-calculator.png`, `fitmind-memos.png`, and `fitmind-personal-tools-light.png` in the same evidence directory.
 - State: authenticated FitMind mobile view at 711 × 1270, checked in dark and light themes.
 

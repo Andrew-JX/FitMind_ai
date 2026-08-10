@@ -11,6 +11,7 @@ import {
   setMenstrualDate,
   updateMenstrualSettings,
 } from "./personal-tools-api";
+import { getPersonalToolWriteErrorMessage } from "./personal-tool-error-message";
 import {
   addMonths,
   formatLocalDate,
@@ -93,8 +94,13 @@ export function MenstrualTrackerView(props: {
         setHealthConsentOnFile(true);
         setConsentAccepted(false);
       }
-    } catch {
-      setStatus("这一天没有保存成功，请稍后重试。");
+    } catch (error) {
+      setStatus(
+        getPersonalToolWriteErrorMessage(
+          error,
+          "这一天没有保存成功，请稍后重试。",
+        ),
+      );
     } finally {
       setSavingDate(null);
     }

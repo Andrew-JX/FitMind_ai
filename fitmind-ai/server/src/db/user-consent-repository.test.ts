@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createUserWithConsents,
+  getConsentStatus,
   recordUserConsent,
 } from "./user-consent-repository.js";
 
@@ -174,5 +175,48 @@ describe("recordUserConsent keeps consent history append-only", () => {
 
     expect(sql).not.toContain("accepted_at = now()");
     expect(sql).not.toContain("revoked_at = NULL");
+  });
+});
+
+describe("getConsentStatus migration compatibility", () => {
+  const statusRow = {
+    hasCrossBorderConsent: true,
+    hasHealthConsent: false,
+    hasWithdrawableHealthConsent: false,
+    hasStoredInjuryData: true,
+    hasStoredHealthData: true,
+  };
+
+  it("falls back to legacy health tables when personal-tool tables are not migrated yet", async () => {
+    const undefinedTable = Object.assign(new Error("relation does not exist"), {
+      code: "42P01",
+    });
+    const pool = {
+      query: vi
+        .fn()
+        .mockRejectedValueOnce(undefinedTable)
+        .mockResolvedValueOnce({ rows: [statusRow] }),
+    };
+
+    await expect(
+      getConsentStatus(userRow.id, "2026-08-09", pool),
+    ).resolves.toEqual(statusRow);
+
+    expect(pool.query).toHaveBeenCalledTimes(2);
+    expect(pool.query.mock.calls[0]?.[0]).toContain("menstrual_records");
+    expect(pool.query.mock.calls[1]?.[0]).not.toContain("menstrual_records");
+    expect(pool.query.mock.calls[1]?.[0]).not.toContain("body_measurements");
+  });
+
+  it("does not hide database failures unrelated to an undefined table", async () => {
+    const connectionFailure = Object.assign(new Error("connection lost"), {
+      code: "08006",
+    });
+    const pool = { query: vi.fn().mockRejectedValue(connectionFailure) };
+
+    await expect(getConsentStatus(userRow.id, "2026-08-09", pool)).rejects.toBe(
+      connectionFailure,
+    );
+    expect(pool.query).toHaveBeenCalledTimes(1);
   });
 });

@@ -23,6 +23,7 @@
 | 系统怎么搭的 | [`architecture.md`](./architecture.md) |
 | 演示给别人看 | [`demo-script.md`](./demo-script.md) |
 | 系统性学习整个项目 | [`project-study-guide.md`](./project-study-guide.md) |
+| 查看本轮 UI 参考、对比和交互验收 | [`design-qa.md`](../design-qa.md) |
 
 ## 我要知道下一步做什么
 
@@ -38,7 +39,7 @@
 - [`assistant-usability-plan.md`](./assistant-usability-plan.md) — 计划卡生命周期。PL-1/PL-3 已完成，PL-2 休眠，PL-4 待做
 - [`ar-arc-plan.md`](./ar-arc-plan.md) — 让 AI 真实活过来 + 成本护栏。AR-0/1/2 已封板
 - [`color-token-consolidation-plan.md`](./color-token-consolidation-plan.md) — 色值 token 收口。已完成，留作分类依据
-- [`china-launch-plan.md`](./china-launch-plan.md) — 境内上线（个人备案 + 邀请制）。**未执行**，唯一功能改动是服务端关公开注册
+- [`china-launch-plan.md`](./china-launch-plan.md) — 境内上线（个人备案 + 邀请制）。腾讯云已上线；后续更新仍需在服务器按提交号执行部署脚本
 
 ## 我要上线 / 排查线上
 

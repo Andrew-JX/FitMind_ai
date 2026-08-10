@@ -24,6 +24,7 @@ Two targets are built from this repo. They differ in configuration only — same
 ### Release behavior
 
 - The Vercel project is linked to GitHub. A push to `main` triggers a production deployment; pushes to other branches create preview deployments. Updating a Vercel environment variable still requires a new deployment before the running application reads it.
+- Vercel's build does **not** run PostgreSQL migrations. Any release containing a new migration must migrate and verify the intended Neon database before pushing to `main`; automatic code deployment is not automatic schema deployment.
 - `fitmind.jimmyuuu.com` is a self-hosted Tencent Cloud release and does **not** update from a Git push alone. The server release checkout must move to the reviewed commit and run `deploy/scripts/deploy.sh`.
 - Local `.env` changes do not synchronize to Vercel or Tencent Cloud. Each hosted environment keeps its own secrets and runtime configuration.
 
@@ -37,6 +38,8 @@ normal API traffic uses the pooled connection. See
 deploy, smoke, and rollback sequence. Never run plain `docker compose config`
 against the production `.env`, because Compose renders `env_file` secrets into
 its output; use the quiet no-env-resolution command documented there.
+The deployment now requires exact expected pooled host, migration host, and
+database name values and verifies them before changing schema.
 
 ## Mobile Install
 

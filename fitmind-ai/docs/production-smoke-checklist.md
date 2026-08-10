@@ -19,6 +19,18 @@ Use this checklist before sending the app to an interviewer, friend, or recruite
 - [ ] Footer displays `苏ICP备2026054660号` and links to the MIIT filing query.
 - [ ] `DATA_RESIDENCY=overseas`; registration asks for separate cross-border consent because Neon is in AWS Singapore.
 - [ ] Privacy policy names the current contractual recipient and actual region before the site accepts real user data.
+- [ ] Server-only `.env` contains exact `EXPECTED_DATABASE_HOST`, `EXPECTED_MIGRATION_DATABASE_HOST`, and `EXPECTED_DATABASE_NAME`; `deploy.sh` prints the verified host/database without printing credentials.
+- [ ] The production schema contains `menstrual_records`, `personal_health_settings`, `body_measurements`, and `training_memos` before the new API/Web containers replace the old ones.
+
+## Migration and consent release gate
+
+- [ ] Record the reviewed release SHA and the intended Neon project/branch before migration.
+- [ ] On Vercel releases, run and verify the production migration **before** pushing that SHA to `main`; the Vercel build itself never migrates PostgreSQL.
+- [ ] On Tencent releases, run only `bash deploy/scripts/deploy.sh`; do not bypass its pre-migration database identity check with ad-hoc Compose commands.
+- [ ] Before release, run `CONSENT_SQL_TEST_DATABASE_URL=<allowlisted-local-url> pnpm --filter @fitmind/server run verify:personal-tools-sql` against a dedicated local database migrated to the candidate schema.
+- [ ] A stored-data account that accepted policy `2026-08-07` is asked to review `2026-08-09` after login, and the UI explains a stale policy instead of saying only「请稍后重试」.
+- [ ] From the pending-consent screen,「删除全部健康数据」works and removes the pending health consent without deleting workouts, memos, or the account.
+- [ ] Refusing catch-up still allows category deletion: all menstrual dates, all body measurements, or one owned body measurement can be deleted; reads and writes remain blocked until consent is settled.
 
 ## Browser Setup
 
@@ -43,6 +55,15 @@ Use this checklist before sending the app to an interviewer, friend, or recruite
 - [ ] Edit one set or metadata field and save.
 - [ ] Delete the test workout and confirm it disappears.
 - [ ] Confirm loading, empty, and error states use the shared `StateNotice` style.
+
+## Personal tools
+
+- [ ] Without current health consent, saving a menstrual date or body measurement returns `422 CONSENT_REQUIRED` and writes no row.
+- [ ] With the current separate health consent, save and reload one menstrual date and one body measurement from the real production database.
+- [ ] Toggle「在历史页面显示经期」and confirm the history calendar marker follows the saved setting.
+- [ ] Create, edit, pin, reload, and delete a training memo.
+- [ ] Calculate 80 kg × 8 reps locally and confirm the RM calculator persists no input.
+- [ ] Delete the temporary menstrual/body records and confirm other health categories are unchanged.
 
 ## Intake
 

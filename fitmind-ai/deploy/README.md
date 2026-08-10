@@ -71,6 +71,11 @@ DATABASE_URL=
 # Neon Connect dialog: direct connection string (no `-pooler`)
 MIGRATION_DATABASE_URL=
 
+# Exact values used to stop a wrong-database migration before it starts.
+EXPECTED_DATABASE_HOST=<pooled-hostname-from-DATABASE_URL>
+EXPECTED_MIGRATION_DATABASE_HOST=<direct-hostname-from-MIGRATION_DATABASE_URL>
+EXPECTED_DATABASE_NAME=neondb
+
 JWT_SECRET=
 DATA_RESIDENCY=overseas
 REGISTRATION_INVITE_ONLY=on
@@ -93,11 +98,29 @@ The script deliberately performs this order:
 
 1. validate Compose without expanding `env_file` secrets;
 2. build commit-tagged API, Web, and one-shot dictionary seed images;
-3. run every database migration through the direct Neon connection;
-4. idempotently seed the production muscle/exercise dictionaries;
-5. verify both `vector` and `public.user_consents` exist;
-6. replace the API/Web containers;
-7. require healthy loopback responses on ports 3000 and 8081.
+3. verify both configured hosts, the database name, and `current_database()`;
+4. run every database migration through the direct Neon connection;
+5. idempotently seed the production muscle/exercise dictionaries;
+6. verify `vector`, consent, and all personal-tool tables exist;
+7. replace the API/Web containers;
+8. require healthy loopback responses on ports 3000 and 8081.
+
+For an update after the first installation, fetch and inspect the release, then
+deploy the exact reviewed commit rather than an ambiguous moving branch:
+
+```bash
+cd ~/FitMind_ai
+git fetch origin
+git status --short
+git log --oneline --decorate -5 origin/main
+git checkout --detach <reviewed-commit-sha>
+cd fitmind-ai
+bash deploy/scripts/deploy.sh
+```
+
+Stop if `git status --short` is not empty. The first run after this guardrail is
+added also requires the three `EXPECTED_*` values above to be added to the
+server-only `.env`.
 
 Do not run plain `docker compose config`: it renders `.env` values into stdout.
 The safe validation command is:

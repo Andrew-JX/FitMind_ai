@@ -277,7 +277,64 @@ export interface ConsentStatus {
   /** Whether the user actually has injury constraints stored right now. */
   hasStoredInjuryData: boolean;
   /** Whether any supported sensitive health record is stored right now. */
-  hasStoredHealthData?: boolean | undefined;
+  hasStoredHealthData: boolean;
+}
+
+function isUndefinedTableError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: unknown }).code === "42P01"
+  );
+}
+
+function consentStatusQuery(includePersonalHealthTables: boolean): string {
+  const storedInjuryData = `
+    EXISTS (
+      SELECT 1 FROM athlete_profiles
+      WHERE user_id = $1
+        AND coalesce(array_length(injury_constraints, 1), 0) > 0
+    )
+  `;
+
+  const storedHealthData = includePersonalHealthTables
+    ? `(
+        ${storedInjuryData}
+        OR EXISTS (
+          SELECT 1 FROM menstrual_records
+          WHERE user_id = $1
+        )
+        OR EXISTS (
+          SELECT 1 FROM body_measurements
+          WHERE user_id = $1
+        )
+      )`
+    : storedInjuryData;
+
+  return `
+    SELECT
+      EXISTS (
+        SELECT 1 FROM user_consents
+        WHERE user_id = $1
+          AND policy_version = $2
+          AND consent_type = 'cross_border_transfer'
+          AND revoked_at IS NULL
+      ) AS "hasCrossBorderConsent",
+      EXISTS (
+        SELECT 1 FROM user_consents
+        WHERE user_id = $1
+          AND policy_version = $2
+          AND consent_type = 'sensitive_health_data'
+          AND revoked_at IS NULL
+      ) AS "hasHealthConsent",
+      EXISTS (
+        SELECT 1 FROM user_consents
+        WHERE user_id = $1
+          AND ${LIVE_HEALTH_CONSENT_PREDICATE}
+      ) AS "hasWithdrawableHealthConsent",
+      ${storedInjuryData} AS "hasStoredInjuryData",
+      ${storedHealthData} AS "hasStoredHealthData"
+  `;
 }
 
 /**
@@ -317,51 +374,29 @@ export async function getConsentStatus(
   const ownsPool = pool === undefined;
 
   try {
-    const result = await activePool.query(
-      `
-        SELECT
-          EXISTS (
-            SELECT 1 FROM user_consents
-            WHERE user_id = $1
-              AND policy_version = $2
-              AND consent_type = 'cross_border_transfer'
-              AND revoked_at IS NULL
-          ) AS "hasCrossBorderConsent",
-          EXISTS (
-            SELECT 1 FROM user_consents
-            WHERE user_id = $1
-              AND policy_version = $2
-              AND consent_type = 'sensitive_health_data'
-              AND revoked_at IS NULL
-          ) AS "hasHealthConsent",
-          EXISTS (
-            SELECT 1 FROM user_consents
-            WHERE user_id = $1
-              AND ${LIVE_HEALTH_CONSENT_PREDICATE}
-          ) AS "hasWithdrawableHealthConsent",
-          EXISTS (
-            SELECT 1 FROM athlete_profiles
-            WHERE user_id = $1
-              AND coalesce(array_length(injury_constraints, 1), 0) > 0
-          ) AS "hasStoredInjuryData",
-          (
-            EXISTS (
-              SELECT 1 FROM athlete_profiles
-              WHERE user_id = $1
-                AND coalesce(array_length(injury_constraints, 1), 0) > 0
-            )
-            OR EXISTS (
-              SELECT 1 FROM menstrual_records
-              WHERE user_id = $1
-            )
-            OR EXISTS (
-              SELECT 1 FROM body_measurements
-              WHERE user_id = $1
-            )
-          ) AS "hasStoredHealthData"
-      `,
-      [userId, policyVersion],
-    );
+    let result;
+
+    try {
+      result = await activePool.query(consentStatusQuery(true), [
+        userId,
+        policyVersion,
+      ]);
+    } catch (error) {
+      if (!isUndefinedTableError(error)) {
+        throw error;
+      }
+
+      // Expand/contract compatibility: an API instance can briefly start
+      // before the personal-tools migration is visible to its database. The
+      // consent gate runs during login, so an undefined new table must not turn
+      // otherwise valid credentials into a 500. During that window the legacy
+      // health source (injury constraints) remains fully enforced; the deploy
+      // script still refuses to switch containers until all new tables exist.
+      result = await activePool.query(consentStatusQuery(false), [
+        userId,
+        policyVersion,
+      ]);
+    }
 
     return result.rows[0] as ConsentStatus;
   } finally {

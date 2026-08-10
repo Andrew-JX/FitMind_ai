@@ -215,6 +215,9 @@ When exceeded, both endpoints return:
 | `POST /api/auth/consents` | 不豁免就没法签 |
 | `DELETE /api/auth/account` | 不豁免则拒绝的人既不能同意也不能离开 |
 | `DELETE /api/athlete-profile/injury-constraints` | 不豁免则欠健康同意的人无法撤回伤病数据，只剩「同意/退出/删号」 |
+| `DELETE /api/menstrual-records` | 允许只删除经期数据，不强迫用户连其他健康类别一起删除 |
+| `DELETE /api/body-measurements` | 允许只删除全部身体测量，不强迫用户接受补签或全量删除 |
+| `DELETE /api/body-measurements/:id` | 允许在补签前删除指定身体测量，范围仍受账号所有权约束 |
 | `POST /api/auth/logout` | 本来就不鉴权 |
 
 默认开启是要点：新加的业务路由只要用 `authMiddleware` 就自动带闸门，**不存在「忘了加」这种失败方式**，只存在「显式写了豁免」这种需要被 review 的动作。
@@ -1132,6 +1135,8 @@ consent insert, and health-data write share one transaction and per-user lock.
   consent object. `date` is an ISO calendar date.
 - `PATCH /api/menstrual-records/settings` accepts `{ showInHistory }`.
 - `DELETE /api/menstrual-records` deletes every menstrual date for the user.
+  It remains authenticated but bypasses the pending-consent gate so declining
+  users can delete this category without deleting unrelated health data.
 
 ### Body measurements
 
@@ -1143,6 +1148,8 @@ consent insert, and health-data write share one transaction and per-user lock.
   and calf measurements. At least one value is required.
 - `DELETE /api/body-measurements/:id` deletes one owned measurement.
 - `DELETE /api/body-measurements` deletes all body measurements.
+  Both deletes remain authenticated but bypass the pending-consent gate; reads
+  and writes stay gated.
 
 ### Training memos
 

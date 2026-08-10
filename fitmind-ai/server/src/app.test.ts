@@ -19,7 +19,7 @@ vi.mock("./services/product-feedback-service.js", () => ({
   submitProductFeedback: vi.fn(),
 }));
 
-import { createApp } from "./app.js";
+import { createApp, normalizeRequestPathForLog } from "./app.js";
 import { createAiRateLimiter } from "./services/assistant/ai-rate-limiter.js";
 import { verifyJwt } from "./services/auth/jwt.js";
 import { submitProductFeedback } from "./services/product-feedback-service.js";
@@ -71,6 +71,14 @@ describe("createApp", () => {
 
   it("trusts one proxy hop for Vercel client IP resolution", () => {
     expect(app.get("trust proxy")).toBe(1);
+  });
+
+  it("normalizes health dates and record ids before logging request paths", () => {
+    expect(
+      normalizeRequestPathForLog(
+        "/api/menstrual-records/2026-08-10/body/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      ),
+    ).toBe("/api/menstrual-records/:date/body/:id");
   });
 
   it("logs unknown request failures without messages or request data", async () => {

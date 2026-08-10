@@ -27,6 +27,21 @@ personalHealthWithdrawalRouter.delete(
   authMiddlewareAllowingPendingConsents,
   deleteAllSensitiveHealthDataController,
 );
+personalHealthWithdrawalRouter.delete(
+  "/menstrual-records",
+  authMiddlewareAllowingPendingConsents,
+  deleteMenstrualRecordsController,
+);
+personalHealthWithdrawalRouter.delete(
+  "/body-measurements/:id",
+  authMiddlewareAllowingPendingConsents,
+  deleteBodyMeasurementController,
+);
+personalHealthWithdrawalRouter.delete(
+  "/body-measurements",
+  authMiddlewareAllowingPendingConsents,
+  deleteAllBodyMeasurementsController,
+);
 
 export const personalToolsRouter = Router();
 personalToolsRouter.use(
@@ -40,21 +55,9 @@ personalToolsRouter.patch(
   "/menstrual-records/settings",
   patchMenstrualSettingsController,
 );
-personalToolsRouter.delete(
-  "/menstrual-records",
-  deleteMenstrualRecordsController,
-);
 
 personalToolsRouter.get("/body-measurements", getBodyMeasurementsController);
 personalToolsRouter.put("/body-measurements", putBodyMeasurementController);
-personalToolsRouter.delete(
-  "/body-measurements/:id",
-  deleteBodyMeasurementController,
-);
-personalToolsRouter.delete(
-  "/body-measurements",
-  deleteAllBodyMeasurementsController,
-);
 
 personalToolsRouter.get("/training-memos", getTrainingMemosController);
 personalToolsRouter.post("/training-memos", postTrainingMemoController);

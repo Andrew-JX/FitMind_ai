@@ -57,6 +57,21 @@ vi.mock("./services/training/workout-service.js", () => ({
   updateUserWorkoutSet: vi.fn(),
 }));
 
+vi.mock("./services/personal-tools-service.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("./services/personal-tools-service.js")
+    >();
+
+  return {
+    ...actual,
+    removeAllBodyMeasurements: vi.fn(),
+    removeBodyMeasurement: vi.fn(),
+    removeMenstrualRecords: vi.fn(),
+    withdrawAllSensitiveHealthData: vi.fn(),
+  };
+});
+
 import { createApp } from "./app.js";
 import { getAthleteProfileByUserId } from "./db/athlete-profile-repository.js";
 import {
@@ -78,6 +93,12 @@ import { createAiRateLimiter } from "./services/assistant/ai-rate-limiter.js";
 import { CURRENT_PRIVACY_POLICY_VERSION } from "./services/auth/consent-service.js";
 import { signJwt, verifyJwt } from "./services/auth/jwt.js";
 import { comparePassword, hashPassword } from "./services/auth/password.js";
+import {
+  removeAllBodyMeasurements,
+  removeBodyMeasurement,
+  removeMenstrualRecords,
+  withdrawAllSensitiveHealthData,
+} from "./services/personal-tools-service.js";
 import { listUserWorkouts } from "./services/training/workout-service.js";
 
 const mockedFindUserByEmail = vi.mocked(findUserByEmail);
@@ -93,6 +114,12 @@ const mockedListUserWorkouts = vi.mocked(listUserWorkouts);
 const mockedDeleteUserById = vi.mocked(deleteUserById);
 const mockedWithdrawHealth = vi.mocked(withdrawSensitiveHealthData);
 const mockedSaveProfile = vi.mocked(saveProfileWithHealthConsent);
+const mockedRemoveAllBodyMeasurements = vi.mocked(removeAllBodyMeasurements);
+const mockedRemoveBodyMeasurement = vi.mocked(removeBodyMeasurement);
+const mockedRemoveMenstrualRecords = vi.mocked(removeMenstrualRecords);
+const mockedWithdrawAllSensitiveHealthData = vi.mocked(
+  withdrawAllSensitiveHealthData,
+);
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -132,6 +159,7 @@ function consentStatus(overrides?: {
   hasHealthConsent?: boolean;
   hasWithdrawableHealthConsent?: boolean;
   hasStoredInjuryData?: boolean;
+  hasStoredHealthData?: boolean;
 }) {
   const hasHealthConsent = overrides?.hasHealthConsent ?? false;
 
@@ -144,6 +172,8 @@ function consentStatus(overrides?: {
     hasWithdrawableHealthConsent:
       overrides?.hasWithdrawableHealthConsent ?? hasHealthConsent,
     hasStoredInjuryData: overrides?.hasStoredInjuryData ?? false,
+    hasStoredHealthData:
+      overrides?.hasStoredHealthData ?? overrides?.hasStoredInjuryData ?? false,
   };
 }
 
@@ -609,6 +639,77 @@ describe("consent enforcement over HTTP", () => {
       });
 
       expect(result.status).toBe(403);
+    });
+  });
+
+  describe("personal health deletion while consent is outstanding", () => {
+    function owingHealthConsent() {
+      mockedConsentStatus.mockResolvedValue(
+        consentStatus({
+          hasCrossBorderConsent: true,
+          hasStoredHealthData: true,
+        }),
+      );
+    }
+
+    it.each([
+      {
+        path: "/api/personal-health-data",
+        mock: mockedWithdrawAllSensitiveHealthData,
+        expectedArgs: [USER_ID],
+      },
+      {
+        path: "/api/menstrual-records",
+        mock: mockedRemoveMenstrualRecords,
+        expectedArgs: [USER_ID],
+      },
+      {
+        path: "/api/body-measurements",
+        mock: mockedRemoveAllBodyMeasurements,
+        expectedArgs: [USER_ID],
+      },
+      {
+        path: "/api/body-measurements/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        mock: mockedRemoveBodyMeasurement,
+        expectedArgs: [USER_ID, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"],
+      },
+    ])("keeps DELETE $path reachable", async ({ path, mock, expectedArgs }) => {
+      owingHealthConsent();
+      mock.mockResolvedValueOnce(undefined as never);
+
+      const result = await request(path, {
+        method: "DELETE",
+        headers: asUser(),
+      });
+
+      expect(result.status).toBe(200);
+      expect(mock).toHaveBeenCalledWith(...expectedArgs);
+      expect(mockedConsentStatus).not.toHaveBeenCalled();
+    });
+
+    it("still requires authentication for category deletion", async () => {
+      const result = await request("/api/menstrual-records", {
+        method: "DELETE",
+      });
+
+      expect(result.status).toBe(401);
+      expect(mockedRemoveMenstrualRecords).not.toHaveBeenCalled();
+    });
+
+    it("keeps personal health writes behind the consent gate", async () => {
+      owingHealthConsent();
+
+      const result = await request("/api/body-measurements", {
+        method: "PUT",
+        headers: asUser(),
+        body: JSON.stringify({ measuredOn: "2026-08-10", weightKg: 70 }),
+      });
+
+      expect(result.status).toBe(403);
+      expect(result.payload).toMatchObject({
+        ok: false,
+        error: { code: "CONSENT_REQUIRED" },
+      });
     });
   });
 

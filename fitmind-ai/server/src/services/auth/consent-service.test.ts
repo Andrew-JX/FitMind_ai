@@ -27,6 +27,7 @@ function status(overrides: {
   hasHealthConsent?: boolean;
   hasWithdrawableHealthConsent?: boolean;
   hasStoredInjuryData?: boolean;
+  hasStoredHealthData?: boolean;
 }) {
   const hasHealthConsent = overrides.hasHealthConsent ?? false;
 
@@ -36,6 +37,8 @@ function status(overrides: {
     hasWithdrawableHealthConsent:
       overrides.hasWithdrawableHealthConsent ?? hasHealthConsent,
     hasStoredInjuryData: overrides.hasStoredInjuryData ?? false,
+    hasStoredHealthData:
+      overrides.hasStoredHealthData ?? overrides.hasStoredInjuryData ?? false,
   });
 }
 

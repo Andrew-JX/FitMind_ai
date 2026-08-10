@@ -16,6 +16,7 @@ import {
   getBodyMeasurements,
   saveBodyMeasurement,
 } from "./personal-tools-api";
+import { getPersonalToolWriteErrorMessage } from "./personal-tool-error-message";
 import {
   convertWeight,
   formatLocalDate,
@@ -134,8 +135,13 @@ export function BodyMeasurementsView(props: {
       setConsentAccepted(false);
       setFormOpen(false);
       setStatus("身体数据已保存。");
-    } catch {
-      setStatus("身体数据没有保存成功，请稍后重试。");
+    } catch (error) {
+      setStatus(
+        getPersonalToolWriteErrorMessage(
+          error,
+          "身体数据没有保存成功，请稍后重试。",
+        ),
+      );
     } finally {
       setSaving(false);
     }
