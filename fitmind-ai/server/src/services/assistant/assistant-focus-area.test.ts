@@ -61,8 +61,11 @@ describe("assistant focus-area characterization", () => {
     expect(inferFocusAreaFromName("Barbell Bench Press")).toBe("chest");
     expect(inferFocusAreaFromName("Romanian Deadlift")).toBe("back");
     expect(inferFocusAreaFromName("Bulgarian Split Squat")).toBe("legs");
-    expect(inferFocusAreaFromName("Dumbbell Lateral Raise")).toBe("back");
+    expect(inferFocusAreaFromName("Dumbbell Lateral Raise")).toBe("shoulders");
     expect(inferFocusAreaFromName("Overhead Press")).toBe("shoulders");
+    expect(inferFocusAreaFromName("Pilates Roll Up")).toBe("unknown");
+    expect(inferFocusAreaFromName("Lat Pulldown")).toBe("back");
+    expect(inferFocusAreaFromName("Lats")).toBe("back");
     expect(inferFocusAreaFromName("Barbell Curl")).toBe("unknown");
   });
 
@@ -70,8 +73,11 @@ describe("assistant focus-area characterization", () => {
     expect(detectTargetArea("今天练胸")).toBe("chest");
     expect(detectTargetArea("安排一些划船动作")).toBe("back");
     expect(detectTargetArea("深蹲怎么加重量")).toBe("legs");
-    expect(detectTargetArea("add lateral raise")).toBe("back");
+    expect(detectTargetArea("add lateral raise")).toBe("shoulders");
     expect(detectTargetArea("今天练肩")).toBe("shoulders");
+    expect(detectTargetArea("latest news")).toBe("unknown");
+    expect(detectTargetArea("train lats")).toBe("back");
+    expect(detectTargetArea("lat pulldown")).toBe("back");
   });
 
   it("does not route neighboring non-fitness topics", () => {
