@@ -157,6 +157,8 @@ sudo certbot certonly --nginx \
 After issuance, install the final HTTPS configuration:
 
 ```bash
+sudo install -d -m 755 /etc/nginx/snippets
+sudo cp deploy/nginx/fitmind-security-headers.conf /etc/nginx/snippets/fitmind-security-headers.conf
 sudo cp deploy/nginx/fitmind-https.conf /etc/nginx/sites-available/fitmind.conf
 sudo nginx -t
 sudo systemctl reload nginx
@@ -165,9 +167,11 @@ curl --head https://www.jimmyuuu.com
 sudo certbot renew --dry-run
 ```
 
-The final Nginx configuration disables proxy buffering for `/api/`, including
-assistant SSE, and redirects every HTTP/`www` request to the canonical HTTPS
-domain.
+The final Nginx configuration applies the shared security-header snippet at
+both the HTTPS server and `/api/` location scopes. The location must include it
+again because its `X-Accel-Buffering` header disables Nginx `add_header`
+inheritance. Proxy buffering remains disabled for `/api/`, including assistant
+SSE, and every HTTP/`www` request redirects to the canonical HTTPS domain.
 
 ## 6. Preserve the independent port 8080 site
 

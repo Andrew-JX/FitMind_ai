@@ -1034,3 +1034,11 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
   非 main commit、部署失败恢复 checkout、镜像回滚调用与部署锁竞争。GitHub Secrets、服务器公钥
   安装器另有 4 个断言覆盖强制命令、幂等安装、错误密钥类型和禁止静默换钥。GitHub Secrets、
   服务器公钥安装、push、首次 Actions 运行和生产健康检查尚未执行，不能声称腾讯云已经自动更新。
+
+## 2026-08-11 — HTTPS API 安全头继承修复（fitmind-1lo，本地候选）
+
+- HTTPS 主站改用共享安全头片段，并在 `/api/` location 内重复 include；这是因为该 location 自己的
+  `X-Accel-Buffering` 会关闭 Nginx `add_header` 的父级继承，修复前 API 响应不会继承主站四个安全头。
+- 保留 API/SSE 的 `X-Accel-Buffering: no`，本批不加入 CSP 或 Permissions-Policy；部署说明同步要求
+  先安装共享片段，再运行 `nginx -t` 和 reload。
+- 新增源码作用域与安装顺序回归测试。真实生产响应尚未部署验证，不能用本地测试冒充线上已生效。
