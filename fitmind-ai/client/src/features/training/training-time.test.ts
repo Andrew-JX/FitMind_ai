@@ -1,3 +1,7 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 import * as trainingTime from "./training-time";
@@ -9,16 +13,47 @@ const {
   getDurationMinutesFromLocalValues,
   parseDateTimeLocalValue,
 } = trainingTime;
+const trainingDirectory = dirname(fileURLToPath(import.meta.url));
+const helperNames = [
+  "formatDateTimeLocalValue",
+  "formatTimeOnly",
+  "formatTrainingTimeSummary",
+  "getDurationMinutesFromLocalValues",
+  "parseDateTimeLocalValue",
+] as const;
 
 describe("training time characterization", () => {
   it("keeps the public helper surface exact", () => {
-    expect(Object.keys(trainingTime).sort()).toEqual([
-      "formatDateTimeLocalValue",
-      "formatTimeOnly",
-      "formatTrainingTimeSummary",
-      "getDurationMinutesFromLocalValues",
-      "parseDateTimeLocalValue",
-    ]);
+    expect(Object.keys(trainingTime).sort()).toEqual([...helperNames]);
+  });
+
+  it("keeps one definition owner and a one-way module dependency", () => {
+    const composerSource = readFileSync(
+      join(trainingDirectory, "TrainingSessionComposer.tsx"),
+      "utf8",
+    );
+    const timeSource = readFileSync(
+      join(trainingDirectory, "training-time.ts"),
+      "utf8",
+    );
+
+    for (const helperName of helperNames) {
+      const definition = new RegExp(`export function ${helperName}\\b`, "g");
+      const definitionCount =
+        (composerSource.match(definition) ?? []).length +
+        (timeSource.match(definition) ?? []).length;
+      expect(definitionCount, helperName).toBe(1);
+    }
+
+    const composerDependsOnTime = composerSource.includes(
+      'from "./training-time"',
+    );
+    const timeDependsOnComposer = timeSource.includes(
+      'from "./TrainingSessionComposer"',
+    );
+    expect(Number(composerDependsOnTime) + Number(timeDependsOnComposer)).toBe(
+      1,
+    );
   });
 
   it("prioritizes a start/end range over duration and performed date", () => {
