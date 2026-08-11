@@ -1,6 +1,4 @@
-import { createRequire } from "node:module";
-
-import { loadServerEnv } from "../env.js";
+import { createDbPool } from "./pool.js";
 
 interface DbPoolLike {
   query: (
@@ -33,29 +31,11 @@ export interface CreateAssistantSavedInsightInput {
   shareText: string;
 }
 
-const require = createRequire(import.meta.url);
-
-async function createRepositoryPool(): Promise<DbPoolLike> {
-  const env = loadServerEnv();
-
-  if (env.databaseUrl === undefined) {
-    throw new Error("DATABASE_URL is required for database access.");
-  }
-
-  const { Pool } = require("pg") as {
-    Pool: new (config: { connectionString: string }) => DbPoolLike;
-  };
-
-  return new Pool({
-    connectionString: env.databaseUrl,
-  });
-}
-
 export async function createAssistantSavedInsight(
   input: CreateAssistantSavedInsightInput,
   pool?: DbPoolLike,
 ): Promise<AssistantSavedInsightRow> {
-  const activePool = pool ?? (await createRepositoryPool());
+  const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
   try {
@@ -113,7 +93,7 @@ export async function listAssistantSavedInsightsForUser(
   userId: string,
   pool?: DbPoolLike,
 ): Promise<AssistantSavedInsightRow[]> {
-  const activePool = pool ?? (await createRepositoryPool());
+  const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
   try {
@@ -151,7 +131,7 @@ export async function findAssistantSavedInsightByIdForUser(
   userId: string,
   pool?: DbPoolLike,
 ): Promise<AssistantSavedInsightRow | null> {
-  const activePool = pool ?? (await createRepositoryPool());
+  const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
   try {
@@ -188,7 +168,7 @@ export async function deleteAssistantSavedInsightByIdForUser(
   userId: string,
   pool?: DbPoolLike,
 ): Promise<boolean> {
-  const activePool = pool ?? (await createRepositoryPool());
+  const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
   try {

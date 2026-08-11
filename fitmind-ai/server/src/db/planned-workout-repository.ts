@@ -1,6 +1,4 @@
-import { createRequire } from "node:module";
-
-import { loadServerEnv } from "../env.js";
+import { createDbPool } from "./pool.js";
 
 interface DbQueryable {
   query: (
@@ -42,24 +40,6 @@ export interface CreatePlannedWorkoutInput {
   sourceMessageId?: string | null | undefined;
 }
 
-const require = createRequire(import.meta.url);
-
-async function createRepositoryPool(): Promise<DbPoolLike> {
-  const env = loadServerEnv();
-
-  if (env.databaseUrl === undefined) {
-    throw new Error("DATABASE_URL is required for database access.");
-  }
-
-  const { Pool } = require("pg") as {
-    Pool: new (config: { connectionString: string }) => DbPoolLike;
-  };
-
-  return new Pool({
-    connectionString: env.databaseUrl,
-  });
-}
-
 const RETURNED_COLUMNS = `
   id,
   user_id,
@@ -76,14 +56,14 @@ const RETURNED_COLUMNS = `
  * Inserts an accepted plan as a new active planned workout.
  *
  * @param input - Owner, date range, serialized plan snapshot, optional source message
- * @param pool - Optional injected pool (owns and closes its own pool otherwise)
+ * @param pool - Optional injected pool; defaults to the process-owned facade
  * @returns The persisted planned workout row
  */
 export async function createPlannedWorkout(
   input: CreatePlannedWorkoutInput,
   pool?: DbPoolLike,
 ): Promise<PlannedWorkoutRow> {
-  const activePool = pool ?? (await createRepositoryPool());
+  const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
   try {
@@ -121,7 +101,7 @@ export async function createPlannedWorkout(
  * serialized against concurrent accepts by the same user.
  *
  * @param input - Owner, date range, serialized plan snapshot, optional source message
- * @param pool - Optional injected pool (owns and closes its own pool otherwise)
+ * @param pool - Optional injected pool; defaults to the process-owned facade
  * @returns The newly persisted planned workout row
  *
  * @remarks
@@ -148,7 +128,7 @@ export async function createPlannedWorkoutSupersedingActive(
   input: CreatePlannedWorkoutInput,
   pool?: DbPoolLike,
 ): Promise<PlannedWorkoutRow> {
-  const activePool = pool ?? (await createRepositoryPool());
+  const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
   if (typeof activePool.connect !== "function") {
@@ -222,14 +202,14 @@ export async function createPlannedWorkoutSupersedingActive(
  * Reads the most recent active planned workout for a user, or null when none.
  *
  * @param userId - Owner user id
- * @param pool - Optional injected pool (owns and closes its own pool otherwise)
+ * @param pool - Optional injected pool; defaults to the process-owned facade
  * @returns The active planned workout row, or null
  */
 export async function getActivePlannedWorkoutForUser(
   userId: string,
   pool?: DbPoolLike,
 ): Promise<PlannedWorkoutRow | null> {
-  const activePool = pool ?? (await createRepositoryPool());
+  const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
   try {
@@ -257,14 +237,14 @@ export async function getActivePlannedWorkoutForUser(
  * evidence window, or null when none exists.
  *
  * @param input - Owner user id plus the evidence date range to overlap.
- * @param pool - Optional injected pool (owns and closes its own pool otherwise)
+ * @param pool - Optional injected pool; defaults to the process-owned facade
  * @returns The latest active/completed overlapping planned workout row, or null
  */
 export async function getLatestAcceptedPlannedWorkoutForUser(
   input: { userId: string; startDate: string; endDate: string },
   pool?: DbPoolLike,
 ): Promise<PlannedWorkoutRow | null> {
-  const activePool = pool ?? (await createRepositoryPool());
+  const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
   try {
@@ -294,14 +274,14 @@ export async function getLatestAcceptedPlannedWorkoutForUser(
  * Updates the status of a user's planned workout (e.g. complete / abandon).
  *
  * @param input - Plan id, owner user id, and the new status
- * @param pool - Optional injected pool (owns and closes its own pool otherwise)
+ * @param pool - Optional injected pool; defaults to the process-owned facade
  * @returns The updated row, or null when no matching plan was found
  */
 export async function updatePlannedWorkoutStatus(
   input: { id: string; userId: string; status: PlannedWorkoutStatus },
   pool?: DbPoolLike,
 ): Promise<PlannedWorkoutRow | null> {
-  const activePool = pool ?? (await createRepositoryPool());
+  const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
   try {

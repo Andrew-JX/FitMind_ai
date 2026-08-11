@@ -1,6 +1,4 @@
-import { createRequire } from "node:module";
-
-import { loadServerEnv } from "../env.js";
+import { createDbPool } from "./pool.js";
 
 interface DbPoolLike {
   query: (
@@ -8,24 +6,6 @@ interface DbPoolLike {
     params?: readonly unknown[],
   ) => Promise<{ rows: unknown[] }>;
   end?: () => Promise<void>;
-}
-
-const require = createRequire(import.meta.url);
-
-async function createRepositoryPool(): Promise<DbPoolLike> {
-  const env = loadServerEnv();
-
-  if (env.databaseUrl === undefined) {
-    throw new Error("DATABASE_URL is required for database access.");
-  }
-
-  const { Pool } = require("pg") as {
-    Pool: new (config: { connectionString: string }) => DbPoolLike;
-  };
-
-  return new Pool({
-    connectionString: env.databaseUrl,
-  });
 }
 
 export interface ToolCallLogStatus {
@@ -71,7 +51,7 @@ export async function createToolCallLog(
   input: CreateToolCallLogInput,
   pool?: DbPoolLike,
 ): Promise<ToolCallLogRow> {
-  const activePool = pool ?? (await createRepositoryPool());
+  const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
   try {
@@ -137,7 +117,7 @@ export async function listRecentToolCallLogs(
   filters: ListToolCallLogsFilters,
   pool?: DbPoolLike,
 ): Promise<ToolCallLogRow[]> {
-  const activePool = pool ?? (await createRepositoryPool());
+  const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
   try {

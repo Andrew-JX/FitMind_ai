@@ -1,6 +1,4 @@
-import { createRequire } from "node:module";
-
-import { loadServerEnv } from "../env.js";
+import { createDbPool } from "./pool.js";
 
 interface DbPoolLike {
   query: (
@@ -47,24 +45,6 @@ export interface CreateChatMessageInput {
   tokenOutput?: number | null | undefined;
 }
 
-const require = createRequire(import.meta.url);
-
-async function createRepositoryPool(): Promise<DbPoolLike> {
-  const env = loadServerEnv();
-
-  if (env.databaseUrl === undefined) {
-    throw new Error("DATABASE_URL is required for database access.");
-  }
-
-  const { Pool } = require("pg") as {
-    Pool: new (config: { connectionString: string }) => DbPoolLike;
-  };
-
-  return new Pool({
-    connectionString: env.databaseUrl,
-  });
-}
-
 /**
  * Create one user-owned chat session row.
  *
@@ -76,7 +56,7 @@ export async function createChatSession(
   input: CreateChatSessionInput,
   pool?: DbPoolLike,
 ): Promise<ChatSessionRow> {
-  const activePool = pool ?? (await createRepositoryPool());
+  const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
   try {
@@ -115,7 +95,7 @@ export async function findChatSessionByIdForUser(
   userId: string,
   pool?: DbPoolLike,
 ): Promise<ChatSessionRow | null> {
-  const activePool = pool ?? (await createRepositoryPool());
+  const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
   try {
@@ -153,7 +133,7 @@ export async function hasChatSessionById(
   sessionId: string,
   pool?: DbPoolLike,
 ): Promise<boolean> {
-  const activePool = pool ?? (await createRepositoryPool());
+  const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
   try {
@@ -188,7 +168,7 @@ export async function findChatMessageByIdForUser(
   userId: string,
   pool?: DbPoolLike,
 ): Promise<ChatMessageRow | null> {
-  const activePool = pool ?? (await createRepositoryPool());
+  const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
   try {
@@ -233,7 +213,7 @@ export async function hasChatMessageById(
   messageId: string,
   pool?: DbPoolLike,
 ): Promise<boolean> {
-  const activePool = pool ?? (await createRepositoryPool());
+  const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
   try {
@@ -266,7 +246,7 @@ export async function createChatMessage(
   input: CreateChatMessageInput,
   pool?: DbPoolLike,
 ): Promise<ChatMessageRow> {
-  const activePool = pool ?? (await createRepositoryPool());
+  const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
   try {
@@ -345,7 +325,7 @@ export async function listChatSessionsForUser(
   userId: string,
   pool?: DbPoolLike,
 ): Promise<ChatSessionRow[]> {
-  const activePool = pool ?? (await createRepositoryPool());
+  const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
   try {
@@ -385,7 +365,7 @@ export async function listMessagesForSession(
   userId: string,
   pool?: DbPoolLike,
 ): Promise<ChatMessageRow[]> {
-  const activePool = pool ?? (await createRepositoryPool());
+  const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
   try {

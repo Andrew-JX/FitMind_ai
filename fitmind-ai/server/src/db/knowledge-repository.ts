@@ -1,6 +1,4 @@
-import { createRequire } from "node:module";
-
-import { loadServerEnv } from "../env.js";
+import { createDbPool } from "./pool.js";
 
 interface DbPoolLike {
   query: (
@@ -79,24 +77,6 @@ export interface UpsertKnowledgeChunkResult {
   id: string;
 }
 
-const require = createRequire(import.meta.url);
-
-async function createRepositoryPool(): Promise<DbPoolLike> {
-  const env = loadServerEnv();
-
-  if (env.databaseUrl === undefined) {
-    throw new Error("DATABASE_URL is required for database access.");
-  }
-
-  const { Pool } = require("pg") as {
-    Pool: new (config: { connectionString: string }) => DbPoolLike;
-  };
-
-  return new Pool({
-    connectionString: env.databaseUrl,
-  });
-}
-
 function normalizeTags(tags: unknown): string[] {
   if (Array.isArray(tags)) {
     return tags.filter((tag): tag is string => typeof tag === "string");
@@ -149,7 +129,7 @@ function toVectorLiteral(embedding: number[]): string {
 export async function listKnowledgeChunks(
   options: ListKnowledgeChunksOptions = {},
 ): Promise<KnowledgeChunkRow[]> {
-  const activePool = options.pool ?? (await createRepositoryPool());
+  const activePool = options.pool ?? createDbPool();
   const ownsPool = options.pool === undefined;
 
   try {
@@ -179,7 +159,7 @@ export async function listKnowledgeChunks(
 export async function searchKnowledgeChunksByEmbedding(
   input: SearchKnowledgeChunksByEmbeddingInput,
 ): Promise<KnowledgeChunkSearchRow[]> {
-  const activePool = input.pool ?? (await createRepositoryPool());
+  const activePool = input.pool ?? createDbPool();
   const ownsPool = input.pool === undefined;
 
   try {
@@ -217,7 +197,7 @@ export async function searchKnowledgeChunksByEmbedding(
 export async function listKnowledgeChunksMissingEmbeddings(
   input: ListKnowledgeChunksMissingEmbeddingsInput,
 ): Promise<KnowledgeChunkRow[]> {
-  const activePool = input.pool ?? (await createRepositoryPool());
+  const activePool = input.pool ?? createDbPool();
   const ownsPool = input.pool === undefined;
 
   try {
@@ -251,7 +231,7 @@ export async function listKnowledgeChunksMissingEmbeddings(
 export async function updateKnowledgeChunkEmbedding(
   input: UpdateKnowledgeChunkEmbeddingInput,
 ): Promise<void> {
-  const activePool = input.pool ?? (await createRepositoryPool());
+  const activePool = input.pool ?? createDbPool();
   const ownsPool = input.pool === undefined;
 
   try {
@@ -276,7 +256,7 @@ export async function updateKnowledgeChunkEmbedding(
 export async function upsertKnowledgeDocument(
   input: UpsertKnowledgeDocumentInput,
 ): Promise<KnowledgeDocumentRow> {
-  const activePool = input.pool ?? (await createRepositoryPool());
+  const activePool = input.pool ?? createDbPool();
   const ownsPool = input.pool === undefined;
 
   try {
@@ -310,7 +290,7 @@ export async function upsertKnowledgeDocument(
 export async function upsertKnowledgeChunk(
   input: UpsertKnowledgeChunkInput,
 ): Promise<UpsertKnowledgeChunkResult> {
-  const activePool = input.pool ?? (await createRepositoryPool());
+  const activePool = input.pool ?? createDbPool();
   const ownsPool = input.pool === undefined;
 
   try {

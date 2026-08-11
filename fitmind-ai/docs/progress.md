@@ -1103,3 +1103,11 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
 - 测试扫描 db 与 repositories 源码，所有直接发出 `BEGIN` 的非测试文件必须与具名场景集合精确相同；内存加入未覆盖的第五 repository 会失败，避免未来只靠人工维护清单。
 - `workouts-repository.d.ts` 补齐运行时已有的可选 pool 参数与 query/client/pool 类型；测试从 runtime export 发现全部 10 个可注入函数并逐一检查声明，不使用类型强转绕过。
 - 全量 `pnpm verify` 通过 105 个 Vitest 文件、812 个断言及 5 个 monitor Node 断言，server production build 通过。本批没有改变 SQL、连接生命周期或生产行为；每请求新建 pool、4 个 JS repository 和手写声明仍待 4.1b，不能记成已修。
+
+## 2026-08-11 — 进程级共享数据库连接池（fitmind-o90，本地候选）
+
+- 数据库默认路径已收口到一个进程级 pg Pool：14 个 TypeScript repository 移除各自的 `createRepositoryPool()`，与既有 4 个 JavaScript repository、weekly-report repository 一起通过 `createDbPool()` 使用同一稳定门面；生产 db 源码中只允许 `pool.ts` 构造或加载 `pg`。
+- 共享门面的 `end()` 是兼容旧 repository finally 清理代码的 no-op，只有显式 `closeDbPool()` 会 drain 并清除真实底层 Pool；重复工厂调用返回同一门面，显式关闭后可重建底层 Pool。测试注入的 fake pool 仍由调用方持有，repository 不会关闭它。
+- 唯一 Pool 配置固定 `max: 10` 与 `allowExitOnIdle: true`，并监听空闲客户端 error。输出事件只含 `db_pool_idle_error`、保守错误类型和错误码；异常 message、stack、数据库 URL、SQL 与凭据不进入日志。
+- 新增机器护栏会精确枚举 19 个共享工厂消费者，拒绝第二个 `new Pool`、第二个 `require("pg")` 或任何 `createRepositoryPool`；生命周期、脱敏日志与 4.1a 事务不逃逸测试共 13 条定向断言通过。
+- 全量 `pnpm verify` 通过 106 个 Vitest 文件、816 个断言及 5 个 monitor Node 断言，server production build 通过。验证全程使用 mock/fake pool，没有连接真实数据库、没有读取生产密钥、没有 push 或部署；4 个 JavaScript repository 的 TypeScript 迁移、手写声明清理和进程信号优雅停机仍不属于本批。

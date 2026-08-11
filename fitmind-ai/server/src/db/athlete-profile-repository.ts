@@ -1,6 +1,4 @@
-import { createRequire } from "node:module";
-
-import { loadServerEnv } from "../env.js";
+import { createDbPool } from "./pool.js";
 
 interface DbPoolLike {
   query: (
@@ -28,36 +26,18 @@ export interface UpsertAthleteProfileInput {
   injuryConstraints: string[];
 }
 
-const require = createRequire(import.meta.url);
-
-async function createRepositoryPool(): Promise<DbPoolLike> {
-  const env = loadServerEnv();
-
-  if (env.databaseUrl === undefined) {
-    throw new Error("DATABASE_URL is required for database access.");
-  }
-
-  const { Pool } = require("pg") as {
-    Pool: new (config: { connectionString: string }) => DbPoolLike;
-  };
-
-  return new Pool({
-    connectionString: env.databaseUrl,
-  });
-}
-
 /**
  * Reads the single athlete profile for a user, or null when none exists yet.
  *
  * @param userId - Owner user id
- * @param pool - Optional injected pool (owns and closes its own pool otherwise)
+ * @param pool - Optional injected pool; defaults to the process-owned facade
  * @returns The profile row, or null
  */
 export async function getAthleteProfileByUserId(
   userId: string,
   pool?: DbPoolLike,
 ): Promise<AthleteProfileRow | null> {
-  const activePool = pool ?? (await createRepositoryPool());
+  const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
   try {

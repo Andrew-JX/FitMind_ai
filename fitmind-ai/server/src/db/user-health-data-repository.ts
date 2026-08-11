@@ -1,8 +1,6 @@
-import { createRequire } from "node:module";
-
 import type { AthleteProfileRow } from "./athlete-profile-repository.js";
+import { createDbPool } from "./pool.js";
 import { LIVE_HEALTH_CONSENT_PREDICATE } from "./user-consent-repository.js";
-import { loadServerEnv } from "../env.js";
 
 interface DbQueryable {
   query: (
@@ -44,8 +42,6 @@ export type SaveProfileResult =
   | { status: "consent_missing" }
   | { status: "consent_stale" };
 
-const require = createRequire(import.meta.url);
-
 const PROFILE_COLUMNS = `
   user_id,
   goal,
@@ -55,20 +51,6 @@ const PROFILE_COLUMNS = `
   created_at,
   updated_at
 `;
-
-async function createRepositoryPool(): Promise<DbPoolLike> {
-  const env = loadServerEnv();
-
-  if (env.databaseUrl === undefined) {
-    throw new Error("DATABASE_URL is required for database access.");
-  }
-
-  const { Pool } = require("pg") as {
-    Pool: new (config: { connectionString: string }) => DbPoolLike;
-  };
-
-  return new Pool({ connectionString: env.databaseUrl });
-}
 
 /**
  * Take the per-user write lock that every mutation in this module shares.
@@ -165,7 +147,7 @@ export async function withLockedUser<T>(
   pool: DbPoolLike | undefined,
   work: (client: DbQueryable) => Promise<T>,
 ): Promise<T> {
-  const activePool = pool ?? (await createRepositoryPool());
+  const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
   if (typeof activePool.connect !== "function") {
@@ -261,7 +243,7 @@ export async function ensureCurrentHealthConsent(
  * Save an athlete profile, taking any required health consent with it.
  *
  * @param input - Normalized profile fields, policy version, and consent decision
- * @param pool - Optional injected pool (owns and closes its own pool otherwise)
+ * @param pool - Optional injected pool; defaults to the process-owned facade
  * @returns The saved row, or why the save was refused
  *
  * @remarks
@@ -348,7 +330,7 @@ export async function saveProfileWithHealthConsent(
  * Clear a user's injury constraints and conditionally close health consent.
  *
  * @param userId - Owner user id
- * @param pool - Optional injected pool (owns and closes its own pool otherwise)
+ * @param pool - Optional injected pool; defaults to the process-owned facade
  * @returns Resolves once the data deletion and consent re-evaluation commit
  *
  * @remarks

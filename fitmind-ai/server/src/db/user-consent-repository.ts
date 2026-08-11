@@ -1,6 +1,4 @@
-import { createRequire } from "node:module";
-
-import { loadServerEnv } from "../env.js";
+import { createDbPool } from "./pool.js";
 
 interface DbQueryable {
   query: (
@@ -72,8 +70,6 @@ export interface CreatedUserRow {
   updatedAt: unknown;
 }
 
-const require = createRequire(import.meta.url);
-
 const CONSENT_COLUMNS = `
   id,
   user_id,
@@ -84,27 +80,11 @@ const CONSENT_COLUMNS = `
   source
 `;
 
-async function createRepositoryPool(): Promise<DbPoolLike> {
-  const env = loadServerEnv();
-
-  if (env.databaseUrl === undefined) {
-    throw new Error("DATABASE_URL is required for database access.");
-  }
-
-  const { Pool } = require("pg") as {
-    Pool: new (config: { connectionString: string }) => DbPoolLike;
-  };
-
-  return new Pool({
-    connectionString: env.databaseUrl,
-  });
-}
-
 /**
  * Create a user and their registration consents in a single transaction.
  *
  * @param input - User fields plus the consents collected alongside them
- * @param pool - Optional injected pool (owns and closes its own pool otherwise)
+ * @param pool - Optional injected pool; defaults to the process-owned facade
  * @returns The inserted user row
  *
  * @remarks
@@ -121,7 +101,7 @@ export async function createUserWithConsents(
   input: CreateUserWithConsentsInput,
   pool?: DbPoolLike,
 ): Promise<CreatedUserRow> {
-  const activePool = pool ?? (await createRepositoryPool());
+  const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
   if (typeof activePool.connect !== "function") {
@@ -191,7 +171,7 @@ export async function createUserWithConsents(
  * Record a consent given outside the registration flow.
  *
  * @param input - Consent to persist, keyed by user id
- * @param pool - Optional injected pool (owns and closes its own pool otherwise)
+ * @param pool - Optional injected pool; defaults to the process-owned facade
  * @returns The stored consent row
  *
  * @remarks
@@ -211,7 +191,7 @@ export async function recordUserConsent(
   input: ConsentToRecord & { userId: string },
   pool?: DbPoolLike,
 ): Promise<UserConsentRow> {
-  const activePool = pool ?? (await createRepositoryPool());
+  const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
   try {
@@ -342,7 +322,7 @@ function consentStatusQuery(includePersonalHealthTables: boolean): string {
  *
  * @param userId - Owner user id
  * @param policyVersion - Policy version to match exactly
- * @param pool - Optional injected pool (owns and closes its own pool otherwise)
+ * @param pool - Optional injected pool; defaults to the process-owned facade
  * @returns The three facts the consent gate and the catch-up flow both need
  *
  * @remarks
@@ -370,7 +350,7 @@ export async function getConsentStatus(
   policyVersion: string,
   pool?: DbPoolLike,
 ): Promise<ConsentStatus> {
-  const activePool = pool ?? (await createRepositoryPool());
+  const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
   try {
