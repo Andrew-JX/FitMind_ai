@@ -1255,7 +1255,7 @@ function translateErrorMessage(message: string): string {
   return message;
 }
 
-function formatTrainingTimeSummary(input: {
+export function formatTrainingTimeSummary(input: {
   durationMin: number | null;
   endedAt: string | null | undefined;
   performedAt: string | null | undefined;
@@ -1276,7 +1276,7 @@ function formatTrainingTimeSummary(input: {
   return "\u672a\u8bbe\u7f6e";
 }
 
-function formatTimeOnly(value: string): string {
+export function formatTimeOnly(value: string): string {
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
@@ -1289,7 +1289,9 @@ function formatTimeOnly(value: string): string {
   });
 }
 
-function formatDateTimeLocalValue(value: string | null | undefined): string {
+export function formatDateTimeLocalValue(
+  value: string | null | undefined,
+): string {
   if (!value) {
     return "";
   }
@@ -1309,7 +1311,7 @@ function formatDateTimeLocalValue(value: string | null | undefined): string {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
-function parseDateTimeLocalValue(value: string): string | null {
+export function parseDateTimeLocalValue(value: string): string | null {
   if (!value.trim()) {
     return null;
   }
@@ -1319,7 +1321,7 @@ function parseDateTimeLocalValue(value: string): string | null {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-function getDurationMinutesFromLocalValues(
+export function getDurationMinutesFromLocalValues(
   startedAtValue: string,
   endedAtValue: string,
 ): number | null {
