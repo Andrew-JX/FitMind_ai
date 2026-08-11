@@ -1,356 +1,150 @@
-# AGENTS.md — AI 编码助手必读规则
-
-> 你（AI 助手）在开始任何任务前必须读完这份文件。 这里写的是**硬规则**，违反就是 bug。
-
-------
-
-## 0. 任务开始前必读清单
-
-本文件是**唯一入口**。开工前只需读两层：
-
-1. 本文件（AGENTS.md）—— 项目定位、分层规则、当前状态、文档同步规则都在这里。
-2. **与本次任务直接相关的那一份领域文档**（按需，不要全读）：
-   - 改后端路由 / API → `docs/api-contract.md`
-   - 改数据库 → `docs/db-schema.md`
-   - 涉及 AI / Tool Calling / RAG → `docs/ai-decisions.md`
-   - 改前端 UI → `docs/UI_SPEC.md`
-   - 需要历史背景 → `docs/PROJECT_BRIEF.md`、`docs/architecture.md`
-
-不需要每次都把 docs/ 通读一遍，也不需要先写"5 条总结"。直接读相关文件 + 看目标代码附近的现有实现和测试，然后动手。不确定再问。
-
-### 0.1 Beads 任务规则（硬规则）
-
-- 本仓库使用 `bd` 管理任务；开工先运行 `bd prime` 载入项目记忆，再运行 `bd ready` 查看无阻塞任务。
-- 从 `bd ready` 选择已有任务；认领必须使用 `bd update <id> --claim`，未认领不得开始实现。
-- 开工前运行 `bd show <id>`，确认描述、依赖和 acceptance 均明确；不明确时停止并交还规划者补充。
-- acceptance 必须由规划者在开工前写定；执行者禁止新增、删除、放宽或改写 acceptance 字段。
-- 实现范围以已认领 issue 为准；发现额外工作时记录并交给规划者，不得顺手扩大当前任务。
-- 完成后逐条验证 acceptance，并用 `bd close <id> --reason "<验证结果>"` 关闭；reason 必须写实际验证证据。
-- 禁止执行者自己新建任务后又由自己关闭；任务创建与验收关闭必须保持职责分离。
-- 被依赖项阻塞时更新 issue 状态或备注，不得绕过 `bd ready` 显示的依赖关系抢做。
-- Dolt 数据库是 Beads 的事实源；`.beads/issues.jsonl` 仅用于交换/查看，不得当作事实源或备份。
-
-------
-
-## 1. 项目定位（一句话提醒）
-
-FitMind AI = 训练日志 + 计算层 + Tool Calling + 可解释 AI 建议。
-
-- **不是**聊天机器人
-- **不是**套壳 ChatGPT
-- **核心卖点**：所有 AI 建议绑定真实数据，通过 evidence 字段可追溯
-
-------
-
-## 2. 目录结构与分层规则
-
-```
-fitmind-ai/
-├── client/                      # React 前端
-│   ├── src/
-│   │   ├── components/          # 纯 UI 组件，不直接 fetch
-│   │   ├── features/            # 业务功能模块（chat / training / dashboard）
-│   │   ├── hooks/               # 复用逻辑（useStreamChat、useToolCallState 等）
-│   │   ├── services/            # 接口请求封装（唯一发请求的地方）
-│   │   ├── store/               # Zustand 全局状态
-│   │   ├── types/               # TS 类型定义（与后端共享部分放 shared/）
-│   │   ├── utils/               # 纯函数工具
-│   │   └── constants/           # 常量
-│   └── ...
-├── server/                      # Express 后端
-│   ├── src/
-│   │   ├── routes/              # 路由定义
-│   │   ├── controllers/         # 请求处理（薄）
-│   │   ├── services/
-│   │   │   ├── analytics/       # 计算层（fatigue/volume/progress/plateau）
-│   │   │   ├── ai/              # AI 相关（anthropicClient、toolLoop、structuredOutput）
-│   │   │   ├── rag/             # RAG（扩展阶段）
-│   │   │   ├── mcp/             # MCP Server（扩展阶段）
-│   │   │   └── agent/           # ReAct Workflow（扩展阶段）
-│   │   ├── db/                  # DB 连接、迁移、查询封装
-│   │   ├── middleware/          # 鉴权、限流、错误处理
-│   │   ├── types/               # TS 类型
-│   │   ├── utils/               # 纯函数
-│   │   └── constants/           # 常量（含算法阈值如 FATIGUE_TAU）
-│   └── ...
-├── shared/                      # 前后端共享类型（DTO、tool schemas）
-├── docs/                        # 所有项目文档
-├── AGENTS.md                    # 本文件
-└── README.md
-```
-
-### 分层硬规则（违反即 bug）
-
-**前端**：
-
-- `components/` 中的组件**禁止直接调用 fetch / axios**
-- `components/shared/` 下的共享组件**禁止 import store**；只通过 props 接收数据
-- `features/<domain>/components/` 下的业务组件**只能通过同 feature 的 hook 间接使用 store**，不能直接 import store
-- 所有接口请求只能通过 `services/` 发起
-- `services/` 不能 import `components/`
-- 业务功能模块必须放在 `features/`，而不是塞在 `components/`
-- Zustand store 只放跨组件共享的状态；组件内部状态用 `useState` / `useReducer`
-
-**后端**：
-
-- `controllers/` 必须薄（< 30 行）：解参数、调 service、返结果
-- 所有业务逻辑放在 `services/`
-- `services/analytics/` **禁止 import** `services/ai/`（计算层不依赖 AI 层）
-- `services/ai/` **可以** import `services/analytics/`（AI 层调用计算层）
-- 数据库查询统一走 `db/` 层，不在 controller 里写 SQL
-
-**共享层**：
+# AGENTS.md — FitMind 协作与工程规则
 
-- 所有 DTO（数据传输对象）、Tool 参数 / 返回 schema 写在 `shared/`，前后端都从这里 import
-- 这样前后端类型不会漂移
+本文件只保存会影响实现和验收的当前规则。历史、产品状态和长篇设计不在这里复制；按任务读取对应权威文档和目标代码/测试。
 
-------
+## 1. 开工入口
 
-## 3. 命名规范
+先读本文件，再按改动类型读取最小必要文档：
 
-| 对象        | 规则              | 示例                                  |
-| ----------- | ----------------- | ------------------------------------- |
-| 文件名      | kebab-case        | `fatigue-score.ts`                    |
-| 组件文件    | PascalCase        | `WorkoutForm.tsx`                     |
-| 变量 / 函数 | camelCase         | `getFatigueScore`                     |
-| 类型 / 接口 | PascalCase        | `TrainingSet`                         |
-| 常量        | UPPER_SNAKE_CASE  | `FATIGUE_TAU`                         |
-| 数据库表    | snake_case 复数   | `exercise_muscles`                    |
-| 数据库字段  | snake_case        | `contribution_weight`                 |
-| API 路径    | kebab-case        | `/api/training-logs`                  |
-| 环境变量    | UPPER_SNAKE_CASE  | `DATABASE_URL`                        |
-| 枚举值      | snake_case 字符串 | `'tool_calling'`, `'recovery_status'` |
+- API / HTTP 行为：`docs/api-contract.md`
+- 数据库与迁移：`docs/db-schema.md`
+- 助手、Tool Calling、RAG、模型成本：`docs/architecture.md`、`docs/ai-decisions.md`
+- 前端交互与合规文案：`docs/UI_SPEC.md`
+- 部署与线上验证：`docs/production-smoke-checklist.md`、`deploy/README.md`
+- 历史与当前进度：`docs/INDEX.md`、`docs/progress.md`
 
-------
+文档与源码冲突时，不猜测也不把旧文档当事实：检查当前实现和测试，指出冲突，并把修正文档纳入任务范围或另建任务。
 
-## 4. TypeScript 规则（严格）
+## 2. Beads：重新启用的任务流程
 
-- `tsconfig.json` 必须开启 `"strict": true` 和 `"noUncheckedIndexedAccess": true`
-- **禁止使用 `any`**。如果真的需要，用 `unknown` 然后做类型守卫
-- \- **禁止类型逃逸**：禁止 `as any`、`as unknown as Xxx`、`@ts-ignore`、`@ts-nocheck` 
-- **允许的类型操作**：  - `as const` —— 字面量类型收窄  - `satisfies Xxx` —— 校验类型但保留字面量类型  - Zod / class-validator 等运行时校验后的类型收窄  - 第三方库返回 `unknown` 后经过类型守卫（`isXxx`）的转换 
-- **优先用类型守卫函数**而不是 `as Xxx`，例如 `if (isUser(x)) { x.email }` 而不是 `(x as User).email`
-- 所有公开函数必须有 JSDoc，至少包含 `@param` 和 `@returns`
-- 类型定义优先 `interface`（可扩展），临时联合类型用 `type`
-- 数据库 row 类型与 API DTO 类型分开（`UserRow` vs `UserDTO`），不要混用
+对可独立验收的中大型工作使用 `bd`：
 
-### JSDoc 模板
+1. 新会话先运行 `bd prime`，再用 `bd ready` 查看现有可执行任务。
+2. 用户已经明确指定的新工作，不必改做 `bd ready` 中的无关任务；规划者可以创建 issue，再用 `bd update <id> --claim` 认领。
+3. 实现前运行 `bd show <id>`，确认 description、依赖和 acceptance。acceptance 必须先冻结；执行者不得在实现中放宽、删除或改写。
+4. 只做已认领 issue 的范围。发现额外问题时记录到新 issue，不顺手扩批。
+5. 完成后把候选 SHA、命令、退出码、负向测试和未验证项写进 notes。
+6. 创建并执行同一 issue 的人不关闭它；保持 `in_progress`，交给独立复核者验收和关闭。
+7. `bd ready` 显示的依赖不可绕过。Dolt 数据库是 Beads 事实源；不要手改交换文件冒充状态。
 
-```typescript
-/**
- * 计算指定肌群在最近 N 天的疲劳分数（0-10 归一化）
- *
- * @param userId - 用户 ID
- * @param muscleGroupId - 肌群 ID（来自 muscle_groups 表）
- * @param days - 回溯天数，默认 7
- * @returns 疲劳分数（0=完全恢复，10=高度疲劳）
- *
- * @remarks
- * 公式：Σ (volume × rpeFactor × muscleContribution × decay(daysAgo))
- * 衰减常数 τ 在 constants/training.ts 中定义
- */
-export async function getFatigueScore(
-  userId: string,
-  muscleGroupId: string,
-  days = 7
-): Promise<number> { ... }
-```
+多人同步、hooks 与恢复流程的生产级验证仍由 `fitmind-xbt` 跟踪；本地 Beads 可用不等于该任务已经完成。
 
-------
+## 3. 真实仓库地图
 
-## 5. 算法层硬规则
+workspace 包为 `client`、`server`、`shared`。以下 manifest 由测试解析；新增、移动或删除架构目录时，源码与本节必须在同一批更新。
 
-- 所有算法阈值必须从 `constants/` 读取
+<!-- architecture-manifest:start -->
 
-  ，不能写死在公式里
+- `client/src/components/` — 可复用 UI 组件
+- `client/src/features/` — 按业务域组织的页面、组件、hooks、纯逻辑与 `*-api.ts`
+- `client/src/services/` — 跨 feature 的 HTTP transport
+- `client/src/theme/` — 主题与设计 token
+- `server/src/routes/` — Express 路由挂载
+- `server/src/controllers/` — HTTP 参数、service 调用与响应映射
+- `server/src/middleware/` — 鉴权、同意、限流和错误边界
+- `server/src/schemas/` — 请求/响应运行时校验
+- `server/src/services/training/` — 确定性训练计算与训练业务
+- `server/src/services/assistant/` — 助手编排、provider、评测与可观测性
+- `server/src/services/rag/` — 检索、embedding、语料和 RAG 评测
+- `server/src/services/auth/` — 认证与同意业务
+- `server/src/services/agent/` — 多步计划 agent
+- `server/src/db/` — repository、连接池与数据库边界
+- `server/src/utils/` — 通用服务端工具
+- `shared/src/` — client/server 共同消费的跨边界契约
 
-  - 例：`FATIGUE_TAU = 3.5`、`PLATEAU_SLOPE_THRESHOLD = 0.005`
+<!-- architecture-manifest:end -->
 
-- **所有算法函数必须有单元测试**（`*.test.ts`）
+`server/migrations/` 保存顺序迁移，`server/scripts/` 保存迁移/烟测/维护脚本，`client/e2e/` 保存 Playwright 测试，`deploy/` 保存腾讯云部署链路。
 
-- **测试必须覆盖边界情况**：空数据、单条数据、跨年、未来日期
+## 4. 分层与依赖
 
-- **算法不直接打 console.log，使用 logger**
+### 客户端
 
-------
+- 共享请求行为集中在 `client/src/services/http-client.ts`；领域端点封装留在对应 feature 的 `*-api.ts`。
+- `client/src/components/` 保持领域无关，通过 props/children 组合；业务状态、请求和文案留在 feature。
+- 组件内状态优先 React state/reducer；跨组件状态通过已有 feature hook/context 传递。不要为不存在的抽象写规则。
+- 跨前后端数据结构优先复用 `shared/src/` 的现有契约；不要为了“统一”把纯服务端 row 或运维 telemetry 暴露给客户端。
 
-## 6. AI 集成规则
+### 服务端
 
-### 6.1 Tool 定义
+- routes 负责挂载，controllers 负责 HTTP 边界，services 负责业务，repositories 负责 SQL。以职责和测试为判据，不用行数判定“薄”。
+- 所有用户资源查询/写入必须由已认证 `user_id` 约束。跨用户资源与不存在资源返回相同的安全 404，不做忽略 owner 的存在性探测。
+- 确定性训练数据和数值来自 training/repository；assistant 可以消费它们，模型不得成为数值事实源。
+- SQL 使用参数化查询。敏感同意检查与写入需要原子性时，在同一 `client` 事务内完成，不逃逸到共享 `pool.query`。
 
-- 所有 tool 的 schema 写在 `shared/tools.ts`
-- 工具参数用 Zod schema 校验，不信任模型传过来的任何参数
-- 工具返回**结构化结论**，不返回原始数据列表（防幻觉）
+### training → assistant 临时例外
 
-### 6.2 Prompt 管理
+默认方向是 assistant 依赖 training。当前只冻结以下两个 importer；这是迁移期 allowlist，不是目录级许可。
 
-- System prompt 不能硬编码在业务代码里，统一放 `server/src/services/ai/prompts/`
-- Prompt 改动必须在 `docs/ai-decisions.md` 留版本记录
+<!-- training-assistant-allowlist:start -->
 
-### 6.3 Tool Calling 循环
+- `server/src/services/training/workout-intake-llm-parser.ts` — 训练录入暂时复用 assistant 下的 OpenAI-compatible client/config。
+- `server/src/services/training/assistant-insights-service.ts` — 训练洞察 DTO 暂时复用 assistant intent type。
 
-- Tool 循环必须有最大轮数限制（默认 5），防止死循环
-- 每次 tool_use → tool_result 都记录到 `tool_call_logs` 表
-- 工具执行抛错要捕获并返回 `tool_result` 中的 error 字段，让模型能看到
+<!-- training-assistant-allowlist:end -->
 
-### 6.4 模型输出
+到期点：修复计划“结构债 4.2”必须把 provider client/config 与共享 intent 类型抽到中立边界，并删除本 allowlist。到期不能用“主文件减少到 N 行”替代；抽出的模块要有自己的测试和拆分前后不变的 characterization 证据。
 
-- 用户面向的最终回答必须是 **JSON Schema 校验过**的结构化输出
-- 必须包含 `disclaimer` 字段（健康建议风险提示）
-- 必须包含 `evidence` 字段（引用了哪个 tool 的哪个数据）
+## 5. TypeScript、测试与错误边界
 
-------
+- 基础配置保持 `strict` 和 `noUncheckedIndexedAccess`。优先 `unknown` + 校验/类型守卫，禁止用 `as any`、双重断言或 `@ts-ignore` 掩盖错误。
+- 外部输入在 HTTP/provider 边界用 Zod 或等价的运行时校验；数据库 row 与公开 DTO 不混用。
+- 行为变更先补 characterization/失败测试，再修实现；测试必须断言副作用、状态或调用边界，不能只断言字符串存在。
+- 已知失败不得标成环境 flaky。先保存输出、端口/PID 和复现条件，再判断环境还是产品漂移。
+- provider、工具或数据库失败只捕获能够安全分类的错误；未知错误保留原始失败边界，不能静默伪装成功。
 
-## 7. 安全规则
+## 6. AI 可信度与成本
 
-### 7.1 认证
+- 模型选择工具和可选措辞；训练数字、证据和计划内容由确定性函数/工具输出构造。
+- provider 参数与响应均校验；工具参数失败走已有确定性引导/fallback，不信任模型输入。
+- faithfulness、refusal、安全和 intent 回归由 `pnpm eval` 离线门禁；失败必须非零退出。
+- 模型价格是会变化的外部事实。新增/修改价格要记录官方来源和核实日期；未知模型保持 `null`，调用次数护栏仍生效。
+- 日志不得包含完整 request body、token、密钥或敏感健康数据。结构化日志使用归一化路径和必要字段。
 
-- MVP 用 JWT Bearer Token；生产化切 HttpOnly Cookie + CSRF
-- **绝对不允许**把 token 存 localStorage（XSS 风险）
+## 7. 数据库迁移与回滚
 
-### 7.2 输入校验
+<!-- migration-compatibility-rule -->
 
-- 所有 API 入参用 Zod 校验
-- SQL 必须用参数化查询（pg 的 `$1, $2` 占位符），**禁止字符串拼接**
-- 用户输入不能直接拼到 system prompt（Prompt Injection 防御）
+- 已应用 migration 不重写，也不靠事后补破坏性 `down()` 宣称可回滚。
+- 每个新 migration 必须与上一个应用版本向后兼容：expand 阶段只增加旧镜像能够忽略的表、列、索引或兼容结构；不在同一 release rename/drop/收紧旧字段语义。
+- contract 删除只能在所有线上应用都停止读取/写入旧结构后，于后续独立 release 执行。
+- 发布前同时回答：新应用在迁移窗口是否可运行、schema 前进后旧镜像是否仍可运行。任一答案为否，必须写出分阶段前滚/回滚方案，不能依赖 image rollback 的名字。
+- 迁移仍遵循 migration-first 的部署链路；expand/contract 是回滚兼容约束，不是跳过迁移的理由。
 
-### 7.3 限流
+数据库身份、目标分支、破坏性变更和回滚检查以 `docs/production-smoke-checklist.md` 为准。
 
-- 全局限流：每 IP 每分钟 60 次
-- AI 接口限流：每用户每分钟 20 次
-- 每用户每天最多 50 次 AI 调用
+## 8. 安全与合规
 
-### 7.4 日志脱敏
+- 认证使用 HttpOnly cookie，Bearer 只为受控脚本兼容；客户端不持久化 token。
+- 用户输入、provider 输出、路径参数和游标均在边界校验；错误响应不泄露其他用户资源存在性。
+- 健康数据写入受当前版本同意约束；分类删除和撤回路径不能被 pending-consent gate 阻断。
+- 改隐私文案、同意版本、数据驻留或跨境行为时，同步 API/UI/政策契约和合规 E2E。
+- 密钥、真实生产数据、部署目标和线上环境修改需要明确授权；本地代码授权不自动包含 push 或部署。
 
-- `tool_call_logs` 不记录用户的身高 / 体重 / 真实姓名
-- 错误日志不打印完整 request body（可能含敏感数据）
+## 9. 验证与提交
 
-------
-
-## 8. 提交规则
-
-### Commit Message 格式
-
-```
-<type>(<scope>): <subject>
-
-<body 可选>
-```
-
-- type: `feat` / `fix` / `refactor` / `docs` / `test` / `chore` / `style`
-- scope: `client` / `server` / `db` / `ai` / `docs`
-- subject: 用动词开头，不超过 50 字
-
-例：
-
-- `feat(server): add fatigue score calculation in analytics layer`
-- `fix(client): handle SSE chunk parsing edge case`
-- `docs: update ai-decisions with embedding provider choice`
-
-### Pre-commit 必须通过
-
-- `npm run lint`
-- `npm run type-check`
-- `npm test`
-
-------
-
-## 9. 面对 AI 助手的元规则
-
-这一节是给 AI 看的，不是给人看的。
-
-### 9.1 不假装看懂
-
-- 如果文档冲突或不清楚，**立刻指出，不要猜**
-- 如果用户的需求模糊，**回问澄清，不要硬上**
-
-### 9.2 先 Plan 再写
-
-- 用户没有明说「直接写代码」之前，**先给执行计划**
-- Plan 包含：步骤、涉及文件、关键决策、风险点、不确定点
-- 用户确认 plan 后再写
-
-### 9.3 单次改动控制
-
-- **一次改动不超过 5 个文件**
-- 如果任务需要改 5+ 文件，先拆分，告诉用户拆分方案
-
-### 9.4 改完必须自检
-
-每次改完代码，最后输出一份简短报告：
-
-```
-本次改动总结：
-- 改动文件：X 个
-- 主要逻辑：...
-- 风险点：...
-- 用户需要重点 review 的地方：...
-- 是否需要更新文档（ai-decisions / troubleshooting）：是/否
-```
-
-### 9.5 禁止行为
-
-- 禁止偷偷修改本任务范围外的文件
-- 禁止删除注释（除非是过时注释）
-- 禁止跳过用户已写好的 TODO
-- 禁止用 `as any` / `@ts-ignore` 绕过类型错误（让用户决定）
-- 禁止 import 未在 package.json 声明的依赖（如需新依赖，提议给用户确认）
-
-------
-
-## 10. 这份文档的更新
-
-- 项目规则发生变化时，**先更新本文件**，再让 AI 用新规则工作
-- 如果你（AI 助手）发现规则有矛盾或缺失，**主动提出**，让用户更新本文件
-
-## 11. 当前状态与部署（current state）
-
-> 这一节是项目的"现状快照"，改动较大的能力时同步更新这里。
-
-- **线上地址**：`https://fitmind-ai-psi.vercel.app/`
-- **部署**：Vercel 托管 app/API 合并运行时；PostgreSQL 存用户、训练、消息、知识 chunk、saved insights、feedback。客户端走相对 `/api`，Vercel 上 `VITE_API_BASE_URL` 可留空。
-- **已落地的主流程**：训练日志 CRUD + 自然语言录入、确定性训练分析（summary / progress / muscle-load / recommendation-context / weekly-report）、SSE 助手（intent 路由 + 确定性工具 + RAG + 周报/平台期诊断）、saved insights、产品反馈、可安装 PWA 壳。
-- **多步 Agent（Phase 6.0 ✅）**：`next_week_plan` intent 走 `server/src/services/agent/` 的确定性 ReAct 规划器（查容量→找弱项→查进展→检索知识→生成草案），发 `agent_step_*` SSE 事件 + `state:"planning"`，`agent_trace` 进 `structured_output` 持久化；前端 `AssistantAgentTrace.tsx` 在消息气泡里渲染 thought→action→observation 时间线。synthesis 还产出确定性可执行下周草案 `plan`（动作×组×次×目标重量，`next-week-plan-generator.ts`，结构化不内联、先不落库）进 structured_output；薄运动员档案（`athlete_profiles` 表 + `GET/PUT /api/athlete-profile`）best-effort 注入计划，按训练目标选次数/强度方案、伤病/每周天数进安全 notes。生成的草案可「接受」成计划训练（`planned_workouts` 表 + `POST /api/planned-workouts`、`GET /api/planned-workouts/current`、`PATCH /api/planned-workouts/:id`），读取时确定性算 planned-vs-performed 依从度（`plan-adherence.ts`），合上 记录→分析→计划→再记录 闭环。
-- **AI 护栏 / 评估 / 可观测（roadmap §8 Slice 1-3、6 ✅）**：运行时 faithfulness 校验（`answer-faithfulness.ts`，确定性核对答案数字/引用是否都源自本轮工具输出，标注不拦截，结果进 `structured_output.faithfulness`）；离线 eval 套件 + 回归门禁（`assistant-eval.ts` + `pnpm eval`，mock-first 无 DB 零成本：intent 路由准确率 + 拒答/证据回归 + faithfulness 通过率，回归非零退出）；每轮可观测（`assistant-turn-observability.ts`，延迟/工具耗时/步数/faithfulness 单行 JSON）+ AI 限流（`ai-rate-limiter.ts` + 中间件，每用户 20/分→RATE_LIMITED、50/天→AI_QUOTA_EXCEEDED，落实 §7.3；内存计数、多实例各自计）。
-- **RAG**：DB 存知识 chunk，Voyage `voyage-4-lite` + pgvector `vector(1024)`，有 embedding 时用 `0.7*向量 + 0.3*关键词` 混合打分，否则关键词兜底。
-- **鉴权**：HttpOnly + SameSite=Lax 会话 cookie（`fitmind_token`，7 天），刷新不掉线；中间件优先读 cookie、回退 Bearer（保留给 smoke 脚本）。详见 `ai-decisions.md`。
-- **语音/文本录入**：规则解析器（多动作 / 连接词 / 磅→kg / 先报后述合并）+ 可选 LLM 兜底（`WORKOUT_INTAKE_LLM_PROVIDER`= `mock`/`off`/`gemini`/`groq`/`anthropic`）；未匹配/多候选动作在语音页先确认（可"搜动作库替换"选词典动作，或移除），已匹配才进 composer。**记录页内**也可语音：composer 右下 FAB 长按"细胞分裂"成放射菜单（中=收起、上=语音、左=动作库），可滑动松手或点卫星选择；静止时脉冲光环 + "长按"提示，快速轻点仍开动作库。语音解析结果合并/追加进当前 draft，不覆盖（`use-fab-gesture.ts` 速拨手势 + `appendIntakeExercisesToDraft`）。
-- **测试**：单测 Vitest（`pnpm test:unit`）；浏览器 E2E 用 Playwright + mock 后端覆盖鉴权会话流程（`pnpm test:e2e`，见 `client/e2e/`）；DB 后端链路靠 `server/scripts/*-smoke.ts`。训练·分析·助手的全流程 E2E 仍待补。
-- **当前限制**：无 saved-insight 分享链接；无离线编辑/同步；无知识管理后台；无 ANN 索引；**刻意不引入** LangChain / LangGraph / MCP / 多 Agent。
-
-验证命令以 `README.md` 为准；docs-only 改动跑 `pnpm format:check`，完整门禁跑 `pnpm verify`（E2E 需另跑 `pnpm test:e2e`）。
-
-**后续待办清单见 `docs/roadmap.md §1.6`**（开新窗口接手时先读那里）。
-
-------
-
-## 12. 文档同步规则（每次改动必做）
-
-文档不是事后清理。**每次任务在收尾前都要做一次"文档影响审查"**：代码、行为、数据结构、流程或运维方式变了，就在同一次改动里更新对应文档；如果确实不用更新，在最终回复里说明原因。不要等用户单独说"顺便更新文档"。
-
-按改动区域对照下表，更新命中的文档（`docs/progress.md` 几乎总是要追加一条）：
-
-| 改动区域 | 需要检查/更新的文档 |
-| --- | --- |
-| **不确定该读哪份文档** | `docs/INDEX.md`（按任务组织的总索引，先读它再定位） |
-| 产品定位 / 范围 / 阶段计划 / 重大能力 | `docs/PROJECT_BRIEF.md`、`README.md`、本文件第 11 节 |
-| API 路由 / 请求 / 响应 / 错误 / 鉴权 / SSE 事件 | `docs/api-contract.md`、受影响的 `shared/src/**` |
-| 数据库表 / 列 / 索引 / 迁移 / seed / 归属 | `docs/db-schema.md` |
-| 助手 intent / 工具 / provider / prompt / 结构化输出 / Evidence·Sources 语义 | `docs/ai-decisions.md`、`docs/api-contract.md`、`docs/demo-script.md`、`docs/production-smoke-checklist.md` |
-| RAG 检索 / 知识导入 / embedding / eval | `docs/ai-decisions.md`、`docs/db-schema.md`、`docs/production-smoke-checklist.md` |
-| 前端 UI / 交互 / tab / 布局 / 工作流耦合 | `docs/UI_SPEC.md`、`docs/frontend-current-state.md`、`docs/demo-script.md` |
-| 本地运行 / env / 端口 / 验证 / 部署 / smoke 命令 | `docs/local-run-guide.md`、`docs/production-smoke-checklist.md`、`README.md` |
-| 阻塞性或反复出现的故障 | `docs/troubleshooting.md` |
-| Agent / 流程 / 规则本身 | 本文件（AGENTS.md） |
-
-最终回复里带一行文档结论，例如：
+默认离线门禁：
 
 ```text
-文档：已更新 <files>；未更新 <files>，因为 <原因>。
+pnpm verify
+pnpm eval
 ```
 
-------
+按范围增加：
 
-## 前端开发规则
+- 目标单测：`pnpm test:unit -- <files>`
+- 合规浏览器门禁：`pnpm test:e2e:release`
+- 构建：`pnpm --filter @fitmind/server build`、`pnpm --filter @fitmind/client build`
+- 迁移/SQL/部署 smoke：仅在所需数据库、容器、密钥和授权真实存在时运行；未运行就明确写“未验证”。
 
-1. 开始写任何前端组件前，先读 `docs/UI_SPEC.md`
+提交只包含任务允许文件。提交前检查 staged diff 和负向用例；本地 commit、push、部署分别需要对应授权。不要把本地通过描述成 GitHub Actions 或生产已生效。
+
+## 10. 文档同步
+
+- API 路由/状态/DTO：更新 `docs/api-contract.md`。
+- schema/migration：更新 `docs/db-schema.md` 和生产 smoke checklist。
+- AI 边界、provider、成本或 fallback：更新 `docs/ai-decisions.md`。
+- 用户交互与合规文案：更新 `docs/UI_SPEC.md`。
+- 每个已验证批次：在 `docs/progress.md` 记录候选 SHA、证据和未验证项；历史条目不回写成“当时就已正确”。
+
+文档中的绝对规则要么有机器门禁，要么改成带边界的指导。发现规则已经失效时，修规则和防漂移测试，不创建空目录迁就旧地图。

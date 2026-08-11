@@ -1062,3 +1062,11 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
   cache-miss `$0.14/M`、输出 `$0.28/M` 计价。因现有 usage 没有 cache-hit 明细，所有 prompt token
   按 cache-miss 做保守上界；未知 BYO 模型仍为 `null`，调用次数闸门继续生效。
 - 本批没有修改服务器环境、没有部署、没有真实 provider 调用；线上模型切换与成本累计仍未验证。
+
+## 2026-08-11 — AGENTS 真实地图与可执行治理（fitmind-cqh，本地候选）
+
+- 删除 AGENTS 中不存在的 Zustand/store、analytics、固定 controller 行数、全量 JSDoc、单批文件数等绝对规则，改为当前 client/server/shared 真实目录、职责边界和权威文档路由。
+- 明确选择“重新启用 Beads”：用户已指定工作可由规划者创建并 claim，不必改做 `bd ready` 的无关任务；acceptance 开工前冻结，创建/执行同一 issue 的人继续不负责关闭。多人同步、hooks 与恢复仍由 `fitmind-xbt` 独立验证。
+- training → assistant 本批只冻结两个具名例外：workout intake 复用 OpenAI-compatible client/config，assistant insights 复用 intent type；到修复计划结构债 4.2 抽中立边界，不在文档批次搬代码。
+- 新 governance 测试解析 AGENTS architecture manifest，要求每个目录含真实非测试源码；内存加入幽灵目录和空目录都会失败。测试同时扫描反向依赖，第三个 importer 不在 allowlist 时失败。
+- migration 硬规则改为 expand/contract：新 schema 必须兼容上一个应用镜像，破坏性删除放后续 release；生产 smoke 新增“是否破坏、旧镜像能否跑、回滚或分阶段前滚方案”三问。没有给已上线迁移补 `down()`，也没有执行生产回滚演练。

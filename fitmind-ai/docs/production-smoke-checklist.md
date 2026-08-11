@@ -24,6 +24,14 @@ Use this checklist before sending the app to an interviewer, friend, or recruite
 
 ## Migration and consent release gate
 
+<!-- destructive-migration-check:start -->
+
+- [ ] 本次发布是否包含破坏性 schema 变更（drop/rename、收紧 nullability、改变旧字段语义或删除旧索引/表）？若是，不得与 expand 同批发布。
+- [ ] expand migration 执行后，上一个应用版本的旧镜像能否继续运行并完成健康检查？镜像回滚不能假设 schema 也会自动回退。
+- [ ] 若新应用不能兼容旧 schema，或旧镜像不能兼容新 schema，已记录可执行的回滚或分阶段前滚方案、负责人和验证命令。
+
+<!-- destructive-migration-check:end -->
+
 - [ ] Record the reviewed release SHA and the intended Neon project/branch before migration.
 - [ ] On Vercel releases, run and verify the production migration **before** pushing that SHA to `main`; the Vercel build itself never migrates PostgreSQL.
 - [ ] On Tencent releases, run only `bash deploy/scripts/deploy.sh`; do not bypass its pre-migration database identity check with ad-hoc Compose commands.
