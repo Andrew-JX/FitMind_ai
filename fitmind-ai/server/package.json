@@ -29,7 +29,9 @@
     "smoke:training": "tsx scripts/training-summary-api-smoke.ts && tsx scripts/recommendation-context-api-smoke.ts && tsx scripts/exercise-progress-api-smoke.ts",
     "smoke:workout-intake": "tsx scripts/workout-intake-parse-smoke.ts",
     "smoke:recommendation-context": "tsx scripts/recommendation-context-api-smoke.ts",
-    "type-check": "tsc -p tsconfig.json --noEmit",
+    "type-check": "pnpm run type-check:src && pnpm run type-check:scripts",
+    "type-check:src": "tsc -p tsconfig.json --noEmit",
+    "type-check:scripts": "tsc -p tsconfig.scripts.json",
     "lint": "eslint src pgmigrate.config.cjs",
     "test": "pnpm run test:unit",
     "test:unit": "cd .. && vitest run"

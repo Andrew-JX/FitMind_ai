@@ -72,9 +72,14 @@ VITE_API_BASE_URL=/api
 pnpm install
 pnpm verify
 pnpm --filter @fitmind/server type-check
+pnpm --filter @fitmind/server type-check:scripts
 pnpm --filter @fitmind/client type-check
 pnpm lint
 ```
+
+`server` 的默认 `type-check` 会依次检查 production `src` 与 `server/scripts`；
+`type-check:scripts` 只用于单独定位维护脚本、迁移验证脚本和 smoke 的类型错误，
+不会把这些脚本加入 production `dist`。
 
 ## 5. Database Migration and Seed
 

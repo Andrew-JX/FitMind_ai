@@ -2,7 +2,7 @@ import { access, readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { createDbPool } from "../src/db/index.js";
+import { createDbPool } from "../src/db/pool.js";
 import { hashPassword } from "../src/services/auth/password.js";
 
 interface ExerciseLookupRow {

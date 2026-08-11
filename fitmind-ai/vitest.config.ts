@@ -5,6 +5,7 @@ export default defineConfig({
     environment: "node",
     include: [
       "client/src/**/*.test.ts",
+      "server/scripts-typecheck.test.ts",
       "server/src/**/*.test.ts",
       "shared/src/**/*.test.ts",
     ],

@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "moduleResolution": "NodeNext",
+    "module": "NodeNext",
+    "noEmit": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsconfig.scripts.tsbuildinfo"
+  },
+  "include": ["scripts/**/*.ts"]
+}

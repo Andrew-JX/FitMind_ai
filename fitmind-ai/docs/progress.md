@@ -1166,3 +1166,12 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
 - 初次全量验证揭示旧 focus/metrics 测试把“唯一实现所有者”错误绑定为“orchestrator 必须直接 import”。范围补充合同 `042cf56` 冻结正确两跳链，`ff98eb8` 单独适配护栏；focus/metrics 新测试 blob 分别为 `1df0141fa5971c0c72bb395a35b3493dd99fed43` 与 `086a78d383e2a0c4d3fe83f0a7766d0d757de21a`，candidate 不修改。
 - 定向验证通过 47/47；assistant 目录通过 30 个测试文件、289 条断言；全量 `pnpm verify` 通过 114 个 Vitest 文件、879 条断言及 5 个 monitor Node 断言，server production build 通过。orchestrator 从 2568 行降到 2014 行，但完成判据是模块自有测试、单一所有权与依赖方向，不是行数。
 - 开工前与过程中并行出现的 workflow/deploy/health/release-identity/progress 改动未进入本批暂存或提交；验证没有真实 provider、数据库或网络调用，没有 push 或部署。orchestrator 的 session/provider/tool/planning 生命周期和 TrainingSessionComposer 其余 UI 边界仍需后续独立拆分。
+
+## 2026-08-11 — server scripts 独立 TypeScript 门禁（fitmind-xd4，本地候选）
+
+- 合同由 `61f93aa` 冻结，baseline 为 `9e229c8`。首次 production build 揭示“测试必须位于 `server/src`”与“dist 路径逐项不变”冲突，`5ad9471` 在 candidate 前冻结范围补充，把治理测试移到 server 根并由 Vitest 显式收录；原合同未修改。
+- `server/tsconfig.scripts.json` 继承 base 的 `strict` 与 `noUncheckedIndexedAccess`，使用 NodeNext 且 `noEmit`；server 默认 `type-check` 现在串联 src 与 scripts，根 recursive type-check/verify 会实际执行它。治理测试动态枚举当前 26 个 `.ts` 脚本，逐项验证 TypeScript program 覆盖脚本及其 source import closure，并锁定根/包命令和 production graph。
+- 基线严格检查暴露的 12 条诊断已按真实类型修复：production smoke 的 JSON body 改用 Fetch 原生接受的 string；两个 seed 直接消费 `db/pool.ts`；共享 `DbPool`/`DbClient` query 支持泛型 row，而 SQL、seed 内容、路由、断言和 pool 生命周期未改。新增/修改 TypeScript 没有 `as any`、双重断言或 ignore suppression。
+- 回滚演示把 demo seed 的有效 `../src/db/pool.js` 临时改成不存在的 `missing-pool.js`；根 `pnpm type-check` 在 scripts 阶段以 TS2307 非零退出。恢复后 type-check exit 0，故障注入前后文件 blob 均为 `8c5f790425b54b2661850431123a45ea85055da4`。
+- production `tsconfig.json` blob 保持 `ee3259286eb56dca980f86fb5970f48da20f15da`，build 命令未变；最终 build exit 0，`dist` 仍为 219 个路径、SHA-256 `cc3a85d0e51384779a7b1e971e0d6729b752718aa5880abd3f2d4ff44f19c5f7`、`dist/scripts` 为 0，错误测试位置产生的单个 ignored artifact 已删除且未被重建。
+- 最终 `pnpm verify` 通过 115 个 Vitest 文件、882 条断言及 5 条 monitor 断言；根 `pnpm eval` 的 intent 15/15、refusal 14/14、faithfulness 3/3、safety 20/20 全通过。需要数据库、provider、注册配置或线上 API 的 server eval/smoke 未验证；并行 deploy/health/release-identity/progress 改动未暂存、未提交，没有 push 或部署。

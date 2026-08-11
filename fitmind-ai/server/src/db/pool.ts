@@ -2,18 +2,24 @@ import { createRequire } from "node:module";
 
 import { loadServerEnv } from "../env.js";
 
-export interface DbQueryResult {
-  rows: unknown[];
+export interface DbQueryResult<TRow = unknown> {
+  rows: TRow[];
   rowCount?: number | null;
 }
 
 export interface DbClient {
-  query: (sql: string, params?: readonly unknown[]) => Promise<DbQueryResult>;
+  query: <TRow = unknown>(
+    sql: string,
+    params?: readonly unknown[],
+  ) => Promise<DbQueryResult<TRow>>;
   release: () => void;
 }
 
 export interface DbPool {
-  query: (sql: string, params?: readonly unknown[]) => Promise<DbQueryResult>;
+  query: <TRow = unknown>(
+    sql: string,
+    params?: readonly unknown[],
+  ) => Promise<DbQueryResult<TRow>>;
   connect: () => Promise<DbClient>;
   end: () => Promise<void>;
 }

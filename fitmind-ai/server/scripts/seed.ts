@@ -1,6 +1,4 @@
-import { Pool } from "pg";
-
-import { createDbPool } from "../src/db/index.js";
+import { createDbPool, type DbPool } from "../src/db/pool.js";
 import { exerciseMuscleSeeds } from "../src/db/seed-data/exercise-muscles.js";
 import { exerciseSeeds } from "../src/db/seed-data/exercises.js";
 import { muscleGroupSeeds } from "../src/db/seed-data/muscle-groups.js";
@@ -67,7 +65,7 @@ function printHelp(): void {
  * @returns A lookup from muscle code to database id.
  */
 async function seedMuscleGroups(
-  pool: Pool,
+  pool: DbPool,
   seeds: readonly MuscleGroupSeed[],
 ): Promise<Map<string, string>> {
   const idByCode = new Map<string, string>();
@@ -127,7 +125,7 @@ async function seedMuscleGroups(
  * @returns A lookup from exercise code to database id.
  */
 async function seedExercises(
-  pool: Pool,
+  pool: DbPool,
   seeds: readonly ExerciseSeed[],
 ): Promise<Map<string, string>> {
   const idByCode = new Map<string, string>();
@@ -197,7 +195,7 @@ async function seedExercises(
  * @returns Nothing.
  */
 async function seedExerciseMuscles(
-  pool: Pool,
+  pool: DbPool,
   seeds: readonly ExerciseMuscleSeed[],
   exerciseIds: ReadonlyMap<string, string>,
   muscleGroupIds: ReadonlyMap<string, string>,
@@ -250,7 +248,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const pool: Pool = createDbPool();
+  const pool = createDbPool();
 
   try {
     await pool.query("BEGIN");

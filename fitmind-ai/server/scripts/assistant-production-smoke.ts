@@ -60,8 +60,8 @@ function assert(condition: unknown, message: string): asserts condition {
   }
 }
 
-function jsonBody(value: unknown): Uint8Array {
-  return new TextEncoder().encode(JSON.stringify(value));
+function jsonBody(value: unknown): string {
+  return JSON.stringify(value);
 }
 
 async function requestJson<TData>(
