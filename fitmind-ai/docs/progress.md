@@ -1095,3 +1095,11 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
 - 本批明确选择 SHA 语义，不引入 registry 或可部署 artifact。Playwright artifact 仍仅在失败时保存 trace/截图/报告，deploy job 不下载或消费它。
 - 测试会拒绝删除 `needs`/environment/job output、直接改用 `github.sha`、把审批放到 verify 或把 gate/SSH 混回同一 job；全量 `pnpm verify` 通过 104 个 Vitest 文件、803 个断言和 5 个 monitor Node 断言，client/server production build 通过。
 - 本地 workflow 文件不能证明远端审批已生效；本批没有 push、没有创建/修改 GitHub environment、没有配置 required reviewer、没有触发运行、没有审批或部署。后续必须保存 environment 规则截图和一次 verify 全绿后 Waiting → 独立批准 → 同 SHA 部署的证据。
+
+## 2026-08-11 — 事务 query 不逃逸 CI 护栏（fitmind-bcq，本地候选）
+
+- 新增无 Vitest 依赖的共享 transaction routing probe：`pool.query` 与 `connect()` 返回的 `client.query` 是两个独立通道，事务中一旦直接调用 pool 就抛固定错误并留下记录。
+- 真实执行 consent 注册、health profile 保存、planned-workout supersede、workout+sets 创建和 personal-tools 经期保存五条链路；每条成功路径均断言 connect 一次、BEGIN/业务 SQL/COMMIT 全在 client、pool query 为 0、release 一次。workout set 写失败另证实 ROLLBACK 仍在 client 且不 COMMIT。
+- 测试扫描 db 与 repositories 源码，所有直接发出 `BEGIN` 的非测试文件必须与具名场景集合精确相同；内存加入未覆盖的第五 repository 会失败，避免未来只靠人工维护清单。
+- `workouts-repository.d.ts` 补齐运行时已有的可选 pool 参数与 query/client/pool 类型；测试从 runtime export 发现全部 10 个可注入函数并逐一检查声明，不使用类型强转绕过。
+- 全量 `pnpm verify` 通过 105 个 Vitest 文件、812 个断言及 5 个 monitor Node 断言，server production build 通过。本批没有改变 SQL、连接生命周期或生产行为；每请求新建 pool、4 个 JS repository 和手写声明仍待 4.1b，不能记成已修。

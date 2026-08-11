@@ -3,6 +3,22 @@ export interface WorkoutCursor {
   id: string;
 }
 
+export interface DbQueryResult {
+  rows: unknown[];
+  rowCount?: number | null;
+}
+
+export interface DbClientLike {
+  query: (sql: string, params?: readonly unknown[]) => Promise<DbQueryResult>;
+  release: () => void;
+}
+
+export interface DbPoolLike {
+  query: DbClientLike["query"];
+  connect?: () => Promise<DbClientLike>;
+  end?: () => Promise<void>;
+}
+
 export interface WorkoutSetRow {
   id: string;
   exercise_id: string;
@@ -94,6 +110,7 @@ export declare function encodeWorkoutCursor(cursor: WorkoutCursor): string;
 export declare function decodeWorkoutCursor(cursor: string): WorkoutCursor;
 export declare function listWorkoutsByUser(
   filters: ListWorkoutsFilters,
+  pool?: DbPoolLike,
 ): Promise<{
   items: WorkoutSummaryRow[];
   nextCursor: string | null;
@@ -101,33 +118,46 @@ export declare function listWorkoutsByUser(
 export declare function findWorkoutByIdForUser(
   workoutId: string,
   userId: string,
+  pool?: DbPoolLike,
 ): Promise<WorkoutDetailRow | null>;
-export declare function hasWorkoutById(workoutId: string): Promise<boolean>;
+export declare function hasWorkoutById(
+  workoutId: string,
+  pool?: DbPoolLike,
+): Promise<boolean>;
 export declare function createWorkoutWithSets(
   userId: string,
   input: CreateWorkoutInput,
+  pool?: DbPoolLike,
 ): Promise<WorkoutDetailRow>;
 export declare function updateWorkoutByIdForUser(
   workoutId: string,
   userId: string,
   input: UpdateWorkoutInput,
+  pool?: DbPoolLike,
 ): Promise<WorkoutDetailRow | null>;
 export declare function deleteWorkoutByIdForUser(
   workoutId: string,
   userId: string,
+  pool?: DbPoolLike,
 ): Promise<{ id: string } | null>;
 export declare function addSetToWorkoutForUser(
   workoutId: string,
   userId: string,
   input: SetInput,
+  pool?: DbPoolLike,
 ): Promise<WorkoutSetRow | null>;
 export declare function updateSetByIdForUser(
   setId: string,
   userId: string,
   input: UpdateSetInput,
+  pool?: DbPoolLike,
 ): Promise<WorkoutSetRow | null>;
 export declare function deleteSetByIdForUser(
   setId: string,
   userId: string,
+  pool?: DbPoolLike,
 ): Promise<{ id: string; workout_id: string } | null>;
-export declare function hasSetById(setId: string): Promise<boolean>;
+export declare function hasSetById(
+  setId: string,
+  pool?: DbPoolLike,
+): Promise<boolean>;
