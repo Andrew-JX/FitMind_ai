@@ -284,7 +284,7 @@ type AssistantExerciseClarificationContext = z.infer<
   typeof assistantExerciseClarificationContextSchema
 >;
 
-interface TrainingOverviewResult {
+export interface TrainingOverviewResult {
   range: {
     start_date: string;
     end_date: string;
@@ -305,7 +305,7 @@ interface TrainingOverviewResult {
   };
 }
 
-interface ExerciseProgressResult {
+export interface ExerciseProgressResult {
   range: {
     start_date: string;
     end_date: string;
@@ -332,7 +332,7 @@ interface ExerciseProgressResult {
   };
 }
 
-interface RecommendationContextResult {
+export interface RecommendationContextResult {
   range: {
     start_date: string;
     end_date: string;
@@ -362,7 +362,7 @@ interface RecommendationContextResult {
   };
 }
 
-interface WeeklyTrainingReportResult {
+export interface WeeklyTrainingReportResult {
   range: {
     start_date: string;
     end_date: string;
@@ -516,7 +516,7 @@ interface ProviderSimulationResult {
   normalizedMessage: string;
 }
 
-interface AssistantAnswerCore {
+export interface AssistantAnswerCore {
   summary: string;
   bullets: string[];
   evidence: AssistantAnswerEvidence;
@@ -641,7 +641,7 @@ function completeAnswer(input: {
   };
 }
 
-function normalizeStructuredAnswer(
+export function normalizeStructuredAnswer(
   answer: AssistantAnswerCore | AssistantStructuredAnswer,
   intent: AssistantRoutedIntent,
 ): AssistantStructuredAnswer {
@@ -663,7 +663,7 @@ function normalizeStructuredAnswer(
   });
 }
 
-function buildTrainingOverviewAnswer(
+export function buildTrainingOverviewAnswer(
   result: TrainingOverviewResult,
 ): AssistantAnswerCore {
   const topExercise = result.by_exercise[0];
@@ -695,7 +695,7 @@ function buildTrainingOverviewAnswer(
   };
 }
 
-function buildExerciseProgressAnswer(
+export function buildExerciseProgressAnswer(
   result: ExerciseProgressResult,
 ): AssistantAnswerCore {
   const exerciseName = result.exercise.exercise_name ?? "当前动作";
@@ -724,7 +724,7 @@ function buildExerciseProgressAnswer(
   };
 }
 
-function buildWeeklyTrainingReportAnswer(
+export function buildWeeklyTrainingReportAnswer(
   result: WeeklyTrainingReportResult,
 ): AssistantAnswerCore {
   const topExercise = result.top_exercises[0];
@@ -763,7 +763,7 @@ function buildWeeklyTrainingReportAnswer(
   };
 }
 
-function buildPlateauDiagnosisAnswer(input: {
+export function buildPlateauDiagnosisAnswer(input: {
   message: string;
   result: ExerciseProgressResult;
   sources: Awaited<ReturnType<typeof retrieveKnowledgeChunks>>;
@@ -806,7 +806,7 @@ function buildPlateauDiagnosisAnswer(input: {
   };
 }
 
-function buildRecommendationContextAnswer(
+export function buildRecommendationContextAnswer(
   mode: AssistantIntentMode,
   message: string,
   result: RecommendationContextResult,
@@ -959,7 +959,9 @@ function buildEvidenceExplainAnswer(
   };
 }
 
-function buildProviderMessageAnswer(message: string): AssistantAnswerCore {
+export function buildProviderMessageAnswer(
+  message: string,
+): AssistantAnswerCore {
   return {
     summary: message,
     bullets: [],
@@ -967,7 +969,7 @@ function buildProviderMessageAnswer(message: string): AssistantAnswerCore {
   };
 }
 
-function buildProviderErrorFallbackGuidance(
+export function buildProviderErrorFallbackGuidance(
   missingInputFields: string[],
 ): string {
   const fieldLabels = missingInputFields.map((field) =>
