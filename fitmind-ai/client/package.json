@@ -10,6 +10,7 @@
     "lint": "eslint src vite.config.ts",
     "test": "vitest run --passWithNoTests src/**/*.test.ts",
     "test:e2e": "playwright test",
+    "test:e2e:release": "playwright test e2e/registration-consent.spec.ts e2e/injury-withdrawal.spec.ts",
     "verify:e2e-lifecycle": "node scripts/verify-e2e-lifecycle.mjs",
     "verify:e2e-exit": "node scripts/measure-e2e-exit.mjs 3"
   },

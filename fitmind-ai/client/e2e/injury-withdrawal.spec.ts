@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-import { installApiMocks, MOCK_POLICY_VERSION } from "./support/mock-api";
+import { CURRENT_PRIVACY_POLICY_VERSION } from "../../shared/src/consent";
+import { installApiMocks } from "./support/mock-api";
 
 /**
  * fitmind-lmy: an account whose consents are settled must be able to take the
@@ -16,8 +17,8 @@ import { installApiMocks, MOCK_POLICY_VERSION } from "./support/mock-api";
 const PROFILE_TAB = "个人";
 const PROFILE_ENTRY = "训练档案";
 const INJURY_PLACEHOLDER = "用逗号分隔，如：膝盖, 肩";
-const WITHDRAW_TRIGGER = "撤回伤病信息";
-const WITHDRAW_CONFIRM = "确认撤回";
+const WITHDRAW_TRIGGER = "删除伤病信息";
+const WITHDRAW_CONFIRM = "确认删除";
 const SAVE_PROFILE = "保存档案";
 const HEALTH_CONSENT = /敏感个人信息/;
 
@@ -143,12 +144,10 @@ test.describe("withdrawing injury data from the ordinary profile sheet", () => {
     ).toBeHidden();
   });
 
-  // The gap the previous round shipped: the control was driven by the
-  // current-version flag, so a user holding only a superseded-version consent
-  // — no injury data behind it — saw no way to take that permission back, and
-  // the catch-up screen never asks them either (it only asks when injury data
-  // is stored). Live permission, no route to it.
-  test("offers withdrawal for a consent given under superseded wording", async ({
+  // The profile sheet owns injury data only. A live category consent may now
+  // belong to menstrual or body data, so it must not advertise injury deletion
+  // when the server says no injury constraints are stored.
+  test("does not advertise injury deletion for consent from another health category", async ({
     page,
   }) => {
     const mocks = await installApiMocks(page, {
@@ -161,14 +160,10 @@ test.describe("withdrawing injury data from the ordinary profile sheet", () => {
     await page.goto("/");
     await openProfileSheet(page);
 
-    await page.getByRole("button", { name: WITHDRAW_TRIGGER }).click();
-    await page.getByRole("button", { name: WITHDRAW_CONFIRM }).click();
-
-    expect(mocks.getWithdrawHealthCalls()).toBe(1);
-    expect(mocks.getProfileState().withdrawableHealthConsent).toBe(false);
     await expect(
       page.getByRole("button", { name: WITHDRAW_TRIGGER }),
     ).toBeHidden();
+    expect(mocks.getWithdrawHealthCalls()).toBe(0);
   });
 
   // A request that fails after the server committed is indistinguishable, from
@@ -200,7 +195,7 @@ test.describe("withdrawing injury data from the ordinary profile sheet", () => {
 
     // The withdrawal really happened, so the user must be told it happened.
     await expect(page.getByPlaceholder(INJURY_PLACEHOLDER)).toHaveValue("");
-    await expect(page.getByText("撤回尚未完成")).toBeHidden();
+    await expect(page.getByText("删除尚未完成")).toBeHidden();
     await expect(page.getByText("无法确认")).toBeHidden();
     expect(mocks.getProfileState().profile?.injuryConstraints).toEqual([]);
     expect(mocks.getProfileState().healthConsentOnFile).toBe(false);
@@ -272,7 +267,7 @@ test.describe("withdrawing injury data from the ordinary profile sheet", () => {
     await page.getByRole("button", { name: WITHDRAW_CONFIRM }).click();
 
     await expect(
-      page.getByText("当前仍检测到伤病信息或相关同意，撤回尚未完成，请重试。"),
+      page.getByText("当前仍检测到伤病信息，删除尚未完成，请重试。"),
     ).toBeVisible();
     // The two things this must not say: a claim about the past, and a claim
     // that the outcome is unknown when the re-read plainly answered it.
@@ -311,7 +306,7 @@ test.describe("withdrawing injury data from the ordinary profile sheet", () => {
       injuryConstraints: ["膝盖"],
       sensitiveHealthConsent: {
         accepted: true,
-        policy_version: MOCK_POLICY_VERSION,
+        policy_version: CURRENT_PRIVACY_POLICY_VERSION,
       },
     });
     expect(mocks.getProfileState().healthConsentOnFile).toBe(true);

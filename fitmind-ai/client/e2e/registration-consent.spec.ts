@@ -235,9 +235,10 @@ test.describe("consent catch-up for accounts predating the seam", () => {
     expect(mocks.getDeleteAccountCalls()).toBe(1);
   });
 
-  // The proportionate exit from a health-data consent. Without it, declining
-  // this one consent cost the user their whole training history.
-  test("withdraws only the injury data without deleting the account", async ({
+  // The proportionate exit from a health-data consent. Health consent now
+  // spans injury, menstrual and body data, so declining deletes that category
+  // while keeping the account and training history.
+  test("deletes all health data without deleting the account", async ({
     page,
   }) => {
     const mocks = await installApiMocks(page, {
@@ -249,22 +250,32 @@ test.describe("consent catch-up for accounts predating the seam", () => {
         },
       ],
     });
+    let deleteAllHealthDataCalls = 0;
+    await page.route("**/api/personal-health-data", (route) => {
+      deleteAllHealthDataCalls += 1;
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, data: { success: true } }),
+      });
+    });
     await page.goto("/");
 
-    await expect(page.getByText("需要你单独确认：伤病信息")).toBeVisible();
+    await expect(page.getByText("需要你单独确认：健康数据")).toBeVisible();
 
-    await page.getByRole("button", { name: /请删除我的伤病信息/ }).click();
+    await page.getByRole("button", { name: /删除全部健康数据/ }).click();
 
     // Back in the app, account intact.
     await expect(page.getByRole("button", { name: PROFILE_TAB })).toBeVisible();
-    expect(mocks.getWithdrawHealthCalls()).toBe(1);
+    expect(deleteAllHealthDataCalls).toBe(1);
+    expect(mocks.getWithdrawHealthCalls()).toBe(0);
     expect(mocks.getDeleteAccountCalls()).toBe(0);
     expect(mocks.getConsentBodies()).toEqual([]);
   });
 
-  // The cross-border consent has no equivalent narrow withdrawal: the data
-  // being exported is the whole account, so the option must not appear there.
-  test("does not offer injury-only withdrawal for the cross-border consent", async ({
+  // The cross-border consent cannot be settled by deleting only health data:
+  // the exported data is the whole account, so this option must not appear.
+  test("does not offer health-only deletion for the cross-border consent", async ({
     page,
   }) => {
     await installApiMocks(page, {
@@ -279,7 +290,7 @@ test.describe("consent catch-up for accounts predating the seam", () => {
     await page.goto("/");
 
     await expect(
-      page.getByRole("button", { name: /请删除我的伤病信息/ }),
+      page.getByRole("button", { name: /删除全部健康数据/ }),
     ).toHaveCount(0);
   });
 

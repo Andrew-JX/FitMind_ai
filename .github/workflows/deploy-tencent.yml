@@ -47,11 +47,35 @@ jobs:
         working-directory: fitmind-ai
         run: pnpm verify
 
+      - name: Evaluate assistant regressions
+        working-directory: fitmind-ai
+        run: pnpm eval
+
       - name: Build production applications
         working-directory: fitmind-ai
         run: |
           pnpm --filter @fitmind/server build
           pnpm --filter @fitmind/client build
+
+      - name: Install Playwright Chromium
+        working-directory: fitmind-ai
+        run: pnpm --filter @fitmind/client exec playwright install --with-deps chromium
+
+      - name: Run release compliance E2E
+        working-directory: fitmind-ai
+        timeout-minutes: 8
+        run: pnpm test:e2e:release
+
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-release-${{ github.sha }}
+          path: |
+            fitmind-ai/client/test-results
+            fitmind-ai/client/playwright-report
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Configure restricted deployment key
         env:

@@ -15,6 +15,7 @@ import {
   getRememberedLoginEmail,
   saveRememberedLoginEmail,
 } from "./remembered-login-email";
+import { deriveRegistrationConsentState } from "./registration-consent-state";
 import type { AuthStatus } from "./use-auth";
 import { accentAlpha, brandAlpha, BRAND_NEON } from "../../theme/tokens";
 
@@ -82,15 +83,17 @@ export function AuthScreen(props: AuthScreenProps) {
     };
   }, []);
 
-  const isPolicyLoading = policy === null && !policyFailed;
   // Fail closed: an instance whose policy could not be read must not accept
   // sign-ups, because the consent it requires is one of the unknowns. Login is
   // deliberately unaffected — an existing user has already consented, and
   // locking them out over a failed policy read would turn a legal control into
   // an availability incident.
-  const isRegistrationOpen = policy?.registration_open === true;
-  const requiresCrossBorderConsent =
-    policy?.cross_border_consent_required === true;
+  const {
+    isPolicyLoading,
+    isRegistrationOpen,
+    policyVersion,
+    requiresCrossBorderConsent,
+  } = deriveRegistrationConsentState(policy, policyFailed);
 
   const isSubmitting = status === "authenticating";
   const isSucceeded = props.isAuthenticated === true;
@@ -409,7 +412,7 @@ export function AuthScreen(props: AuthScreenProps) {
                 {/* Shown because the policy page tells users they can compare
                     this against the version printed there. It said so before
                     anything but the catch-up screen actually displayed it. */}
-                （政策版本 {policy.policy_version}）
+                （政策版本 {policyVersion}）
               </span>
             </label>
           ) : null}

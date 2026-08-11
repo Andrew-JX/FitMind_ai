@@ -11,6 +11,7 @@
     "test": "pnpm test:unit",
     "test:unit": "vitest run",
     "test:e2e": "pnpm --filter @fitmind/client run test:e2e",
+    "test:e2e:release": "pnpm --filter @fitmind/client run test:e2e:release",
     "eval": "pnpm --filter @fitmind/server exec tsx scripts/run-eval.ts",
     "smoke:auth": "pnpm --filter @fitmind/server run smoke:auth",
     "smoke:assistant": "pnpm --filter @fitmind/server run smoke:assistant",

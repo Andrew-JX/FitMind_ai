@@ -1042,3 +1042,12 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
 - 保留 API/SSE 的 `X-Accel-Buffering: no`，本批不加入 CSP 或 Permissions-Policy；部署说明同步要求
   先安装共享片段，再运行 `nginx -t` 和 reload。
 - 新增源码作用域与安装顺序回归测试。真实生产响应尚未部署验证，不能用本地测试冒充线上已生效。
+
+## 2026-08-11 — 发布关键 E2E 与 Assistant Eval 门禁（fitmind-h22，本地候选）
+
+- 腾讯云部署 workflow 在任何 deployment key/SSH 操作前新增离线 assistant eval、Chromium 安装和
+  注册同意＋健康数据删除两份 release E2E；失败时上传 Playwright trace、截图和 HTML 报告。
+- release E2E 固定为两份合规 spec，不把 UI finishing 等非关键套件混入自动部署门禁；修正测试中
+  已漂移的“撤回伤病”旧文案，使断言匹配当前多类健康数据与“删除伤病信息”产品语义。
+- 注册政策和伤病删除 readback 的决策从组件内联分支抽成纯函数并补直接单测，浏览器失败可先由
+  快速逻辑测试定位。GitHub Actions 实际运行、push 和生产部署仍未执行，不能声称远端门禁已生效。

@@ -17,6 +17,7 @@ import {
   type Equipment,
   type TrainingGoal,
 } from "./athlete-profile-api";
+import { classifyInjuryWithdrawalReadback } from "./injury-withdrawal-state";
 
 export interface AthleteProfileSheetProps {
   open: boolean;
@@ -228,19 +229,19 @@ export function AthleteProfileSheet(props: AthleteProfileSheetProps) {
       // So ask the server what actually happened rather than inferring it.
       try {
         const state = await getAthleteProfile(props.token);
-        const stillStored = state.profile?.injuryConstraints.length ?? 0;
+        const readback = classifyInjuryWithdrawalReadback(state);
 
-        if (stillStored === 0) {
+        if (readback.kind === "withdrawn") {
           // The write landed; only the response was lost.
           applyWithdrawnState({
-            healthConsentOnFile: state.healthConsentOnFile,
+            healthConsentOnFile: readback.healthConsentOnFile,
           });
           props.onSaved?.("伤病信息已删除；其他健康数据不受影响。");
           return;
         }
 
-        setStoredInjuryCount(stillStored);
-        setHasStoredHealthConsent(state.healthConsentOnFile);
+        setStoredInjuryCount(readback.storedInjuryCount);
+        setHasStoredHealthConsent(readback.healthConsentOnFile);
         // A snapshot of now, stated as a snapshot of now. "Your data was not
         // changed" is a claim about history, and this read cannot support it:
         // the withdrawal may have committed and another session may have saved
