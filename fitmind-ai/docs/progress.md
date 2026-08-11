@@ -1119,3 +1119,10 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
 - 新增源码合同精确限定 5 个生产 `.ts`、0 个生产 `.js`、0 个手写 `.d.ts`，固定四个实现和 barrel 的运行时导出集合，并拒绝 `any` / `as unknown as` 类型逃逸。
 - 迁移前冻结的 exercises 1 块、muscle-groups 1 块、users 5 块、workouts 12 块 SQL 模板，在统一换行后 SHA-256 逐项完全相同；参数、事务、分页和返回行为没有借类型迁移改写。auth、dictionary、workout service 与事务护栏定向共 49 条断言通过。
 - 全量 `pnpm verify` 通过 107 个 Vitest 文件、820 个断言及 5 个 monitor Node 断言，server production build 通过。验证没有连接真实数据库、没有读取生产密钥、没有 push 或部署；真实 PostgreSQL 集成和进程信号优雅停机仍不属于本批。
+
+## 2026-08-11 — TrainingSessionComposer 时间纯逻辑边界（fitmind-wyj，本地候选）
+
+- 先以 `21556b2` 建立稳定 `training-time.ts` facade 和 7 条行为 characterization，再以 `3e6b754` 在尚未提交实现移动前补齐“5 个函数只有一个定义所有者、两个模块只能单向依赖”的负向护栏；最终冻结测试 blob 为 `4bb1639f1b664ef96c83f60cf1ba0b393324f923`。
+- `formatTrainingTimeSummary`、`formatTimeOnly`、`formatDateTimeLocalValue`、`parseDateTimeLocalValue`、`getDurationMinutesFromLocalValues` 五个纯函数现在唯一位于 `training-time.ts`，composer 只导入消费；新模块不依赖 React、API、状态或 composer，characterization 测试文件从最终拆分前 commit 到 candidate 逐字节不变。
+- 8 条模块测试固定 summary 分支优先级、中文文案、合法/非法本地时间显示、ISO 解析、分钟舍入、1 分钟下限、空值、同刻和倒序；fixture 使用本地构造 Date，未把执行机时区写死。composer 从 1723 行降至 1648 行，但行数不是完成判据，测试所有权与单向依赖才是。
+- 全量 `pnpm verify` 通过 108 个 Vitest 文件、828 个断言及 5 个 monitor Node 断言，client production build 通过。没有改变 UI、保存/API 行为，没有访问网络或远端浏览器状态，也没有 push 或部署；composer 的表单组件、样式、错误映射及其余 1600 余行仍需后续独立边界，不能记成整体拆分完成。
