@@ -1141,3 +1141,11 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
 - 名称与消息 back 正则中的两处裸 `lat` 已分别收紧为完整 `lat` / `lats` token。`Dumbbell Lateral Raise` 与 `add lateral raise` 现在归 shoulders，`Pilates Roll Up` 与 `latest news` 归 unknown；`Lat Pulldown`、`lat pulldown`、`Lats` 与 `train lats` 继续归 back。
 - 修复没有重排 chest/back/legs/shoulders 分支，也没有改变其他关键词、部位文案或运行时导出。regression 测试文件在实现修复后逐字节不变，定向测试由红转为 8/8。
 - assistant 目录通过 28 个测试文件、264 条断言；全量 `pnpm verify` 通过 109 个 Vitest 文件、837 条断言及 5 个 monitor Node 断言，server production build 通过。五个开工前已有的 deploy/health 工作树改动仍保持未暂存、未提交；本批没有 provider、数据库、网络调用，没有 push 或部署。
+
+## 2026-08-11 — assistant 显示度量纯逻辑边界（fitmind-6tx，本地候选）
+
+- 合同由 `202ac44` 冻结；随后以 `dfd60ee` 建立迁移前 facade 和 14 条 characterization，测试 blob 固定为 `128720910b0cb57103acbc5c37d5212dbaa855de`。实现迁移后测试文件与合同均未修改，工作树测试 blob 仍与冻结值完全相同。
+- `formatMetricKg`、`formatPercent`、`getDaysSince` 与私有 `METRIC_WEIGHT_DISPLAY_INCREMENT_KG = 0.5` 现在唯一归属 `assistant-display-metrics.ts`；orchestrator 只单向导入消费。新模块的运行时导出精确为三个函数，不依赖 provider、数据库、工具、环境配置或 orchestrator，也没有 `any` / `as unknown as` 类型逃逸。
+- characterization 固定 null/零值、0.25kg 半步边界、负数、千分位、百分比四舍五入与固定一位小数；时间用 fake system clock 覆盖非法日期、未来、少于一天、整一天和 1.9 个 24 小时桶。迁移保持原有中文文案、`en-US` locale、round/floor/max 算法逐字不变。
+- 定向测试通过 14/14；assistant 目录通过 29 个测试文件、278 条断言；全量 `pnpm verify` 通过 110 个 Vitest 文件、851 条断言及 5 个 monitor Node 断言，server production build 通过。orchestrator 从基线 2595 行降至 2568 行，但行数不是完成判据，其他 provider、tool、answer、session、planning 边界仍未拆分。
+- 五个开工前已有的 deploy/health 工作树改动保持未暂存、未提交；验证没有真实 provider、数据库或网络调用，没有 push 或部署。
