@@ -513,7 +513,13 @@ interface AssistantAnswerCore {
   evidence: AssistantAnswerEvidence;
 }
 
-type FocusArea = "back" | "chest" | "legs" | "mixed" | "shoulders" | "unknown";
+export type FocusArea =
+  | "back"
+  | "chest"
+  | "legs"
+  | "mixed"
+  | "shoulders"
+  | "unknown";
 
 const ANSWER_DELTA_CHUNK_SIZE = 24;
 const RECOVERY_BOUNDARY_COPY =
@@ -2573,7 +2579,7 @@ async function loadPlanAdherenceContext(
   }
 }
 
-function inferDominantFocusArea(
+export function inferDominantFocusArea(
   exercises: Array<{ exercise_name: string; total_volume: number }>,
 ): FocusArea {
   const areaScores = new Map<FocusArea, number>([
@@ -2606,7 +2612,7 @@ function inferDominantFocusArea(
   return topArea[0];
 }
 
-function inferFocusAreaFromName(exerciseName: string): FocusArea {
+export function inferFocusAreaFromName(exerciseName: string): FocusArea {
   const normalized = exerciseName.trim().toLowerCase();
 
   if (/(bench|chest|fly|push[- ]?up|incline|decline|dip)/u.test(normalized)) {
@@ -2636,7 +2642,7 @@ function inferFocusAreaFromName(exerciseName: string): FocusArea {
   return "unknown";
 }
 
-function resolveNextFocusSuggestion(area: FocusArea): string {
+export function resolveNextFocusSuggestion(area: FocusArea): string {
   switch (area) {
     case "chest":
       return "背部或腿部";
@@ -2653,7 +2659,7 @@ function resolveNextFocusSuggestion(area: FocusArea): string {
   }
 }
 
-function detectTargetArea(message: string): FocusArea {
+export function detectTargetArea(message: string): FocusArea {
   const normalized = message.trim().toLowerCase();
 
   if (/(胸|卧推|bench|incline|push)/u.test(normalized)) {
@@ -2675,7 +2681,7 @@ function detectTargetArea(message: string): FocusArea {
   return "unknown";
 }
 
-function describeTargetArea(area: FocusArea): string {
+export function describeTargetArea(area: FocusArea): string {
   switch (area) {
     case "chest":
       return "胸部";
