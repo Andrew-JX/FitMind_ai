@@ -23,9 +23,13 @@ describe("assistant display metrics characterization", () => {
     expect(Object.keys(displayMetrics).sort()).toEqual([...helperNames]);
   });
 
-  it("keeps one definition owner and a one-way module dependency", () => {
+  it("keeps one definition owner behind the deterministic-answer boundary", () => {
     const orchestratorSource = readFileSync(
       join(assistantDirectory, "assistant-orchestrator-service.ts"),
+      "utf8",
+    );
+    const answersSource = readFileSync(
+      join(assistantDirectory, "assistant-deterministic-answers.ts"),
       "utf8",
     );
     const metricsSource = readFileSync(
@@ -37,20 +41,24 @@ describe("assistant display metrics characterization", () => {
       const definition = new RegExp(`export function ${helperName}\\b`, "g");
       const definitionCount =
         (orchestratorSource.match(definition) ?? []).length +
+        (answersSource.match(definition) ?? []).length +
         (metricsSource.match(definition) ?? []).length;
       expect(definitionCount, helperName).toBe(1);
     }
 
-    const orchestratorDependsOnMetrics = orchestratorSource.includes(
+    expect(orchestratorSource).toContain(
+      'from "./assistant-deterministic-answers.js"',
+    );
+    expect(answersSource).toContain('from "./assistant-display-metrics.js"');
+    expect(orchestratorSource).not.toContain(
       'from "./assistant-display-metrics.js"',
     );
-    const metricsDependsOnOrchestrator = metricsSource.includes(
+    expect(metricsSource).not.toContain(
       'from "./assistant-orchestrator-service.js"',
     );
-    expect(
-      Number(orchestratorDependsOnMetrics) +
-        Number(metricsDependsOnOrchestrator),
-    ).toBe(1);
+    expect(metricsSource).not.toContain(
+      'from "./assistant-deterministic-answers.js"',
+    );
     expect(metricsSource).not.toContain("as unknown as");
     expect(metricsSource).not.toMatch(/\bany\b/);
   });

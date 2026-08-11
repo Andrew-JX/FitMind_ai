@@ -28,9 +28,13 @@ describe("assistant focus-area characterization", () => {
     expect(Object.keys(focusArea).sort()).toEqual([...helperNames]);
   });
 
-  it("keeps one definition owner and a one-way module dependency", () => {
+  it("keeps one definition owner behind the deterministic-answer boundary", () => {
     const orchestratorSource = readFileSync(
       join(assistantDirectory, "assistant-orchestrator-service.ts"),
+      "utf8",
+    );
+    const answersSource = readFileSync(
+      join(assistantDirectory, "assistant-deterministic-answers.ts"),
       "utf8",
     );
     const focusSource = readFileSync(
@@ -42,19 +46,24 @@ describe("assistant focus-area characterization", () => {
       const definition = new RegExp(`export function ${helperName}\\b`, "g");
       const definitionCount =
         (orchestratorSource.match(definition) ?? []).length +
+        (answersSource.match(definition) ?? []).length +
         (focusSource.match(definition) ?? []).length;
       expect(definitionCount, helperName).toBe(1);
     }
 
-    const orchestratorDependsOnFocus = orchestratorSource.includes(
+    expect(orchestratorSource).toContain(
+      'from "./assistant-deterministic-answers.js"',
+    );
+    expect(answersSource).toContain('from "./assistant-focus-area.js"');
+    expect(orchestratorSource).not.toContain(
       'from "./assistant-focus-area.js"',
     );
-    const focusDependsOnOrchestrator = focusSource.includes(
+    expect(focusSource).not.toContain(
       'from "./assistant-orchestrator-service.js"',
     );
-    expect(
-      Number(orchestratorDependsOnFocus) + Number(focusDependsOnOrchestrator),
-    ).toBe(1);
+    expect(focusSource).not.toContain(
+      'from "./assistant-deterministic-answers.js"',
+    );
   });
 
   it("preserves exercise-name classification and overlapping regex priority", () => {
