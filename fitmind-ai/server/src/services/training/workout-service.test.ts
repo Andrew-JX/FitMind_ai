@@ -158,16 +158,6 @@ describe("workout-service", () => {
     });
   });
 
-  it("rejects cross-user workout access as forbidden", async () => {
-    mockedFindWorkoutByIdForUser.mockResolvedValueOnce(null);
-    mockedHasWorkoutById.mockResolvedValueOnce(true);
-
-    await expect(getUserWorkout(workoutId, userId)).rejects.toMatchObject({
-      statusCode: 403,
-      code: "FORBIDDEN",
-    });
-  });
-
   it("creates a workout and returns the mapped detail payload", async () => {
     mockedCreateWorkoutWithSets.mockResolvedValueOnce(workoutDetailRow);
 
@@ -189,19 +179,6 @@ describe("workout-service", () => {
 
     expect(result).toEqual({
       workout: workoutDetailRow,
-    });
-  });
-
-  it("rejects workout metadata updates for a foreign workout", async () => {
-    mockedUpdateWorkoutByIdForUser.mockResolvedValueOnce(null);
-    mockedFindWorkoutByIdForUser.mockResolvedValueOnce(null);
-    mockedHasWorkoutById.mockResolvedValueOnce(true);
-
-    await expect(
-      updateUserWorkout(workoutId, userId, { notes: "new note" }),
-    ).rejects.toMatchObject({
-      statusCode: 403,
-      code: "FORBIDDEN",
     });
   });
 
@@ -234,18 +211,6 @@ describe("workout-service", () => {
     });
   });
 
-  it("rejects cross-user set updates as forbidden", async () => {
-    mockedUpdateSetByIdForUser.mockResolvedValueOnce(null);
-    mockedHasSetById.mockResolvedValueOnce(true);
-
-    await expect(
-      updateUserWorkoutSet(setId, userId, { reps: 6 }),
-    ).rejects.toMatchObject({
-      statusCode: 403,
-      code: "FORBIDDEN",
-    });
-  });
-
   it("returns the unified delete payload for sets", async () => {
     mockedDeleteSetByIdForUser.mockResolvedValueOnce({
       id: setId,
@@ -257,6 +222,92 @@ describe("workout-service", () => {
     expect(result).toEqual({
       deleted: true,
       id: setId,
+    });
+  });
+
+  describe.each([
+    ["belongs to another user", true],
+    ["does not exist", false],
+  ])("when a resource %s", (_condition, existsGlobally) => {
+    const workoutNotFound = {
+      statusCode: 404,
+      code: "NOT_FOUND",
+      message: "Workout was not found.",
+    };
+    const setNotFound = {
+      statusCode: 404,
+      code: "NOT_FOUND",
+      message: "Set was not found.",
+    };
+
+    it("returns the same 404 for workout reads without a global probe", async () => {
+      mockedFindWorkoutByIdForUser.mockResolvedValueOnce(null);
+      mockedHasWorkoutById.mockResolvedValueOnce(existsGlobally);
+
+      await expect(getUserWorkout(workoutId, userId)).rejects.toMatchObject(
+        workoutNotFound,
+      );
+      expect(mockedHasWorkoutById).not.toHaveBeenCalled();
+    });
+
+    it("returns the same 404 for workout updates without a global probe", async () => {
+      mockedUpdateWorkoutByIdForUser.mockResolvedValueOnce(null);
+      mockedFindWorkoutByIdForUser.mockResolvedValueOnce(null);
+      mockedHasWorkoutById.mockResolvedValueOnce(existsGlobally);
+
+      await expect(
+        updateUserWorkout(workoutId, userId, { notes: "new note" }),
+      ).rejects.toMatchObject(workoutNotFound);
+      expect(mockedHasWorkoutById).not.toHaveBeenCalled();
+    });
+
+    it("returns the same 404 for workout deletes without a global probe", async () => {
+      mockedDeleteWorkoutByIdForUser.mockResolvedValueOnce(null);
+      mockedFindWorkoutByIdForUser.mockResolvedValueOnce(null);
+      mockedHasWorkoutById.mockResolvedValueOnce(existsGlobally);
+
+      await expect(deleteUserWorkout(workoutId, userId)).rejects.toMatchObject(
+        workoutNotFound,
+      );
+      expect(mockedHasWorkoutById).not.toHaveBeenCalled();
+    });
+
+    it("returns the same 404 for add-set writes without a global probe", async () => {
+      mockedAddSetToWorkoutForUser.mockResolvedValueOnce(null);
+      mockedFindWorkoutByIdForUser.mockResolvedValueOnce(null);
+      mockedHasWorkoutById.mockResolvedValueOnce(existsGlobally);
+
+      await expect(
+        addUserWorkoutSet(workoutId, userId, {
+          exercise_id: "44444444-4444-4444-8444-444444444444",
+          set_index: 2,
+          reps: 8,
+          weight_kg: 80,
+          rpe: 7,
+          is_warmup: false,
+        }),
+      ).rejects.toMatchObject(workoutNotFound);
+      expect(mockedHasWorkoutById).not.toHaveBeenCalled();
+    });
+
+    it("returns the same 404 for set updates without a global probe", async () => {
+      mockedUpdateSetByIdForUser.mockResolvedValueOnce(null);
+      mockedHasSetById.mockResolvedValueOnce(existsGlobally);
+
+      await expect(
+        updateUserWorkoutSet(setId, userId, { reps: 6 }),
+      ).rejects.toMatchObject(setNotFound);
+      expect(mockedHasSetById).not.toHaveBeenCalled();
+    });
+
+    it("returns the same 404 for set deletes without a global probe", async () => {
+      mockedDeleteSetByIdForUser.mockResolvedValueOnce(null);
+      mockedHasSetById.mockResolvedValueOnce(existsGlobally);
+
+      await expect(deleteUserWorkoutSet(setId, userId)).rejects.toMatchObject(
+        setNotFound,
+      );
+      expect(mockedHasSetById).not.toHaveBeenCalled();
     });
   });
 });

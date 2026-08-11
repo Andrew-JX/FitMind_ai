@@ -6,8 +6,6 @@ import {
   deleteSetByIdForUser,
   deleteWorkoutByIdForUser,
   findWorkoutByIdForUser,
-  hasSetById,
-  hasWorkoutById,
   decodeWorkoutCursor,
   listWorkoutsByUser,
   updateSetByIdForUser,
@@ -212,18 +210,10 @@ async function resolveWorkoutAccess(
     return mapWorkoutDetailDto(workout);
   }
 
-  if (await hasWorkoutById(workoutId)) {
-    throw new HttpError(403, "FORBIDDEN", "You cannot access this workout.");
-  }
-
   throw new HttpError(404, "NOT_FOUND", "Workout was not found.");
 }
 
-async function resolveSetAccess(setId: string): Promise<never> {
-  if (await hasSetById(setId)) {
-    throw new HttpError(403, "FORBIDDEN", "You cannot access this set.");
-  }
-
+function throwSetNotFound(): never {
   throw new HttpError(404, "NOT_FOUND", "Set was not found.");
 }
 
@@ -382,7 +372,7 @@ export async function updateUserWorkoutSet(
   const updatedSet = await updateSetByIdForUser(setId, userId, input);
 
   if (updatedSet === null) {
-    await resolveSetAccess(setId);
+    throwSetNotFound();
   }
 
   return mapWorkoutSetDto(updatedSet);
@@ -402,7 +392,7 @@ export async function deleteUserWorkoutSet(
   const deletedSet = await deleteSetByIdForUser(setId, userId);
 
   if (deletedSet === null) {
-    await resolveSetAccess(setId);
+    throwSetNotFound();
   }
 
   return {

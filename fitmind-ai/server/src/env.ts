@@ -210,10 +210,40 @@ function trimKnownEnvValues(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return trimmed;
 }
 
+const RETIRED_DEEPSEEK_MODELS = new Set(["deepseek-chat", "deepseek-reasoner"]);
+
+function rejectRetiredOfficialDeepSeekModel(
+  baseUrl: string | undefined,
+  model: string | undefined,
+): void {
+  if (baseUrl === undefined || model === undefined) {
+    return;
+  }
+
+  if (new URL(baseUrl).hostname.toLowerCase() !== "api.deepseek.com") {
+    return;
+  }
+
+  if (RETIRED_DEEPSEEK_MODELS.has(model)) {
+    throw new Error(
+      `OPENAI_COMPAT_MODEL=${model} was retired by DeepSeek on 2026-07-24. Use deepseek-v4-flash or deepseek-v4-pro.`,
+    );
+  }
+}
+
 export function loadServerEnv(
   source: NodeJS.ProcessEnv = process.env,
 ): ServerEnv {
   const parsed = serverEnvSchema.parse(trimKnownEnvValues(source));
+
+  // Provider unit fixtures may use retired identifiers as inert model strings;
+  // development and production configuration must still fail before a call.
+  if (parsed.NODE_ENV !== "test") {
+    rejectRetiredOfficialDeepSeekModel(
+      parsed.OPENAI_COMPAT_BASE_URL,
+      parsed.OPENAI_COMPAT_MODEL,
+    );
+  }
 
   return {
     nodeEnv: parsed.NODE_ENV,

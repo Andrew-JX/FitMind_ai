@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   buildAssistantTurnLogEvent,
+  estimateAssistantProviderCallCostUsd,
   logAssistantTurnEvent,
   logFailedAssistantTurnEvent,
   summarizeTurnLlmCalls,
@@ -298,6 +299,39 @@ describe("buildAssistantTurnLogEvent", () => {
     expect(event.model).toBe("some-future-model");
     expect(event.total_tokens).toBe(600);
     expect(event.estimated_cost_usd).toBeNull();
+  });
+
+  it("prices DeepSeek V4 Flash with the cache-miss input upper bound", () => {
+    const event = buildAssistantTurnLogEvent({
+      intent: "recommendation",
+      durationMs: 100,
+      toolCalls: [],
+      llm: {
+        attemptCount: 1,
+        usageReportCount: 1,
+        errorCount: 0,
+        promptTokens: 1_000_000,
+        completionTokens: 1_000_000,
+        totalTokens: 2_000_000,
+        provider: "openai_compatible",
+        model: "deepseek-v4-flash",
+      },
+    });
+
+    expect(event.estimated_cost_usd).toBeCloseTo(0.42, 6);
+    expect(
+      estimateAssistantProviderCallCostUsd({
+        attempted: true,
+        errored: false,
+        provider: "openai_compatible",
+        model: "deepseek-v4-flash",
+        usage: {
+          prompt_tokens: 1_000_000,
+          completion_tokens: 1_000_000,
+          total_tokens: 2_000_000,
+        },
+      }),
+    ).toBeCloseTo(0.42, 6);
   });
 });
 

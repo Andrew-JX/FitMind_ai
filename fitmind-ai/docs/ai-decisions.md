@@ -1493,3 +1493,41 @@ Application rollback remains image-only for this additive migration. Future
 destructive schema changes require an explicit expand/contract plan; an
 automatic down migration is not an acceptable generic rollback because it can
 destroy data.
+
+## [D56] Hide cross-user resource existence and price the current DeepSeek model conservatively
+
+- **Date**: 2026-08-11
+- **Status**: Accepted / implemented locally; production configuration unverified
+
+Workout and set mutations already scope their SQL by authenticated `user_id`,
+but the service previously followed a scoped miss with `hasWorkoutById` or
+`hasSetById`, queries that deliberately ignored ownership. That turned a foreign
+UUID into 403 and an absent UUID into 404. The distinction gives the caller no
+legitimate recovery path and discloses whether another user's resource exists.
+Single-resource misses now always return `404 NOT_FOUND` directly from the
+user-scoped result. Regression tests keep the old global probes mocked as true
+and assert their call count remains zero; changing only the outward status
+cannot create a false green.
+
+The production example also named `deepseek-chat`. DeepSeek's official V4
+release notice says that alias and `deepseek-reasoner` became inaccessible after
+2026-07-24 15:59 UTC. On 2026-08-11, the current official model/price page lists
+`deepseek-v4-flash` at $0.0028/M cache-hit input tokens, $0.14/M cache-miss input
+tokens, and $0.28/M output tokens:
+
+- https://api-docs.deepseek.com/news/news260424/
+- https://api-docs.deepseek.com/quick_start/pricing
+
+FitMind's provider usage currently reports aggregate `prompt_tokens`, not the
+cache-hit split. Cost telemetry therefore prices every V4 Flash prompt token at
+the $0.14/M cache-miss rate. This is a deliberate upper bound: it can overstate
+the bill but cannot silently weaken the daily cost budget by assuming an
+unmeasured discount. Unknown BYO models remain `null` and retain the independent
+call-count guard. When the endpoint hostname is exactly `api.deepseek.com`, the
+two retired aliases now fail configuration with a migration message; other
+OpenAI-compatible hosts are not subjected to DeepSeek-specific model rules.
+
+The checked-in production example now points at `deepseek-v4-flash`. This local
+change does not alter the server's deployed environment, perform a paid provider
+call, or prove the live model/cost counter works. Those remain deployment-time
+checks requiring separate authorization.

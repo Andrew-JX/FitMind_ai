@@ -148,6 +148,39 @@ describe("loadServerEnv", () => {
     expect(blankEnv.openAiCompatBaseUrl).toBeUndefined();
   });
 
+  it.each(["deepseek-chat", "deepseek-reasoner"])(
+    "rejects retired model %s on the official DeepSeek endpoint",
+    (model) => {
+      expect(() =>
+        loadServerEnv({
+          NODE_ENV: "production",
+          OPENAI_COMPAT_BASE_URL: "https://api.deepseek.com",
+          OPENAI_COMPAT_MODEL: model,
+        } as NodeJS.ProcessEnv),
+      ).toThrow(/retired.*deepseek-v4-flash.*deepseek-v4-pro/i);
+    },
+  );
+
+  it("accepts the current DeepSeek V4 Flash model", () => {
+    const env = loadServerEnv({
+      NODE_ENV: "production",
+      OPENAI_COMPAT_BASE_URL: "https://api.deepseek.com",
+      OPENAI_COMPAT_MODEL: "deepseek-v4-flash",
+    } as NodeJS.ProcessEnv);
+
+    expect(env.openAiCompatModel).toBe("deepseek-v4-flash");
+  });
+
+  it("does not apply DeepSeek retirement rules to another compatible endpoint", () => {
+    const env = loadServerEnv({
+      NODE_ENV: "production",
+      OPENAI_COMPAT_BASE_URL: "https://compatible.example.com/v1",
+      OPENAI_COMPAT_MODEL: "deepseek-chat",
+    } as NodeJS.ProcessEnv);
+
+    expect(env.openAiCompatModel).toBe("deepseek-chat");
+  });
+
   it("keeps plan-adherence context opt-in by default", () => {
     const defaultEnv = loadServerEnv({} as NodeJS.ProcessEnv);
     const enabledEnv = loadServerEnv({

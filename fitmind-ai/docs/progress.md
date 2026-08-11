@@ -1051,3 +1051,14 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
   已漂移的“撤回伤病”旧文案，使断言匹配当前多类健康数据与“删除伤病信息”产品语义。
 - 注册政策和伤病删除 readback 的决策从组件内联分支抽成纯函数并补直接单测，浏览器失败可先由
   快速逻辑测试定位。GitHub Actions 实际运行、push 和生产部署仍未执行，不能声称远端门禁已生效。
+
+## 2026-08-11 — 资源存在性与生产模型成本护栏（fitmind-x0t，本地候选）
+
+- workout/set 的 user-scoped 查询返回空时统一为 `404 NOT_FOUND`，不再追加忽略 owner 的全局存在性
+  探测；测试分别模拟“他人资源存在”和“资源不存在”，并断言两个旧 probe 的调用数均为 0。
+- 核实 DeepSeek 官方资料后修正了原审计的过时前提：`deepseek-chat` / `deepseek-reasoner` 已于
+  2026-07-24 退役。生产示例迁到 `deepseek-v4-flash`，官方 endpoint 若仍配退役别名会在调用前报错。
+- 价格于 2026-08-11 从 `https://api-docs.deepseek.com/quick_start/pricing` 核实；V4 Flash 按输入
+  cache-miss `$0.14/M`、输出 `$0.28/M` 计价。因现有 usage 没有 cache-hit 明细，所有 prompt token
+  按 cache-miss 做保守上界；未知 BYO 模型仍为 `null`，调用次数闸门继续生效。
+- 本批没有修改服务器环境、没有部署、没有真实 provider 调用；线上模型切换与成本累计仍未验证。

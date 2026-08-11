@@ -57,6 +57,11 @@ const MODEL_PRICING_USD_PER_1M: Record<
   { prompt: number; completion: number }
 > = {
   "llama-3.3-70b-versatile": { prompt: 0.59, completion: 0.79 },
+  // DeepSeek official price verified 2026-08-11:
+  // https://api-docs.deepseek.com/quick_start/pricing
+  // Usage currently lacks cache-hit token detail, so prompt tokens use the
+  // cache-miss rate as a conservative upper bound ($0.14/M, output $0.28/M).
+  "deepseek-v4-flash": { prompt: 0.14, completion: 0.28 },
 };
 
 export interface AssistantTurnLogInput {
