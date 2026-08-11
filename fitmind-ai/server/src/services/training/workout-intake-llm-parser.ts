@@ -4,12 +4,12 @@ import { loadServerEnv } from "../../env.js";
 import {
   runOpenAiCompatibleChatCompletion,
   type OpenAiCompatibleChatRequest,
-} from "../assistant/openai-compatible-chat-client.js";
+} from "../ai/openai-compatible-chat-client.js";
 import {
   getGroqAssistantProviderConfig,
   getOpenAiCompatibleProviderConfig,
   type OpenAiCompatibleProviderConfig,
-} from "../assistant/provider-config.js";
+} from "../ai/openai-compatible-provider-config.js";
 
 export type WorkoutIntakeLlmProviderMode =
   | "off"

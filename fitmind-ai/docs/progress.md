@@ -1149,3 +1149,11 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
 - characterization 固定 null/零值、0.25kg 半步边界、负数、千分位、百分比四舍五入与固定一位小数；时间用 fake system clock 覆盖非法日期、未来、少于一天、整一天和 1.9 个 24 小时桶。迁移保持原有中文文案、`en-US` locale、round/floor/max 算法逐字不变。
 - 定向测试通过 14/14；assistant 目录通过 29 个测试文件、278 条断言；全量 `pnpm verify` 通过 110 个 Vitest 文件、851 条断言及 5 个 monitor Node 断言，server production build 通过。orchestrator 从基线 2595 行降至 2568 行，但行数不是完成判据，其他 provider、tool、answer、session、planning 边界仍未拆分。
 - 五个开工前已有的 deploy/health 工作树改动保持未暂存、未提交；验证没有真实 provider、数据库或网络调用，没有 push 或部署。
+
+## 2026-08-11 — 中立 AI provider 边界与反向依赖清零（fitmind-dlo，本地候选）
+
+- 合同由 `047e856` 冻结；`e4e158b` 先建立三个中立 re-export facade 与各自 characterization，再移动实现。冻结测试 blob 分别为 chat `26b099ef3830abc121e14fb6d1b42daa2f9af496`、config `e28c348b6cdac1bfc5ace44f499d8864721e1b05`、types `04845378ca0742a04c621798c79ec90d7800a656`，实现反转后逐字节保持一致。
+- 通用 OpenAI-compatible HTTP/timeout/响应归一化现在唯一归属 `services/ai/openai-compatible-chat-client.ts`；Groq/BYO 环境配置唯一归属 `openai-compatible-provider-config.ts`；`OpenAiCompatibleProviderName`、`AssistantProviderUsage` 与完整 `AssistantIntentMode` union 唯一归属 `provider-types.ts`。三个中立模块不导入 assistant、training、controller 或 repository，也没有类型逃逸。
+- assistant 旧 chat/config/types 路径保留兼容导出，assistant 专属 provider 选择与配置失败归一化仍在 assistant seam；workout intake 与 assistant insights 改为直接消费中立层。production training 对 `../assistant/` 的 importer 集合由冻结的两个降为零，AGENTS 临时 allowlist 已删除，治理测试改为任何 synthetic importer 都失败。
+- 中立模块与相关 assistant/training/governance 定向验证通过 8 个文件、54 条断言；assistant 目录通过 29 个测试文件、278 条断言；全量 `pnpm verify` 通过 113 个 Vitest 文件、868 条断言及 5 个 monitor Node 断言，server production build 通过。HTTP URL、Bearer header、payload、content/tool call/usage、错误脱敏、timeout/timer、默认模型与缺失配置行为均由冻结 characterization 覆盖。
+- 五个开工前已有的 deploy README/compose/deploy.sh、app test 与 health route 工作树改动保持未暂存、未提交；验证只使用 stub fetch 与 fake timers，没有真实 provider、数据库或网络调用，没有 push 或部署。中立边界到期债已清理，但 assistant orchestrator 其余业务流和 TrainingSessionComposer 其余 UI 边界仍需后续独立拆分。

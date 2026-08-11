@@ -1,3 +1,15 @@
+import type {
+  AssistantIntentMode,
+  AssistantProviderUsage,
+  OpenAiCompatibleProviderName,
+} from "../ai/provider-types.js";
+
+export type {
+  AssistantIntentMode,
+  AssistantProviderUsage,
+  OpenAiCompatibleProviderName,
+} from "../ai/provider-types.js";
+
 export interface AssistantProviderToolDefinition {
   name: string;
   description: string;
@@ -8,22 +20,6 @@ export interface AssistantProviderSimulationHint {
   scenario: "default" | "message" | "error";
   normalized_message: string;
 }
-
-export type OpenAiCompatibleProviderName = "groq" | "openai_compatible";
-
-export type AssistantIntentMode =
-  | "auto"
-  | "training_overview"
-  | "weekly_report"
-  | "exercise_progress"
-  | "plateau_diagnosis"
-  | "next_training_focus"
-  | "next_week_plan"
-  | "muscle_balance"
-  | "training_imbalance"
-  | "recovery_check"
-  | "evidence_explain"
-  | "unsupported";
 
 export interface AssistantProviderRequest {
   conversation: {
@@ -37,13 +33,6 @@ export interface AssistantProviderRequest {
   };
   allowed_tools: AssistantProviderToolDefinition[];
   simulation: AssistantProviderSimulationHint;
-}
-
-/** Token usage for one provider (LLM) call; OpenAI-compatible shape. */
-export interface AssistantProviderUsage {
-  prompt_tokens: number;
-  completion_tokens: number;
-  total_tokens: number;
 }
 
 /**

@@ -110,15 +110,8 @@ async function findTrainingAssistantImporters(): Promise<string[]> {
   return importers.sort();
 }
 
-const allowedTrainingAssistantImporters = [
-  "server/src/services/training/assistant-insights-service.ts",
-  "server/src/services/training/workout-intake-llm-parser.ts",
-];
-
 function findUnexpectedImporters(importers: string[]): string[] {
-  return importers.filter(
-    (path) => !allowedTrainingAssistantImporters.includes(path),
-  );
+  return [...importers].sort();
 }
 
 describe("executable repository governance", () => {
@@ -172,23 +165,28 @@ describe("executable repository governance", () => {
     }
   });
 
-  it("freezes the two training-to-assistant exceptions and rejects a third", async () => {
+  it("rejects every production training-to-assistant import", async () => {
     const agents = await readFile(agentsPath, "utf8");
     const importers = await findTrainingAssistantImporters();
 
-    expect(importers).toEqual(allowedTrainingAssistantImporters);
+    expect(importers).toEqual([]);
     expect(findUnexpectedImporters(importers)).toEqual([]);
     expect(
       findUnexpectedImporters([
-        ...importers,
         "server/src/services/training/synthetic-third-importer.ts",
       ]),
     ).toEqual(["server/src/services/training/synthetic-third-importer.ts"]);
 
-    for (const importer of allowedTrainingAssistantImporters) {
-      expect(agents).toContain(importer);
-    }
-    expect(agents).toContain("结构债 4.2");
+    expect(agents).toContain("server/src/services/ai/");
+    expect(agents).toContain("production training 不得导入 `../assistant/`");
+    expect(agents).not.toContain("training-assistant-allowlist");
+    expect(agents).not.toContain(
+      "server/src/services/training/workout-intake-llm-parser.ts",
+    );
+    expect(agents).not.toContain(
+      "server/src/services/training/assistant-insights-service.ts",
+    );
+    expect(agents).not.toContain("结构债 4.2");
   });
 
   it("pins migration compatibility and destructive-release questions", async () => {

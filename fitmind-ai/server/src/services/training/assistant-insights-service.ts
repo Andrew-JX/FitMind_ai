@@ -1,4 +1,4 @@
-import type { AssistantIntentMode } from "../assistant/provider-types.js";
+import type { AssistantIntentMode } from "../ai/provider-types.js";
 import { getUserExerciseProgress } from "./exercise-progress-service.js";
 import { getUserMuscleLoad } from "./muscle-load-service.js";
 import { getUserRecommendationContext } from "./recommendation-context-service.js";

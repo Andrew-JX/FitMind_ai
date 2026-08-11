@@ -70,20 +70,8 @@ workspace 包为 `client`、`server`、`shared`。以下 manifest 由测试解�
 - routes 负责挂载，controllers 负责 HTTP 边界，services 负责业务，repositories 负责 SQL。以职责和测试为判据，不用行数判定“薄”。
 - 所有用户资源查询/写入必须由已认证 `user_id` 约束。跨用户资源与不存在资源返回相同的安全 404，不做忽略 owner 的存在性探测。
 - 确定性训练数据和数值来自 training/repository；assistant 可以消费它们，模型不得成为数值事实源。
+- 通用 provider transport/config 与跨业务 AI 基础类型归属 `server/src/services/ai/`；assistant 与 training 都只能向中立层依赖，production training 不得导入 `../assistant/`。
 - SQL 使用参数化查询。敏感同意检查与写入需要原子性时，在同一 `client` 事务内完成，不逃逸到共享 `pool.query`。
-
-### training → assistant 临时例外
-
-默认方向是 assistant 依赖 training。当前只冻结以下两个 importer；这是迁移期 allowlist，不是目录级许可。
-
-<!-- training-assistant-allowlist:start -->
-
-- `server/src/services/training/workout-intake-llm-parser.ts` — 训练录入暂时复用 assistant 下的 OpenAI-compatible client/config。
-- `server/src/services/training/assistant-insights-service.ts` — 训练洞察 DTO 暂时复用 assistant intent type。
-
-<!-- training-assistant-allowlist:end -->
-
-到期点：修复计划“结构债 4.2”必须把 provider client/config 与共享 intent 类型抽到中立边界，并删除本 allowlist。到期不能用“主文件减少到 N 行”替代；抽出的模块要有自己的测试和拆分前后不变的 characterization 证据。
 
 ## 5. TypeScript、测试与错误边界
 
