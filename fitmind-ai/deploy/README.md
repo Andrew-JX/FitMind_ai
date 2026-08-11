@@ -239,7 +239,18 @@ adds exactly one `authorized_keys` entry with `restrict` and a forced command.
 The uploaded public-key file is removed. The private key never goes to the
 server.
 
-Create these encrypted repository Secrets in `Andrew-JX/FitMind_ai`:
+In GitHub Settings → Environments, create `production` and configure all of the
+following before enabling deployment:
+
+1. add at least one independent required reviewer and enable prevent
+   self-review;
+2. restrict deployment branches to `main` only;
+3. disable administrator bypass where the repository plan and visibility expose
+   that control;
+4. save screenshots of the protection rules without showing secret values.
+
+Create these encrypted **production environment Secrets** in
+`Andrew-JX/FitMind_ai`:
 
 - `TENCENT_HOST`: the Lighthouse SSH hostname or IP;
 - `TENCENT_USER`: `ubuntu` for the confirmed host;
@@ -247,9 +258,17 @@ Create these encrypted repository Secrets in `Andrew-JX/FitMind_ai`:
 - `TENCENT_KNOWN_HOSTS`: a separately verified SSH host-key line.
 
 Delete the local private key after the encrypted Secret is confirmed. A push to
-`main` then runs `.github/workflows/deploy-tencent.yml`: repository verification
-and production builds run on GitHub, after which SSH sends only
-`deploy <github.sha>`. The forced server entrypoint:
+`main` then runs `.github/workflows/deploy-tencent.yml`. The `verify` job runs
+repository checks, eval, builds, release E2E, and monitor shell tests before it
+exports the exact 40-character `GITHUB_SHA`. Only after that job succeeds does
+the `deploy` job enter the protected `production` environment and wait for
+approval. After approval, SSH sends only
+`deploy <needs.verify.outputs.release_sha>`. Environment secrets are not exposed
+to the verify job.
+
+The workflow verifies and deploys the same SHA; it does not publish or consume a
+deployment artifact or registry image. Playwright uploads remain failure-only
+diagnostics. The forced server entrypoint:
 
 1. rejects every other verb, argument shape, or non-`main` commit;
 2. serializes deployments with `flock`;
@@ -267,6 +286,12 @@ Before enabling the workflow, run the isolated command-boundary test:
 ```bash
 bash fitmind-ai/deploy/scripts/test-deploy-from-github.sh
 ```
+
+For the first approved run, save evidence that all verify gates completed before
+the deploy job changed to `Waiting`, that a different reviewer approved it, and
+that the SHA displayed by the verify output equals the SHA received by the
+server. Merely referencing `environment: production` is not evidence that
+required-reviewer protection was configured.
 
 ## 9. Install availability paging and the daily quality digest
 

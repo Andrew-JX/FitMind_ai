@@ -14,14 +14,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Verify and deploy production release
+  verify:
+    name: Verify production release
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      DEPLOY_HOST: ${{ secrets.TENCENT_HOST }}
-      DEPLOY_USER: ${{ secrets.TENCENT_USER }}
-      RELEASE_SHA: ${{ github.sha }}
+    outputs:
+      release_sha: ${{ steps.release.outputs.sha }}
 
     steps:
       - name: Check out repository
@@ -81,6 +79,29 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+      - name: Freeze verified release SHA
+        id: release
+        run: |
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          printf 'sha=%s\n' "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    name: Approve and deploy verified release
+    needs: verify
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      deployments: write
+    environment:
+      name: production
+      url: https://fitmind.jimmyuuu.com/
+    env:
+      DEPLOY_HOST: ${{ secrets.TENCENT_HOST }}
+      DEPLOY_USER: ${{ secrets.TENCENT_USER }}
+      RELEASE_SHA: ${{ needs.verify.outputs.release_sha }}
+
+    steps:
       - name: Configure restricted deployment key
         env:
           DEPLOY_KEY: ${{ secrets.TENCENT_DEPLOY_KEY }}

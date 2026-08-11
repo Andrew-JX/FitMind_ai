@@ -1087,3 +1087,11 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
 - API/Web 的 Docker `json-file` 日志限制为 `10m × 5`；仓库提供一分钟 page timer 和每日 09:00 digest timer 候选。日志汇总器默认在当前 API 镜像的禁网、只读临时容器中运行，不要求宿主另装 Node。
 - 全量 `pnpm verify` 通过 104 个 Vitest 文件、802 个断言及 5 个 monitor Node 断言；禁网、只读挂载的本地 Linux API 镜像中 shell 隔离测试通过；client/server production build 和 Compose 安全配置检查通过。
 - 本批没有安装 systemd unit、没有配置或调用真实 webhook、没有 push、没有部署，也没有执行“部署 → 回滚上一 tag → 健康检查 → 滚回候选”的生产演练；这些不能用本地 stub 或镜像测试冒充完成。
+
+## 2026-08-11 — 已验证 SHA 的生产审批边界（fitmind-6e8，本地候选）
+
+- 腾讯云 workflow 从单 job 拆为 `verify` 与 `deploy`：verify 保留全仓检查、assistant eval、两端构建、release E2E 和 monitor shell gate，全部成功后才输出本次运行的 40 位 `GITHUB_SHA`。
+- deploy 必须 `needs: verify`、仅允许 `refs/heads/main`，并引用 `production` environment；部署凭据只在该 job 中读取，SSH 只发送 `needs.verify.outputs.release_sha`，不直接使用 moving ref 或另一份 SHA。
+- 本批明确选择 SHA 语义，不引入 registry 或可部署 artifact。Playwright artifact 仍仅在失败时保存 trace/截图/报告，deploy job 不下载或消费它。
+- 测试会拒绝删除 `needs`/environment/job output、直接改用 `github.sha`、把审批放到 verify 或把 gate/SSH 混回同一 job；全量 `pnpm verify` 通过 104 个 Vitest 文件、803 个断言和 5 个 monitor Node 断言，client/server production build 通过。
+- 本地 workflow 文件不能证明远端审批已生效；本批没有 push、没有创建/修改 GitHub environment、没有配置 required reviewer、没有触发运行、没有审批或部署。后续必须保存 environment 规则截图和一次 verify 全绿后 Waiting → 独立批准 → 同 SHA 部署的证据。
