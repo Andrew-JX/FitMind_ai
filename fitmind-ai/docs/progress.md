@@ -1126,3 +1126,11 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
 - `formatTrainingTimeSummary`、`formatTimeOnly`、`formatDateTimeLocalValue`、`parseDateTimeLocalValue`、`getDurationMinutesFromLocalValues` 五个纯函数现在唯一位于 `training-time.ts`，composer 只导入消费；新模块不依赖 React、API、状态或 composer，characterization 测试文件从最终拆分前 commit 到 candidate 逐字节不变。
 - 8 条模块测试固定 summary 分支优先级、中文文案、合法/非法本地时间显示、ISO 解析、分钟舍入、1 分钟下限、空值、同刻和倒序；fixture 使用本地构造 Date，未把执行机时区写死。composer 从 1723 行降至 1648 行，但行数不是完成判据，测试所有权与单向依赖才是。
 - 全量 `pnpm verify` 通过 108 个 Vitest 文件、828 个断言及 5 个 monitor Node 断言，client production build 通过。没有改变 UI、保存/API 行为，没有访问网络或远端浏览器状态，也没有 push 或部署；composer 的表单组件、样式、错误映射及其余 1600 余行仍需后续独立边界，不能记成整体拆分完成。
+
+## 2026-08-11 — assistant 训练部位纯规则边界（fitmind-bu0，本地候选）
+
+- 先以 `67d43d9` 在原 orchestrator 上建立稳定 `assistant-focus-area.ts` facade，并冻结 8 条 characterization；测试 blob 为 `97a8e2092d2ad48da1f9cee9cfceea4064149a1e`。candidate 只反转依赖和移动实现，测试文件与合同均未修改。
+- `inferDominantFocusArea`、`inferFocusAreaFromName`、`resolveNextFocusSuggestion`、`detectTargetArea`、`describeTargetArea` 及 `FocusArea` 类型现在唯一归属 `assistant-focus-area.ts`；orchestrator 只导入消费，新模块没有 provider、数据库、工具、环境或时间依赖。
+- characterization 固定中英文名称/消息分类、自由输入反例、volume 累计、空输入、mixed 与恰好 1.25 阈值，以及 6 类部位的建议和描述文案。它同时揭示并保留现状：`lateral` 会先被 back 规则中的 `lat` 子串命中；本结构批次不顺手改变路由行为，该词边界缺陷单独跟踪。
+- assistant 定向验证通过 28 个测试文件、264 条断言；全量 `pnpm verify` 通过 109 个 Vitest 文件、837 条断言及 5 个 monitor Node 断言，server production build 通过。orchestrator 从 2710 行降至 2595 行，但行数不是完成判据；provider、tool、answer、session、planning 等边界仍未拆分。
+- 开工前已有的 deploy README/compose/deploy.sh、app test 与 health route 工作树改动未进入本批实现或提交；本批没有真实 provider/数据库/网络调用，没有 push 或部署。
