@@ -2577,7 +2577,7 @@ async function loadPlanAdherenceContext(
   }
 }
 
-function formatMetricKg(value: number | null): string {
+export function formatMetricKg(value: number | null): string {
   if (value === null) {
     return "暂无结果";
   }
@@ -2591,11 +2591,11 @@ function formatMetricKg(value: number | null): string {
   })} kg`;
 }
 
-function formatPercent(value: number): string {
+export function formatPercent(value: number): string {
   return `${(value * 100).toFixed(1)}%`;
 }
 
-function getDaysSince(value: string): number {
+export function getDaysSince(value: string): number {
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
