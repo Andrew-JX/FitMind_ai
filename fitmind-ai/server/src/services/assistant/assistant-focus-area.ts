@@ -47,7 +47,7 @@ export function inferFocusAreaFromName(exerciseName: string): FocusArea {
   }
 
   if (
-    /(row|pull|lat|deadlift|pull[- ]?down|face pull|chin[- ]?up)/u.test(
+    /(row|pull|\blats?\b|deadlift|pull[- ]?down|face pull|chin[- ]?up)/u.test(
       normalized,
     )
   ) {
@@ -93,7 +93,7 @@ export function detectTargetArea(message: string): FocusArea {
     return "chest";
   }
 
-  if (/(背|引体|划船|row|pull|deadlift|lat)/u.test(normalized)) {
+  if (/(背|引体|划船|row|pull|deadlift|\blats?\b)/u.test(normalized)) {
     return "back";
   }
 

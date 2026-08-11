@@ -1134,3 +1134,10 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
 - characterization 固定中英文名称/消息分类、自由输入反例、volume 累计、空输入、mixed 与恰好 1.25 阈值，以及 6 类部位的建议和描述文案。它同时揭示并保留现状：`lateral` 会先被 back 规则中的 `lat` 子串命中；本结构批次不顺手改变路由行为，该词边界缺陷单独跟踪。
 - assistant 定向验证通过 28 个测试文件、264 条断言；全量 `pnpm verify` 通过 109 个 Vitest 文件、837 条断言及 5 个 monitor Node 断言，server production build 通过。orchestrator 从 2710 行降至 2595 行，但行数不是完成判据；provider、tool、answer、session、planning 等边界仍未拆分。
 - 开工前已有的 deploy README/compose/deploy.sh、app test 与 health route 工作树改动未进入本批实现或提交；本批没有真实 provider/数据库/网络调用，没有 push 或部署。
+
+## 2026-08-11 — assistant `lat` / `lateral` 词边界（fitmind-gct，本地候选）
+
+- `90321a5` 先只修改回归期望并增加正反例；未改生产代码时定向运行精确出现 2 个失败、6 个通过，失败分别来自 exercise-name 与 message 的 lateral 误分类，证明测试确实命中原缺陷。冻结测试 blob 为 `35bcc03c8c5862ff613c7b23aef6db13da83832c`。
+- 名称与消息 back 正则中的两处裸 `lat` 已分别收紧为完整 `lat` / `lats` token。`Dumbbell Lateral Raise` 与 `add lateral raise` 现在归 shoulders，`Pilates Roll Up` 与 `latest news` 归 unknown；`Lat Pulldown`、`lat pulldown`、`Lats` 与 `train lats` 继续归 back。
+- 修复没有重排 chest/back/legs/shoulders 分支，也没有改变其他关键词、部位文案或运行时导出。regression 测试文件在实现修复后逐字节不变，定向测试由红转为 8/8。
+- assistant 目录通过 28 个测试文件、264 条断言；全量 `pnpm verify` 通过 109 个 Vitest 文件、837 条断言及 5 个 monitor Node 断言，server production build 通过。五个开工前已有的 deploy/health 工作树改动仍保持未暂存、未提交；本批没有 provider、数据库、网络调用，没有 push 或部署。
