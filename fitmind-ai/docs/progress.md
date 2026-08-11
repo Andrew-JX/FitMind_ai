@@ -1157,3 +1157,12 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
 - assistant 旧 chat/config/types 路径保留兼容导出，assistant 专属 provider 选择与配置失败归一化仍在 assistant seam；workout intake 与 assistant insights 改为直接消费中立层。production training 对 `../assistant/` 的 importer 集合由冻结的两个降为零，AGENTS 临时 allowlist 已删除，治理测试改为任何 synthetic importer 都失败。
 - 中立模块与相关 assistant/training/governance 定向验证通过 8 个文件、54 条断言；assistant 目录通过 29 个测试文件、278 条断言；全量 `pnpm verify` 通过 113 个 Vitest 文件、868 条断言及 5 个 monitor Node 断言，server production build 通过。HTTP URL、Bearer header、payload、content/tool call/usage、错误脱敏、timeout/timer、默认模型与缺失配置行为均由冻结 characterization 覆盖。
 - 五个开工前已有的 deploy README/compose/deploy.sh、app test 与 health route 工作树改动保持未暂存、未提交；验证只使用 stub fetch 与 fake timers，没有真实 provider、数据库或网络调用，没有 push 或部署。中立边界到期债已清理，但 assistant orchestrator 其余业务流和 TrainingSessionComposer 其余 UI 边界仍需后续独立拆分。
+
+## 2026-08-11 — assistant 确定性答案构建边界（fitmind-gdd，本地候选）
+
+- 合同由 `5e28076` 冻结；`006602f` 先建立稳定 facade 和 11 条 characterization，答案测试 blob 固定为 `e3b2881f92a03e6509563ebb5784b8eb4533cfbb`。实现迁移后测试文件与合同均未修改。
+- 四个工具结果 DTO、`AssistantAnswerCore`、八个公开 builder 以及 evidence/range/complete/recommendation 内部纯 helper 现在唯一归属 `assistant-deterministic-answers.ts`；orchestrator 只导入消费。`buildToolAnswer`、tool validation、provider simulation、stream、persistence 与 agent 生命周期仍留在 orchestrator。
+- 混合 tool+RAG 路径通过既有 `buildToolAnswer(...).evidence` 复用同一 evidence owner，没有暴露第九个 API 或复制 helper。characterization 固定 empty/ready overview、progress、weekly，五类 recommendation、55% 集中度、24 小时恢复桶、plateau Sources、provider guidance、evidence 去重和 structured 默认字段。
+- 初次全量验证揭示旧 focus/metrics 测试把“唯一实现所有者”错误绑定为“orchestrator 必须直接 import”。范围补充合同 `042cf56` 冻结正确两跳链，`ff98eb8` 单独适配护栏；focus/metrics 新测试 blob 分别为 `1df0141fa5971c0c72bb395a35b3493dd99fed43` 与 `086a78d383e2a0c4d3fe83f0a7766d0d757de21a`，candidate 不修改。
+- 定向验证通过 47/47；assistant 目录通过 30 个测试文件、289 条断言；全量 `pnpm verify` 通过 114 个 Vitest 文件、879 条断言及 5 个 monitor Node 断言，server production build 通过。orchestrator 从 2568 行降到 2014 行，但完成判据是模块自有测试、单一所有权与依赖方向，不是行数。
+- 开工前与过程中并行出现的 workflow/deploy/health/release-identity/progress 改动未进入本批暂存或提交；验证没有真实 provider、数据库或网络调用，没有 push 或部署。orchestrator 的 session/provider/tool/planning 生命周期和 TrainingSessionComposer 其余 UI 边界仍需后续独立拆分。
