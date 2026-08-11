@@ -267,3 +267,77 @@ Before enabling the workflow, run the isolated command-boundary test:
 ```bash
 bash fitmind-ai/deploy/scripts/test-deploy-from-github.sh
 ```
+
+## 9. Install availability paging and the daily quality digest
+
+The monitor has two deliberately separate outputs:
+
+- `page` covers API/Web container failure, a restart-count increase, three
+  consecutive loopback health failures, and a sustained 5xx spike;
+- `digest` reports provider/budget fallback, faithfulness flags, calls, cost,
+  unknown model prices, and 80% budget pressure once per day. These quality
+  metrics never page by themselves.
+
+The default 5xx spike requires at least 10 non-health requests in five minutes,
+at least 3 server errors, and a 20% error rate. `/api/health` is excluded from
+both numerator and denominator. The monitor uses Node from the deployed API
+image to parse JSON logs; it does not require Node to be installed on the host.
+
+Before installation, run both isolated suites from the release checkout:
+
+```bash
+node --test deploy/scripts/summarize-monitor-logs.test.mjs
+bash deploy/scripts/test-fitmind-monitor.sh
+FITMIND_MONITOR_DRY_RUN=1 bash deploy/scripts/fitmind-monitor.sh page
+FITMIND_MONITOR_DRY_RUN=1 bash deploy/scripts/fitmind-monitor.sh digest
+```
+
+Create a server-only config. The receiver must accept the canonical FitMind JSON
+payload; use an internal relay if the final chat provider requires another
+schema. Never put this URL in Git or shell output.
+
+```bash
+install -m 600 /dev/null ~/.config/fitmind-monitor.env
+${EDITOR:-vi} ~/.config/fitmind-monitor.env
+```
+
+Required production value:
+
+```dotenv
+FITMIND_MONITOR_WEBHOOK_URL=<private-https-receiver>
+```
+
+Optional threshold overrides retain all three 5xx conditions:
+
+```dotenv
+FITMIND_MONITOR_5XX_MINIMUM_REQUESTS=10
+FITMIND_MONITOR_5XX_MINIMUM_ERRORS=3
+FITMIND_MONITOR_5XX_MINIMUM_PERCENT=20
+FITMIND_MONITOR_HEALTH_FAILURE_THRESHOLD=3
+```
+
+Install the user units for the same account that owns the release checkout and
+can access Docker:
+
+```bash
+install -d -m 700 ~/.config/systemd/user ~/.local/state/fitmind-monitor
+install -m 644 deploy/systemd/fitmind-monitor@.service ~/.config/systemd/user/
+install -m 644 deploy/systemd/fitmind-monitor-page.timer ~/.config/systemd/user/
+install -m 644 deploy/systemd/fitmind-monitor-digest.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now fitmind-monitor-page.timer fitmind-monitor-digest.timer
+sudo loginctl enable-linger "$USER"
+```
+
+The page timer runs every minute; the digest timer runs daily at 09:00 in the
+host timezone. Inspect without exposing the webhook URL:
+
+```bash
+systemctl --user list-timers 'fitmind-monitor-*'
+journalctl --user -u 'fitmind-monitor@*' --since today --no-pager
+```
+
+Do not call monitoring installed until a controlled test proves one firing
+notification, deduplication on the next run, one recovery, and a digest at the
+receiver. A real image rollback drill remains separate: deploy a reviewed SHA,
+roll back to the retained previous tag, verify health, and then roll forward.

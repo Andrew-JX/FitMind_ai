@@ -1078,3 +1078,12 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
 - Permissions-Policy 关闭 camera/geolocation，只允许同源页面使用 microphone；这限制页面能力，不改变浏览器 SpeechRecognition 厂商的数据处理披露。
 - Nginx 源码测试精确解析策略并加入四个内存退化：缺 frame-ancestors、script 加 unsafe-eval、style 去掉当前必要例外、microphone 放宽为 wildcard 都会失败。
 - 本批没有部署；生产响应头、浏览器 console、PWA 与真实语音权限仍需单独线上 smoke，不能用本地配置测试冒充已生效。
+
+## 2026-08-11 — Paging 与每日质量 Digest 分层（fitmind-ry9，本地候选）
+
+- API 新增 `http_request_completed` 结构事件，为 5xx 比例提供真实分母；事件只含 method、路由模板、status 和 duration。query/body/headers/error message/stack 不记录，未匹配或路由前失败统一为 `/api/:unmatched`，logger 抛错不改变响应。
+- 宿主监控把可用性与质量严格分层：容器退出/不健康、重启增量、连续三次 loopback health 失败和满足“5 分钟至少 10 请求、3 个 5xx、20%”三重门槛时 Paging；provider/budget fallback、faithfulness flagged、成本/调用逼近 80% 只进入每日 Digest。
+- page 状态文件只按白名单逐项解析，不 `source`；写入使用同目录临时文件原子替换并由 `flock` 防并发。首次重启计数只建立基线，同一故障集合去重，清除后输出一次 recovery；dry-run 不访问 webhook，真实发送失败非零退出。
+- API/Web 的 Docker `json-file` 日志限制为 `10m × 5`；仓库提供一分钟 page timer 和每日 09:00 digest timer 候选。日志汇总器默认在当前 API 镜像的禁网、只读临时容器中运行，不要求宿主另装 Node。
+- 全量 `pnpm verify` 通过 104 个 Vitest 文件、802 个断言及 5 个 monitor Node 断言；禁网、只读挂载的本地 Linux API 镜像中 shell 隔离测试通过；client/server production build 和 Compose 安全配置检查通过。
+- 本批没有安装 systemd unit、没有配置或调用真实 webhook、没有 push、没有部署，也没有执行“部署 → 回滚上一 tag → 健康检查 → 滚回候选”的生产演练；这些不能用本地 stub 或镜像测试冒充完成。

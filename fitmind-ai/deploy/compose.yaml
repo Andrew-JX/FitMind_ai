@@ -69,6 +69,11 @@ services:
         exec node server/dist/server.js
     ports:
       - "127.0.0.1:3000:3000"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     healthcheck:
       test:
         [
@@ -97,6 +102,11 @@ services:
       - no-new-privileges:true
     ports:
       - "127.0.0.1:8081:80"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
       interval: 15s

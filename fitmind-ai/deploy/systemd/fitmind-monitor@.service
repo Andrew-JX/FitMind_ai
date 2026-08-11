@@ -1,0 +1,13 @@
+[Unit]
+Description=FitMind production monitor (%i)
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/FitMind_ai/fitmind-ai
+EnvironmentFile=-%h/.config/fitmind-monitor.env
+Environment=FITMIND_MONITOR_STATE_DIR=%h/.local/state/fitmind-monitor
+ExecStart=/usr/bin/bash %h/FitMind_ai/fitmind-ai/deploy/scripts/fitmind-monitor.sh %i
+NoNewPrivileges=true
+PrivateTmp=true

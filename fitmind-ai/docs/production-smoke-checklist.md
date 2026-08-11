@@ -51,6 +51,16 @@ Use this checklist before sending the app to an interviewer, friend, or recruite
 - [ ] The public health and registration-policy checks pass before calling the automatic deployment complete.
 - [ ] Triggering `shell`, `deploy <sha> extra`, an uppercase SHA, or a commit outside `origin/main` is rejected before `deploy.sh` runs.
 
+## Production monitoring and rollback evidence
+
+- [ ] `node --test deploy/scripts/summarize-monitor-logs.test.mjs` and `bash deploy/scripts/test-fitmind-monitor.sh` pass for the exact release SHA.
+- [ ] `fitmind-monitor-page.timer` and `fitmind-monitor-digest.timer` are enabled for the deploy user; `systemctl --user list-timers 'fitmind-monitor-*'` shows their next runs.
+- [ ] A controlled API/container failure sends one Paging firing notification, the unchanged next run sends none, and recovery sends exactly one resolved notification.
+- [ ] A controlled provider fallback or faithfulness flag appears in the daily Digest but sends no Paging notification.
+- [ ] The Digest reports unknown model pricing separately; it does not treat an unknown model as zero cost.
+- [ ] Docker inspect confirms API/Web use bounded `json-file` rotation with `max-size=10m` and `max-file=5`.
+- [ ] Record a real drill: deploy the reviewed SHA, run `rollback.sh <previous-tag>`, verify public and loopback health, then roll forward and verify again. Stubbed script tests are not rollback evidence.
+
 ## Browser Setup
 
 - [ ] Open the target URL in a normal browser tab.

@@ -23,7 +23,17 @@ import { HttpError, isHttpError } from "./utils/http-error.js";
 
 export interface CreateAppOptions {
   authRateLimiter?: AiRateLimiter;
+  now?: () => number;
+  requestCompletionLogger?: (entry: HttpRequestCompletedLog) => void;
   unknownErrorLogger?: (entry: UnknownRequestErrorLog) => void;
+}
+
+export interface HttpRequestCompletedLog {
+  event: "http_request_completed";
+  method: string;
+  path: string;
+  status: number;
+  duration_ms: number;
 }
 
 export interface UnknownRequestErrorLog {
@@ -75,6 +85,30 @@ function createUnknownRequestErrorLog(
   };
 }
 
+function resolveCompletedRequestPathForLog(
+  req: express.Request,
+  originalPath: string,
+): string {
+  const routePath = (req.route as { path?: unknown } | undefined)?.path;
+
+  if (typeof routePath === "string") {
+    const originalSegments = originalPath.split("/").filter(Boolean);
+    const routeSegments = routePath.split("/").filter(Boolean);
+    const mountedSegments = [
+      ...originalSegments.slice(
+        0,
+        originalSegments.length - routeSegments.length,
+      ),
+      ...routeSegments,
+    ];
+    return normalizeRequestPathForLog(`/${mountedSegments.join("/")}`);
+  }
+
+  return originalPath === "/api" || originalPath.startsWith("/api/")
+    ? "/api/:unmatched"
+    : "/:unmatched";
+}
+
 /**
  * Creates the Express app and wires production middleware and routers.
  *
@@ -83,6 +117,12 @@ function createUnknownRequestErrorLog(
  */
 export function createApp(options?: CreateAppOptions) {
   const app = express();
+  const now = options?.now ?? Date.now;
+  const requestCompletionLogger =
+    options?.requestCompletionLogger ??
+    ((entry: HttpRequestCompletedLog) => {
+      console.info(JSON.stringify(entry));
+    });
   const unknownErrorLogger =
     options?.unknownErrorLogger ??
     ((entry: UnknownRequestErrorLog) => {
@@ -90,6 +130,26 @@ export function createApp(options?: CreateAppOptions) {
     });
 
   app.set("trust proxy", 1);
+  app.use((req, res, next) => {
+    const startedAt = now();
+    const originalPath = req.path;
+
+    res.once("finish", () => {
+      try {
+        requestCompletionLogger({
+          event: "http_request_completed",
+          method: req.method,
+          path: resolveCompletedRequestPathForLog(req, originalPath),
+          status: res.statusCode,
+          duration_ms: Math.max(0, Math.round(now() - startedAt)),
+        });
+      } catch {
+        // Observability must never replace or interrupt the API response.
+      }
+    });
+
+    next();
+  });
   app.use(express.json());
 
   app.use(

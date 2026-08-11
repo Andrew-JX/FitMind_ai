@@ -46,6 +46,7 @@ function assertReleaseGates(source: string): void {
     "Build production applications",
     "Install Playwright Chromium",
     "Run release compliance E2E",
+    "Test production monitor command boundary",
     "Upload Playwright failure artifacts",
     "Configure restricted deployment key",
     "Deploy reviewed commit and verify containers",
@@ -61,6 +62,7 @@ function assertReleaseGates(source: string): void {
   const evaluation = getStep(steps, "Evaluate assistant regressions");
   const browser = getStep(steps, "Install Playwright Chromium");
   const e2e = getStep(steps, "Run release compliance E2E");
+  const monitor = getStep(steps, "Test production monitor command boundary");
   const artifacts = getStep(steps, "Upload Playwright failure artifacts");
 
   expect(verify.source).toContain("run: pnpm verify");
@@ -69,6 +71,10 @@ function assertReleaseGates(source: string): void {
   expect(browser.source).toContain("playwright install --with-deps chromium");
   expect(e2e.source).toContain("run: pnpm test:e2e:release");
   expect(e2e.source).not.toContain("continue-on-error");
+  expect(monitor.source).toContain(
+    "run: bash deploy/scripts/test-fitmind-monitor.sh",
+  );
+  expect(monitor.source).not.toContain("continue-on-error");
   expect(artifacts.source).toContain("if: failure()");
   expect(artifacts.source).toContain("uses: actions/upload-artifact@v4");
   expect(artifacts.source).toContain("fitmind-ai/client/test-results");
@@ -96,6 +102,11 @@ describe("Tencent production release workflow", () => {
     ).toThrow();
     expect(() =>
       assertReleaseGates(removeStep(source, "Run release compliance E2E")),
+    ).toThrow();
+    expect(() =>
+      assertReleaseGates(
+        removeStep(source, "Test production monitor command boundary"),
+      ),
     ).toThrow();
     expect(() =>
       assertReleaseGates(

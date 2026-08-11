@@ -10,6 +10,7 @@
     "format:check": "prettier --check .",
     "test": "pnpm test:unit",
     "test:unit": "vitest run",
+    "test:monitor": "node --test deploy/scripts/summarize-monitor-logs.test.mjs",
     "test:e2e": "pnpm --filter @fitmind/client run test:e2e",
     "test:e2e:release": "pnpm --filter @fitmind/client run test:e2e:release",
     "eval": "pnpm --filter @fitmind/server exec tsx scripts/run-eval.ts",
@@ -22,7 +23,7 @@
     "smoke:workout-intake": "pnpm --filter @fitmind/server run smoke:workout-intake",
     "create:user": "pnpm --filter @fitmind/server run create:user",
     "seed:assistant-demo": "pnpm --filter @fitmind/server run seed:assistant-demo",
-    "verify": "pnpm lint && pnpm format:check && pnpm type-check && pnpm test:unit",
+    "verify": "pnpm lint && pnpm format:check && pnpm type-check && pnpm test:unit && pnpm test:monitor",
     "db:migrate": "pnpm --filter @fitmind/server run db:migrate",
     "dev:client": "pnpm --filter @fitmind/client dev",
     "dev:server": "pnpm --filter @fitmind/server dev"

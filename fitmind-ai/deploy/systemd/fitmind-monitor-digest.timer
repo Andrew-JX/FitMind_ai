@@ -1,0 +1,11 @@
+[Unit]
+Description=Send the FitMind operations digest daily
+
+[Timer]
+OnCalendar=*-*-* 09:00:00
+RandomizedDelaySec=5min
+Persistent=true
+Unit=fitmind-monitor@digest.service
+
+[Install]
+WantedBy=timers.target

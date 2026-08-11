@@ -35,6 +35,7 @@ describe("createApp", () => {
       perDay: 100_000,
       now: () => 0,
     }),
+    requestCompletionLogger: () => undefined,
   });
   const server = app.listen(0);
 
@@ -81,6 +82,115 @@ describe("createApp", () => {
     ).toBe("/api/menstrual-records/:date/body/:id");
   });
 
+  it("logs privacy-safe completion events for 2xx, 4xx, and 5xx responses", async () => {
+    const entries: unknown[] = [];
+    const times = [100, 125, 200, 240, 300, 355, 400, 410];
+    const loggingApp = createApp({
+      authRateLimiter: createAiRateLimiter({
+        perMinute: 1_000,
+        perDay: 100_000,
+        now: () => 0,
+      }),
+      now: () => times.shift() ?? 355,
+      requestCompletionLogger: (entry) => entries.push(entry),
+      unknownErrorLogger: () => undefined,
+    });
+    const loggingServer = loggingApp.listen(0);
+
+    try {
+      const address = loggingServer.address();
+
+      if (address === null || typeof address === "string") {
+        throw new Error("Expected the test server to bind to a TCP port");
+      }
+
+      const origin = `http://127.0.0.1:${address.port}`;
+      await fetch(`${origin}/api/health?token=must-not-appear`);
+      await fetch(`${origin}/api/auth/me`, {
+        headers: {
+          authorization: "Token must-not-appear",
+          cookie: "session=must-not-appear",
+        },
+      });
+      await fetch(`${origin}/api/auth/login?password=must-not-appear`, {
+        body: '{"password":"must-not-appear"',
+        headers: {
+          "content-type": "application/json",
+        },
+        method: "POST",
+      });
+      await fetch(`${origin}/api/must-not-appear`);
+
+      expect(entries).toEqual([
+        {
+          event: "http_request_completed",
+          method: "GET",
+          path: "/api/health",
+          status: 200,
+          duration_ms: 25,
+        },
+        {
+          event: "http_request_completed",
+          method: "GET",
+          path: "/api/auth/me",
+          status: 401,
+          duration_ms: 40,
+        },
+        {
+          event: "http_request_completed",
+          method: "POST",
+          path: "/api/:unmatched",
+          status: 500,
+          duration_ms: 55,
+        },
+        {
+          event: "http_request_completed",
+          method: "GET",
+          path: "/api/:unmatched",
+          status: 404,
+          duration_ms: 10,
+        },
+      ]);
+      expect(JSON.stringify(entries)).not.toContain("must-not-appear");
+      expect(JSON.stringify(entries)).not.toContain("authorization");
+      expect(JSON.stringify(entries)).not.toContain("cookie");
+      expect(JSON.stringify(entries)).not.toContain("stack");
+    } finally {
+      loggingServer.close();
+    }
+  });
+
+  it("does not let a completion logger failure alter the response", async () => {
+    const loggingApp = createApp({
+      requestCompletionLogger: () => {
+        throw new Error("logger unavailable");
+      },
+    });
+    const loggingServer = loggingApp.listen(0);
+
+    try {
+      const address = loggingServer.address();
+
+      if (address === null || typeof address === "string") {
+        throw new Error("Expected the test server to bind to a TCP port");
+      }
+
+      const response = await fetch(
+        `http://127.0.0.1:${address.port}/api/health`,
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        ok: true,
+        data: {
+          status: "ok",
+        },
+      });
+    } finally {
+      loggingServer.close();
+    }
+  });
+
   it("logs unknown request failures without messages or request data", async () => {
     const entries: unknown[] = [];
     const loggingApp = createApp({
@@ -89,6 +199,7 @@ describe("createApp", () => {
         perDay: 100_000,
         now: () => 0,
       }),
+      requestCompletionLogger: () => undefined,
       unknownErrorLogger: (entry) => entries.push(entry),
     });
     const loggingServer = loggingApp.listen(0);
@@ -216,6 +327,7 @@ describe("createApp", () => {
         perDay: 100,
         now: () => 0,
       }),
+      requestCompletionLogger: () => undefined,
     });
     const limitedServer = limitedApp.listen(0);
 

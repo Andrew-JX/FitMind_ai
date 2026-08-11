@@ -1,0 +1,12 @@
+[Unit]
+Description=Run FitMind availability paging monitor every minute
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=5s
+Persistent=true
+Unit=fitmind-monitor@page.service
+
+[Install]
+WantedBy=timers.target
