@@ -1,4 +1,16 @@
-import { createDbPool } from "../pool.js";
+import { createDbPool, type DbPool } from "../pool.js";
+
+type DbPoolLike = Pick<DbPool, "query"> & Partial<Pick<DbPool, "end">>;
+
+export interface MuscleGroupRow {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameZh: string;
+  parentId: string | null;
+  recoveryHours: number;
+  createdAt: unknown;
+}
 
 /**
  * List all muscle groups ordered by hierarchy and code.
@@ -7,7 +19,9 @@ import { createDbPool } from "../pool.js";
  *   Optional shared database pool.
  * @returns {Promise<unknown[]>} Muscle group rows.
  */
-export async function listMuscleGroups(pool) {
+export async function listMuscleGroups(
+  pool?: DbPoolLike,
+): Promise<MuscleGroupRow[]> {
   const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
@@ -29,10 +43,10 @@ export async function listMuscleGroups(pool) {
       `,
     );
 
-    return result.rows;
+    return result.rows as MuscleGroupRow[];
   } finally {
     if (ownsPool) {
-      await activePool.end();
+      await activePool.end?.();
     }
   }
 }

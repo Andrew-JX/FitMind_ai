@@ -1,4 +1,21 @@
-import { createDbPool } from "../pool.js";
+import { createDbPool, type DbPool } from "../pool.js";
+
+type DbPoolLike = Pick<DbPool, "query"> & Partial<Pick<DbPool, "end">>;
+
+export interface UserRow {
+  id: string;
+  email: string;
+  passwordHash: string;
+  displayName: string | null;
+  createdAt: unknown;
+  updatedAt: unknown;
+}
+
+export interface CreateUserInput {
+  email: string;
+  passwordHash: string;
+  displayName?: string | null | undefined;
+}
 
 /**
  * Find a user row by normalized email address.
@@ -9,7 +26,10 @@ import { createDbPool } from "../pool.js";
  *   Optional shared database pool.
  * @returns {Promise<unknown | null>} Matching user row or null.
  */
-export async function findUserByEmail(email, pool) {
+export async function findUserByEmail(
+  email: string,
+  pool?: DbPoolLike,
+): Promise<UserRow | null> {
   const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
@@ -30,10 +50,10 @@ export async function findUserByEmail(email, pool) {
       [email],
     );
 
-    return result.rows[0] ?? null;
+    return (result.rows[0] as UserRow | undefined) ?? null;
   } finally {
     if (ownsPool) {
-      await activePool.end();
+      await activePool.end?.();
     }
   }
 }
@@ -47,7 +67,10 @@ export async function findUserByEmail(email, pool) {
  *   Optional shared database pool.
  * @returns {Promise<unknown | null>} Matching user row or null.
  */
-export async function findUserById(userId, pool) {
+export async function findUserById(
+  userId: string,
+  pool?: DbPoolLike,
+): Promise<UserRow | null> {
   const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
@@ -68,10 +91,10 @@ export async function findUserById(userId, pool) {
       [userId],
     );
 
-    return result.rows[0] ?? null;
+    return (result.rows[0] as UserRow | undefined) ?? null;
   } finally {
     if (ownsPool) {
-      await activePool.end();
+      await activePool.end?.();
     }
   }
 }
@@ -85,7 +108,10 @@ export async function findUserById(userId, pool) {
  *   Optional shared database pool.
  * @returns {Promise<unknown>} Inserted user row.
  */
-export async function createUser(input, pool) {
+export async function createUser(
+  input: CreateUserInput,
+  pool?: DbPoolLike,
+): Promise<UserRow> {
   const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
@@ -105,10 +131,10 @@ export async function createUser(input, pool) {
       [input.email, input.passwordHash, input.displayName ?? null],
     );
 
-    return result.rows[0];
+    return result.rows[0] as UserRow;
   } finally {
     if (ownsPool) {
-      await activePool.end();
+      await activePool.end?.();
     }
   }
 }
@@ -131,7 +157,10 @@ export async function createUser(input, pool) {
  * Returns a boolean rather than throwing on a missing row so a double-submit
  * from the client is idempotent instead of a 500.
  */
-export async function deleteUserById(userId, pool) {
+export async function deleteUserById(
+  userId: string,
+  pool?: DbPoolLike,
+): Promise<boolean> {
   const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
@@ -143,7 +172,7 @@ export async function deleteUserById(userId, pool) {
     return (result.rowCount ?? 0) > 0;
   } finally {
     if (ownsPool) {
-      await activePool.end();
+      await activePool.end?.();
     }
   }
 }

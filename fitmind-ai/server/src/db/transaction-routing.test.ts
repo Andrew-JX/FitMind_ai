@@ -160,7 +160,7 @@ function createPlannedWorkoutScenario(): TransactionScenario {
 function createWorkoutScenario(): TransactionScenario {
   return {
     name: "workout and sets creation",
-    sourceFile: "repositories/workouts-repository.js",
+    sourceFile: "repositories/workouts-repository.ts",
     run: async () => {
       const workoutDetail = {
         id: "workout-1",
@@ -349,45 +349,25 @@ describe("transaction query routing", () => {
     ).toThrow();
   });
 
-  it("declares the injectable pool on every matching workouts runtime function", async () => {
+  it("types the injectable pool on every workouts runtime function", async () => {
     const runtime = await readFile(
-      resolve(dbDirectory, "repositories/workouts-repository.js"),
-      "utf8",
-    );
-    const declaration = await readFile(
-      resolve(dbDirectory, "repositories/workouts-repository.d.ts"),
+      resolve(dbDirectory, "repositories/workouts-repository.ts"),
       "utf8",
     );
     const injectableFunctions = [
       ...runtime.matchAll(
         /^export async function ([a-zA-Z0-9_]+)\(([^)]*)\)/gmu,
       ),
-    ]
-      .filter((match) =>
-        (match[2] ?? "")
-          .split(",")
-          .map((parameter) => parameter.trim())
-          .includes("pool"),
-      )
-      .map((match) => match[1] ?? "");
+    ].map((match) => ({
+      name: match[1] ?? "",
+      parameters: match[2] ?? "",
+    }));
 
     expect(injectableFunctions).toHaveLength(10);
-    for (const [index, functionName] of injectableFunctions.entries()) {
-      const start = declaration.indexOf(
-        `export declare function ${functionName}(`,
-      );
-      const nextName = injectableFunctions[index + 1];
-      const end =
-        nextName === undefined
-          ? declaration.length
-          : declaration.indexOf(`export declare function ${nextName}(`, start);
-      const functionDeclaration = declaration.slice(start, end);
-
-      expect(
-        start,
-        `missing declaration for ${functionName}`,
-      ).toBeGreaterThanOrEqual(0);
-      expect(functionDeclaration, functionName).toContain("pool?: DbPoolLike");
+    for (const { name, parameters } of injectableFunctions) {
+      expect(parameters, name).toMatch(/\bpool\?: DbPoolLike\b/);
     }
+    expect(runtime).toContain("export interface DbPoolLike");
+    expect(runtime).not.toContain("as unknown as");
   });
 });

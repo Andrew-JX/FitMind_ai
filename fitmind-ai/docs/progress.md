@@ -1111,3 +1111,11 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
 - 唯一 Pool 配置固定 `max: 10` 与 `allowExitOnIdle: true`，并监听空闲客户端 error。输出事件只含 `db_pool_idle_error`、保守错误类型和错误码；异常 message、stack、数据库 URL、SQL 与凭据不进入日志。
 - 新增机器护栏会精确枚举 19 个共享工厂消费者，拒绝第二个 `new Pool`、第二个 `require("pg")` 或任何 `createRepositoryPool`；生命周期、脱敏日志与 4.1a 事务不逃逸测试共 13 条定向断言通过。
 - 全量 `pnpm verify` 通过 106 个 Vitest 文件、816 个断言及 5 个 monitor Node 断言，server production build 通过。验证全程使用 mock/fake pool，没有连接真实数据库、没有读取生产密钥、没有 push 或部署；4 个 JavaScript repository 的 TypeScript 迁移、手写声明清理和进程信号优雅停机仍不属于本批。
+
+## 2026-08-11 — repository TypeScript 单一类型源（fitmind-18z，本地候选）
+
+- `db/repositories` 的 exercises、muscle-groups、users、workouts 四个实现和 barrel 已从 JavaScript 原位迁移到 TypeScript；`index.d.ts` 与 `workouts-repository.d.ts` 两份旁路手写声明删除，公共行类型、输入类型及可注入 pool/client 类型现在与实现同源。
+- NodeNext 导入说明符继续使用 `.js`，所以源码消费者无需改路由，server build 会从 `.ts` 生成对应运行时 `.js`。构建后精确检查 exercises、muscle-groups、users、workouts 和 index 五个产物均存在。
+- 新增源码合同精确限定 5 个生产 `.ts`、0 个生产 `.js`、0 个手写 `.d.ts`，固定四个实现和 barrel 的运行时导出集合，并拒绝 `any` / `as unknown as` 类型逃逸。
+- 迁移前冻结的 exercises 1 块、muscle-groups 1 块、users 5 块、workouts 12 块 SQL 模板，在统一换行后 SHA-256 逐项完全相同；参数、事务、分页和返回行为没有借类型迁移改写。auth、dictionary、workout service 与事务护栏定向共 49 条断言通过。
+- 全量 `pnpm verify` 通过 107 个 Vitest 文件、820 个断言及 5 个 monitor Node 断言，server production build 通过。验证没有连接真实数据库、没有读取生产密钥、没有 push 或部署；真实 PostgreSQL 集成和进程信号优雅停机仍不属于本批。

@@ -1,4 +1,32 @@
-import { createDbPool } from "../pool.js";
+import { createDbPool, type DbPool } from "../pool.js";
+
+type DbPoolLike = Pick<DbPool, "query"> & Partial<Pick<DbPool, "end">>;
+
+export interface ExerciseMuscleRow {
+  code: string;
+  contributionWeight: number;
+  isPrimary: boolean;
+}
+
+export interface ExerciseRow {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameZh: string;
+  movementPattern: string | null;
+  equipment: string | null;
+  isCompound?: boolean;
+  defaultRestSeconds?: number;
+  techniqueCuesZh: string[];
+  commonMistakesZh: string[];
+  equipmentNotesZh: string | null;
+  muscles: ExerciseMuscleRow[];
+}
+
+export interface ExerciseSearchFilters {
+  q?: string | undefined;
+  muscleCode?: string | undefined;
+}
 
 /**
  * Search exercises by keyword and optional muscle code.
@@ -9,7 +37,10 @@ import { createDbPool } from "../pool.js";
  *   Optional shared database pool.
  * @returns {Promise<unknown[]>} Exercise rows with aggregated muscles.
  */
-export async function searchExercises(filters = {}, pool) {
+export async function searchExercises(
+  filters: ExerciseSearchFilters = {},
+  pool?: DbPoolLike,
+): Promise<ExerciseRow[]> {
   const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
   const keyword = filters.q?.trim() ?? "";
@@ -67,10 +98,10 @@ export async function searchExercises(filters = {}, pool) {
       [keywordPattern, muscleCode],
     );
 
-    return result.rows;
+    return result.rows as ExerciseRow[];
   } finally {
     if (ownsPool) {
-      await activePool.end();
+      await activePool.end?.();
     }
   }
 }

@@ -2,63 +2,105 @@ import { Buffer } from "node:buffer";
 
 import { createDbPool } from "../pool.js";
 
-/**
- * @typedef {{
- *   id: string;
- *   exercise_id: string;
- *   set_index: number;
- *   reps: number;
- *   weight_kg: number;
- *   rpe: number | null;
- *   is_warmup: boolean;
- *   notes: string | null;
- *   created_at: string;
- * }} WorkoutSetRow
- */
+export interface WorkoutCursor {
+  performed_at: string;
+  id: string;
+}
 
-/**
- * @typedef {{
- *   id: string;
- *   performed_at: string;
- *   started_at: string | null;
- *   ended_at: string | null;
- *   duration_minutes: number | null;
- *   notes: string | null;
- *   sets_count: number;
- *   total_volume: number;
- *   muscle_groups: string[];
- * }} WorkoutSummaryRow
- */
+export interface DbQueryResult {
+  rows: unknown[];
+  rowCount?: number | null;
+}
 
-/**
- * @typedef {{
- *   id: string;
- *   performed_at: string;
- *   started_at: string | null;
- *   ended_at: string | null;
- *   duration_minutes: number | null;
- *   notes: string | null;
- *   sets: WorkoutSetRow[];
- * }} WorkoutDetailRow
- */
+export interface DbClientLike {
+  query: (sql: string, params?: readonly unknown[]) => Promise<DbQueryResult>;
+  release: () => void;
+}
 
-/**
- * @typedef {{
- *   query: (sql: string, params?: readonly unknown[]) => Promise<{ rows: unknown[] }>;
- *   end?: () => Promise<void>;
- *   connect?: () => Promise<{
- *     query: (sql: string, params?: readonly unknown[]) => Promise<{ rows: unknown[] }>;
- *     release: () => void;
- *   }>;
- * }} DbPoolLike
- */
+export interface DbPoolLike {
+  query: DbClientLike["query"];
+  connect?: () => Promise<DbClientLike>;
+  end?: () => Promise<void>;
+}
 
-/**
- * @typedef {{
- *   performed_at: string;
- *   id: string;
- * }} WorkoutCursor
- */
+export interface WorkoutSetRow {
+  id: string;
+  exercise_id: string;
+  set_index: number;
+  reps: number;
+  weight_kg: number;
+  rpe: number | null;
+  is_warmup: boolean;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface WorkoutSummaryRow {
+  id: string;
+  performed_at: string;
+  started_at: string | null;
+  ended_at: string | null;
+  duration_minutes: number | null;
+  notes: string | null;
+  sets_count: number;
+  total_volume: number;
+  muscle_groups: string[];
+}
+
+export interface WorkoutDetailRow {
+  id: string;
+  performed_at: string;
+  started_at: string | null;
+  ended_at: string | null;
+  duration_minutes: number | null;
+  notes: string | null;
+  sets: WorkoutSetRow[];
+}
+
+export interface ListWorkoutsFilters {
+  userId: string;
+  from?: string | undefined;
+  to?: string | undefined;
+  cursor?: string | undefined;
+  limit?: number | undefined;
+}
+
+export interface SetInput {
+  exercise_id: string;
+  set_index: number;
+  reps: number;
+  weight_kg: number;
+  rpe?: number | undefined;
+  is_warmup: boolean;
+  notes?: string | undefined;
+}
+
+export interface CreateWorkoutInput {
+  performed_at: string;
+  started_at?: string | null | undefined;
+  ended_at?: string | null | undefined;
+  duration_minutes?: number | undefined;
+  notes?: string | undefined;
+  sets: SetInput[];
+}
+
+export interface UpdateWorkoutInput {
+  performed_at?: string | undefined;
+  started_at?: string | null | undefined;
+  ended_at?: string | null | undefined;
+  duration_minutes?: number | undefined;
+  notes?: string | undefined;
+}
+
+export interface UpdateSetInput {
+  exercise_id?: string | undefined;
+  set_index?: number | undefined;
+  reps?: number | undefined;
+  weight_kg?: number | undefined;
+  rpe?: number | undefined;
+  is_warmup?: boolean | undefined;
+  notes?: string | undefined;
+}
 
 /**
  * Encode a composite workout cursor.
@@ -67,7 +109,7 @@ import { createDbPool } from "../pool.js";
  *   Cursor payload ordered by performed_at DESC, id DESC.
  * @returns {string} Base64-encoded cursor string.
  */
-export function encodeWorkoutCursor(cursor) {
+export function encodeWorkoutCursor(cursor: WorkoutCursor): string {
   return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64");
 }
 
@@ -78,14 +120,16 @@ export function encodeWorkoutCursor(cursor) {
  *   Base64-encoded cursor string.
  * @returns {WorkoutCursor} Decoded cursor payload.
  */
-export function decodeWorkoutCursor(cursor) {
+export function decodeWorkoutCursor(cursor: string): WorkoutCursor {
   const rawValue = Buffer.from(cursor, "base64").toString("utf8");
-  const parsedValue = JSON.parse(rawValue);
+  const parsedValue = JSON.parse(rawValue) as unknown;
 
   if (
     typeof parsedValue !== "object" ||
     parsedValue === null ||
+    !("performed_at" in parsedValue) ||
     typeof parsedValue.performed_at !== "string" ||
+    !("id" in parsedValue) ||
     typeof parsedValue.id !== "string"
   ) {
     throw new Error("Invalid workout cursor.");
@@ -113,7 +157,10 @@ export function decodeWorkoutCursor(cursor) {
  * @returns {Promise<{ items: WorkoutSummaryRow[]; nextCursor: string | null }>}
  *   Paginated workout summaries.
  */
-export async function listWorkoutsByUser(filters, pool) {
+export async function listWorkoutsByUser(
+  filters: ListWorkoutsFilters,
+  pool?: DbPoolLike,
+): Promise<{ items: WorkoutSummaryRow[]; nextCursor: string | null }> {
   const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
   const limit = filters.limit ?? 20;
@@ -169,7 +216,7 @@ export async function listWorkoutsByUser(filters, pool) {
       ],
     );
 
-    const rows = /** @type {WorkoutSummaryRow[]} */ (result.rows);
+    const rows = result.rows as WorkoutSummaryRow[];
     const hasNextPage = rows.length > limit;
     const items = hasNextPage ? rows.slice(0, limit) : rows;
     const lastItem = hasNextPage ? (items[items.length - 1] ?? null) : null;
@@ -202,7 +249,11 @@ export async function listWorkoutsByUser(filters, pool) {
  *   Optional shared database pool.
  * @returns {Promise<WorkoutDetailRow | null>} Workout detail or null.
  */
-export async function findWorkoutByIdForUser(workoutId, userId, pool) {
+export async function findWorkoutByIdForUser(
+  workoutId: string,
+  userId: string,
+  pool?: DbPoolLike,
+): Promise<WorkoutDetailRow | null> {
   const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
@@ -224,7 +275,10 @@ export async function findWorkoutByIdForUser(workoutId, userId, pool) {
  *   Optional shared database pool.
  * @returns {Promise<boolean>} True when the workout exists.
  */
-export async function hasWorkoutById(workoutId, pool) {
+export async function hasWorkoutById(
+  workoutId: string,
+  pool?: DbPoolLike,
+): Promise<boolean> {
   const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
@@ -273,7 +327,11 @@ export async function hasWorkoutById(workoutId, pool) {
  *   Optional shared database pool.
  * @returns {Promise<WorkoutDetailRow>} Inserted workout detail.
  */
-export async function createWorkoutWithSets(userId, input, pool) {
+export async function createWorkoutWithSets(
+  userId: string,
+  input: CreateWorkoutInput,
+  pool?: DbPoolLike,
+): Promise<WorkoutDetailRow> {
   return withTransaction(pool, async (client) => {
     const workoutResult = await client.query(
       `
@@ -291,7 +349,7 @@ export async function createWorkoutWithSets(userId, input, pool) {
       ],
     );
 
-    const workoutId = /** @type {{ id: string }} */ (workoutResult.rows[0]).id;
+    const workoutId = (workoutResult.rows[0] as { id: string }).id;
 
     for (const set of input.sets) {
       await client.query(
@@ -350,13 +408,18 @@ export async function createWorkoutWithSets(userId, input, pool) {
  *   Optional shared database pool.
  * @returns {Promise<WorkoutDetailRow | null>} Updated workout detail or null.
  */
-export async function updateWorkoutByIdForUser(workoutId, userId, input, pool) {
+export async function updateWorkoutByIdForUser(
+  workoutId: string,
+  userId: string,
+  input: UpdateWorkoutInput,
+  pool?: DbPoolLike,
+): Promise<WorkoutDetailRow | null> {
   const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
   try {
-    const fields = [];
-    const values = [];
+    const fields: string[] = [];
+    const values: unknown[] = [];
 
     if (input.performed_at !== undefined) {
       fields.push(`performed_at = $${fields.length + 3}`);
@@ -415,7 +478,11 @@ export async function updateWorkoutByIdForUser(workoutId, userId, input, pool) {
  *   Optional shared database pool.
  * @returns {Promise<{ id: string } | null>} Deleted workout id or null.
  */
-export async function deleteWorkoutByIdForUser(workoutId, userId, pool) {
+export async function deleteWorkoutByIdForUser(
+  workoutId: string,
+  userId: string,
+  pool?: DbPoolLike,
+): Promise<{ id: string } | null> {
   const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
@@ -429,7 +496,7 @@ export async function deleteWorkoutByIdForUser(workoutId, userId, pool) {
       [workoutId, userId],
     );
 
-    return /** @type {{ id: string } | null} */ (result.rows[0] ?? null);
+    return (result.rows[0] as { id: string } | undefined) ?? null;
   } finally {
     if (ownsPool) {
       await activePool.end?.();
@@ -458,7 +525,12 @@ export async function deleteWorkoutByIdForUser(workoutId, userId, pool) {
  *   Optional shared database pool.
  * @returns {Promise<WorkoutSetRow | null>} Inserted set row or null.
  */
-export async function addSetToWorkoutForUser(workoutId, userId, input, pool) {
+export async function addSetToWorkoutForUser(
+  workoutId: string,
+  userId: string,
+  input: SetInput,
+  pool?: DbPoolLike,
+): Promise<WorkoutSetRow | null> {
   const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
@@ -510,7 +582,7 @@ export async function addSetToWorkoutForUser(workoutId, userId, input, pool) {
       ],
     );
 
-    return /** @type {WorkoutSetRow | null} */ (result.rows[0] ?? null);
+    return (result.rows[0] as WorkoutSetRow | undefined) ?? null;
   } finally {
     if (ownsPool) {
       await activePool.end?.();
@@ -539,13 +611,18 @@ export async function addSetToWorkoutForUser(workoutId, userId, input, pool) {
  *   Optional shared database pool.
  * @returns {Promise<WorkoutSetRow | null>} Updated set row or null.
  */
-export async function updateSetByIdForUser(setId, userId, input, pool) {
+export async function updateSetByIdForUser(
+  setId: string,
+  userId: string,
+  input: UpdateSetInput,
+  pool?: DbPoolLike,
+): Promise<WorkoutSetRow | null> {
   const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
   try {
-    const fields = [];
-    const values = [];
+    const fields: string[] = [];
+    const values: unknown[] = [];
 
     if (input.exercise_id !== undefined) {
       fields.push(`exercise_id = $${fields.length + 3}`);
@@ -608,7 +685,7 @@ export async function updateSetByIdForUser(setId, userId, input, pool) {
       [setId, userId, ...values],
     );
 
-    return /** @type {WorkoutSetRow | null} */ (result.rows[0] ?? null);
+    return (result.rows[0] as WorkoutSetRow | undefined) ?? null;
   } finally {
     if (ownsPool) {
       await activePool.end?.();
@@ -627,7 +704,11 @@ export async function updateSetByIdForUser(setId, userId, input, pool) {
  *   Optional shared database pool.
  * @returns {Promise<{ id: string; workout_id: string } | null>} Deleted set ids or null.
  */
-export async function deleteSetByIdForUser(setId, userId, pool) {
+export async function deleteSetByIdForUser(
+  setId: string,
+  userId: string,
+  pool?: DbPoolLike,
+): Promise<{ id: string; workout_id: string } | null> {
   const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
@@ -644,8 +725,8 @@ export async function deleteSetByIdForUser(setId, userId, pool) {
       [setId, userId],
     );
 
-    return /** @type {{ id: string; workout_id: string } | null} */ (
-      result.rows[0] ?? null
+    return (
+      (result.rows[0] as { id: string; workout_id: string } | undefined) ?? null
     );
   } finally {
     if (ownsPool) {
@@ -663,7 +744,10 @@ export async function deleteSetByIdForUser(setId, userId, pool) {
  *   Optional shared database pool.
  * @returns {Promise<boolean>} True when the set exists.
  */
-export async function hasSetById(setId, pool) {
+export async function hasSetById(
+  setId: string,
+  pool?: DbPoolLike,
+): Promise<boolean> {
   const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
@@ -696,7 +780,10 @@ export async function hasSetById(setId, pool) {
  *   Transaction callback.
  * @returns {Promise<T>} Callback result.
  */
-async function withTransaction(pool, callback) {
+async function withTransaction<T>(
+  pool: DbPoolLike | undefined,
+  callback: (client: DbClientLike) => Promise<T>,
+): Promise<T> {
   const activePool = pool ?? createDbPool();
   const ownsPool = pool === undefined;
 
@@ -734,7 +821,11 @@ async function withTransaction(pool, callback) {
  *   Owner user id.
  * @returns {Promise<WorkoutDetailRow | null>} Workout detail or null.
  */
-async function loadWorkoutDetail(queryable, workoutId, userId) {
+async function loadWorkoutDetail(
+  queryable: Pick<DbPoolLike, "query">,
+  workoutId: string,
+  userId: string,
+): Promise<WorkoutDetailRow | null> {
   const result = await queryable.query(
     `
       SELECT
@@ -781,7 +872,7 @@ async function loadWorkoutDetail(queryable, workoutId, userId) {
     [workoutId, userId],
   );
 
-  return /** @type {WorkoutDetailRow | null} */ (result.rows[0] ?? null);
+  return (result.rows[0] as WorkoutDetailRow | undefined) ?? null;
 }
 
 /**
@@ -795,7 +886,11 @@ async function loadWorkoutDetail(queryable, workoutId, userId) {
  *   Queryable client or pool.
  * @returns {Promise<WorkoutSetRow | null>} Set row or null.
  */
-async function findSetByIdForUser(setId, userId, queryable) {
+async function findSetByIdForUser(
+  setId: string,
+  userId: string,
+  queryable: Pick<DbPoolLike, "query">,
+): Promise<WorkoutSetRow | null> {
   const result = await queryable.query(
     `
       SELECT
@@ -816,5 +911,5 @@ async function findSetByIdForUser(setId, userId, queryable) {
     [setId, userId],
   );
 
-  return /** @type {WorkoutSetRow | null} */ (result.rows[0] ?? null);
+  return (result.rows[0] as WorkoutSetRow | undefined) ?? null;
 }
