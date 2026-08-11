@@ -173,6 +173,17 @@ again because its `X-Accel-Buffering` header disables Nginx `add_header`
 inheritance. Proxy buffering remains disabled for `/api/`, including assistant
 SSE, and every HTTP/`www` request redirects to the canonical HTTPS domain.
 
+The same snippet enforces the production browser policy. Scripts, API/SSE,
+fonts, the PWA manifest, and the service worker are same-origin only; frames and
+plugins are disabled. `style-src` intentionally retains `'unsafe-inline'`
+because the current React UI uses style props and the legal pages contain inline
+style blocks. Removing it requires a separate CSS/nonce migration plus browser
+evidence, not a header-only edit. Permissions Policy disables camera and
+geolocation while allowing microphone access only to the same-origin app for
+the existing speech-recognition input. After changing either policy, run the
+source regression test, `nginx -t`, and browser smoke including legal pages,
+service-worker registration, API/SSE, and speech permission.
+
 ## 6. Preserve the independent port 8080 site
 
 `listen 8080` belongs to `mj-portfolio`, not FitMind. Leave its Nginx file and

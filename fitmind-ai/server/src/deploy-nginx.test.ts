@@ -9,6 +9,10 @@ const repositoryRoot = resolve(
   "../..",
 );
 const nginxDirectory = resolve(repositoryRoot, "deploy/nginx");
+const expectedCsp =
+  "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; frame-src 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'";
+const expectedPermissionsPolicy =
+  "camera=(), geolocation=(), microphone=(self)";
 
 function countOccurrences(source: string, expected: string): number {
   return source.split(expected).length - 1;
@@ -54,6 +58,50 @@ function extractDeclaredBlock(source: string, declaration: string): string {
   return extractContainingBlock(source.slice(openingBrace), "{");
 }
 
+function extractQuotedHeader(source: string, name: string): string {
+  const prefix = `add_header ${name} "`;
+  const start = source.indexOf(prefix);
+  if (start === -1) {
+    throw new Error(`Missing Nginx response header: ${name}`);
+  }
+
+  const valueStart = start + prefix.length;
+  const valueEnd = source.indexOf('" always;', valueStart);
+  if (valueEnd === -1) {
+    throw new Error(`Header ${name} must be quoted and use always.`);
+  }
+
+  return source.slice(valueStart, valueEnd);
+}
+
+function parseCsp(source: string): Map<string, string[]> {
+  return new Map(
+    source.split(";").map((rawDirective) => {
+      const [name = "", ...values] = rawDirective.trim().split(/\s+/u);
+      return [name, values];
+    }),
+  );
+}
+
+function assertBrowserSecurityPolicy(securityHeaders: string): void {
+  const csp = extractQuotedHeader(securityHeaders, "Content-Security-Policy");
+  const directives = parseCsp(csp);
+
+  expect(csp).toBe(expectedCsp);
+  expect(directives.get("script-src")).toEqual(["'self'"]);
+  expect(directives.get("style-src")).toEqual(["'self'", "'unsafe-inline'"]);
+  expect(directives.get("connect-src")).toEqual(["'self'"]);
+  expect(directives.get("object-src")).toEqual(["'none'"]);
+  expect(directives.get("frame-src")).toEqual(["'none'"]);
+  expect(directives.get("frame-ancestors")).toEqual(["'none'"]);
+  expect(csp).not.toMatch(
+    /script-src[^;]*(?:unsafe-inline|unsafe-eval|\*|https:|data:)/u,
+  );
+  expect(extractQuotedHeader(securityHeaders, "Permissions-Policy")).toBe(
+    expectedPermissionsPolicy,
+  );
+}
+
 function assertSecurityHeaderScopes(
   httpsConfig: string,
   securityHeaders: string,
@@ -81,6 +129,7 @@ function assertSecurityHeaderScopes(
   expect(securityHeaders).toContain(
     "add_header Referrer-Policy strict-origin-when-cross-origin always;",
   );
+  assertBrowserSecurityPolicy(securityHeaders);
   expect(securityHeaders).not.toContain("X-Accel-Buffering");
 }
 
@@ -113,6 +162,57 @@ describe("production Nginx security headers", () => {
     expect(() =>
       assertSecurityHeaderScopes(regressedConfig, securityHeaders),
     ).toThrow();
+  });
+
+  it("rejects weakened or currently incompatible browser policies", async () => {
+    const securityHeaders = await readFile(
+      resolve(nginxDirectory, "fitmind-security-headers.conf"),
+      "utf8",
+    );
+    const mutations = [
+      securityHeaders.replace("frame-ancestors 'none'; ", ""),
+      securityHeaders.replace(
+        "script-src 'self';",
+        "script-src 'self' 'unsafe-eval';",
+      ),
+      securityHeaders.replace(
+        "style-src 'self' 'unsafe-inline';",
+        "style-src 'self';",
+      ),
+      securityHeaders.replace("microphone=(self)", "microphone=*"),
+    ];
+
+    for (const mutation of mutations) {
+      expect(mutation).not.toBe(securityHeaders);
+      expect(() => assertBrowserSecurityPolicy(mutation)).toThrow();
+    }
+  });
+
+  it("keeps the CSP aligned with current inline styles and same-origin worker", async () => {
+    const [button, privacy, terms, serviceWorkerRegistration] =
+      await Promise.all([
+        readFile(
+          resolve(repositoryRoot, "client/src/components/Button.tsx"),
+          "utf8",
+        ),
+        readFile(
+          resolve(repositoryRoot, "client/public/legal/privacy.html"),
+          "utf8",
+        ),
+        readFile(
+          resolve(repositoryRoot, "client/public/legal/terms.html"),
+          "utf8",
+        ),
+        readFile(
+          resolve(repositoryRoot, "client/src/register-service-worker.ts"),
+          "utf8",
+        ),
+      ]);
+
+    expect(button).toContain("style={{");
+    expect(privacy).toContain("<style>");
+    expect(terms).toContain("<style>");
+    expect(serviceWorkerRegistration).toContain('register("/sw.js")');
   });
 
   it("installs the shared snippet before validating and reloading Nginx", async () => {

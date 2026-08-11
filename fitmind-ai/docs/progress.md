@@ -1070,3 +1070,11 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
 - training → assistant 本批只冻结两个具名例外：workout intake 复用 OpenAI-compatible client/config，assistant insights 复用 intent type；到修复计划结构债 4.2 抽中立边界，不在文档批次搬代码。
 - 新 governance 测试解析 AGENTS architecture manifest，要求每个目录含真实非测试源码；内存加入幽灵目录和空目录都会失败。测试同时扫描反向依赖，第三个 importer 不在 allowlist 时失败。
 - migration 硬规则改为 expand/contract：新 schema 必须兼容上一个应用镜像，破坏性删除放后续 release；生产 smoke 新增“是否破坏、旧镜像能否跑、回滚或分阶段前滚方案”三问。没有给已上线迁移补 `down()`，也没有执行生产回滚演练。
+
+## 2026-08-11 — CSP 与浏览器能力边界（fitmind-y70，本地候选）
+
+- 共享 Nginx 安全头新增精确 CSP：脚本、API/SSE、字体、manifest 与 service worker 只允许同源，object/frame 禁用，frame ancestors 禁止，图片额外允许 `data:`。
+- `style-src` 暂保留 `'unsafe-inline'`：当前 36 个 TSX 文件使用 React style props，两份 legal 页面使用 inline style block；本批不以一条严格但会让 UI 失效的 header 冒充修复。script 不允许 inline/eval/wildcard/broad scheme。
+- Permissions-Policy 关闭 camera/geolocation，只允许同源页面使用 microphone；这限制页面能力，不改变浏览器 SpeechRecognition 厂商的数据处理披露。
+- Nginx 源码测试精确解析策略并加入四个内存退化：缺 frame-ancestors、script 加 unsafe-eval、style 去掉当前必要例外、microphone 放宽为 wildcard 都会失败。
+- 本批没有部署；生产响应头、浏览器 console、PWA 与真实语音权限仍需单独线上 smoke，不能用本地配置测试冒充已生效。
