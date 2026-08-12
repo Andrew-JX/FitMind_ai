@@ -145,7 +145,7 @@ describe("prepareTrainingSessionSave", () => {
     });
   });
 
-  it("uses imported training timestamps instead of active elapsed time", () => {
+  it("preserves the baseline intake branch that ends a started draft at save time", () => {
     expect(
       prepareTrainingSessionSave(
         createInput({
@@ -162,9 +162,33 @@ describe("prepareTrainingSessionSave", () => {
       kind: "create",
       request: {
         duration_minutes: 42,
-        ended_at: "2026-07-03T20:42:00.000+08:00",
+        ended_at: "2030-01-01T00:00:00.000Z",
         performed_at: "2026-07-03T12:00:00.000Z",
         started_at: "2026-07-03T20:00:00.000+08:00",
+      },
+    });
+  });
+
+  it("uses the draft end time when an intake draft has no explicit start", () => {
+    expect(
+      prepareTrainingSessionSave(
+        createInput({
+          draftDurationMin: 42,
+          draftEndedAt: "2026-07-03T20:42:00.000+08:00",
+          draftPerformedAt: "2026-07-03T20:00:00.000+08:00",
+          draftStartedAt: null,
+          elapsedSeconds: 9999,
+          mode: "create_from_intake",
+          now: new Date("2030-01-01T00:00:00.000Z"),
+        }),
+      ),
+    ).toMatchObject({
+      kind: "create",
+      request: {
+        duration_minutes: 42,
+        ended_at: "2026-07-03T20:42:00.000+08:00",
+        performed_at: "2026-07-03T12:00:00.000Z",
+        started_at: null,
       },
     });
   });
