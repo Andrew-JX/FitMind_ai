@@ -25,6 +25,10 @@ fi
 image_tag="$(git rev-parse --short=12 HEAD)"
 export FITMIND_IMAGE_TAG="$image_tag"
 
+# Handed to the api container so /api/health can prove which release answers.
+release_sha="$(git rev-parse HEAD)"
+export FITMIND_RELEASE_SHA="$release_sha"
+
 compose=(docker compose -f "$compose_file")
 
 # Plain `docker compose config` expands env_file values and prints secrets.
@@ -111,10 +115,16 @@ client.connect()
 
 "${compose[@]}" up -d --no-build api web
 
+# A 200 alone cannot distinguish this release from the previous containers still
+# answering during the swap, so the gate also requires the API to report the
+# commit being deployed. A mismatch keeps retrying and then fails the deploy.
+health_body=''
+expected_health_body="{\"ok\":true,\"data\":{\"status\":\"ok\",\"release\":\"${release_sha}\"}}"
 for attempt in {1..30}; do
-  if curl --fail --silent http://127.0.0.1:3000/api/health >/dev/null && \
-     curl --fail --silent http://127.0.0.1:8081/healthz >/dev/null; then
-    echo "FitMind $image_tag is healthy on loopback ports 3000 and 8081."
+  if health_body="$(curl --fail --silent http://127.0.0.1:3000/api/health)" && \
+     curl --fail --silent http://127.0.0.1:8081/healthz >/dev/null && \
+     [[ "$health_body" == "$expected_health_body" ]]; then
+    echo "FitMind $image_tag is healthy on loopback ports 3000 and 8081 and reports release $release_sha."
     "${compose[@]}" ps
     exit 0
   fi
@@ -122,5 +132,6 @@ for attempt in {1..30}; do
 done
 
 "${compose[@]}" ps
-echo "Deploy failed: containers did not become healthy within 60 seconds." >&2
+echo "Deploy failed: containers did not become healthy and report release $release_sha within 60 seconds." >&2
+echo "Last /api/health body: ${health_body:-<none>}" >&2
 exit 1

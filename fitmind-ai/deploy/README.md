@@ -103,7 +103,21 @@ The script deliberately performs this order:
 5. idempotently seed the production muscle/exercise dictionaries;
 6. verify `vector`, consent, and all personal-tool tables exist;
 7. replace the API/Web containers;
-8. require healthy loopback responses on ports 3000 and 8081.
+8. require healthy loopback responses on ports 3000 and 8081, and require
+   `/api/health` to report the exact commit being deployed.
+
+Step 8 checks release identity, not just liveness. `deploy.sh` exports the
+deployed commit as `FITMIND_RELEASE_SHA`, Compose passes it into the API
+container, and `GET /api/health` returns it as `data.release` (`null` wherever
+the variable is unset, including local runs). A 200 alone cannot tell a new
+release from the previous containers still answering during the swap, so the
+gate retries until the reported release matches and otherwise fails the deploy.
+The endpoint stays out of `docs/api-contract.md` by design — it is deployment
+infrastructure, and `server/src/routes/api-contract.test.ts` enforces that.
+The release workflow runs
+`node --test deploy/scripts/deploy-release-identity.test.mjs` before freezing
+the verified SHA; the isolated harness proves a mismatched live response cannot
+pass and an exact match can.
 
 For an update after the first installation, fetch and inspect the release, then
 deploy the exact reviewed commit rather than an ambiguous moving branch:

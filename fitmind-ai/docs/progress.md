@@ -1158,6 +1158,17 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
 - 中立模块与相关 assistant/training/governance 定向验证通过 8 个文件、54 条断言；assistant 目录通过 29 个测试文件、278 条断言；全量 `pnpm verify` 通过 113 个 Vitest 文件、868 条断言及 5 个 monitor Node 断言，server production build 通过。HTTP URL、Bearer header、payload、content/tool call/usage、错误脱敏、timeout/timer、默认模型与缺失配置行为均由冻结 characterization 覆盖。
 - 五个开工前已有的 deploy README/compose/deploy.sh、app test 与 health route 工作树改动保持未暂存、未提交；验证只使用 stub fetch 与 fake timers，没有真实 provider、数据库或网络调用，没有 push 或部署。中立边界到期债已清理，但 assistant orchestrator 其余业务流和 TrainingSessionComposer 其余 UI 边界仍需后续独立拆分。
 
+## 2026-08-11 — 发布响应者提交身份门禁（fitmind-a0k，未收口）
+
+- 没有复现 FitMind 现有流水线“门禁绿但仍运行旧镜像”的可信路径；本批不是已复现缺陷修复。保留改动的理由是 `/api/health` 按设计不进产品 API 契约，增加 `data.release` 是低兼容成本的加法，却能让部署门禁区分上一次容器和本次请求的完整提交。
+- `deploy.sh` 导出 detached checkout 的完整 `git rev-parse HEAD`，Compose 将 `FITMIND_RELEASE_SHA` 传给 API，health route 对未设置/纯空白返回 `null`、对注入值 trim 后回报；loopback 门禁同时要求 API/Web 存活和 API release 精确匹配，错版本继续重试并在有界循环后失败。
+- 黑盒 Node 测试让 Git、Docker、迁移/数据库前置步骤和两个 loopback 端点都成功，只改变 health release：错 SHA 时 API probe 命中 30 次后 exit 1，正确 SHA 时首个 probe exit 0；默认 Linux/WSL 路径有 10 秒超时，本机显式 Git Bash fallback 有 30 秒超时。腾讯云 workflow 在冻结 verified SHA 前运行该测试，workflow 单测会拒绝步骤缺失或后移。
+- acceptance 发生两次显式退回：v1 的 `pnpm exec vitest` 与 `deploy/` include 假设不可执行；v2 虽能手工运行黑盒，却没有任何默认 CI 会执行它。最终冻结 v3 SHA-256 `7AD4C192467C1CD9019133D8D90EC86D3148BE3EC1287854E98007E31FE814D3`，没有放宽产品判据。
+- 独立复核发现原脚本只搜索任意位置的 `"release":"<sha>"` 子串：当 `data.release` 错误、旁路对象含正确 SHA 时会假绿。新增负向控制先复现首轮错误放行，再把门禁收紧为 health 完整结构与目标 SHA 精确相等；两类错误响应现在各命中 30 次后失败，正确响应首轮通过。
+- 定向证据：app、API contract、workflow 共 3 个 Vitest 文件、19 条断言通过；release 黑盒 3/3、monitor Node 测试 5/5、合规 Playwright 21/21 通过；Compose 渲染的 synthetic SHA 逐字相等；Git Bash `bash -n` 通过；`pnpm eval` 为 52/52。
+- 当前组合工作树 `pnpm verify` 通过 119 个 Vitest 文件、939 条断言及 5 条 monitor 断言；server/client production build 通过，client 转换 147 个模块。baseline 为 `e4e158bbd20544638eb25b6c33141cef9ac30f54`，本节随本地候选提交收口，canonical SHA 记录到 Beads。
+- 本机 WSL 当前无法完成最小启动探针，因此本次黑盒证据来自显式 Git Bash fallback；真实 Linux `test-deploy-from-github.sh`、真实容器环境传递、线上 health 回报、push、workflow run、审批和部署仍未验证/未执行。
+
 ## 2026-08-11 — assistant 确定性答案构建边界（fitmind-gdd，本地候选）
 
 - 合同由 `5e28076` 冻结；`006602f` 先建立稳定 facade 和 11 条 characterization，答案测试 blob 固定为 `e3b2881f92a03e6509563ebb5784b8eb4533cfbb`。实现迁移后测试文件与合同均未修改。

@@ -58,16 +58,67 @@ describe("createApp", () => {
   }
 
   it("serves the health endpoint", async () => {
-    const response = await request("/api/health");
-    const payload = await response.json();
+    const previous = process.env.FITMIND_RELEASE_SHA;
 
-    expect(response.status).toBe(200);
-    expect(payload).toEqual({
-      ok: true,
-      data: {
-        status: "ok",
-      },
-    });
+    try {
+      for (const release of [undefined, "   "]) {
+        if (release === undefined) {
+          delete process.env.FITMIND_RELEASE_SHA;
+        } else {
+          process.env.FITMIND_RELEASE_SHA = release;
+        }
+
+        const response = await request("/api/health");
+        const payload = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(payload).toEqual({
+          ok: true,
+          data: {
+            status: "ok",
+            release: null,
+          },
+        });
+      }
+    } finally {
+      if (previous === undefined) {
+        delete process.env.FITMIND_RELEASE_SHA;
+      } else {
+        process.env.FITMIND_RELEASE_SHA = previous;
+      }
+    }
+  });
+
+  it("reports the deployed release so a health check can tell releases apart", async () => {
+    const previous = process.env.FITMIND_RELEASE_SHA;
+    const releases = [
+      "0123456789abcdef0123456789abcdef01234567",
+      "fedcba9876543210fedcba9876543210fedcba98",
+    ];
+
+    try {
+      for (const release of releases) {
+        process.env.FITMIND_RELEASE_SHA = `  ${release}  `;
+
+        const response = await request("/api/health");
+        const payload = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(payload).toEqual({
+          ok: true,
+          data: {
+            status: "ok",
+            release,
+          },
+        });
+      }
+    } finally {
+      if (previous === undefined) {
+        delete process.env.FITMIND_RELEASE_SHA;
+      } else {
+        process.env.FITMIND_RELEASE_SHA = previous;
+      }
+    }
   });
 
   it("trusts one proxy hop for Vercel client IP resolution", () => {
@@ -184,6 +235,7 @@ describe("createApp", () => {
         ok: true,
         data: {
           status: "ok",
+          release: null,
         },
       });
     } finally {

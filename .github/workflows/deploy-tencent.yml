@@ -68,6 +68,10 @@ jobs:
         working-directory: fitmind-ai
         run: bash deploy/scripts/test-fitmind-monitor.sh
 
+      - name: Test release identity health gate
+        working-directory: fitmind-ai
+        run: node --test deploy/scripts/deploy-release-identity.test.mjs
+
       - name: Upload Playwright failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4

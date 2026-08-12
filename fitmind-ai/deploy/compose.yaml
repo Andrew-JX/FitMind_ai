@@ -9,6 +9,7 @@ x-api-environment: &api-environment
   PORT: 3000
   DATA_RESIDENCY: overseas
   REGISTRATION_INVITE_ONLY: "on"
+  FITMIND_RELEASE_SHA: ${FITMIND_RELEASE_SHA:-}
 
 x-api-service: &api-service
   image: fitmind-api:${FITMIND_IMAGE_TAG:-local}
