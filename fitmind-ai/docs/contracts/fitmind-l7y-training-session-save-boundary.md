@@ -1,6 +1,6 @@
 # fitmind-l7y — training session 保存边界合同
 
-contract SHA：本文档首次提交所在的 commit；candidate 不得修改。
+contract SHA：本次修订所在的 commit；`43642e3` 因 intake 结束时间判据与 baseline 冲突而作废，candidate 不得修改本修订。
 
 baseline SHA：`84d8330900f1be80fe1dc5071f3b6762644ec0ef`
 
@@ -19,7 +19,7 @@ candidate SHA：开工前为空。
 ## 冻结事实与边界
 
 1. baseline 的 `TrainingSessionComposer.tsx` 为 1648 个物理行，取值命令是 `(Get-Content fitmind-ai/client/src/features/training/TrainingSessionComposer.tsx).Count`。本批不以候选行数作为完成条件；完成条件是保存语义与 mutation 顺序的单一所有权、冻结行为和依赖方向。
-2. baseline 的 create 与 edit 保存逻辑都在组件内部：create 调用 `buildWorkoutRequestFromDraft` 后 `createWorkout`；edit 组装 `TrainingSessionInitialDraft`、调用 `buildWorkoutEditPlan`，再严格按 workout patch、set deletes、set patches、set adds 的顺序逐项 await。
+2. baseline 的 create 与 edit 保存逻辑都在组件内部：create 调用 `buildWorkoutRequestFromDraft` 后 `createWorkout`；edit 组装 `TrainingSessionInitialDraft`、调用 `buildWorkoutEditPlan`，再严格按 workout patch、set deletes、set patches、set adds 的顺序逐项 await。baseline 还把任何非空 `draftStartedAt` 都视为 active start，因此 create-from-intake 带显式 start/end 时会以保存点击时间覆盖 `draftEndedAt`；本重构必须先保持该行为，独立 bug `fitmind-8n2` 负责修正。
 3. 新模块稳定 facade 精确导出 `prepareTrainingSessionSave` 和 `executeTrainingSessionSave` 两个 runtime 函数。测试提交可以先提供只抛 `Not implemented` 的 facade；它不接入 production 组件，不算候选实现。
 4. `prepareTrainingSessionSave` 是纯函数。它接收组件当次点击读取到的 mode、draft、elapsed seconds、initial draft 与显式 `now: Date`，返回 create/edit 判别联合或 null；它不读取系统时间、token、React state、网络或浏览器全局。
 5. `executeTrainingSessionSave` 是保存 HTTP 边界。production 默认依赖现有 `workout-api.ts` 五个 mutation；测试可以注入同形 fake API。它不捕获或改写异常，失败按原组件边界向上抛，由组件现有 `getReadableErrorMessage` 处理。
@@ -36,10 +36,10 @@ candidate SHA：开工前为空。
 - 度量：冻结表驱动测试深比较完整 create request，并用两个不同时区语义的 ISO 输入证明不在模块内重新读取 `Date.now/new Date()`。
 - 已知假绿灯：只断言返回 kind 为 create，会放过 performed/end time、duration、notes 或 sets 漂移。
 
-判据 3：机器 · prepare 对 create-from-intake 使用 `draftDurationMin`、`draftPerformedAt`、`draftStartedAt`、`draftEndedAt`；对 edit-existing 使用 `initialDraft.originalWorkout` 与当前 draft 字段生成原 `buildWorkoutEditPlan` 结果。无有效 create sets 或缺少 edit original workout 时返回 null。
+判据 3：机器 · prepare 对 create-from-intake 保持 baseline 分支：使用 `draftDurationMin` 与 `draftPerformedAt`；`draftStartedAt` 非空时 `ended_at` 取显式注入的 `now.toISOString()`，为空时才使用 `draftEndedAt`。对 edit-existing 使用 `initialDraft.originalWorkout` 与当前 draft 字段生成原 `buildWorkoutEditPlan` 结果。无有效 create sets 或缺少 edit original workout 时返回 null。
 
-- 度量：冻结测试分别深比较 intake request、含 workout patch/delete/patch/add 的 edit plan，以及两类 null；测试数据中的 mode 直接来自组件同名联合类型。
-- 已知假绿灯：只覆盖 active create 会让导入训练时间或编辑训练静默漂移；edit 缺 original 时返回 no-op plan 会把无效状态伪装成保存成功。
+- 度量：修订后的冻结测试分别深比较 intake 的“有 start → now end”与“无 start → draft end”、含 workout patch/delete/patch/add 的 edit plan，以及两类 null；测试数据中的 mode 直接来自组件同名联合类型。
+- 已知假绿灯：只覆盖 active create 会让导入训练或编辑训练静默漂移；把 `fitmind-8n2` 的期望修复混入本结构批会让“行为不变”变成假话；edit 缺 original 时返回 no-op plan 会把无效状态伪装成保存成功。
 
 判据 4：机器 · execute 对 create 精确调用一次 `createWorkout(token, request)`；对 edit 严格按 workout patch（若有）→ 所有 deletes → 所有 patches → 所有 adds 的顺序串行执行，并逐次透传 token、workout/set id 与 payload。完全空 edit plan 不发请求且正常返回。
 
@@ -62,7 +62,7 @@ candidate SHA：开工前为空。
 
 ## 冲突与限定词检查
 
-冲突检查：已通读，无冲突。本地 commits 已授权；push、部署、真实数据库、真实 API 与外部网络未授权。测试只用纯数据、fake API 和源码读取。
+冲突检查：已通读，无冲突。初版 intake 判据与 baseline 冲突，已在任何 candidate implementation 前撤回未提交实现、作废旧 contract/test 冻结，并把期望修复拆到 `fitmind-8n2`。本地 commits 已授权；push、部署、真实数据库、真实 API 与外部网络未授权。测试只用纯数据、fake API 和源码读取。
 
 限定词：
 
