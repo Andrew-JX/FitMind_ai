@@ -1,33 +1,54 @@
-import type { DraftExercise, DraftSet } from "./training-session-draft";
+import {
+  createDraftSet as createDefaultDraftSet,
+  isDraftSetValid,
+  type DraftExercise,
+  type DraftSet,
+} from "./training-session-draft";
 
 export type DraftSetFactory = (previousSet?: DraftSet) => DraftSet;
-
-function notImplemented(): never {
-  throw new Error("Not implemented");
-}
 
 export function addDraftSet(
   draftExercises: DraftExercise[],
   exerciseId: string,
-  createSet?: DraftSetFactory,
+  createSet: DraftSetFactory = createDefaultDraftSet,
 ): DraftExercise[] {
-  void draftExercises;
-  void exerciseId;
-  void createSet;
-  return notImplemented();
+  return draftExercises.map((draftExercise) => {
+    if (draftExercise.id !== exerciseId) {
+      return draftExercise;
+    }
+
+    return {
+      ...draftExercise,
+      isExpanded: true,
+      sets: [...draftExercise.sets, createSet(draftExercise.sets.at(-1))],
+    };
+  });
 }
 
 export function copyDraftSet(
   draftExercises: DraftExercise[],
   exerciseId: string,
   setId: string,
-  createSet?: DraftSetFactory,
+  createSet: DraftSetFactory = createDefaultDraftSet,
 ): DraftExercise[] {
-  void draftExercises;
-  void exerciseId;
-  void setId;
-  void createSet;
-  return notImplemented();
+  return draftExercises.map((draftExercise) => {
+    if (draftExercise.id !== exerciseId) {
+      return draftExercise;
+    }
+
+    const sourceSet = draftExercise.sets.find(
+      (setDraft) => setDraft.id === setId,
+    );
+
+    if (!sourceSet) {
+      return draftExercise;
+    }
+
+    return {
+      ...draftExercise,
+      sets: [...draftExercise.sets, createSet(sourceSet)],
+    };
+  });
 }
 
 export function deleteDraftSet(
@@ -35,10 +56,20 @@ export function deleteDraftSet(
   exerciseId: string,
   setId: string,
 ): DraftExercise[] {
-  void draftExercises;
-  void exerciseId;
-  void setId;
-  return notImplemented();
+  return draftExercises.map((draftExercise) => {
+    if (draftExercise.id !== exerciseId) {
+      return draftExercise;
+    }
+
+    if (draftExercise.sets.length <= 1) {
+      return draftExercise;
+    }
+
+    return {
+      ...draftExercise,
+      sets: draftExercise.sets.filter((setDraft) => setDraft.id !== setId),
+    };
+  });
 }
 
 export function updateDraftSet<TField extends keyof DraftSet>(
@@ -48,12 +79,33 @@ export function updateDraftSet<TField extends keyof DraftSet>(
   field: TField,
   value: DraftSet[TField],
 ): DraftExercise[] {
-  void draftExercises;
-  void exerciseId;
-  void setId;
-  void field;
-  void value;
-  return notImplemented();
+  return draftExercises.map((draftExercise) => {
+    if (draftExercise.id !== exerciseId) {
+      return draftExercise;
+    }
+
+    return {
+      ...draftExercise,
+      sets: draftExercise.sets.map((setDraft) => {
+        if (setDraft.id !== setId) {
+          return setDraft;
+        }
+
+        return {
+          ...setDraft,
+          completed:
+            field === "weightKg" || field === "reps"
+              ? false
+              : setDraft.completed,
+          restSeconds:
+            field === "weightKg" || field === "reps"
+              ? null
+              : setDraft.restSeconds,
+          [field]: value,
+        };
+      }),
+    };
+  });
 }
 
 export function toggleDraftSetCompleted(
@@ -61,8 +113,32 @@ export function toggleDraftSetCompleted(
   exerciseId: string,
   setId: string,
 ): DraftExercise[] {
-  void draftExercises;
-  void exerciseId;
-  void setId;
-  return notImplemented();
+  return draftExercises.map((draftExercise) => {
+    if (draftExercise.id !== exerciseId) {
+      return draftExercise;
+    }
+
+    return {
+      ...draftExercise,
+      sets: draftExercise.sets.map((setDraft) => {
+        if (setDraft.id !== setId) {
+          return setDraft;
+        }
+
+        if (!isDraftSetValid(setDraft, draftExercise)) {
+          return {
+            ...setDraft,
+            completed: false,
+            restSeconds: null,
+          };
+        }
+
+        return {
+          ...setDraft,
+          completed: !setDraft.completed,
+          restSeconds: setDraft.completed ? null : setDraft.restSeconds,
+        };
+      }),
+    };
+  });
 }

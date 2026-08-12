@@ -18,14 +18,19 @@ import {
 import { TrainingSessionTimer } from "./TrainingSessionTimer";
 import {
   createDraftExercise,
-  createDraftSet,
   getCompletedValidSetCount,
   getExerciseLoadType,
-  isDraftSetValid,
   type DraftExercise,
   type DraftSet,
   type TrainingSessionInitialDraft,
 } from "./training-session-draft";
+import {
+  addDraftSet,
+  copyDraftSet,
+  deleteDraftSet,
+  toggleDraftSetCompleted,
+  updateDraftSet,
+} from "./training-session-set-state";
 import {
   formatDateTimeLocalValue,
   formatTrainingTimeSummary,
@@ -694,64 +699,19 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
   }
 
   function handleAddSet(exerciseId: string): void {
-    setDraftExercises((currentValue) => {
-      return currentValue.map((draftExercise) => {
-        if (draftExercise.id !== exerciseId) {
-          return draftExercise;
-        }
-
-        return {
-          ...draftExercise,
-          isExpanded: true,
-          sets: [
-            ...draftExercise.sets,
-            createDraftSet(draftExercise.sets.at(-1)),
-          ],
-        };
-      });
-    });
+    setDraftExercises((currentValue) => addDraftSet(currentValue, exerciseId));
   }
 
   function handleCopySet(exerciseId: string, setId: string): void {
-    setDraftExercises((currentValue) => {
-      return currentValue.map((draftExercise) => {
-        if (draftExercise.id !== exerciseId) {
-          return draftExercise;
-        }
-
-        const sourceSet = draftExercise.sets.find(
-          (setDraft) => setDraft.id === setId,
-        );
-
-        if (!sourceSet) {
-          return draftExercise;
-        }
-
-        return {
-          ...draftExercise,
-          sets: [...draftExercise.sets, createDraftSet(sourceSet)],
-        };
-      });
-    });
+    setDraftExercises((currentValue) =>
+      copyDraftSet(currentValue, exerciseId, setId),
+    );
   }
 
   function handleDeleteSet(exerciseId: string, setId: string): void {
-    setDraftExercises((currentValue) => {
-      return currentValue.map((draftExercise) => {
-        if (draftExercise.id !== exerciseId) {
-          return draftExercise;
-        }
-
-        if (draftExercise.sets.length <= 1) {
-          return draftExercise;
-        }
-
-        return {
-          ...draftExercise,
-          sets: draftExercise.sets.filter((setDraft) => setDraft.id !== setId),
-        };
-      });
-    });
+    setDraftExercises((currentValue) =>
+      deleteDraftSet(currentValue, exerciseId, setId),
+    );
   }
 
   function handleUpdateSet<TField extends keyof DraftSet>(
@@ -760,68 +720,15 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
     field: TField,
     value: DraftSet[TField],
   ): void {
-    setDraftExercises((currentValue) => {
-      return currentValue.map((draftExercise) => {
-        if (draftExercise.id !== exerciseId) {
-          return draftExercise;
-        }
-
-        return {
-          ...draftExercise,
-          sets: draftExercise.sets.map((setDraft) => {
-            if (setDraft.id !== setId) {
-              return setDraft;
-            }
-
-            return {
-              ...setDraft,
-              completed:
-                field === "weightKg" || field === "reps"
-                  ? false
-                  : setDraft.completed,
-              restSeconds:
-                field === "weightKg" || field === "reps"
-                  ? null
-                  : setDraft.restSeconds,
-              [field]: value,
-            };
-          }),
-        };
-      });
-    });
+    setDraftExercises((currentValue) =>
+      updateDraftSet(currentValue, exerciseId, setId, field, value),
+    );
   }
 
   function handleToggleSetCompleted(exerciseId: string, setId: string): void {
-    setDraftExercises((currentValue) => {
-      return currentValue.map((draftExercise) => {
-        if (draftExercise.id !== exerciseId) {
-          return draftExercise;
-        }
-
-        return {
-          ...draftExercise,
-          sets: draftExercise.sets.map((setDraft) => {
-            if (setDraft.id !== setId) {
-              return setDraft;
-            }
-
-            if (!canCompleteSet(setDraft, draftExercise)) {
-              return {
-                ...setDraft,
-                completed: false,
-                restSeconds: null,
-              };
-            }
-
-            return {
-              ...setDraft,
-              completed: !setDraft.completed,
-              restSeconds: setDraft.completed ? null : setDraft.restSeconds,
-            };
-          }),
-        };
-      });
-    });
+    setDraftExercises((currentValue) =>
+      toggleDraftSetCompleted(currentValue, exerciseId, setId),
+    );
   }
 
   function handleOpenRestTimer(setId: string): void {
@@ -1027,13 +934,6 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
     setReplacingDraftExerciseId(null);
     setRestTimer(null);
   }
-}
-
-function canCompleteSet(
-  setDraft: DraftSet,
-  draftExercise: DraftExercise,
-): boolean {
-  return isDraftSetValid(setDraft, draftExercise);
 }
 
 function TrainingTimeEditor(props: {

@@ -1211,3 +1211,12 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
 - 隔离回退演示临时恢复“任意 startedAt 都用 now end”：纯函数与 E2E 分别非零退出并显示显式 2026 end 与实际 2030 save time；恢复后定向纯函数/edit 为 2 文件 13 条，浏览器为 1/1。global teardown 后 5173 无监听；两个冻结 blobs 不变。
 - 最终 `pnpm verify` 通过 118 个 Vitest 文件、932 条断言及 5 条 monitor 断言；根 `pnpm eval` 四组全过；client production build 转换 146 个模块并成功产出。E2E 使用 route interception，无真实 API、数据库、密钥或外网。
 - 并行 deploy/health/release-identity/progress 改动未暂存、未提交；没有 push 或部署。
+
+## 2026-08-11 — TrainingSessionComposer 草稿组状态边界（fitmind-wsf，本地候选）
+
+- 合同由 `e5c06b6` 冻结，baseline 为 `b678991`；`7dbded9` 在实现前提交只抛 `Not implemented` 的稳定 facade 与 7 条 characterization，冻结测试 blob 为 `7ec7766ab03e89770aaceb33f85220b7a3efe80d`，candidate 未修改合同或测试。
+- `training-session-set-state.ts` 现在唯一拥有新增、复制、删除、编辑和完成切换五类草稿组数组变换；新增/复制 production 默认复用既有 `createDraftSet`，测试可注入确定性工厂。模块不读 React state、网络、时间或浏览器全局，Composer 的五个 handler 只委托 facade。
+- 冻结测试逐对象固定最后一组复制、空组、跨动作同名 set、缺失目标、禁止删除最后一组、重量/次数编辑重置完成与休息、其他字段和 `persistedSetId` 保留、weighted 有效/无效以及 bodyweight 零外部负重完成语义，并扫描源码所有权。
+- 隔离回退演示临时把最后一组删除保护从 `<= 1` 改成 `< 1`；冻结测试 6/7 通过，唯一失败明确显示目标动作 sets 从一组变为空。恢复后 7/7 通过，冻结测试 blob 不变。
+- 定向 set-state + draft 为 2 个文件、10 条断言；最终 `pnpm verify` 通过 119 个 Vitest 文件、939 条断言及 5 条 monitor 断言；根 `pnpm eval` 的四组 52/52 全过；client production build 转换 147 个模块并成功产出。
+- 验证使用纯数据和本地源码读取，没有真实浏览器、API、数据库或外部网络；并行 deploy/health/release-identity/既有 progress 改动未进入本批暂存。没有 push 或部署，Composer 的动作选择、休息计时和其余 UI 边界仍需后续独立拆分。
