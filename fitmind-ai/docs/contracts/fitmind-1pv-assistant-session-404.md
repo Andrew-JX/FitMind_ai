@@ -15,8 +15,15 @@ candidate SHA：开工前为空。
 - `fitmind-ai/server/src/services/assistant/assistant-orchestrator-service.ts`
 - `fitmind-ai/server/src/services/assistant/assistant-session-access.test.ts`
 - `fitmind-ai/server/src/assistant-session-access-http.test.ts`
+- `fitmind-ai/server/src/services/assistant/assistant-entity-eval.test.ts`
+- `fitmind-ai/server/src/services/assistant/assistant-range-label-orchestrator.test.ts`
+- `fitmind-ai/server/src/services/assistant/assistant-refusal-orchestrator.test.ts`
+- `fitmind-ai/server/src/services/assistant/assistant-safety-orchestrator.test.ts`
+- `fitmind-ai/server/src/services/assistant/weekly-report-orchestrator.test.ts`
 
 明确排除开工前已有的 `.github/workflows/deploy-tencent.yml`、`fitmind-ai/deploy/README.md`、`fitmind-ai/deploy/compose.yaml`、`fitmind-ai/deploy/scripts/deploy.sh`、`fitmind-ai/deploy/scripts/deploy-release-identity.test.mjs`、`fitmind-ai/server/src/app.test.ts`、`fitmind-ai/server/src/deploy-workflow.test.ts`、`fitmind-ai/server/src/routes/health.ts` 与 `fitmind-ai/docs/progress.md` 中并行的 `fitmind-a0k` 工作树改动。
+
+范围补遗：判据 3 从首次冻结起就要求测试 mock 中的 `hasChatSessionById` 引用总数为 0，但初版允许文件清单漏列了持有该失效 mock 的 5 个既有测试。candidate 实现前先机械扩充上述路径；产品行为判据、冻结回归测试及其他允许范围不变。
 
 ## 冻结事实与策略
 
