@@ -1231,3 +1231,11 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
 - 隔离回退演示临时把最后一组删除保护从 `<= 1` 改成 `< 1`；冻结测试 6/7 通过，唯一失败明确显示目标动作 sets 从一组变为空。恢复后 7/7 通过，冻结测试 blob 不变。
 - 定向 set-state + draft 为 2 个文件、10 条断言；最终 `pnpm verify` 通过 119 个 Vitest 文件、939 条断言及 5 条 monitor 断言；根 `pnpm eval` 的四组 52/52 全过；client production build 转换 147 个模块并成功产出。
 - 验证使用纯数据和本地源码读取，没有真实浏览器、API、数据库或外部网络；并行 deploy/health/release-identity/既有 progress 改动未进入本批暂存。没有 push 或部署，Composer 的动作选择、休息计时和其余 UI 边界仍需后续独立拆分。
+
+## 2026-08-11 — 修复计划 Batch 4.2 边界拆分收口（fitmind-4zg，本地候选）
+
+- 完成审计合同由 `85f0b03` 冻结，baseline 为 `892af1a`。审计集合明确为 orchestrator 的 focus-area、display-metrics、deterministic-answers、turn-routing 四个边界，Composer 的 training-time、session-save、session-set-state 三个边界，以及清理 4.2 到期例外的三个中立 AI transport/config/type 模块；不以主文件行数作为完成判据。
+- 逐项 Git 审计确认 8 个原批次的 contract 都早于 characterization、characterization 都早于 candidate；10 个自有测试 blob 在各自拆分前后逐字节相等。当前主链只单向消费这些模块，反向主文件标记为 0，production training 对 `../assistant/` 的 importer 为 0。
+- 11 个定向测试文件共 123 条断言通过；当前组合工作树 `pnpm verify` 通过 119 个 Vitest 文件、939 条断言及 5 条 monitor 断言，`pnpm eval` 为 52/52，server/client production build 通过，client 转换 147 个模块，release compliance Playwright 为 21/21。
+- Batch 4.2 完成只表示上述具名边界有单一所有者、自有测试和冻结回归。`assistant-orchestrator-service.ts` 当前 1803 行、`TrainingSessionComposer.tsx` 当前 1473 行只是描述；session/provider/tool/planning、动作选择/休息计时等生命周期仍在主文件，不得宣称“完全模块化”。
+- AR-3 的边界拆分前置已完成，真实 provider token streaming 仍未实现；按用户指令在此停止继续重构，后续只执行已授权的 push、真实 CI/部署与“回滚到上一已验证版本 → 健康核验 → 滚回当前版本”演练。

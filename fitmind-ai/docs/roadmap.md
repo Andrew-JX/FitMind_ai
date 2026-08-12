@@ -325,6 +325,16 @@ Batch order:
    boundary so streaming can be reasoned about and tested incrementally, then
    wire true real-provider streaming end to end. Do not combine orchestrator
    extraction and streaming behavior changes into one batch.
+   - **Boundary-splitting prerequisite ✅ 2026-08-11**: frozen, independently
+     tested focus-area, display-metrics, deterministic-answer, and turn-routing
+     modules now sit outside the orchestrator. The corresponding training
+     composer split owns time logic, save orchestration, and draft-set state;
+     neutral AI transport/config/types also removed the temporary
+     training-to-assistant dependency.
+   - **True provider token streaming ⚪**: still not implemented. Session,
+     provider execution, tool/planning lifecycles, and the composer's exercise
+     selection/rest-timer UI remain explicit future boundaries; the completed
+     split must not be reported as end-to-end streaming.
 5. **AR-4 - real-link eval**: add a reviewed live DeepSeek smoke/eval path after
    local real conversations are stable. The committed gate remains deterministic
    and zero-network unless a later review explicitly promotes a live-provider
