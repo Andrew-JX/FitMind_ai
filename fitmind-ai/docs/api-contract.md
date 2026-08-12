@@ -475,6 +475,8 @@ When exceeded, both endpoints return:
 
 同一编排的非流式版本，返回一次性 JSON，供测试与不支持 SSE 的客户端使用。
 
+当请求携带 `session_id` 时，该会话必须属于当前认证用户。会话不存在或属于其他用户均返回同一安全响应：HTTP `404`，`error.code = "NOT_FOUND"`，`error.message = "Chat session was not found."`；接口不会向调用者披露其他用户会话是否存在。
+
 两个端点都挂 per-user 限流（见 §9）。会话历史目前没有独立的读取端点：`session_id` 由 `done` 事件回传，客户端自行保留。
 
 ------

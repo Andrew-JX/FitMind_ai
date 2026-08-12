@@ -123,39 +123,6 @@ export async function findChatSessionByIdForUser(
 }
 
 /**
- * Check whether a chat session exists regardless of ownership.
- *
- * @param sessionId - Session id.
- * @param pool - Optional shared database pool.
- * @returns True when the session id exists.
- */
-export async function hasChatSessionById(
-  sessionId: string,
-  pool?: DbPoolLike,
-): Promise<boolean> {
-  const activePool = pool ?? createDbPool();
-  const ownsPool = pool === undefined;
-
-  try {
-    const result = await activePool.query(
-      `
-        SELECT id
-        FROM chat_sessions
-        WHERE id = $1
-        LIMIT 1
-      `,
-      [sessionId],
-    );
-
-    return result.rows.length > 0;
-  } finally {
-    if (ownsPool) {
-      await activePool.end?.();
-    }
-  }
-}
-
-/**
  * Load one chat message for the provided user id.
  *
  * @param messageId - Message id.

@@ -4,7 +4,6 @@ import {
   createChatMessage,
   createChatSession,
   findChatSessionByIdForUser,
-  hasChatSessionById,
   listMessagesForSession,
   type ChatMessageRow,
 } from "../../db/chat-repository.js";
@@ -479,14 +478,6 @@ async function resolveSession(
     return {
       sessionId: ownedSession.id,
     };
-  }
-
-  if (await hasChatSessionById(sessionId)) {
-    throw new HttpError(
-      403,
-      "FORBIDDEN",
-      "You cannot access this chat session.",
-    );
   }
 
   throw new HttpError(404, "NOT_FOUND", "Chat session was not found.");

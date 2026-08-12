@@ -58,7 +58,6 @@ vi.mock("../../db/chat-repository.js", () => ({
   createChatSession: vi.fn(async () => ({ id: "session-1" })),
   createChatMessage: vi.fn(async () => ({ id: "message-1" })),
   findChatSessionByIdForUser: vi.fn(async () => null),
-  hasChatSessionById: vi.fn(async () => false),
   listMessagesForSession: vi.fn(async () => []),
 }));
 

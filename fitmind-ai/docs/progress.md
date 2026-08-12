@@ -1184,3 +1184,12 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
 - 初次真实消费验证揭示 `NO_LLM_CALL` 同时服务 provider telemetry 与 resumed clarification，并非 routing 私有事实；`bd89cf5` 在继续实现前冻结 addendum。routing 使用私有 `NO_ROUTER_CALL`，orchestrator 保留私有 provider no-call 常量并在 resumed 分支机械组装同一结果；43 条冻结测试不改，原先 13 条失败恢复为绿。
 - 定向 routing 为 43/43，routing+weekly+safety 为 3 文件 81 条，assistant 目录为 30 文件 326 条；最终 `pnpm verify` 通过 115 个 Vitest 文件、919 条断言及 5 条 monitor 断言，根 `pnpm eval` 四组全过，server production build 通过。orchestrator 以同一物理行口径从 2027 降到 1826，但完成判据是单一所有权、冻结行为与依赖方向。
 - provider 执行、预算、session/repository、持久化、stream、tool execution 与 answer construction 生命周期保持原位；并行 deploy/health/release-identity/progress 改动未暂存、未提交。验证没有真实 provider、数据库或网络调用，没有 push 或部署；orchestrator 与 TrainingSessionComposer 其余边界仍需后续独立拆分。
+
+## 2026-08-11 — assistant chat session 安全 404（fitmind-1pv，本地候选）
+
+- 合同由 `dc6e587` 冻结，baseline 为 `c51b125`；`35b8854` 在实现前提交 service 与真实 HTTP 失败回归，冻结 blobs 分别为 `f8cacdee6e1fb3081c5b7f58f4ae56f3fa059ef2`、`4d6324053f9ea771b632cc72b3fa1cf44d7cdb36`，candidate 未修改。红灯确认 foreign session 为 403、absent 为 404，且 absent 路径执行两次 DB query。
+- 冻结判据要求测试 mock 同名引用也归零，但初版允许路径漏列 5 个既有测试；先回退机械清理，再由 `6621022` 只补充允许路径，未改产品判据或冻结回归，之后才重新删除失效 mock。
+- `resolveSession` 现在只信任 `findChatSessionByIdForUser(sessionId, authenticatedUserId)`：scoped lookup 返回 null 时统一抛 404 `NOT_FOUND` / `Chat session was not found.`。repository 的无 owner `hasChatSessionById` 定义、SQL、export、生产调用与测试 mock 均已删除，源码全量同名引用为 0。
+- service 与 production `createApp → auth middleware → assistant router/controller → error middleware` HTTP 回归证明 foreign/absent 的 status 与 JSON error body 逐字段相同；owned session 复用与无 `session_id` 创建路径由原 weekly-report characterization 继续覆盖。API 契约已明确不存在和他人会话均不披露存在性。
+- 定向回归为 3 个文件、39 条断言；assistant 目录连同 HTTP 回归为 32 个文件、329 条断言。最终 `pnpm verify` 通过 117 个 Vitest 文件、922 条断言及 5 条 monitor 断言，根 `pnpm eval` 四组全过，server production build 通过；冻结测试哈希保持不变。
+- 验证只绑定本地 loopback 并使用 fake DB/provider/tool 边界，没有真实数据库、provider 或外部网络。并行 deploy/health/release-identity/progress 改动未暂存、未提交；没有 push 或部署。

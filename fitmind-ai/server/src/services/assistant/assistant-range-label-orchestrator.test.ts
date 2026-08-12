@@ -98,7 +98,6 @@ vi.mock("../../db/chat-repository.js", () => ({
   findChatMessageByIdForUser: vi.fn(async () => null),
   findChatSessionByIdForUser: vi.fn(async () => null),
   hasChatMessageById: vi.fn(async () => false),
-  hasChatSessionById: vi.fn(async () => false),
   listMessagesForSession: vi.fn(async () => []),
 }));
 
