@@ -100,7 +100,8 @@ export function prepareTrainingSessionSave(
     };
   }
 
-  const activeStartedAt = input.draftStartedAt;
+  const activeStartedAt =
+    input.mode === "create_active" ? input.draftStartedAt : null;
   const request = buildWorkoutRequestFromDraft({
     draftExercises: input.draftExercises,
     durationMinutes:

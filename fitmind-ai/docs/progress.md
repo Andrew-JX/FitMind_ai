@@ -1202,3 +1202,12 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
 - 隔离回退演示临时在 delete 失败后继续 patch/add、最后再抛同一错误；冻结测试 9/10 通过，唯一失败的 ordered log 明确多出 `updateWorkoutSet` 与 `addWorkoutSet`。恢复后定向 3 个文件、16 条断言通过，冻结测试 hash 不变。
 - 最终 `pnpm verify` 通过 118 个 Vitest 文件、932 条断言及 5 条 monitor 断言；根 `pnpm eval` 四组全过；client production build 转换 146 个模块并成功产出。验证使用纯数据、fake API 与本地源码读取，没有真实 API、数据库、浏览器交互或外部网络。
 - `fitmind-8n2` 的 intake 结束时间产品修复没有混入本批；并行 deploy/health/release-identity/progress 改动未暂存、未提交。没有 push 或部署。
+
+## 2026-08-11 — 导入训练显式结束时间修复（fitmind-8n2，本地候选）
+
+- 合同由 `014c0d0` 冻结，baseline 为 `4010f27`；`3259b53` 在实现前提交纯函数与真实浏览器路径失败回归，冻结 blobs 分别为 `9af48968244287a32c3aaedfd6df27a8ded0c9c9`、`77354f546419ec06ff3e46d184b8411bb95e836a`，candidate 未修改。
+- 红灯精确证明同一缺陷：create-from-intake 明确填写 start/end 后，纯函数期望显式 end、实际得到固定的 2030 保存时刻（1/10 失败）；Playwright 从正式 App 的“文本录入训练”经过 parse、composer 时间编辑器和完成按钮，捕获 `POST /api/workouts`，同样只在 `ended_at` 上得到 2030（1/1 失败）。
+- 修复只把 `activeStartedAt` 限定为 `mode === "create_active"`；active 训练仍在点击完成时结束，intake 显式 end 传给 request builder，无 start intake、performed-at、duration、notes、sets、edit plan、mutation 顺序与组件状态不改。
+- 隔离回退演示临时恢复“任意 startedAt 都用 now end”：纯函数与 E2E 分别非零退出并显示显式 2026 end 与实际 2030 save time；恢复后定向纯函数/edit 为 2 文件 13 条，浏览器为 1/1。global teardown 后 5173 无监听；两个冻结 blobs 不变。
+- 最终 `pnpm verify` 通过 118 个 Vitest 文件、932 条断言及 5 条 monitor 断言；根 `pnpm eval` 四组全过；client production build 转换 146 个模块并成功产出。E2E 使用 route interception，无真实 API、数据库、密钥或外网。
+- 并行 deploy/health/release-identity/progress 改动未暂存、未提交；没有 push 或部署。
