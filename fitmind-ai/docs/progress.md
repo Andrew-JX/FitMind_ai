@@ -1193,3 +1193,12 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
 - service 与 production `createApp → auth middleware → assistant router/controller → error middleware` HTTP 回归证明 foreign/absent 的 status 与 JSON error body 逐字段相同；owned session 复用与无 `session_id` 创建路径由原 weekly-report characterization 继续覆盖。API 契约已明确不存在和他人会话均不披露存在性。
 - 定向回归为 3 个文件、39 条断言；assistant 目录连同 HTTP 回归为 32 个文件、329 条断言。最终 `pnpm verify` 通过 117 个 Vitest 文件、922 条断言及 5 条 monitor 断言，根 `pnpm eval` 四组全过，server production build 通过；冻结测试哈希保持不变。
 - 验证只绑定本地 loopback 并使用 fake DB/provider/tool 边界，没有真实数据库、provider 或外部网络。并行 deploy/health/release-identity/progress 改动未暂存、未提交；没有 push 或部署。
+
+## 2026-08-11 — TrainingSessionComposer 保存边界（fitmind-l7y，本地候选）
+
+- baseline 为 `84d8330`。初版合同 `43642e3` 与红灯测试 `96f2925` 揭示 intake 时间判据和 baseline 冲突：带 `draftStartedAt` 的 create-from-intake 实际会用保存点击时间覆盖 `draftEndedAt`。未提交实现先完整回退；期望修复拆为独立 bug `fitmind-8n2`，修订合同 `b679afe` 与修订测试 `36b6c00` 先固定现有行为后才重新实现。
+- 冻结测试 blob 为 `e6a72f4fcaf0d8d166ea1d608bca3a1c723af0b7`，candidate 未修改。10 条红灯覆盖 active/intake 两条时间分支、edit patch/delete/patch/add、两类无效 draft、create 与 no-op、顺序写入、同一错误透传/失败短路及源码所有权；facade 开工时只抛 `Not implemented`，client type-check 仍通过。
+- `training-session-save.ts` 现在唯一拥有 create/edit 保存计划准备和五个 workout mutation 的串行编排；`TrainingSessionComposer.tsx` 只传入当前 state、mode 与点击时创建的 `new Date()`，再消费两个 facade。组件原无 token/无效 draft 文案、pending、reset、`onCreated`、catch 与 finally 状态动作保持原位；组件从 1648 降到 1573 个物理行，但完成判据是单一所有权和冻结行为，不是行数。
+- 隔离回退演示临时在 delete 失败后继续 patch/add、最后再抛同一错误；冻结测试 9/10 通过，唯一失败的 ordered log 明确多出 `updateWorkoutSet` 与 `addWorkoutSet`。恢复后定向 3 个文件、16 条断言通过，冻结测试 hash 不变。
+- 最终 `pnpm verify` 通过 118 个 Vitest 文件、932 条断言及 5 条 monitor 断言；根 `pnpm eval` 四组全过；client production build 转换 146 个模块并成功产出。验证使用纯数据、fake API 与本地源码读取，没有真实 API、数据库、浏览器交互或外部网络。
+- `fitmind-8n2` 的 intake 结束时间产品修复没有混入本批；并行 deploy/health/release-identity/progress 改动未暂存、未提交。没有 push 或部署。

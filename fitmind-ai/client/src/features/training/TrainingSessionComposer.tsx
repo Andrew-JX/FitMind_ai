@@ -17,14 +17,6 @@ import {
 } from "./TrainingSessionRestTimer";
 import { TrainingSessionTimer } from "./TrainingSessionTimer";
 import {
-  addWorkoutSet,
-  createWorkout,
-  deleteWorkoutSet,
-  updateWorkout,
-  updateWorkoutSet,
-} from "./workout-api";
-import {
-  buildWorkoutRequestFromDraft,
   createDraftExercise,
   createDraftSet,
   getCompletedValidSetCount,
@@ -51,7 +43,10 @@ import {
   appendIntakeExercisesToDraft,
   mapWorkoutIntakeDraftToSessionInitialDraft,
 } from "./workout-intake-to-session-draft";
-import { buildWorkoutEditPlan } from "./workout-to-session-draft";
+import {
+  executeTrainingSessionSave,
+  prepareTrainingSessionSave,
+} from "./training-session-save";
 
 export interface TrainingSessionComposerProps {
   exerciseLibraryProps: ExercisePickerProps;
@@ -922,30 +917,20 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
       return;
     }
 
-    if (mode === "edit_existing") {
-      await handleCompleteEdit();
-      return;
-    }
-
-    const saveTime = new Date();
-    const activeStartedAt = draftStartedAt;
-    const payload = buildWorkoutRequestFromDraft({
+    const savePlan = prepareTrainingSessionSave({
+      draftDurationMin,
+      draftEndedAt,
       draftExercises,
-      durationMinutes:
-        mode === "create_from_intake" ? draftDurationMin : undefined,
+      draftNote,
+      draftPerformedAt,
+      draftStartedAt,
       elapsedSeconds,
-      endedAt: activeStartedAt ? saveTime.toISOString() : draftEndedAt,
-      notes: draftNote,
-      performedAt:
-        mode === "create_from_intake" && draftPerformedAt
-          ? new Date(draftPerformedAt)
-          : activeStartedAt
-            ? new Date(activeStartedAt)
-            : saveTime,
-      startedAt: activeStartedAt ?? draftStartedAt,
+      initialDraft: props.initialDraft,
+      mode,
+      now: new Date(),
     });
 
-    if (!payload) {
+    if (!savePlan) {
       setErrorMessage(
         "Please fix the highlighted workout fields and try again.",
       );
@@ -957,67 +942,7 @@ export function TrainingSessionComposer(props: TrainingSessionComposerProps) {
     setIsSubmitting(true);
 
     try {
-      await createWorkout(props.token, payload);
-      resetComposerState();
-      await props.onCreated?.();
-    } catch (error) {
-      setErrorMessage(getReadableErrorMessage(error));
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function handleCompleteEdit(): Promise<void> {
-    if (!props.token || !props.initialDraft?.originalWorkout) {
-      setErrorMessage(
-        "Please fix the highlighted workout fields and try again.",
-      );
-      return;
-    }
-
-    const editDraft: TrainingSessionInitialDraft = {
-      ...props.initialDraft,
-      durationMin: draftDurationMin,
-      endedAt: draftEndedAt,
-      exercises: draftExercises,
-      note: draftNote,
-      performedAt: draftPerformedAt ?? props.initialDraft.performedAt,
-      startedAt: draftStartedAt,
-    };
-    const plan = buildWorkoutEditPlan(
-      props.initialDraft.originalWorkout,
-      editDraft,
-    );
-
-    setDuplicateNotice(null);
-    setErrorMessage(null);
-    setIsSubmitting(true);
-
-    try {
-      if (plan.workoutPatch) {
-        await updateWorkout(
-          props.token,
-          props.initialDraft.originalWorkout.id,
-          plan.workoutPatch,
-        );
-      }
-
-      for (const setId of plan.setDeletes) {
-        await deleteWorkoutSet(props.token, setId);
-      }
-
-      for (const patch of plan.setPatches) {
-        await updateWorkoutSet(props.token, patch.setId, patch.input);
-      }
-
-      for (const add of plan.setAdds) {
-        await addWorkoutSet(
-          props.token,
-          props.initialDraft.originalWorkout.id,
-          add,
-        );
-      }
-
+      await executeTrainingSessionSave(props.token, savePlan);
       resetComposerState();
       await props.onCreated?.();
     } catch (error) {
