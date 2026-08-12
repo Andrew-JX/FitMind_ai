@@ -1175,3 +1175,12 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
 - 回滚演示把 demo seed 的有效 `../src/db/pool.js` 临时改成不存在的 `missing-pool.js`；根 `pnpm type-check` 在 scripts 阶段以 TS2307 非零退出。恢复后 type-check exit 0，故障注入前后文件 blob 均为 `8c5f790425b54b2661850431123a45ea85055da4`。
 - production `tsconfig.json` blob 保持 `ee3259286eb56dca980f86fb5970f48da20f15da`，build 命令未变；最终 build exit 0，`dist` 仍为 219 个路径、SHA-256 `cc3a85d0e51384779a7b1e971e0d6729b752718aa5880abd3f2d4ff44f19c5f7`、`dist/scripts` 为 0，错误测试位置产生的单个 ignored artifact 已删除且未被重建。
 - 最终 `pnpm verify` 通过 115 个 Vitest 文件、882 条断言及 5 条 monitor 断言；根 `pnpm eval` 的 intent 15/15、refusal 14/14、faithfulness 3/3、safety 20/20 全通过。需要数据库、provider、注册配置或线上 API 的 server eval/smoke 未验证；并行 deploy/health/release-identity/progress 改动未暂存、未提交，没有 push 或部署。
+
+## 2026-08-11 — assistant turn routing 决策边界（fitmind-l47，本地候选）
+
+- 合同由 `a09084e` 冻结，baseline 为 `c98b714`；`0b5439a` 先建立 facade 并把原 6 条 routing 测试扩为 43 条 characterization，冻结测试 blob 为 `be47e301969efa097b67a1fe9ecd18db8652058b`。candidate 未修改合同或测试。
+- `resolveRoutedIntent`、`resolveExecutionModeForIntent`、`buildProviderRequest`、`ensureAllowedProviderTool` 及其 mode/intent、simulation、allowed-tools 私有 helper 现在唯一归属 `assistant-turn-routing.ts`；runtime export 精确为四个函数，orchestrator 单向导入消费并仅兼容 re-export 既有 `resolveRoutedIntent`。
+- characterization 表驱动固定所有显式 mode 与 routed intent、plateau 有/无 exercise 分叉、keyword/LLM rescue telemetry、原消息与 simulation normalized message 分离、allowed-tools 顺序/去重，以及未授权 provider tool 的 502 `AI_PROVIDER_ERROR`。新模块没有 DB/repository、provider adapter/client、tool executor、agent、I/O、时间/随机或类型逃逸依赖。
+- 初次真实消费验证揭示 `NO_LLM_CALL` 同时服务 provider telemetry 与 resumed clarification，并非 routing 私有事实；`bd89cf5` 在继续实现前冻结 addendum。routing 使用私有 `NO_ROUTER_CALL`，orchestrator 保留私有 provider no-call 常量并在 resumed 分支机械组装同一结果；43 条冻结测试不改，原先 13 条失败恢复为绿。
+- 定向 routing 为 43/43，routing+weekly+safety 为 3 文件 81 条，assistant 目录为 30 文件 326 条；最终 `pnpm verify` 通过 115 个 Vitest 文件、919 条断言及 5 条 monitor 断言，根 `pnpm eval` 四组全过，server production build 通过。orchestrator 以同一物理行口径从 2027 降到 1826，但完成判据是单一所有权、冻结行为与依赖方向。
+- provider 执行、预算、session/repository、持久化、stream、tool execution 与 answer construction 生命周期保持原位；并行 deploy/health/release-identity/progress 改动未暂存、未提交。验证没有真实 provider、数据库或网络调用，没有 push 或部署；orchestrator 与 TrainingSessionComposer 其余边界仍需后续独立拆分。
