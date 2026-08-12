@@ -563,7 +563,7 @@ export async function resolveRoutedIntent(
   return withoutRouterCall(mapExplicitModeToIntent(input.mode));
 }
 
-function resolveExecutionModeForIntent(
+export function resolveExecutionModeForIntent(
   input: MockAssistantTurnInput,
   intent: AssistantRoutedIntent,
 ): AssistantIntentMode {
@@ -614,7 +614,7 @@ function getAllowedToolDefinitions(
   );
 }
 
-function buildProviderRequest(
+export function buildProviderRequest(
   input: MockAssistantTurnInput,
   executionMode: AssistantIntentMode,
 ): AssistantProviderRequest {
@@ -638,7 +638,7 @@ function buildProviderRequest(
   };
 }
 
-function ensureAllowedProviderTool(
+export function ensureAllowedProviderTool(
   response: AssistantProviderResponse,
   allowedTools: AssistantProviderToolDefinition[],
 ): void {
