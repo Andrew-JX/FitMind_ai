@@ -145,7 +145,7 @@ describe("prepareTrainingSessionSave", () => {
     });
   });
 
-  it("preserves the baseline intake branch that ends a started draft at save time", () => {
+  it("preserves an intake draft's explicit end time after the save click", () => {
     expect(
       prepareTrainingSessionSave(
         createInput({
@@ -162,7 +162,7 @@ describe("prepareTrainingSessionSave", () => {
       kind: "create",
       request: {
         duration_minutes: 42,
-        ended_at: "2030-01-01T00:00:00.000Z",
+        ended_at: "2026-07-03T20:42:00.000+08:00",
         performed_at: "2026-07-03T12:00:00.000Z",
         started_at: "2026-07-03T20:00:00.000+08:00",
       },
