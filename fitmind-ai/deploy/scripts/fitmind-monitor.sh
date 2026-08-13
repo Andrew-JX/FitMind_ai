@@ -21,7 +21,17 @@ health_failure_threshold="${FITMIND_MONITOR_HEALTH_FAILURE_THRESHOLD:-3}"
 dry_run="${FITMIND_MONITOR_DRY_RUN:-0}"
 webhook_url="${FITMIND_MONITOR_WEBHOOK_URL:-}"
 use_host_node="${FITMIND_MONITOR_USE_HOST_NODE:-0}"
+payload_log_file="${FITMIND_MONITOR_LOG_FILE:-$state_dir/monitor.jsonl}"
+log_max_bytes="${FITMIND_MONITOR_LOG_MAX_BYTES:-10485760}"
+log_max_files="${FITMIND_MONITOR_LOG_MAX_FILES:-5}"
 compose=(docker compose -f "$compose_file")
+
+for rotation_value in "$log_max_bytes" "$log_max_files"; do
+  if [[ ! "$rotation_value" =~ ^[1-9][0-9]*$ ]]; then
+    echo "Monitor log rotation values must be positive integers" >&2
+    exit 64
+  fi
+done
 
 mkdir -p -- "$state_dir"
 chmod 700 -- "$state_dir"
@@ -91,15 +101,45 @@ deliver_payload() {
     return
   fi
 
-  if [[ -z "$webhook_url" ]]; then
-    echo "FITMIND_MONITOR_WEBHOOK_URL is required unless dry-run is enabled" >&2
+  if [[ "$payload" == *$'\n'* || "$payload" == *$'\r'* ]]; then
+    echo "Monitor payload must be one JSON line" >&2
     return 1
   fi
 
-  curl --fail --silent --show-error --max-time 10 \
-    --header 'content-type: application/json' \
-    --data-binary "$payload" \
-    "$webhook_url" >/dev/null
+  local log_dir current_size payload_size generation
+  log_dir="$(dirname -- "$payload_log_file")"
+  mkdir -p -- "$log_dir"
+  chmod 700 -- "$log_dir"
+  current_size=0
+  [[ -f "$payload_log_file" ]] && \
+    current_size="$(stat -c %s -- "$payload_log_file")"
+  payload_size=$((${#payload} + 1))
+
+  if (( current_size > 0 && current_size + payload_size > log_max_bytes )); then
+    rm -f -- "$payload_log_file.$((log_max_files - 1))"
+    for ((generation = log_max_files - 2; generation >= 1; generation--)); do
+      if [[ -f "$payload_log_file.$generation" ]]; then
+        mv -f -- "$payload_log_file.$generation" \
+          "$payload_log_file.$((generation + 1))"
+      fi
+    done
+    if (( log_max_files > 1 )); then
+      mv -f -- "$payload_log_file" "$payload_log_file.1"
+      chmod 600 -- "$payload_log_file.1"
+    else
+      rm -f -- "$payload_log_file"
+    fi
+  fi
+
+  printf '%s\n' "$payload" >>"$payload_log_file"
+  chmod 600 -- "$payload_log_file"
+
+  if [[ -n "$webhook_url" ]]; then
+    curl --fail --silent --show-error --max-time 10 \
+      --header 'content-type: application/json' \
+      --data-binary "$payload" \
+      "$webhook_url" >/dev/null
+  fi
 }
 
 alerts=()

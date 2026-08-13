@@ -331,9 +331,9 @@ FITMIND_MONITOR_DRY_RUN=1 bash deploy/scripts/fitmind-monitor.sh page
 FITMIND_MONITOR_DRY_RUN=1 bash deploy/scripts/fitmind-monitor.sh digest
 ```
 
-Create a server-only config. The receiver must accept the canonical FitMind JSON
-payload; use an internal relay if the final chat provider requires another
-schema. Never put this URL in Git or shell output.
+Create a server-only config. Paging and Digest payloads are persisted as private
+JSONL locally; an external receiver is optional and can be added later. Never
+put a receiver URL in Git or shell output.
 
 ```bash
 install -m 600 /dev/null ~/.config/fitmind-monitor.env
@@ -344,7 +344,6 @@ Required production value:
 
 ```dotenv
 FITMIND_REPOSITORY_DIR=/absolute/path/to/FitMind_ai/fitmind-ai
-FITMIND_MONITOR_WEBHOOK_URL=<private-https-receiver>
 ```
 
 `FITMIND_REPOSITORY_DIR` must be the absolute path of the deployed checkout.
@@ -359,7 +358,16 @@ FITMIND_MONITOR_5XX_MINIMUM_REQUESTS=10
 FITMIND_MONITOR_5XX_MINIMUM_ERRORS=3
 FITMIND_MONITOR_5XX_MINIMUM_PERCENT=20
 FITMIND_MONITOR_HEALTH_FAILURE_THRESHOLD=3
+FITMIND_MONITOR_LOG_MAX_BYTES=10485760
+FITMIND_MONITOR_LOG_MAX_FILES=5
 ```
+
+The default sink is
+`~/.local/state/fitmind-monitor/monitor.jsonl`. It is mode `0600` in a
+mode-`0700` state directory. Rotation happens before an append would cross 10
+MiB and retains five files total, including the active file. To add external
+delivery later, set `FITMIND_MONITOR_WEBHOOK_URL` to a private HTTPS receiver;
+local persistence remains enabled.
 
 Install the user units for the same account that owns the release checkout and
 can access Docker:
@@ -382,7 +390,8 @@ systemctl --user list-timers 'fitmind-monitor-*'
 journalctl --user -u 'fitmind-monitor@*' --since today --no-pager
 ```
 
-Do not call monitoring installed until a controlled test proves one firing
-notification, deduplication on the next run, one recovery, and a digest at the
-receiver. A real image rollback drill remains separate: deploy a reviewed SHA,
-roll back to the retained previous tag, verify health, and then roll forward.
+Do not call monitoring installed until a controlled test proves one local firing
+record, deduplication on the next run, one recovery record, and a Digest record.
+An external receiver is not required. A real image rollback drill remains
+separate: deploy a reviewed SHA, roll back to the retained previous tag, verify
+health, and then roll forward.

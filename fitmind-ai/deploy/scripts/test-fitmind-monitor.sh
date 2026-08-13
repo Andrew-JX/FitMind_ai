@@ -64,6 +64,7 @@ export PATH="$fake_bin:$PATH"
 export FITMIND_MONITOR_USE_HOST_NODE=1
 export FITMIND_MONITOR_DRY_RUN=1
 export FITMIND_MONITOR_STATE_DIR="$test_root/state"
+export FITMIND_MONITOR_LOG_FILE="$test_root/local/monitor.jsonl"
 export FAKE_LOG_FILE="$test_root/api.log"
 export FAKE_WEBHOOK_CALLS="$test_root/webhook.calls"
 : >"$FAKE_LOG_FILE"
@@ -139,8 +140,71 @@ restart_page="$("$monitor" page)"
 [[ "$restart_page" == *'"api_restarted"'* ]] || fail "restart delta must page"
 
 [[ ! -s "$FAKE_WEBHOOK_CALLS" ]] || fail "dry-run must not call the webhook"
+[[ ! -e "$FITMIND_MONITOR_LOG_FILE" ]] || fail "dry-run must not write a log"
 
+rm -f -- "$FITMIND_MONITOR_STATE_DIR/page.state"
 export FITMIND_MONITOR_DRY_RUN=0
+unset FITMIND_MONITOR_WEBHOOK_URL
+export FAKE_API_RESTART=0
+export FAKE_WEB_RESTART=0
+export FAKE_API_HEALTH=healthy
+export FAKE_WEB_HEALTH=healthy
+export FAKE_HEALTH_FAIL=0
+: >"$FAKE_LOG_FILE"
+export FAKE_API_STATUS=exited
+"$monitor" page
+[[ "$(wc -l <"$FITMIND_MONITOR_LOG_FILE")" -eq 1 ]] || \
+  fail "firing must append exactly one local record"
+grep -qx 'active_keys=api_not_running' \
+  "$FITMIND_MONITOR_STATE_DIR/page.state" || \
+  fail "firing state must retain the active incident"
+"$monitor" page
+[[ "$(wc -l <"$FITMIND_MONITOR_LOG_FILE")" -eq 1 ]] || \
+  fail "deduplicated incident must not append"
+export FAKE_API_STATUS=running
+"$monitor" page
+grep -qx 'active_keys=' "$FITMIND_MONITOR_STATE_DIR/page.state" || \
+  fail "recovery state must clear the active incident"
+local_record_count="$(wc -l <"$FITMIND_MONITOR_LOG_FILE")"
+if [[ "$local_record_count" -ne 2 ]]; then
+  printf 'local_record_count=%s\n' "$local_record_count" >&2
+  find "$test_root/local" -maxdepth 1 -type f -printf '%f|%s|%m\n' >&2
+  fail "recovery must append exactly one local record"
+fi
+"$monitor" digest
+[[ "$(wc -l <"$FITMIND_MONITOR_LOG_FILE")" -eq 3 ]] || \
+  fail "digest must append exactly one local record"
+[[ "$(stat -c %a "$test_root/local")" == "700" ]] || \
+  fail "local log directory must be private"
+[[ "$(stat -c %a "$FITMIND_MONITOR_LOG_FILE")" == "600" ]] || \
+  fail "local log file must be private"
+node -e '
+  const fs = require("node:fs");
+  const lines = fs.readFileSync(process.argv[1], "utf8").trim().split("\n");
+  if (lines.length !== 3) process.exit(1);
+  for (const line of lines) JSON.parse(line);
+' "$FITMIND_MONITOR_LOG_FILE" || fail "every local record must be JSONL"
+
+export FITMIND_MONITOR_LOG_MAX_BYTES=1
+export FITMIND_MONITOR_LOG_MAX_FILES=3
+"$monitor" digest
+"$monitor" digest
+"$monitor" digest
+mapfile -t rotated_logs < <(find "$test_root/local" -maxdepth 1 -type f \
+  -name 'monitor.jsonl*' -print | sort)
+[[ "${#rotated_logs[@]}" -eq 3 ]] || fail "rotation must retain three total files"
+for rotated_log in "${rotated_logs[@]}"; do
+  [[ "$(stat -c %a "$rotated_log")" == "600" ]] || \
+    fail "every rotated log must be private"
+done
+
+if FITMIND_MONITOR_LOG_MAX_BYTES=0 "$monitor" digest >/dev/null 2>&1; then
+  fail "zero rotation size must fail"
+fi
+if FITMIND_MONITOR_LOG_MAX_FILES=invalid "$monitor" digest >/dev/null 2>&1; then
+  fail "malformed retention count must fail"
+fi
+
 export FITMIND_MONITOR_WEBHOOK_URL=https://monitor.invalid/hook
 export FAKE_WEBHOOK_FAIL=1
 export FAKE_API_STATUS=exited
