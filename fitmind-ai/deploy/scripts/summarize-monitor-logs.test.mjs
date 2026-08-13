@@ -185,7 +185,17 @@ test("pins rotation, timer cadence, and the pre-SSH shell gate", async () => {
     assert.match(block, /max-size: "10m"/u);
     assert.match(block, /max-file: "5"/u);
   }
-  assert.match(service, /ExecStart=.*fitmind-monitor\.sh %i/u);
+  assert.match(service, /EnvironmentFile=%h\/\.config\/fitmind-monitor\.env/u);
+  assert.match(
+    service,
+    /ExecCondition=.*\$1\/deploy\/scripts\/fitmind-monitor\.sh.*\$\{FITMIND_REPOSITORY_DIR\}/u,
+  );
+  assert.match(
+    service,
+    /ExecStart=\/usr\/bin\/bash \$\{FITMIND_REPOSITORY_DIR\}\/deploy\/scripts\/fitmind-monitor\.sh %i/u,
+  );
+  assert.doesNotMatch(service, /%h\/FitMind_ai\/fitmind-ai/u);
+  assert.doesNotMatch(service, /EnvironmentFile=-/u);
   assert.match(pageTimer, /OnUnitActiveSec=1min/u);
   assert.match(digestTimer, /OnCalendar=\*-\*-\* 09:00:00/u);
 

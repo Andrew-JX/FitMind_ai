@@ -343,8 +343,14 @@ ${EDITOR:-vi} ~/.config/fitmind-monitor.env
 Required production value:
 
 ```dotenv
+FITMIND_REPOSITORY_DIR=/absolute/path/to/FitMind_ai/fitmind-ai
 FITMIND_MONITOR_WEBHOOK_URL=<private-https-receiver>
 ```
+
+`FITMIND_REPOSITORY_DIR` must be the absolute path of the deployed checkout.
+The service refuses to start when it is relative or does not contain the
+executable monitor script. This keeps the timer wired to the same release that
+was verified instead of assuming a checkout below the deploy user's home.
 
 Optional threshold overrides retain all three 5xx conditions:
 

@@ -57,6 +57,7 @@ Use this checklist before sending the app to an interviewer, friend, or recruite
 
 - [ ] `node --test deploy/scripts/summarize-monitor-logs.test.mjs` and `bash deploy/scripts/test-fitmind-monitor.sh` pass for the exact release SHA.
 - [ ] `fitmind-monitor-page.timer` and `fitmind-monitor-digest.timer` are enabled for the deploy user; `systemctl --user list-timers 'fitmind-monitor-*'` shows their next runs.
+- [ ] `FITMIND_REPOSITORY_DIR` is an absolute path to the exact deployed release, and `systemctl --user start fitmind-monitor@page.service` exits successfully (enabled timers alone are insufficient).
 - [ ] A controlled API/container failure sends one Paging firing notification, the unchanged next run sends none, and recovery sends exactly one resolved notification.
 - [ ] A controlled provider fallback or faithfulness flag appears in the daily Digest but sends no Paging notification.
 - [ ] The Digest reports unknown model pricing separately; it does not treat an unknown model as zero cost.

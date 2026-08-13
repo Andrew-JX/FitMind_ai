@@ -5,9 +5,9 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-WorkingDirectory=%h/FitMind_ai/fitmind-ai
-EnvironmentFile=-%h/.config/fitmind-monitor.env
+EnvironmentFile=%h/.config/fitmind-monitor.env
 Environment=FITMIND_MONITOR_STATE_DIR=%h/.local/state/fitmind-monitor
-ExecStart=/usr/bin/bash %h/FitMind_ai/fitmind-ai/deploy/scripts/fitmind-monitor.sh %i
+ExecCondition=/usr/bin/bash -c 'case "$1" in /*) test -x "$1/deploy/scripts/fitmind-monitor.sh" ;; *) exit 1 ;; esac' monitor-path ${FITMIND_REPOSITORY_DIR}
+ExecStart=/usr/bin/bash ${FITMIND_REPOSITORY_DIR}/deploy/scripts/fitmind-monitor.sh %i
 NoNewPrivileges=true
 PrivateTmp=true
