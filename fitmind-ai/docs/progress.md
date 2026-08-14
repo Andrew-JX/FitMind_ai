@@ -1253,3 +1253,11 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
 - 11 个定向测试文件共 123 条断言通过；当前组合工作树 `pnpm verify` 通过 119 个 Vitest 文件、939 条断言及 5 条 monitor 断言，`pnpm eval` 为 52/52，server/client production build 通过，client 转换 147 个模块，release compliance Playwright 为 21/21。
 - Batch 4.2 完成只表示上述具名边界有单一所有者、自有测试和冻结回归。`assistant-orchestrator-service.ts` 当前 1803 行、`TrainingSessionComposer.tsx` 当前 1473 行只是描述；session/provider/tool/planning、动作选择/休息计时等生命周期仍在主文件，不得宣称“完全模块化”。
 - AR-3 的边界拆分前置已完成，真实 provider token streaming 仍未实现；按用户指令在此停止继续重构，后续只执行已授权的 push、真实 CI/部署与“回滚到上一已验证版本 → 健康核验 → 滚回当前版本”演练。
+
+## 2026-08-14 — 核心 UI 状态走查收口（fitmind-drl）
+
+- 合同由 `1e1f291` 冻结，baseline 为 `f833ab0`，实现候选为 `a64e3f3`。走查覆盖注册、补同意、训练历史、分析、助手/本周计划和个人工具的空态、慢响应、HTTP/断网错态、边界数据及键盘路径。
+- 身体数据、经期记录和训练备忘录新增显式读取状态：加载、失败、成功空态互斥；三者及本周计划读取失败均可在原位重试，机器回归实际执行第一次失败、键盘 Retry、后续请求成功恢复。
+- 训练 cursor 分页回归补齐“历史 → 列表视图”的真实用户路径，仍固定 `[null, "cursor-page-2"]`。320×800 与 390×844 对认证、长训练摘要、长助手回答/计划和长个人资料/备忘录做 `scrollWidth <= clientWidth` 门禁；关键 Tab/按钮/复选框通过记录实际焦点后用 Enter/Space 激活。
+- `UI_SPEC.md` 已从过时的“内存 token、刷新退出”同步为实际 HttpOnly cookie + `/api/auth/me` 恢复规则。完整矩阵和证据边界见 `docs/evidence/fitmind-drl-core-ui-states.md`。
+- 最终本地候选 `pnpm verify`、完整 `pnpm test:e2e`（44/44）、client production build、release E2E（21/21）和 `pnpm eval` 均通过；runner 退出后 5173 无监听。验证使用 HTTP route interception，不代表真实 API、数据库、provider、CI 或生产环境；没有 push 或部署。
