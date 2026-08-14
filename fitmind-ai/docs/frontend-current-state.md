@@ -57,6 +57,13 @@
 - Playwright 的失败登录回归同时检查 DOM 空值与请求计数：登录 500 后切到注册，三个注册凭据
   为空且 `POST /api/auth/register` 调用数为零。
 
+### 核心 UI 状态走查（2026-08-14，fitmind-drl）
+
+- 训练历史、分析、助手本周计划和个人工具的成功空态、加载态与读取错态由 HTTP 边界 Playwright 回归固定；错误态不得同时渲染同一卡片的成功空态。
+- 身体数据、经期记录、训练备忘录与本周计划的读取失败均提供就地重试，重试会发起新的真实客户端请求并在成功后清除错误。
+- 慢注册政策、补同意 mutation、训练列表和本周计划请求保留明确 pending UI；补同意按钮 pending 期间禁用且保持单请求。
+- 320×800 与 390×844 的认证、历史、助手和个人路径使用 `scrollWidth <= clientWidth` 作页面级横向溢出门禁；键盘回归通过 Tab 记录实际焦点，并以 Enter / Space 激活关键控件。
+
 ### 计划草案卡片（AssistantPlanCard，2026-06-14，roadmap §8 FE-1）
 
 助手消息带结构化 `plan`（`next_week_plan` 草案）时，在消息气泡内渲染 `AssistantPlanCard`：策略 chip + 动作行（名称 / 目标重量 / "N 组 × a~b 次" / basis）+ notes。`plan` 由 `mergeStructuredOutputIntoMessage` 的 `normalizePlan` 从 `structured_output.plan` 归一化。目标重量为 null 时显示"沿用上次重量"（不编造）。详见 `UI_SPEC §4.3.3`。

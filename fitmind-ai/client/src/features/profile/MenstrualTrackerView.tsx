@@ -38,12 +38,14 @@ export function MenstrualTrackerView(props: {
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [savingDate, setSavingDate] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const month = formatMonth(viewMonth);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadFailed(false);
     setStatus(null);
     try {
       const overview = await getMenstrualOverview(props.token, month);
@@ -52,6 +54,7 @@ export function MenstrualTrackerView(props: {
       setHealthConsentOnFile(overview.healthConsentOnFile);
     } catch {
       setStatus("经期记录暂时无法加载，请检查服务后重试。");
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -190,7 +193,9 @@ export function MenstrualTrackerView(props: {
                 ? `${ranges.join("、")}，共 ${dates.length} 天`
                 : loading
                   ? "正在加载…"
-                  : "还没有标记日期"}
+                  : loadFailed
+                    ? "记录加载失败"
+                    : "还没有标记日期"}
             </span>
           </div>
         </div>
@@ -238,6 +243,12 @@ export function MenstrualTrackerView(props: {
       </Card>
 
       {status ? <InlineStatus tone="error">{status}</InlineStatus> : null}
+
+      {loadFailed ? (
+        <Button onClick={() => void load()} variant="secondary">
+          重试加载经期记录
+        </Button>
+      ) : null}
 
       {confirmingDelete ? (
         <Card>

@@ -382,6 +382,8 @@ test("workout list pages through real server cursors", async ({ page }) => {
   });
 
   await page.goto("/");
+  await page.getByRole("button", { name: "历史" }).click();
+  await page.getByRole("button", { name: "列表视图" }).click();
 
   // First tap only expands what is already loaded.
   await page.getByText("查看更多（还有 3 条）").click();

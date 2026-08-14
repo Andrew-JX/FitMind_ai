@@ -13,6 +13,8 @@ import {
 } from "./personal-tools-api";
 import { InlineStatus, PersonalToolShell } from "./PersonalToolShell";
 
+type LoadState = "loading" | "ready" | "error";
+
 export function TrainingMemosView(props: {
   onBack: () => void;
   token: string | null;
@@ -26,13 +28,17 @@ export function TrainingMemosView(props: {
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [loadState, setLoadState] = useState<LoadState>("loading");
 
   const load = useCallback(async () => {
+    setLoadState("loading");
     setStatus(null);
     try {
       setItems(await getTrainingMemos(props.token));
+      setLoadState("ready");
     } catch {
       setStatus("训练备忘录暂时无法加载，请检查服务后重试。");
+      setLoadState("error");
     }
   }, [props.token]);
 
@@ -174,7 +180,19 @@ export function TrainingMemosView(props: {
         </InlineStatus>
       ) : null}
 
-      {items.length === 0 && !editorOpen ? (
+      {loadState === "loading" ? (
+        <Card>
+          <InlineStatus>正在加载训练备忘录…</InlineStatus>
+        </Card>
+      ) : null}
+
+      {loadState === "error" ? (
+        <Button onClick={() => void load()} variant="secondary">
+          重试加载训练备忘录
+        </Button>
+      ) : null}
+
+      {loadState === "ready" && items.length === 0 && !editorOpen ? (
         <Card>
           <div style={{ padding: "18px 4px", textAlign: "center" }}>
             <strong style={{ display: "block", fontSize: 14 }}>
@@ -192,7 +210,7 @@ export function TrainingMemosView(props: {
             </span>
           </div>
         </Card>
-      ) : items.length > 0 ? (
+      ) : loadState === "ready" && items.length > 0 ? (
         items.map((item) => (
           <Card key={item.id}>
             <div style={{ display: "grid", gap: 9 }}>

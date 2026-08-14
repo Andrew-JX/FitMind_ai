@@ -29,6 +29,7 @@ import {
 } from "./PersonalToolShell";
 
 type BodyTab = "data" | "trend" | "calendar";
+type LoadState = "loading" | "ready" | "error";
 
 const MEASUREMENT_FIELDS = [
   ["weightKg", "体重", "weight"],
@@ -63,18 +64,22 @@ export function BodyMeasurementsView(props: {
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<FormValues>(() => emptyForm());
   const [status, setStatus] = useState<string | null>(null);
+  const [loadState, setLoadState] = useState<LoadState>("loading");
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [confirmingDeleteAll, setConfirmingDeleteAll] = useState(false);
 
   const load = useCallback(async () => {
+    setLoadState("loading");
     setStatus(null);
     try {
       const result = await getBodyMeasurements(props.token);
       setItems(result.items);
       setHealthConsentOnFile(result.healthConsentOnFile);
+      setLoadState("ready");
     } catch {
       setStatus("身体数据暂时无法加载，请检查服务后重试。");
+      setLoadState("error");
     }
   }, [props.token]);
 
@@ -186,7 +191,11 @@ export function BodyMeasurementsView(props: {
         </div>
       </div>
 
-      {tab === "data" ? (
+      {loadState === "loading" ? (
+        <Card>
+          <InlineStatus>正在加载身体数据…</InlineStatus>
+        </Card>
+      ) : loadState === "error" ? null : tab === "data" ? (
         <DataPanel
           items={items}
           latest={latest}
@@ -321,6 +330,12 @@ export function BodyMeasurementsView(props: {
         <InlineStatus tone={status.includes("已保存") ? "success" : "error"}>
           {status}
         </InlineStatus>
+      ) : null}
+
+      {loadState === "error" ? (
+        <Button onClick={() => void load()} variant="secondary">
+          重试加载身体数据
+        </Button>
       ) : null}
 
       {items.length > 0 ? (

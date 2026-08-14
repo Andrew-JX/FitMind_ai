@@ -22,6 +22,7 @@ export interface AssistantCurrentPlanCardProps {
   actionError: string | null;
   onAbandon: () => Promise<boolean>;
   onArchive: () => Promise<boolean>;
+  onRefresh: () => Promise<boolean>;
 }
 
 const STATUS_LABEL: Record<PlanAdherenceStatus, string> = {
@@ -63,9 +64,18 @@ export function AssistantCurrentPlanCard(props: AssistantCurrentPlanCardProps) {
   if (status === "error" && !plan) {
     return (
       <Card>
-        <p style={errorStyle(theme)}>
-          {props.actionError ?? "本周计划加载失败，可稍后重试。"}
-        </p>
+        <div style={bodyStyle}>
+          <p style={errorStyle(theme)}>
+            {props.actionError ?? "本周计划加载失败，可稍后重试。"}
+          </p>
+          <button
+            onClick={() => void props.onRefresh()}
+            style={retryButtonStyle(theme)}
+            type="button"
+          >
+            重试加载本周计划
+          </button>
+        </div>
       </Card>
     );
   }
@@ -189,6 +199,22 @@ export function AssistantCurrentPlanCard(props: AssistantCurrentPlanCardProps) {
       </div>
     </Card>
   );
+}
+
+function retryButtonStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    background: "transparent",
+    border: `1px solid ${theme.colors.bdr2}`,
+    borderRadius: 8,
+    color: theme.colors.ac,
+    cursor: "pointer",
+    fontSize: 11,
+    fontWeight: 700,
+    justifySelf: "start",
+    padding: "6px 10px",
+  };
 }
 
 function PlanAdherenceRow(props: { exercise: PlanAdherenceExercise }) {

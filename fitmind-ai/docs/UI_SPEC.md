@@ -422,7 +422,7 @@ RPE 颜色映射：
 6. 表单字段：注册模式多一个"昵称"字段
 7. 跨境同意勾选（条件）：见下
 8. 提交按钮：全宽主按钮
-9. 底部提示："Token 仅保存在内存 · 刷新后需重新登录"（11px/`--fm-tx3`，前面带橙色小圆点）
+9. 底部提示："安全会话由浏览器 Cookie 保持 · 密码不会保存在本地"（11px/`--fm-tx3`，前面带橙色小圆点）
 
 右上角放深浅切换按钮。
 
@@ -449,8 +449,8 @@ RPE 颜色映射：
 把他们锁在门外，是把合规控制变成可用性事故。
 
 **交互逻辑约束**：
-- 不改 token 内存保存机制
-- 不写入 localStorage / sessionStorage / cookie
+- 认证凭据由服务端签发的 HttpOnly cookie 保存；刷新后通过 `/api/auth/me` 恢复会话
+- 不把认证凭据写入 localStorage / sessionStorage；客户端内存 token 只是触发数据 hook 的哨兵值，不是真实凭据
 - 「记住邮箱」只预填登录邮箱；注册邮箱、注册密码与登录凭据使用独立内存状态，切换标签时
   不得把登录值带进注册表单。密码任何时候都不得写入浏览器存储
 - 服务端认证错误只属于实际提交请求的标签。切换登录/注册必须清除当前错误归属，禁止把
@@ -875,7 +875,7 @@ strokeLinejoin="round"
 以下逻辑在 UI 重构中**必须保留**，完整列表见 `docs/frontend-current-state.md` 第 2 节。
 此处列出与 UI 直接相关的关键项：
 
-1. **Token 内存保存**：不写入 localStorage / sessionStorage / cookie
+1. **HttpOnly cookie 会话**：真实凭据不暴露给 JavaScript；刷新后通过 `/api/auth/me` 恢复，localStorage / sessionStorage 不保存认证凭据
 2. **SSE 状态机语义**：idle → thinking → tool_calling → answering → done / error
 3. **activeToolCall 数据来源**：必须来自 SSE `tool_call_started` / `tool_call_finished` 事件，不能从消息文本推断
 4. **sessionId 跨多轮复用**：前端不重新生成，必须使用后端返回的
