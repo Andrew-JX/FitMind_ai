@@ -1178,6 +1178,14 @@ Fake-IP，并在 PostgreSQL TLS 建连前断开；同一数据库通过 Neon 官
 - 定向验证通过 47/47；assistant 目录通过 30 个测试文件、289 条断言；全量 `pnpm verify` 通过 114 个 Vitest 文件、879 条断言及 5 个 monitor Node 断言，server production build 通过。orchestrator 从 2568 行降到 2014 行，但完成判据是模块自有测试、单一所有权与依赖方向，不是行数。
 - 开工前与过程中并行出现的 workflow/deploy/health/release-identity/progress 改动未进入本批暂存或提交；验证没有真实 provider、数据库或网络调用，没有 push 或部署。orchestrator 的 session/provider/tool/planning 生命周期和 TrainingSessionComposer 其余 UI 边界仍需后续独立拆分。
 
+## 2026-08-14 — Single-maintainer verified-release confirmation (fitmind-ytl)
+
+- Frozen contract: `aa3894b`; baseline: `8612bdd2d94e5c29a40e7f1343e904cc1f9e1adb`. The original `fitmind-6e8` contract remains historical evidence for an independent reviewer; it is not rewritten to call a one-user repository independent.
+- GitHub `Production` is now configured with Andrew-JX as the sole required reviewer, `prevent_self_review=false`, a 10-minute wait timer, custom deployment branches restricted to `main`, and administrator bypass disabled. The four encrypted environment secret names are present: `TENCENT_HOST`, `TENCENT_USER`, `TENCENT_DEPLOY_KEY`, and `TENCENT_KNOWN_HOSTS`; values were neither printed nor committed.
+- On Tencent, `/home/ubuntu/FitMind_ai` resolves to the controlled `/opt/fitmind-5c499f3` checkout, its `origin` is `https://github.com/Andrew-JX/FitMind_ai.git`, and the current remote `main` is `8612bdd2d94e5c29a40e7f1343e904cc1f9e1adb`. The dedicated key has one restricted forced-command entry; `/usr/local/sbin/deploy-fitmind-from-github` is `root:root` mode `0755`.
+- The server-side isolated deployment test passed all 14 command, main-ancestry, failed-deploy rollback, lock, installer-singularity, and installer-rejection assertions. A real dedicated-key `shell`, extra-argument, uppercase-SHA, and nonexistent exact-SHA probe were rejected before `deploy.sh`; no deployment was triggered.
+- Still unverified: the next pushed `main` SHA must complete verify and enter `Waiting`; only Andrew-JX may then manually confirm it after the 10-minute wait. The executor does not make that confirmation, and a completed verify job is not a deployment.
+
 ## 2026-08-11 — server scripts 独立 TypeScript 门禁（fitmind-xd4，本地候选）
 
 - 合同由 `61f93aa` 冻结，baseline 为 `9e229c8`。首次 production build 揭示“测试必须位于 `server/src`”与“dist 路径逐项不变”冲突，`5ad9471` 在 candidate 前冻结范围补充，把治理测试移到 server 根并由 Vitest 显式收录；原合同未修改。

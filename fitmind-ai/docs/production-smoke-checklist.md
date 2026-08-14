@@ -42,11 +42,11 @@ Use this checklist before sending the app to an interviewer, friend, or recruite
 
 ## GitHub Actions to Tencent release gate
 
-- [ ] GitHub has a protected `production` environment with an independent required reviewer, prevent self-review enabled, deployments restricted to `main`, and administrator bypass disabled where the current plan exposes that control.
-- [ ] The `production` environment—not the verify job—has encrypted `TENCENT_HOST`, `TENCENT_USER`, `TENCENT_DEPLOY_KEY`, and `TENCENT_KNOWN_HOSTS` Secrets; no value appears in Git, workflow output, screenshots, or shell history.
-- [ ] The dedicated public key comment is `github-actions-fitmind`, and its one `authorized_keys` line contains the forced `/usr/local/sbin/deploy-fitmind-from-github` command plus `restrict`.
-- [ ] `bash fitmind-ai/deploy/scripts/test-deploy-from-github.sh` reports all command rejection, non-main, rollback, and lock assertions passed.
-- [ ] All verify/eval/build/release E2E/monitor-shell gates finish before the deploy job enters `Waiting`; an independent reviewer approves that waiting job.
+- [x] GitHub `Production` has the documented single-maintainer confirmation gate: Andrew-JX is its sole required reviewer, self-review remains enabled, the wait timer is 10 minutes, deployments are restricted to `main`, and administrator bypass is disabled. This is not independent review.
+- [x] The `Production` environment—not the verify job—has encrypted `TENCENT_HOST`, `TENCENT_USER`, `TENCENT_DEPLOY_KEY`, and `TENCENT_KNOWN_HOSTS` Secrets; no value appears in Git, workflow output, screenshots, or shell history.
+- [x] The dedicated public key comment is `github-actions-fitmind`, and its one `authorized_keys` line contains the forced `/usr/local/sbin/deploy-fitmind-from-github` command plus `restrict`.
+- [x] `bash fitmind-ai/deploy/scripts/test-deploy-from-github.sh` reports all command rejection, non-main, rollback, and lock assertions passed.
+- [ ] All verify/eval/build/release E2E/monitor-shell gates finish before the deploy job enters `Waiting`; the repository owner reviews the verified SHA and manually confirms it after the 10-minute wait. This confirmation is not independent review and is never performed by the executor.
 - [ ] `needs.verify.outputs.release_sha`, the approved deployment SHA, and `DEPLOY_OK <40-character-SHA>` are the same exact `main` commit. Failure-only Playwright diagnostics are not deployment artifacts.
 - [ ] `git ls-remote origin refs/heads/main` reports that SHA; a successful local `git push` message alone is not deployment evidence.
 - [ ] After the workflow succeeds, Tencent `api` and `web` containers carry the 12-character prefix of that SHA and are healthy.

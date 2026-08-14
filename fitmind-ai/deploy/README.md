@@ -236,10 +236,10 @@ ssh-keygen -t ed25519 -C github-actions-fitmind -f ./fitmind-github-deploy -N ''
 ```
 
 Copy only the public key to a temporary path on Tencent, check out the reviewed
-automation commit, and install it:
+automation commit, and install it from the controlled checkout:
 
 ```bash
-cd ~/FitMind_ai
+cd /home/ubuntu/FitMind_ai
 git fetch origin
 git checkout --detach <reviewed-automation-commit>
 sudo -v
@@ -256,12 +256,15 @@ server.
 In GitHub Settings → Environments, create `production` and configure all of the
 following before enabling deployment:
 
-1. add at least one independent required reviewer and enable prevent
-   self-review;
-2. restrict deployment branches to `main` only;
-3. disable administrator bypass where the repository plan and visibility expose
-   that control;
-4. save screenshots of the protection rules without showing secret values.
+1. For a repository with multiple GitHub users, add an independent required
+   reviewer and enable prevent self-review.
+2. For this one-user repository, use the frozen `fitmind-ytl` supplement:
+   Andrew-JX is the sole required reviewer, self-review remains enabled, and a
+   10-minute wait creates a deliberate owner-confirmation point. This is not
+   independent review and must not be described as such.
+3. Restrict deployment branches to `main` only and disable administrator bypass.
+4. Save screenshots or an API read-back of protection rules without showing
+   secret values.
 
 Create these encrypted **production environment Secrets** in
 `Andrew-JX/FitMind_ai`:
@@ -302,10 +305,13 @@ bash fitmind-ai/deploy/scripts/test-deploy-from-github.sh
 ```
 
 For the first approved run, save evidence that all verify gates completed before
-the deploy job changed to `Waiting`, that a different reviewer approved it, and
-that the SHA displayed by the verify output equals the SHA received by the
-server. Merely referencing `environment: production` is not evidence that
-required-reviewer protection was configured.
+the deploy job changed to `Waiting`, that the repository owner manually
+confirmed the verified SHA after the 10-minute wait, and that the SHA displayed
+by the verify output equals the SHA received by the server. In a multi-user
+repository this confirmation should be made by a different reviewer; a
+single-maintainer confirmation is intentionally not independent review. Merely
+referencing `environment: production` is not evidence that protection was
+configured.
 
 ## 9. Install availability paging and the daily quality digest
 
