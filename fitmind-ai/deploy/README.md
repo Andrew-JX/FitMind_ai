@@ -289,7 +289,9 @@ diagnostics. The forced server entrypoint:
 
 1. rejects every other verb, argument shape, or non-`main` commit;
 2. serializes deployments with `flock`;
-3. fetches and checks out the exact reviewed commit;
+3. fetches `refs/heads/main` into `refs/remotes/origin/main`, validates the
+   reviewed SHA against that refreshed tracking ref, and checks out that exact
+   commit;
 4. runs the normal `deploy.sh` database identity, migration, seed, table, and
    health gates;
 5. restores the previous checkout and attempts image-only rollback if the

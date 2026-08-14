@@ -64,7 +64,8 @@ main() {
   flock -n 9 || die 'Another FitMind deployment is already running.' 75
 
   cd "$repo_root"
-  git fetch --quiet --prune origin main
+  git fetch --quiet --prune origin \
+    '+refs/heads/main:refs/remotes/origin/main'
   git cat-file -e "${release_sha}^{commit}" 2>/dev/null ||
     die 'Requested release commit does not exist after fetching origin/main.' 65
   git merge-base --is-ancestor "$release_sha" origin/main ||

@@ -93,6 +93,19 @@ run_entrypoint "deploy ${base_sha}"
 grep -Fxq "DEPLOY ${base_sha}" "$log_file"
 pass 'accepts an exact main SHA and reaches deploy'
 
+printf 'advanced\n' >> "${seed}/release.txt"
+git -C "$seed" add release.txt
+git -C "$seed" commit --quiet -m advanced
+advanced_sha="$(git -C "$seed" rev-parse HEAD)"
+git -C "$seed" push --quiet origin main
+[[ "$(git -C "$checkout" rev-parse origin/main)" == "$base_sha" ]]
+pass 'test fixture starts with a stale origin/main tracking ref'
+
+run_entrypoint "deploy ${advanced_sha}"
+grep -Fxq "DEPLOY ${advanced_sha}" "$log_file"
+[[ "$(git -C "$checkout" rev-parse origin/main)" == "$advanced_sha" ]]
+pass 'refreshes stale origin/main before validating and deploying the new SHA'
+
 git -C "$seed" checkout --quiet --orphan side
 git -C "$seed" rm --quiet -rf .
 printf 'side\n' > "${seed}/side.txt"
@@ -112,14 +125,14 @@ git -C "$seed" push --quiet origin main
 
 DEPLOY_STUB_EXIT=42 FITMIND_DEPLOY_TEST_IMAGES_EXIST=1 \
   expect_failure 'failed deploy returns non-zero' run_entrypoint "deploy ${next_sha}"
-[[ "$(git -C "$checkout" rev-parse HEAD)" == "$base_sha" ]]
+[[ "$(git -C "$checkout" rev-parse HEAD)" == "$advanced_sha" ]]
 grep -Eq '^ROLLBACK [0-9a-f]{7,12} [0-9a-f]{40}$' "$log_file"
 pass 'failure branch restores checkout and reaches image rollback'
 
 exec 8>>"$lock_file"
 flock -n 8
 expect_failure 'held deployment lock rejects a concurrent run' \
-  run_entrypoint "deploy ${base_sha}"
+  run_entrypoint "deploy ${advanced_sha}"
 flock -u 8
 
 echo "ALL ${pass_count} DEPLOYMENT TESTS PASSED"
