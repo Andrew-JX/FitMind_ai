@@ -10,6 +10,12 @@
 
 ---
 
+## 2026-08-14 — repository TypeScript 独立整合收口（fitmind-18z）
+
+- 独立审查没有复用旧 notes：精确候选 `c6af4b0` 的 repository 定向测试为 6 文件 53 条、server production build 通过，但候选自身的 `pnpm verify` 实际是 819 通过、1 条部署 workflow 测试失败；旧记录的 820/820 依赖当时未进入候选的并行工作区内容，现已在独立证据中更正。
+- 新收口合同 `b298240` 不改写历史，只允许在已整合主线上做状态验收。repository 五个实现和三份自有测试从 `c6af4b0` 到收口 baseline 逐字节不变；SQL 单字节负向控制会精确打红对应指纹，恢复后候选零 diff。
+- 收口 candidate 的 repository/auth/dictionary/workout 定向测试、`pnpm verify` 与 server production build 均重新执行并通过；证据见 `docs/evidence/fitmind-18z-independent-closeout.md`。没有真实数据库、provider、网络、push 或部署。
+
 ## 2026-07-01 Tier 1：ENV 级 OpenAI-compatible BYO 模型
 
 新增 `openai_compatible` 文本 LLM provider，用共享 `OPENAI_COMPAT_BASE_URL` / `OPENAI_COMPAT_MODEL` / `OPENAI_COMPAT_API_KEY` 覆盖助手和训练录入解析两条文本 seam。默认仍是 `mock` / 既有 Groq 行为；语音 STT 仍是浏览器 Web Speech API，RAG embedding 和每用户密钥 UI/存储不做。
