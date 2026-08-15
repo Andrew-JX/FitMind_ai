@@ -127,6 +127,8 @@ pnpm --filter @fitmind/server dev
 tsx watch --env-file ../.env src/server.ts
 ```
 
+连接真实 Neon 数据库时，不需要额外改启动命令：`DATABASE_URL` 主机名以 `.neon.tech` 结尾时，服务端会自动使用 `@neondatabase/serverless` 的 pg-compatible WebSocket Pool；其他 PostgreSQL 地址仍使用既有 `pg` Pool。这样可避开某些本地代理/Fake-IP 环境对 Neon 原生 TCP 连接的限制，且不改变 API 或数据模型。
+
 ## 7. Start Frontend
 
 根目录方式：

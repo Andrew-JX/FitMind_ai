@@ -1531,3 +1531,30 @@ The checked-in production example now points at `deepseek-v4-flash`. This local
 change does not alter the server's deployed environment, perform a paid provider
 call, or prove the live model/cost counter works. Those remain deployment-time
 checks requiring separate authorization.
+
+## [D57] One weekly-plan generator with temporary generation preferences
+
+- **Date**: 2026-08-15
+- **Status**: Accepted / implemented locally
+
+“给我下周计划” is an entry alias for the structured weekly-plan setup rather
+than an independent generator. The setup sends temporary days, duration,
+equipment, readiness and focus preferences in the current assistant request;
+they do not mutate the athlete profile. The generator applies equipment and
+recorded injury constraints before selecting movements, returns flexible
+`训练日 1..N` sessions for display/editing, and retains a flattened exercise set
+for existing adherence logic. This gives the user one source of truth: draft
+edits are the data submitted when accepting the plan.
+
+## [D58] Use Neon WebSocket transport only for Neon connection URLs
+
+- **Date**: 2026-08-15
+- **Status**: Accepted / implemented locally
+
+In local proxy/Fake-IP environments, the resolved Neon host could not accept a
+raw PostgreSQL TCP connection even though normal HTTP traffic worked. Database
+pool creation therefore selects Neon’s official pg-compatible WebSocket Pool
+only when the parsed hostname ends in `.neon.tech`; all other PostgreSQL URLs
+continue through `pg`. The conditional changes neither API nor schema and is
+covered by pool-selection tests plus a local real-data read. It is not evidence
+of production deployment or provider availability.
