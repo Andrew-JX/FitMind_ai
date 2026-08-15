@@ -2,188 +2,455 @@ import type {
   NextWeekPlanDraft,
   PlanAdherenceContext,
   PlanAdherenceExerciseContext,
+  PlanExerciseCatalogItem,
   PlanGoal,
+  PlanPreferences,
   PlanProfileContext,
   PlannedExercise,
+  PlannedExerciseAlternative,
+  PlannedTrainingSession,
   ProgressionMode,
 } from "./react-planner-types.js";
 
-/** 每个训练目标对应的次数区间 + 目标强度（取估算 1RM 的比例）。 */
 interface GoalScheme {
   repMin: number;
   repMax: number;
   intensityPctOf1Rm: number;
+  fallbackRestSeconds: number;
 }
 
-/** 目标 → 次数/强度方案。无档案时退回 {@link DEFAULT_GOAL}（保持历史行为）。 */
 const GOAL_SCHEMES: Record<PlanGoal, GoalScheme> = {
-  strength: { repMin: 3, repMax: 6, intensityPctOf1Rm: 0.85 },
-  hypertrophy: { repMin: 6, repMax: 10, intensityPctOf1Rm: 0.72 },
-  endurance: { repMin: 12, repMax: 15, intensityPctOf1Rm: 0.6 },
-  general_fitness: { repMin: 8, repMax: 12, intensityPctOf1Rm: 0.68 },
+  strength: {
+    repMin: 3,
+    repMax: 6,
+    intensityPctOf1Rm: 0.85,
+    fallbackRestSeconds: 180,
+  },
+  hypertrophy: {
+    repMin: 6,
+    repMax: 10,
+    intensityPctOf1Rm: 0.72,
+    fallbackRestSeconds: 90,
+  },
+  endurance: {
+    repMin: 12,
+    repMax: 15,
+    intensityPctOf1Rm: 0.6,
+    fallbackRestSeconds: 60,
+  },
+  general_fitness: {
+    repMin: 8,
+    repMax: 12,
+    intensityPctOf1Rm: 0.68,
+    fallbackRestSeconds: 90,
+  },
 };
-/** 无运动员档案时的默认目标（增肌区间，与档案功能上线前的行为一致）。 */
+
 const DEFAULT_GOAL: PlanGoal = "hypertrophy";
-/** 目标重量取整到该公斤数（贴近实际配重片）。 */
+const DEFAULT_WEEKLY_DAYS = 3;
+const DEFAULT_SESSION_DURATION_MINUTES = 60;
 const WEIGHT_ROUNDING_KG = 2.5;
-/** 草案最多排几个动作（保持精简、聚焦）。 */
-const MAX_PLANNED_EXERCISES = 4;
-/** Set adherence at or above this keeps the original progression mode. */
+const MAX_WEEKLY_EXERCISES = 12;
+const MIN_WEEKLY_EXERCISES = 4;
+const MAX_ALTERNATIVES = 3;
 const HIGH_ADHERENCE_RATIO = 0.8;
-/** Set adherence below this consolidates the next plan. */
 const LOW_ADHERENCE_RATIO = 0.5;
-/** 不同进展策略下每个动作的工作组数。 */
 const SETS_BY_MODE: Record<ProgressionMode, number> = {
   consolidate: 3,
   maintain: 3,
   add_frequency: 4,
 };
 
-/** 单个动作的重量基线（来自周报 top_exercises 或单动作进展），都可能缺失。 */
 interface ExerciseWeightBaseline {
   estimated1RmKg: number | null;
   maxWeightKg: number | null;
 }
 
-/** 生成器输入：从 weekly report / exercise progress (+ 运动员档案) 提取后的干净结构。 */
+interface HistoricalExercise extends ExerciseWeightBaseline {
+  exerciseId?: string | undefined;
+  exerciseName: string;
+}
+
 export interface NextWeekPlanGeneratorInput {
   progressionMode: ProgressionMode;
   weakArea: string | null;
-  topExercises: Array<
-    { exerciseName: string; setCount: number } & ExerciseWeightBaseline
-  >;
-  focusExercise: ({ exerciseName: string } & ExerciseWeightBaseline) | null;
+  topExercises: Array<HistoricalExercise & { setCount: number }>;
+  focusExercise: HistoricalExercise | null;
   profile?: PlanProfileContext | null | undefined;
+  preferences?: PlanPreferences | null | undefined;
+  exerciseCatalog?: PlanExerciseCatalogItem[] | undefined;
   planAdherence?: PlanAdherenceContext | null | undefined;
 }
 
-/**
- * 由训练容量 + 动作进展 (+ 运动员档案) 确定性生成一份可执行的下周训练草案
- * （动作 × 组 × 次 × 目标重量）。
- *
- * 纯函数、无 LLM、无 DB、可单测。次数区间与目标强度由档案的训练目标决定（无档案退回增肌方案）；
- * 伤病约束 / 每周天数注入安全与分配提示。目标重量只在有真实重量基线（估算 1RM / 近期最高重量）时
- * 给出，否则保持 null，绝不编造数字。所有阈值用命名常量。
- *
- * @param input - 进展策略、弱项、top 动作、可选 focus 动作的重量基线、可选档案
- * @returns 结构化下周草案（strategy + exercises + notes）
- *
- * @remarks
- * 目标重量 = 取整(估算 1RM × 目标对应强度比例)。
- */
+interface CandidateExercise {
+  baseline: ExerciseWeightBaseline;
+  meta: PlanExerciseCatalogItem | null;
+  name: string;
+  previousAdherence?: PlanAdherenceExerciseContext | undefined;
+}
+
+/** Build a deterministic, constraint-filtered flexible training-day plan. */
 export function generateNextWeekPlan(
   input: NextWeekPlanGeneratorInput,
 ): NextWeekPlanDraft {
-  const scheme = GOAL_SCHEMES[input.profile?.goal ?? DEFAULT_GOAL];
+  const goal = input.profile?.goal ?? DEFAULT_GOAL;
+  const scheme = GOAL_SCHEMES[goal];
+  const settings = resolvePlanSettings(
+    input.profile ?? null,
+    input.preferences,
+  );
+  const requestedMode =
+    input.preferences?.readiness === "fatigued"
+      ? "consolidate"
+      : input.progressionMode;
   const adjustedMode = resolveAdherenceAdjustedMode(
-    input.progressionMode,
+    requestedMode,
     input.planAdherence ?? null,
   );
-  const sets = SETS_BY_MODE[adjustedMode];
-  const exercises: PlannedExercise[] = [];
-  const seen = new Set<string>();
+  const baseSets = SETS_BY_MODE[adjustedMode];
+  const rawCatalog = input.exerciseCatalog ?? [];
+  const allowedCatalog = rawCatalog.filter((exercise) =>
+    isExerciseAllowed(exercise, settings.availableEquipment, settings.injuries),
+  );
+  const catalogIsAuthoritative = rawCatalog.length > 0;
+  const catalogById = new Map(
+    rawCatalog.map((exercise) => [exercise.exerciseId, exercise]),
+  );
+  const catalogByName = new Map<string, PlanExerciseCatalogItem>();
+
+  for (const exercise of rawCatalog) {
+    catalogByName.set(normalizeName(exercise.exerciseName), exercise);
+  }
+
   const adherenceByName = buildAdherenceMap(input.planAdherence ?? null);
+  const candidates: CandidateExercise[] = [];
+  const seen = new Set<string>();
+  const desiredExerciseCount = Math.min(
+    MAX_WEEKLY_EXERCISES,
+    Math.max(
+      MIN_WEEKLY_EXERCISES,
+      settings.weeklyDays *
+        exercisesPerSession(settings.sessionDurationMinutes),
+    ),
+  );
+
+  const addCandidate = (
+    historical: HistoricalExercise,
+    previousAdherence?: PlanAdherenceExerciseContext,
+  ) => {
+    if (candidates.length >= desiredExerciseCount) return;
+
+    const meta =
+      (historical.exerciseId
+        ? catalogById.get(historical.exerciseId)
+        : undefined) ??
+      catalogByName.get(normalizeName(historical.exerciseName));
+    const key = normalizeName(meta?.exerciseName ?? historical.exerciseName);
+
+    if (seen.has(key)) return;
+    if (
+      catalogIsAuthoritative &&
+      (meta === undefined ||
+        !isExerciseAllowed(
+          meta,
+          settings.availableEquipment,
+          settings.injuries,
+        ))
+    ) {
+      return;
+    }
+
+    seen.add(key);
+    candidates.push({
+      baseline: historical,
+      meta: meta ?? null,
+      name: meta?.exerciseName ?? historical.exerciseName,
+      previousAdherence,
+    });
+  };
 
   if (input.focusExercise) {
-    const adherence = adherenceByName.get(
-      normalizeName(input.focusExercise.exerciseName),
+    addCandidate(
+      input.focusExercise,
+      adherenceByName.get(normalizeName(input.focusExercise.exerciseName)),
     );
-    exercises.push(
-      applyExerciseAdherence(
-        buildPlannedExercise(
-          input.focusExercise.exerciseName,
-          input.focusExercise,
-          sets,
-          scheme,
-        ),
-        adherence,
-      ),
-    );
-    seen.add(normalizeName(input.focusExercise.exerciseName));
   }
 
   for (const previous of getCarryOverExercises(input.planAdherence ?? null)) {
-    if (exercises.length >= MAX_PLANNED_EXERCISES) {
-      break;
-    }
-
-    const key = normalizeName(previous.exerciseName);
-    if (seen.has(key)) {
-      continue;
-    }
-
-    seen.add(key);
-    exercises.push(buildCarryOverExercise(previous, sets, scheme));
+    addCandidate(
+      {
+        exerciseName: previous.exerciseName,
+        estimated1RmKg: null,
+        maxWeightKg: previous.targetWeightKg,
+      },
+      previous,
+    );
   }
 
   for (const topExercise of input.topExercises) {
-    if (exercises.length >= MAX_PLANNED_EXERCISES) {
-      break;
-    }
-
-    const key = normalizeName(topExercise.exerciseName);
-    if (seen.has(key)) {
-      continue;
-    }
-
-    const adherence = adherenceByName.get(key);
-    seen.add(key);
-    exercises.push(
-      applyExerciseAdherence(
-        buildPlannedExercise(
-          topExercise.exerciseName,
-          topExercise,
-          sets,
-          scheme,
-        ),
-        adherence,
-      ),
+    addCandidate(
+      topExercise,
+      adherenceByName.get(normalizeName(topExercise.exerciseName)),
     );
   }
+
+  const starterExercises = rankStarterExercises(
+    allowedCatalog,
+    settings.focusAreas,
+    input.weakArea,
+    candidates.flatMap((candidate) => (candidate.meta ? [candidate.meta] : [])),
+  );
+
+  for (const exercise of starterExercises) {
+    addCandidate({
+      exerciseId: exercise.exerciseId,
+      exerciseName: exercise.exerciseName,
+      estimated1RmKg: null,
+      maxWeightKg: null,
+    });
+  }
+
+  let exercises = candidates.map((candidate) => {
+    const exercise = buildPlannedExercise(
+      candidate.name,
+      candidate.baseline,
+      baseSets,
+      scheme,
+      candidate.meta,
+    );
+
+    return candidate.previousAdherence
+      ? applyExerciseAdherence(exercise, candidate.previousAdherence)
+      : exercise;
+  });
+
+  const selectedNames = new Set(
+    exercises.map((exercise) => normalizeName(exercise.exercise_name)),
+  );
+  exercises = exercises.map((exercise) => ({
+    ...exercise,
+    alternatives: buildAlternatives(exercise, allowedCatalog, selectedNames),
+  }));
 
   return {
     strategy: adjustedMode,
     exercises,
-    notes: buildNotes(input, adjustedMode),
+    sessions: buildSessions(
+      exercises,
+      settings.weeklyDays,
+      settings.sessionDurationMinutes,
+    ),
+    notes: buildNotes(
+      input,
+      adjustedMode,
+      settings,
+      rawCatalog,
+      allowedCatalog,
+    ),
   };
 }
 
-/**
- * 由一个动作的重量基线（估算 1RM / 近期最高重量）确定性推导一条计划动作。
- *
- * focus 与非 focus 动作共用这一套规则：优先用估算 1RM × 目标强度比例算起始重量，
- * 退化到近期最高训练重量，两者都没有（含纯自重动作的 0 基线）时保持
- * target_weight_kg=null 并提示"沿用上次重量"，绝不编造数字。
- *
- * @param exerciseName - 动作名
- * @param baseline - 该动作的估算 1RM 与近期最高重量（可缺失）
- * @param sets - 工作组数（由进展策略决定）
- * @param scheme - 训练目标对应的次数区间与目标强度
- * @returns 一条结构化计划动作
- */
+function resolvePlanSettings(
+  profile: PlanProfileContext | null,
+  preferences: PlanPreferences | null | undefined,
+) {
+  return {
+    weeklyDays:
+      preferences?.weeklyDays ?? profile?.weeklyDays ?? DEFAULT_WEEKLY_DAYS,
+    sessionDurationMinutes:
+      preferences?.sessionDurationMinutes ?? DEFAULT_SESSION_DURATION_MINUTES,
+    availableEquipment:
+      preferences?.availableEquipment ?? profile?.availableEquipment ?? [],
+    focusAreas: preferences?.focusAreas ?? [],
+    injuries: profile?.injuryConstraints ?? [],
+  };
+}
+
+function exercisesPerSession(durationMinutes: number): number {
+  if (durationMinutes <= 30) return 3;
+  if (durationMinutes <= 45) return 4;
+  if (durationMinutes <= 60) return 5;
+  return 6;
+}
+
+function isExerciseAllowed(
+  exercise: PlanExerciseCatalogItem,
+  availableEquipment: string[],
+  injuries: string[],
+): boolean {
+  const equipmentAllowed =
+    availableEquipment.length === 0 ||
+    exercise.equipment === null ||
+    availableEquipment.includes(exercise.equipment);
+  return equipmentAllowed && !hasKnownInjuryRisk(exercise, injuries);
+}
+
+function hasKnownInjuryRisk(
+  exercise: PlanExerciseCatalogItem,
+  injuries: string[],
+): boolean {
+  const injuryText = injuries.join(" ").toLowerCase();
+  const pattern = exercise.movementPattern ?? "";
+  const muscles = new Set(exercise.primaryMuscles);
+  const hasKneeConstraint = /knee|acl|膝/u.test(injuryText);
+  const hasShoulderConstraint = /shoulder|rotator|肩/u.test(injuryText);
+  const hasBackConstraint = /lower\s*back|lumbar|back pain|腰|脊柱/u.test(
+    injuryText,
+  );
+
+  if (
+    hasKneeConstraint &&
+    (["squat", "knee_flexion", "knee_extension"].includes(pattern) ||
+      muscles.has("quads"))
+  )
+    return true;
+
+  if (
+    hasShoulderConstraint &&
+    ([
+      "vertical_push",
+      "vertical_pull",
+      "shoulder_abduction",
+      "shoulder_flexion",
+    ].includes(pattern) ||
+      muscles.has("shoulders"))
+  )
+    return true;
+
+  return (
+    hasBackConstraint &&
+    ["hinge", "spinal_flexion", "rotation"].includes(pattern)
+  );
+}
+
+function scoreCatalogExercise(
+  exercise: PlanExerciseCatalogItem,
+  focusAreas: string[],
+  weakArea: string | null,
+): number {
+  const normalizedFocus = new Set(focusAreas.flatMap(expandFocusArea));
+  const weakTokens = weakArea ? expandFocusArea(weakArea) : [];
+  const focusScore = exercise.primaryMuscles.some((muscle) =>
+    normalizedFocus.has(muscle),
+  )
+    ? 50
+    : 0;
+  const weakScore = exercise.primaryMuscles.some((muscle) =>
+    weakTokens.includes(muscle),
+  )
+    ? 30
+    : 0;
+  return focusScore + weakScore;
+}
+
+function rankStarterExercises(
+  catalog: PlanExerciseCatalogItem[],
+  focusAreas: string[],
+  weakArea: string | null,
+  alreadySelected: PlanExerciseCatalogItem[],
+): PlanExerciseCatalogItem[] {
+  const remaining = [...catalog];
+  const ranked: PlanExerciseCatalogItem[] = [];
+  const muscleCounts = new Map<string, number>();
+  const patternCounts = new Map<string, number>();
+
+  for (const exercise of alreadySelected) {
+    incrementCoverage(exercise, muscleCounts, patternCounts);
+  }
+
+  while (remaining.length > 0) {
+    remaining.sort((left, right) => {
+      const adjustedScore = (exercise: PlanExerciseCatalogItem) => {
+        const musclePenalty = exercise.primaryMuscles.reduce(
+          (total, muscle) => total + (muscleCounts.get(muscle) ?? 0) * 24,
+          0,
+        );
+        const patternPenalty =
+          (patternCounts.get(exercise.movementPattern ?? "unknown") ?? 0) * 12;
+        return (
+          scoreCatalogExercise(exercise, focusAreas, weakArea) -
+          musclePenalty -
+          patternPenalty
+        );
+      };
+
+      return (
+        adjustedScore(right) - adjustedScore(left) ||
+        left.exerciseName.localeCompare(right.exerciseName)
+      );
+    });
+
+    const next = remaining.shift();
+    if (!next) break;
+    ranked.push(next);
+    incrementCoverage(next, muscleCounts, patternCounts);
+  }
+
+  return ranked;
+}
+
+function incrementCoverage(
+  exercise: PlanExerciseCatalogItem,
+  muscleCounts: Map<string, number>,
+  patternCounts: Map<string, number>,
+) {
+  for (const muscle of exercise.primaryMuscles) {
+    muscleCounts.set(muscle, (muscleCounts.get(muscle) ?? 0) + 1);
+  }
+  const pattern = exercise.movementPattern ?? "unknown";
+  patternCounts.set(pattern, (patternCounts.get(pattern) ?? 0) + 1);
+}
+
+function expandFocusArea(area: string): string[] {
+  const normalized = area.trim().toLowerCase();
+  const map: Record<string, string[]> = {
+    chest: ["chest", "upper_chest"],
+    胸: ["chest", "upper_chest"],
+    back: ["back", "lats", "upper_back"],
+    背: ["back", "lats", "upper_back"],
+    shoulders: ["shoulders", "front_delts", "side_delts", "rear_delts"],
+    shoulder: ["shoulders", "front_delts", "side_delts", "rear_delts"],
+    肩: ["shoulders", "front_delts", "side_delts", "rear_delts"],
+    arms: ["biceps", "triceps"],
+    手臂: ["biceps", "triceps"],
+    legs: ["legs", "quads", "hamstrings", "calves"],
+    腿: ["legs", "quads", "hamstrings", "calves"],
+    glutes: ["glutes"],
+    臀: ["glutes"],
+    core: ["core"],
+    核心: ["core"],
+  };
+  return map[normalized] ?? [normalized];
+}
+
 function buildPlannedExercise(
   exerciseName: string,
   baseline: ExerciseWeightBaseline,
   sets: number,
   scheme: GoalScheme,
+  meta: PlanExerciseCatalogItem | null,
 ): PlannedExercise {
-  const base = {
+  const base: PlannedExercise = {
+    ...(meta ? { exercise_id: meta.exerciseId } : {}),
     exercise_name: exerciseName,
     sets,
     rep_min: scheme.repMin,
     rep_max: scheme.repMax,
+    target_weight_kg: null,
+    rest_seconds: meta?.defaultRestSeconds ?? scheme.fallbackRestSeconds,
+    equipment: meta?.equipment ?? null,
+    movement_pattern: meta?.movementPattern ?? null,
+    primary_muscles: meta?.primaryMuscles ?? [],
+    basis: "暂无重量基线，沿用上次训练重量并小幅保守渐进。",
   };
 
   if (baseline.estimated1RmKg !== null && baseline.estimated1RmKg > 0) {
     return {
       ...base,
-      // 目标重量用未取整的 1RM 算，避免复合误差；只在 basis 文案里把 1RM 显示取整。
       target_weight_kg: roundToPlate(
         baseline.estimated1RmKg * scheme.intensityPctOf1Rm,
       ),
-      basis: `基于估算 1RM ${formatOneRmForDisplay(baseline.estimated1RmKg)} kg 的 ${Math.round(
-        scheme.intensityPctOf1Rm * 100,
-      )}%（${scheme.repMin}~${scheme.repMax} 次区间起始重量）。`,
+      basis: `基于估算 1RM ${formatOneRmForDisplay(baseline.estimated1RmKg)} kg 的 ${Math.round(scheme.intensityPctOf1Rm * 100)}%（${scheme.repMin}~${scheme.repMax} 次区间起始重量）。`,
     };
   }
 
@@ -195,49 +462,107 @@ function buildPlannedExercise(
     };
   }
 
-  return {
-    ...base,
-    target_weight_kg: null,
-    basis: "暂无重量基线，沿用上次训练重量并小幅保守渐进。",
-  };
+  return base;
 }
 
-function buildCarryOverExercise(
-  previous: PlanAdherenceExerciseContext,
-  baseSets: number,
-  scheme: GoalScheme,
-): PlannedExercise {
-  const sets = resolveAdherenceAdjustedSets(baseSets, previous);
+function buildAlternatives(
+  exercise: PlannedExercise,
+  catalog: PlanExerciseCatalogItem[],
+  selectedNames: Set<string>,
+): PlannedExerciseAlternative[] {
+  const primaryMuscles = new Set(exercise.primary_muscles ?? []);
+  return catalog
+    .filter((candidate) => {
+      if (selectedNames.has(normalizeName(candidate.exerciseName)))
+        return false;
+      const samePattern =
+        exercise.movement_pattern != null &&
+        candidate.movementPattern === exercise.movement_pattern;
+      const sharedMuscle = candidate.primaryMuscles.some((muscle) =>
+        primaryMuscles.has(muscle),
+      );
+      return samePattern || sharedMuscle;
+    })
+    .slice(0, MAX_ALTERNATIVES)
+    .map((candidate) => ({
+      exercise_id: candidate.exerciseId,
+      exercise_name: candidate.exerciseName,
+      equipment: candidate.equipment,
+      movement_pattern: candidate.movementPattern,
+      primary_muscles: candidate.primaryMuscles,
+      rest_seconds: candidate.defaultRestSeconds,
+    }));
+}
 
-  return {
-    exercise_name: previous.exerciseName,
-    sets,
-    rep_min: scheme.repMin,
-    rep_max: scheme.repMax,
-    target_weight_kg: previous.targetWeightKg,
-    basis: buildAdherenceBasis(
-      previous,
-      previous.targetWeightKg === null
-        ? "上次没有可靠重量目标，本次继续不编造重量。"
-        : "本次沿用上一计划重量上限，先把动作完成度补回来。",
+function buildSessions(
+  exercises: PlannedExercise[],
+  weeklyDays: number,
+  durationBudget: number,
+): PlannedTrainingSession[] {
+  if (exercises.length === 0) return [];
+  const sessionCount = Math.min(weeklyDays, exercises.length);
+  const buckets = Array.from(
+    { length: sessionCount },
+    () => [] as PlannedExercise[],
+  );
+  for (const exercise of exercises) {
+    const exerciseMuscles = new Set(exercise.primary_muscles ?? []);
+    const rankedBuckets = buckets
+      .map((bucket, index) => ({
+        bucket,
+        index,
+        overlap: bucket.reduce(
+          (total, item) =>
+            total +
+            (item.primary_muscles ?? []).filter((muscle) =>
+              exerciseMuscles.has(muscle),
+            ).length,
+          0,
+        ),
+      }))
+      .sort(
+        (left, right) =>
+          left.overlap - right.overlap ||
+          left.bucket.length - right.bucket.length ||
+          left.index - right.index,
+      );
+    rankedBuckets[0]?.bucket.push(exercise);
+  }
+
+  return buckets.map((sessionExercises, index) => ({
+    session_index: index + 1,
+    title: `训练日 ${index + 1}`,
+    focus_areas: uniqueStrings(
+      sessionExercises.flatMap((exercise) => exercise.primary_muscles ?? []),
+    ).slice(0, 3),
+    estimated_duration_minutes: Math.min(
+      durationBudget,
+      estimateSessionDuration(sessionExercises),
     ),
-  };
+    exercises: sessionExercises,
+  }));
+}
+
+function estimateSessionDuration(exercises: PlannedExercise[]): number {
+  const seconds = exercises.reduce((total, exercise) => {
+    const workSeconds = exercise.sets * 45;
+    const restSeconds =
+      Math.max(0, exercise.sets - 1) * (exercise.rest_seconds ?? 90);
+    return total + workSeconds + restSeconds;
+  }, 5 * 60);
+  return Math.max(15, Math.ceil(seconds / 300) * 5);
 }
 
 function applyExerciseAdherence(
   exercise: PlannedExercise,
-  adherence: PlanAdherenceExerciseContext | undefined,
+  adherence: PlanAdherenceExerciseContext,
 ): PlannedExercise {
-  if (adherence === undefined || adherence.status === "done") {
-    return exercise;
-  }
-
+  if (adherence.status === "done") return exercise;
   const adjustedSets = resolveAdherenceAdjustedSets(exercise.sets, adherence);
   const cappedWeight = capTargetWeight(
     exercise.target_weight_kg,
     adherence.targetWeightKg,
   );
-
   return {
     ...exercise,
     sets: adjustedSets,
@@ -256,7 +581,6 @@ function buildAdherenceBasis(
   guidance: string,
 ): string {
   const statusCopy = adherence.status === "partial" ? "部分完成" : "未完成";
-
   return `上次计划 ${statusCopy}：完成 ${adherence.performedSets}/${adherence.plannedSets} 组。${guidance}`;
 }
 
@@ -264,14 +588,10 @@ function resolveAdherenceAdjustedSets(
   baseSets: number,
   adherence: PlanAdherenceExerciseContext,
 ): number {
-  if (adherence.status === "missed") {
+  if (adherence.status === "missed")
     return Math.max(1, Math.min(baseSets, adherence.plannedSets) - 1);
-  }
-
-  if (adherence.status === "partial") {
+  if (adherence.status === "partial")
     return Math.max(1, Math.min(baseSets, adherence.plannedSets));
-  }
-
   return baseSets;
 }
 
@@ -279,14 +599,8 @@ function capTargetWeight(
   targetWeightKg: number | null,
   previousTargetWeightKg: number | null,
 ): number | null {
-  if (previousTargetWeightKg === null) {
-    return null;
-  }
-
-  if (targetWeightKg === null) {
-    return previousTargetWeightKg;
-  }
-
+  if (previousTargetWeightKg === null) return null;
+  if (targetWeightKg === null) return previousTargetWeightKg;
   return Math.min(targetWeightKg, previousTargetWeightKg);
 }
 
@@ -294,80 +608,69 @@ function resolveAdherenceAdjustedMode(
   mode: ProgressionMode,
   adherence: PlanAdherenceContext | null,
 ): ProgressionMode {
-  if (
-    adherence === null ||
-    adherence.setAdherenceRatio >= HIGH_ADHERENCE_RATIO
-  ) {
+  if (adherence === null || adherence.setAdherenceRatio >= HIGH_ADHERENCE_RATIO)
     return mode;
-  }
-
-  if (adherence.setAdherenceRatio < LOW_ADHERENCE_RATIO) {
-    return "consolidate";
-  }
-
+  if (adherence.setAdherenceRatio < LOW_ADHERENCE_RATIO) return "consolidate";
   return mode === "add_frequency" ? "maintain" : mode;
 }
 
 function getCarryOverExercises(
   adherence: PlanAdherenceContext | null,
 ): PlanAdherenceExerciseContext[] {
-  if (adherence === null) {
-    return [];
-  }
-
-  return adherence.exercises.filter(
-    (exercise) => exercise.status === "partial" || exercise.status === "missed",
+  return (
+    adherence?.exercises.filter(
+      (exercise) =>
+        exercise.status === "partial" || exercise.status === "missed",
+    ) ?? []
   );
 }
 
 function buildAdherenceMap(
   adherence: PlanAdherenceContext | null,
 ): Map<string, PlanAdherenceExerciseContext> {
-  const map = new Map<string, PlanAdherenceExerciseContext>();
-
-  if (adherence === null) {
-    return map;
-  }
-
-  for (const exercise of adherence.exercises) {
-    map.set(normalizeName(exercise.exerciseName), exercise);
-  }
-
-  return map;
+  return new Map(
+    adherence?.exercises.map((exercise) => [
+      normalizeName(exercise.exerciseName),
+      exercise,
+    ]) ?? [],
+  );
 }
 
 function buildNotes(
   input: NextWeekPlanGeneratorInput,
   adjustedMode: ProgressionMode,
+  settings: ReturnType<typeof resolvePlanSettings>,
+  rawCatalog: PlanExerciseCatalogItem[],
+  allowedCatalog: PlanExerciseCatalogItem[],
 ): string[] {
   const notes = [
     describeStrategy(adjustedMode),
+    `按 ${settings.weeklyDays} 个灵活训练日编排，单次以 ${settings.sessionDurationMinutes} 分钟为上限。`,
     "一次只改一个变量（组数 / 重量 / 次数 / 休息）。",
   ];
-
   if (input.profile) {
     notes.push(describeGoal(input.profile.goal));
-    notes.push(
-      `目标每周 ${input.profile.weeklyDays} 天：把这些动作分配到各训练日，避免单日堆叠。`,
-    );
-
     for (const injury of input.profile.injuryConstraints) {
-      notes.push(
-        `因 ${injury} 约束：相关动作降低负荷 / 控制活动范围，必要时换更安全的替代动作。`,
-      );
+      notes.push(`已按 ${injury} 约束过滤已知高风险动作；不适时立即停止。`);
     }
   }
-
-  if (input.weakArea) {
+  if (settings.availableEquipment.length > 0) {
+    notes.push(`本次只使用：${settings.availableEquipment.join("、")}。`);
+  }
+  if (rawCatalog.length > allowedCatalog.length) {
     notes.push(
-      `弱项 ${input.weakArea}：可加一点可控的针对性补充，不必加大强度。`,
+      `器械与伤病约束已排除 ${rawCatalog.length - allowedCatalog.length} 个候选动作。`,
     );
   }
-
-  notes.push(
-    "这是规划草案而非处方；出现疼痛、麻木或异常疲劳不要硬按草案执行。",
-  );
-
+  if (input.preferences?.readiness === "fatigued") {
+    notes.push("本周状态偏疲劳：计划自动切到巩固模式，不主动加量。");
+  }
+  if (input.weakArea)
+    notes.push(`记录较少的 ${input.weakArea} 仅作排序参考，不强行堆量。`);
+  if (input.topExercises.length === 0) {
+    notes.push("暂无近期动作基线：先使用合规 starter 动作，目标重量保持为空。");
+  }
+  notes.push("这是规划草案而非医疗处方；出现疼痛、麻木或异常疲劳请停止训练。");
   return notes;
 }
 
@@ -375,27 +678,31 @@ function normalizeName(name: string): string {
   return name.trim().toLowerCase();
 }
 
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values)];
+}
+
 function describeStrategy(mode: ProgressionMode): string {
   switch (mode) {
     case "consolidate":
-      return "近期频率偏高：下周以巩固和控制疲劳为主，保持组数、不大幅加量。";
+      return "下周以巩固和控制疲劳为主，不大幅加量。";
     case "add_frequency":
-      return "近期频率偏低：下周可保守地多排一组或补一次训练。";
+      return "近期频率偏低，下周可保守地增加训练量。";
     case "maintain":
-      return "频率适中：下周维持基线，只做小幅优化。";
+      return "频率适中，下周维持基线，只做小幅优化。";
   }
 }
 
 function describeGoal(goal: PlanGoal): string {
   switch (goal) {
     case "strength":
-      return "目标力量：次数偏低、强度偏高，组间充分休息。";
+      return "目标力量：低次数、高强度、充分组间休息。";
     case "hypertrophy":
       return "目标增肌：中等次数与强度，关注总有效组数。";
     case "endurance":
-      return "目标耐力：次数偏高、强度偏低，缩短组间休息。";
+      return "目标耐力：高次数、低强度、较短组间休息。";
     case "general_fitness":
-      return "目标综合健身：中等次数区间，兼顾力量与耐力。";
+      return "目标综合健身：中等次数，兼顾力量与耐力。";
   }
 }
 
@@ -403,12 +710,6 @@ function roundToPlate(value: number): number {
   return Math.round(value / WEIGHT_ROUNDING_KG) * WEIGHT_ROUNDING_KG;
 }
 
-/**
- * 把估算 1RM 取整到 1 位小数用于 basis 文案展示（去掉浮点尾巴，如 110.8333… → 110.8）。
- *
- * @param value - 原始估算 1RM（kg）
- * @returns 适合展示的数值（整数则不带小数点）
- */
 function formatOneRmForDisplay(value: number): number {
   return Math.round(value * 10) / 10;
 }

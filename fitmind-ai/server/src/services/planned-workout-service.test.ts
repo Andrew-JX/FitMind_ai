@@ -119,6 +119,49 @@ describe("acceptPlan", () => {
     expect(dto.status).toBe("active");
     expect(dto.plan.exercises).toHaveLength(2);
   });
+
+  it("accepts the V2 session snapshot while keeping flat exercises for adherence", async () => {
+    const exercise = {
+      exercise_id: "00000000-0000-4000-8000-000000000001",
+      exercise_name: "哑铃卧推",
+      sets: 4,
+      rep_min: 8,
+      rep_max: 12,
+      target_weight_kg: null,
+      rest_seconds: 90,
+      equipment: "dumbbell",
+      movement_pattern: "horizontal_push",
+      primary_muscles: ["chest"],
+      alternatives: [],
+      basis: "用户编辑后的动作",
+    };
+    const v2Plan: NextWeekPlanDraft = {
+      strategy: "maintain",
+      exercises: [exercise],
+      sessions: [
+        {
+          session_index: 1,
+          title: "训练日 1",
+          focus_areas: ["chest"],
+          estimated_duration_minutes: 30,
+          exercises: [exercise],
+        },
+      ],
+      notes: [],
+    };
+    const createPlannedWorkoutSupersedingActive = vi
+      .fn()
+      .mockResolvedValue(buildRow({ plan: v2Plan }));
+
+    const dto = await acceptPlan(
+      "u1",
+      { startDate: "2026-06-15", endDate: "2026-06-21", plan: v2Plan },
+      deps({ createPlannedWorkoutSupersedingActive }),
+    );
+
+    expect(dto.plan.sessions?.[0]?.exercises[0]?.rest_seconds).toBe(90);
+    expect(dto.plan.exercises[0]?.exercise_name).toBe("哑铃卧推");
+  });
 });
 
 describe("createPlannedWorkoutSupersedingActive", () => {

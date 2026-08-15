@@ -120,15 +120,49 @@ function normalizePlan(
 
   return {
     strategy: normalizePlanStrategy(plan.strategy),
-    exercises: exercises.map((exercise) => ({
-      exerciseName: exercise.exercise_name ?? "未命名动作",
-      sets: exercise.sets ?? 0,
-      repMin: exercise.rep_min ?? 0,
-      repMax: exercise.rep_max ?? 0,
-      targetWeightKg: exercise.target_weight_kg ?? null,
-      basis: exercise.basis ?? "",
+    exercises: exercises.map(normalizePlanExercise),
+    sessions: (plan.sessions ?? []).map((session, index) => ({
+      sessionIndex: session.session_index ?? index + 1,
+      title: session.title ?? `训练日 ${index + 1}`,
+      focusAreas: session.focus_areas ?? [],
+      estimatedDurationMinutes: session.estimated_duration_minutes ?? 0,
+      exercises: (session.exercises ?? []).map(normalizePlanExercise),
     })),
     notes: plan.notes ?? [],
+  };
+}
+
+function normalizePlanExercise(
+  exercise: NonNullable<
+    NonNullable<AssistantStructuredOutput["plan"]>["exercises"]
+  >[number],
+) {
+  return {
+    ...(exercise.exercise_id ? { exerciseId: exercise.exercise_id } : {}),
+    exerciseName: exercise.exercise_name ?? "未命名动作",
+    sets: exercise.sets ?? 0,
+    repMin: exercise.rep_min ?? 0,
+    repMax: exercise.rep_max ?? 0,
+    targetWeightKg: exercise.target_weight_kg ?? null,
+    restSeconds: exercise.rest_seconds ?? 90,
+    equipment: exercise.equipment ?? null,
+    movementPattern: exercise.movement_pattern ?? null,
+    primaryMuscles: exercise.primary_muscles ?? [],
+    alternatives: (exercise.alternatives ?? [])
+      .filter(
+        (alternative) =>
+          Boolean(alternative.exercise_id) &&
+          Boolean(alternative.exercise_name),
+      )
+      .map((alternative) => ({
+        exerciseId: alternative.exercise_id ?? "",
+        exerciseName: alternative.exercise_name ?? "未命名动作",
+        equipment: alternative.equipment ?? null,
+        movementPattern: alternative.movement_pattern ?? null,
+        primaryMuscles: alternative.primary_muscles ?? [],
+        restSeconds: alternative.rest_seconds ?? 90,
+      })),
+    basis: exercise.basis ?? "",
   };
 }
 

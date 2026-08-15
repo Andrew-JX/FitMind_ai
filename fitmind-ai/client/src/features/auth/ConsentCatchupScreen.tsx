@@ -2,7 +2,6 @@ import { useState } from "react";
 
 import type { PendingConsentDto } from "../../../../shared/src/consent";
 
-import { Icon } from "../../components/Icon";
 import { useTheme } from "../../theme/ThemeContext";
 import { accentAlpha } from "../../theme/tokens";
 
@@ -22,7 +21,7 @@ export interface ConsentCatchupScreenProps {
 interface ConsentCopy {
   title: string;
   body: React.ReactNode;
-  checkboxLabel: React.ReactNode;
+  confirmationCopy: React.ReactNode;
 }
 
 /**
@@ -48,7 +47,6 @@ interface ConsentCopy {
  */
 export function ConsentCatchupScreen(props: ConsentCatchupScreenProps) {
   const { theme } = useTheme();
-  const [accepted, setAccepted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   // Deletion is irreversible, so it is asked for twice rather than fired from
@@ -66,7 +64,7 @@ export function ConsentCatchupScreen(props: ConsentCatchupScreenProps) {
   const copy = getConsentCopy(consent, theme.colors.ac);
 
   async function handleAccept(): Promise<void> {
-    if (consent === undefined || !accepted) {
+    if (consent === undefined) {
       return;
     }
 
@@ -75,7 +73,6 @@ export function ConsentCatchupScreen(props: ConsentCatchupScreenProps) {
 
     try {
       await props.onAccept(consent);
-      setAccepted(false);
     } catch {
       setErrorMessage("提交失败，请检查网络后重试。未提交前不会记录任何同意。");
     } finally {
@@ -131,25 +128,16 @@ export function ConsentCatchupScreen(props: ConsentCatchupScreenProps) {
           </p>
         ) : null}
 
-        <label
+        <p
           style={{
-            alignItems: "flex-start",
-            color: theme.colors.tx,
-            display: "flex",
+            color: theme.colors.tx2,
             fontSize: 13,
-            gap: 8,
             lineHeight: 1.6,
+            margin: 0,
           }}
         >
-          <input
-            checked={accepted}
-            disabled={isSubmitting}
-            onChange={(event) => setAccepted(event.target.checked)}
-            style={{ marginTop: 3 }}
-            type="checkbox"
-          />
-          <span>{copy.checkboxLabel}</span>
-        </label>
+          {copy.confirmationCopy}
+        </p>
 
         {errorMessage !== null ? (
           <p style={{ color: theme.colors.red, fontSize: 12, margin: 0 }}>
@@ -158,23 +146,21 @@ export function ConsentCatchupScreen(props: ConsentCatchupScreenProps) {
         ) : null}
 
         <div style={{ display: "grid", gap: 8 }}>
-          <button
-            disabled={!accepted || isSubmitting}
-            onClick={handleAccept}
-            style={{
-              backgroundColor: accepted ? theme.colors.ac : theme.colors.surf2,
-              border: "none",
-              borderRadius: 12,
-              color: accepted ? "#fff" : theme.colors.tx3,
-              cursor: accepted && !isSubmitting ? "pointer" : "default",
-              fontSize: 14,
-              fontWeight: 600,
-              padding: "12px 16px",
-            }}
-            type="button"
-          >
-            <Icon name="check" size={15} /> 同意并继续
-          </button>
+          <div style={acceptSubmitRowStyle}>
+            <button
+              disabled={isSubmitting}
+              onClick={handleAccept}
+              style={acceptSubmitButtonStyle(theme, isSubmitting)}
+              type="button"
+            >
+              <span style={acceptSubmitLabelStyle(isSubmitting)}>
+                我已阅读并同意，继续
+              </span>
+            </button>
+            <span aria-hidden="true" style={acceptSpinnerStyle(isSubmitting)}>
+              <span style={acceptSpinnerRingStyle(theme)} />
+            </span>
+          </div>
 
           {/* The proportionate way out of a health-data consent: remove the
               sensitive data, keep everything else. Without it, declining this
@@ -413,7 +399,7 @@ function getConsentCopy(
           </p>
         </>
       ),
-      checkboxLabel: (
+      confirmationCopy: (
         <>
           我同意本站处理我主动填写的健康数据，用于训练安全提示和健康记录功能。（政策版本{" "}
           {consent.policy_version}）
@@ -437,11 +423,79 @@ function getConsentCopy(
         </p>
       </>
     ),
-    checkboxLabel: (
+    confirmationCopy: (
       <>
         我已阅读隐私政策，并同意本站将我的个人信息存储在中国境外的服务器上。（政策版本{" "}
         {consent.policy_version}）
       </>
     ),
+  };
+}
+
+const acceptSubmitRowStyle: React.CSSProperties = {
+  alignItems: "center",
+  display: "flex",
+  height: 48,
+  justifyContent: "center",
+  position: "relative",
+};
+
+function acceptSubmitButtonStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+  isSubmitting: boolean,
+): React.CSSProperties {
+  return {
+    alignItems: "center",
+    background: theme.colors.ac,
+    border: "none",
+    borderRadius: isSubmitting ? 999 : 14,
+    color: theme.colors.acText,
+    cursor: isSubmitting ? "default" : "pointer",
+    display: "flex",
+    fontSize: 14,
+    fontWeight: 700,
+    height: 48,
+    justifyContent: "center",
+    opacity: 1,
+    overflow: "hidden",
+    padding: 0,
+    transition:
+      "width 0.5s cubic-bezier(0.65, 0, 0.35, 1), border-radius 0.5s cubic-bezier(0.65, 0, 0.35, 1)",
+    width: isSubmitting ? 48 : "100%",
+  };
+}
+
+function acceptSubmitLabelStyle(isSubmitting: boolean): React.CSSProperties {
+  return {
+    opacity: isSubmitting ? 0 : 1,
+    transition: "opacity 0.2s ease",
+    whiteSpace: "nowrap",
+  };
+}
+
+function acceptSpinnerStyle(isSubmitting: boolean): React.CSSProperties {
+  return {
+    alignItems: "center",
+    display: "flex",
+    height: 48,
+    justifyContent: "center",
+    opacity: isSubmitting ? 1 : 0,
+    pointerEvents: "none",
+    position: "absolute",
+    transition: "opacity 0.2s ease",
+    width: 48,
+  };
+}
+
+function acceptSpinnerRingStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    animation: "fmspin 0.8s linear infinite",
+    border: `2px solid ${accentAlpha(theme, 0.35)}`,
+    borderRadius: "50%",
+    borderTopColor: theme.colors.acText,
+    height: 20,
+    width: 20,
   };
 }

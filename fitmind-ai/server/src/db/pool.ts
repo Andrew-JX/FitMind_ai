@@ -1,5 +1,7 @@
 import { createRequire } from "node:module";
 
+import { Pool as NeonPool } from "@neondatabase/serverless";
+
 import { loadServerEnv } from "../env.js";
 
 export interface DbQueryResult<TRow = unknown> {
@@ -52,6 +54,16 @@ function conservativeIdentifier(value: unknown): string | undefined {
     : undefined;
 }
 
+/** Neon supports its pg-compatible Pool over HTTPS/WebSocket instead of raw TCP. */
+export function usesNeonWebSocketTransport(databaseUrl: string): boolean {
+  try {
+    const hostname = new URL(databaseUrl).hostname.toLowerCase();
+    return hostname === "neon.tech" || hostname.endsWith(".neon.tech");
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Build the only payload permitted for an idle-client pool error.
  *
@@ -84,8 +96,10 @@ function getOrCreateProcessPool(): PgPool {
     throw new Error("DATABASE_URL is required for database access.");
   }
 
-  const { Pool } = require("pg") as { Pool: PgPoolConstructor };
-  const nextPool = new Pool({
+  const PoolConstructor = usesNeonWebSocketTransport(env.databaseUrl)
+    ? (NeonPool as unknown as PgPoolConstructor)
+    : (require("pg") as { Pool: PgPoolConstructor }).Pool;
+  const nextPool = new PoolConstructor({
     connectionString: env.databaseUrl,
     max: MAX_POOL_CLIENTS,
     allowExitOnIdle: true,

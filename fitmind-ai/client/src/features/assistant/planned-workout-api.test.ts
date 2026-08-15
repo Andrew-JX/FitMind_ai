@@ -54,6 +54,47 @@ describe("denormalizePlanDraft", () => {
       notes: ["note"],
     });
   });
+
+  it("submits edited session structure and exercise prescription fields", () => {
+    const exercise = {
+      exerciseId: "00000000-0000-4000-8000-000000000001",
+      exerciseName: "哑铃卧推",
+      sets: 4,
+      repMin: 8,
+      repMax: 12,
+      targetWeightKg: null,
+      restSeconds: 90,
+      equipment: "dumbbell",
+      movementPattern: "horizontal_push",
+      primaryMuscles: ["chest"],
+      alternatives: [],
+      basis: "用户编辑后的动作",
+    };
+    const draft: AssistantPlanDraft = {
+      strategy: "maintain",
+      exercises: [exercise],
+      sessions: [
+        {
+          sessionIndex: 1,
+          title: "训练日 1",
+          focusAreas: ["chest"],
+          estimatedDurationMinutes: 30,
+          exercises: [exercise],
+        },
+      ],
+      notes: [],
+    };
+
+    const result = denormalizePlanDraft(draft);
+    expect(result.sessions?.[0]?.exercises[0]).toMatchObject({
+      exercise_name: "哑铃卧推",
+      sets: 4,
+      rep_min: 8,
+      rep_max: 12,
+      rest_seconds: 90,
+    });
+    expect(result.exercises[0]).toEqual(result.sessions?.[0]?.exercises[0]);
+  });
 });
 
 describe("createForwardWeekRange", () => {

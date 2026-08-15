@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { RetrievedKnowledgeChunk } from "../rag/knowledge-retriever.js";
+import { runMockAssistantTurn } from "../assistant/assistant-orchestrator-service.js";
 import { runNextWeekPlanAgent } from "./next-week-plan-agent.js";
 import type {
   AgentStepEvent,
@@ -222,6 +223,47 @@ describe("runNextWeekPlanAgent", () => {
     );
   });
 
+  it("returns a constrained starter plan when history is empty but the catalog is available", async () => {
+    const { deps } = createDeps({
+      runTool: async () =>
+        createWeeklyResult({ status: "empty", totals: { workout_count: 0 } }),
+    });
+    const exerciseCatalog = Array.from({ length: 6 }, (_, index) => ({
+      exerciseId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+      exerciseName: `自重动作 ${index + 1}`,
+      equipment: "bodyweight",
+      movementPattern: index % 2 === 0 ? "horizontal_push" : "anti_extension",
+      primaryMuscles: [index % 2 === 0 ? "chest" : "core"],
+      defaultRestSeconds: 60,
+    }));
+
+    const output = await runNextWeekPlanAgent(
+      {
+        ...baseInput,
+        profile: {
+          goal: "general_fitness",
+          weeklyDays: 2,
+          availableEquipment: ["bodyweight"],
+          injuryConstraints: [],
+        },
+        preferences: { weeklyDays: 2, sessionDurationMinutes: 30 },
+        exerciseCatalog,
+      },
+      deps,
+    );
+
+    expect(output.trace.stop_reason).toBe("no_data");
+    expect(output.plan?.exercises.length).toBeGreaterThan(0);
+    expect(output.plan?.sessions).toHaveLength(2);
+    expect(
+      output.plan?.exercises.every(
+        (exercise) =>
+          exercise.equipment === "bodyweight" &&
+          exercise.target_weight_kg === null,
+      ),
+    ).toBe(true);
+  });
+
   it("continues to synthesis when a secondary tool fails", async () => {
     const { deps } = createDeps({
       runTool: async (toolName) => {
@@ -242,5 +284,23 @@ describe("runNextWeekPlanAgent", () => {
     expect(output.trace.stop_reason).toBe("completed");
     expect(output.trace.steps[1]?.status).toBe("error");
     expect(output.answer.intent).toBe("next_week_plan");
+  });
+});
+
+describe("weekly plan request validation", () => {
+  it("rejects invalid temporary days, duration, equipment and focus before any data access", async () => {
+    await expect(
+      runMockAssistantTurn("test-user", {
+        mode: "next_week_plan",
+        message: "生成计划",
+        timezone: "UTC",
+        plan_preferences: {
+          weekly_days: 8,
+          session_duration_minutes: 40,
+          available_equipment: ["treadmill"],
+          focus_areas: ["neck"],
+        },
+      }),
+    ).rejects.toMatchObject({ name: "ZodError" });
   });
 });

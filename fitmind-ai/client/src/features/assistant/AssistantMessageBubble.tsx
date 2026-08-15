@@ -4,7 +4,10 @@ import { AssistantAgentTrace } from "./AssistantAgentTrace";
 import { AssistantPlanCard } from "./AssistantPlanCard";
 import type { AssistantClarificationChoice } from "./assistant-request-payload";
 import { isAssistantMessageSaveEligible } from "./assistant-saved-insights";
-import type { AssistantChatMessage } from "./assistant-types";
+import type {
+  AssistantChatMessage,
+  AssistantPlanDraft,
+} from "./assistant-types";
 import { BRAND_NEON } from "../../theme/tokens";
 
 export interface AssistantMessageBubbleProps {
@@ -15,7 +18,9 @@ export interface AssistantMessageBubbleProps {
   /** Disables candidate buttons while another turn is already streaming. */
   isSending?: boolean | undefined;
   message: AssistantChatMessage;
-  onAcceptPlan?: ((message: AssistantChatMessage) => void) | undefined;
+  onAcceptPlan?:
+    | ((message: AssistantChatMessage, plan: AssistantPlanDraft) => void)
+    | undefined;
   onClarificationChoice?:
     | ((choice: AssistantClarificationChoice) => void)
     | undefined;
@@ -143,7 +148,9 @@ export function AssistantMessageBubble(props: AssistantMessageBubbleProps) {
           isAccepted={props.isPlanAccepted}
           isAccepting={props.isPlanAccepting}
           onAccept={
-            props.onAcceptPlan ? () => props.onAcceptPlan?.(message) : undefined
+            props.onAcceptPlan
+              ? (editedPlan) => props.onAcceptPlan?.(message, editedPlan)
+              : undefined
           }
           plan={message.plan}
         />

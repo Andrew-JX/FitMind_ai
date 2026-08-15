@@ -103,6 +103,38 @@ describe("buildAssistantRequestPayload", () => {
 
     expect(payload.session_id).toBeUndefined();
   });
+
+  it("sends structured weekly-plan preferences only for the plan mode", () => {
+    const preferences = {
+      weekly_days: 4,
+      session_duration_minutes: 45 as const,
+      available_equipment: ["dumbbell", "bodyweight"] as const,
+      readiness: "fatigued" as const,
+      focus_areas: ["back", "core"] as const,
+    };
+    const planPayload = buildAssistantRequestPayload({
+      message: "给我一个下周训练草案",
+      mode: "next_week_plan",
+      planPreferences: {
+        ...preferences,
+        available_equipment: [...preferences.available_equipment],
+        focus_areas: [...preferences.focus_areas],
+      },
+      timeZone: "Asia/Shanghai",
+    });
+    const otherPayload = buildAssistantRequestPayload({
+      message: "训练总览",
+      mode: "training_overview",
+      planPreferences: {
+        ...preferences,
+        available_equipment: [...preferences.available_equipment],
+        focus_areas: [...preferences.focus_areas],
+      },
+    });
+
+    expect(planPayload.plan_preferences).toEqual(preferences);
+    expect(otherPayload.plan_preferences).toBeUndefined();
+  });
 });
 
 describe("buildClarificationChoiceMessage", () => {

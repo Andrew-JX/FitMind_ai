@@ -55,11 +55,26 @@ describe("mergeStructuredOutputIntoMessage", () => {
         strategy: "add_frequency",
         exercises: [
           {
+            exercise_id: "00000000-0000-4000-8000-000000000001",
             exercise_name: "Barbell Bench Press",
             sets: 4,
             rep_min: 6,
             rep_max: 10,
             target_weight_kg: 72.5,
+            rest_seconds: 120,
+            equipment: "barbell",
+            movement_pattern: "horizontal_push",
+            primary_muscles: ["chest"],
+            alternatives: [
+              {
+                exercise_id: "00000000-0000-4000-8000-000000000002",
+                exercise_name: "Dumbbell Bench Press",
+                equipment: "dumbbell",
+                movement_pattern: "horizontal_push",
+                primary_muscles: ["chest"],
+                rest_seconds: 90,
+              },
+            ],
             basis: "基于估算 1RM 的 72%",
           },
           {
@@ -71,6 +86,25 @@ describe("mergeStructuredOutputIntoMessage", () => {
             basis: "沿用上次训练重量",
           },
         ],
+        sessions: [
+          {
+            session_index: 1,
+            title: "训练日 1",
+            focus_areas: ["chest"],
+            estimated_duration_minutes: 35,
+            exercises: [
+              {
+                exercise_name: "Barbell Bench Press",
+                sets: 4,
+                rep_min: 6,
+                rep_max: 10,
+                target_weight_kg: 72.5,
+                rest_seconds: 120,
+                basis: "基于估算 1RM 的 72%",
+              },
+            ],
+          },
+        ],
         notes: ["一次只改一个变量。"],
       },
     });
@@ -79,6 +113,11 @@ describe("mergeStructuredOutputIntoMessage", () => {
     expect(result[0]?.plan?.exercises).toHaveLength(2);
     expect(result[0]?.plan?.exercises[0]?.targetWeightKg).toBe(72.5);
     expect(result[0]?.plan?.exercises[1]?.targetWeightKg).toBeNull();
+    expect(result[0]?.plan?.exercises[0]?.restSeconds).toBe(120);
+    expect(result[0]?.plan?.exercises[0]?.alternatives?.[0]?.exerciseName).toBe(
+      "Dumbbell Bench Press",
+    );
+    expect(result[0]?.plan?.sessions?.[0]?.title).toBe("训练日 1");
     expect(result[0]?.plan?.notes).toContain("一次只改一个变量。");
   });
 

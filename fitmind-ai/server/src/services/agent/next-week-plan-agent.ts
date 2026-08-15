@@ -72,11 +72,26 @@ export async function runNextWeekPlanAgent(
   });
 
   if (isEmptyWeeklyReport(weeklyResult)) {
-    // Step 1 already emitted its observation; stop the loop early with no data.
+    const starterPlan = generateNextWeekPlan(
+      buildGeneratorInput({
+        weeklyResult,
+        weakArea: null,
+        progressionMode: "maintain",
+        progressResult: null,
+        profile: input.profile ?? null,
+        preferences: input.preferences ?? null,
+        exerciseCatalog: input.exerciseCatalog ?? [],
+        planAdherence: input.planAdherence ?? null,
+      }),
+    );
+
+    // No history is no longer a dead end: a filtered dictionary can produce a
+    // conservative starter plan while every target weight remains unknown.
     return {
       trace: buildTrace(accumulator.steps, "no_data"),
       tool_calls: accumulator.toolCalls,
       answer: buildNoDataAnswer(input, accumulator),
+      ...(starterPlan.exercises.length > 0 ? { plan: starterPlan } : {}),
     };
   }
 
@@ -135,6 +150,8 @@ export async function runNextWeekPlanAgent(
       progressionMode,
       progressResult,
       profile: input.profile ?? null,
+      preferences: input.preferences ?? null,
+      exerciseCatalog: input.exerciseCatalog ?? [],
       planAdherence: input.planAdherence ?? null,
     }),
   );
@@ -161,32 +178,36 @@ function buildGeneratorInput(context: {
   progressionMode: ProgressionMode;
   progressResult: unknown;
   profile: NextWeekPlanGeneratorInput["profile"];
+  preferences: NextWeekPlanGeneratorInput["preferences"];
+  exerciseCatalog: NextWeekPlanGeneratorInput["exerciseCatalog"];
   planAdherence: NextWeekPlanGeneratorInput["planAdherence"];
 }): NextWeekPlanGeneratorInput {
   const weekly = asRecord(context.weeklyResult);
-  const topExercises = asArray(weekly?.top_exercises)
-    .map((item) => {
-      const record = asRecord(item);
-      const exerciseName = readString(record?.exercise_name);
+  const topExercises: NextWeekPlanGeneratorInput["topExercises"] = asArray(
+    weekly?.top_exercises,
+  ).flatMap((item) => {
+    const record = asRecord(item);
+    const exerciseName = readString(record?.exercise_name);
+    const exerciseId = readString(record?.exercise_id);
 
-      return exerciseName === null
-        ? null
-        : {
+    return exerciseName === null
+      ? []
+      : [
+          {
+            ...(exerciseId === null ? {} : { exerciseId }),
             exerciseName,
             setCount: readNumber(record?.set_count) ?? 0,
             estimated1RmKg: readNumber(record?.estimated_1rm_kg),
             maxWeightKg: readNumber(record?.max_weight_kg),
-          };
-    })
-    .filter(
-      (item): item is NextWeekPlanGeneratorInput["topExercises"][number] =>
-        item !== null,
-    );
+          },
+        ];
+  });
 
   const progress = asRecord(context.progressResult);
   const exercise = asRecord(progress?.exercise);
   const totals = asRecord(progress?.totals);
   const focusName = readString(exercise?.exercise_name);
+  const focusId = readString(exercise?.exercise_id);
 
   return {
     progressionMode: context.progressionMode,
@@ -196,11 +217,14 @@ function buildGeneratorInput(context: {
       focusName === null
         ? null
         : {
+            ...(focusId === null ? {} : { exerciseId: focusId }),
             exerciseName: focusName,
             estimated1RmKg: readNumber(totals?.estimated_1rm_kg),
             maxWeightKg: readNumber(totals?.max_weight_kg),
           },
     profile: context.profile,
+    preferences: context.preferences,
+    exerciseCatalog: context.exerciseCatalog,
     planAdherence: context.planAdherence,
   };
 }
@@ -437,15 +461,22 @@ function buildNoDataAnswer(
   input: NextWeekPlanAgentInput,
   accumulator: StepAccumulator,
 ): AssistantStructuredAnswer {
+  const canBuildStarter = (input.exerciseCatalog?.length ?? 0) > 0;
+
   return {
-    summary:
-      "这段时间还没有足够的训练记录来规划下周计划。先记录几次包含组数、次数和重量的训练，多步规划才能基于真实 Evidence 给出草案。",
+    summary: canBuildStarter
+      ? "这段时间还没有足够的训练记录，因此先按档案、器械和安全约束生成一份 starter 草案；所有没有真实基线的目标重量都保持为空。"
+      : "这段时间还没有足够的训练记录来规划下周计划。先记录几次包含组数、次数和重量的训练，多步规划才能基于真实 Evidence 给出草案。",
     bullets: [
       `统计范围：${input.startDate} 到 ${input.endDate}。`,
-      "当前记录训练次数：0 次，规划在第一步就停止了。",
+      canBuildStarter
+        ? "当前记录训练次数：0 次，历史分析停止，改走保守 starter 规则。"
+        : "当前记录训练次数：0 次，规划在第一步就停止了。",
       "没有可用于容量、弱项或进展分析的 Evidence。",
     ],
-    conclusion: "没有训练数据时，更安全的行为是停止规划并提示先记录训练。",
+    conclusion: canBuildStarter
+      ? "starter 草案只负责建立可执行起点；完成训练后，下次计划会改用真实记录。"
+      : "没有训练数据和动作目录时，更安全的行为是停止规划并提示先记录训练。",
     recommendation: "先完成几次训练记录，然后再让助手规划下周。",
     evidence: buildAggregatedEvidence(accumulator),
     sources: [],

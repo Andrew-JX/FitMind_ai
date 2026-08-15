@@ -1,6 +1,9 @@
 import { StateNotice } from "../../components/StateNotice";
 import type { AssistantClarificationChoice } from "./assistant-request-payload";
-import type { AssistantChatMessage } from "./assistant-types";
+import type {
+  AssistantChatMessage,
+  AssistantPlanDraft,
+} from "./assistant-types";
 import { AssistantMessageBubble } from "./AssistantMessageBubble";
 
 export interface AssistantMessageListProps {
@@ -10,7 +13,9 @@ export interface AssistantMessageListProps {
   isPlanAccepted?: ((message: AssistantChatMessage) => boolean) | undefined;
   isSending?: boolean | undefined;
   messages: AssistantChatMessage[];
-  onAcceptPlan?: ((message: AssistantChatMessage) => void) | undefined;
+  onAcceptPlan?:
+    | ((message: AssistantChatMessage, plan: AssistantPlanDraft) => void)
+    | undefined;
   onClarificationChoice?:
     | ((choice: AssistantClarificationChoice) => void)
     | undefined;

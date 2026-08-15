@@ -37,6 +37,7 @@
     "test:unit": "cd .. && vitest run"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
     "bcryptjs": "^3.0.2",
     "express": "^5.1.0",
     "jose": "^6.1.0",

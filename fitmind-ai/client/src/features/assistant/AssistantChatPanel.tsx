@@ -18,9 +18,17 @@ import { saveAssistantInsight } from "./assistant-saved-insights-api";
 import type {
   AssistantChatMessage,
   AssistantPlanDraft,
+  AssistantPlanPreferencesWire,
   AssistantPromptSuggestion,
 } from "./assistant-types";
 import type { UseAssistantChatResult } from "./use-assistant-chat";
+import { WeeklyPlanSetup } from "./WeeklyPlanSetup";
+import {
+  isWeeklyPlanCreationRequest,
+  WEEKLY_PLAN_GENERATION_MESSAGE,
+} from "./assistant-weekly-plan-entry";
+import { useTheme } from "../../theme/ThemeContext";
+import { BRAND_NEON } from "../../theme/tokens";
 
 export interface AssistantChatPanelProps {
   chat: UseAssistantChatResult;
@@ -51,6 +59,7 @@ export interface AssistantChatPanelProps {
 export function AssistantChatPanel(props: AssistantChatPanelProps) {
   const { chat } = props;
   const { showToast } = useToast();
+  const { theme } = useTheme();
   const [savedMessageIds, setSavedMessageIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -63,6 +72,14 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
   const [acceptedPlanIds, setAcceptedPlanIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const [planPreferences, setPlanPreferences] =
+    useState<AssistantPlanPreferencesWire>({
+      weekly_days: 3,
+      session_duration_minutes: 60,
+      available_equipment: ["bodyweight"],
+      readiness: "ready",
+      focus_areas: [],
+    });
   const message = props.promptSuggestion?.message ?? "";
   const mode = props.promptSuggestion?.mode ?? "auto";
   const requiresSelectedExercise =
@@ -73,23 +90,35 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
   ): Promise<void> {
     event.preventDefault();
 
+    if (mode === "auto" && isWeeklyPlanCreationRequest(message)) {
+      props.onPromptSuggestionChange({ message: "", mode: "next_week_plan" });
+      return;
+    }
+
     if (requiresSelectedExercise && !props.selectedExerciseId) {
       return;
     }
 
+    const requestMessage =
+      mode === "next_week_plan" ? WEEKLY_PLAN_GENERATION_MESSAGE : message;
+
     const payload = buildAssistantRequestPayload({
-      message,
+      message: requestMessage,
       mode,
       selectedExerciseId: props.selectedExerciseId,
       sessionId: chat.sessionId,
+      planPreferences,
     });
 
-    props.onPromptSuggestionChange({
-      message: "",
-      mode: "auto",
-    });
+    if (mode !== "next_week_plan") {
+      props.onPromptSuggestionChange({ message: "", mode: "auto" });
+    }
 
     await chat.sendMessage(payload);
+
+    if (mode === "next_week_plan") {
+      props.onPromptSuggestionChange({ message: "", mode: "auto" });
+    }
   }
 
   /**
@@ -157,6 +186,7 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
 
   async function handleAcceptPlan(
     assistantMessage: AssistantChatMessage,
+    editedPlan: AssistantPlanDraft,
   ): Promise<void> {
     if (!assistantMessage.plan || !props.onAcceptPlan) {
       return;
@@ -167,7 +197,7 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
 
     try {
       const accepted = await props.onAcceptPlan(
-        assistantMessage.plan,
+        editedPlan,
         assistantMessage.messageId,
       );
 
@@ -205,6 +235,15 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
         selectedExerciseName={props.selectedExerciseName}
       />
 
+      {mode === "next_week_plan" ? (
+        <WeeklyPlanSetup
+          disabled={chat.isStreaming}
+          onChange={setPlanPreferences}
+          token={props.token}
+          value={planPreferences}
+        />
+      ) : null}
+
       {requiresSelectedExercise && !props.selectedExerciseId ? (
         <StateNotice
           description="请先在分析页选择一个重点动作，再追问动作进展或平台期诊断。"
@@ -233,7 +272,8 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
         messages={chat.messages}
         onAcceptPlan={
           props.onAcceptPlan
-            ? (assistantMessage) => void handleAcceptPlan(assistantMessage)
+            ? (assistantMessage, editedPlan) =>
+                void handleAcceptPlan(assistantMessage, editedPlan)
             : undefined
         }
         onClarificationChoice={(choice) =>
@@ -247,23 +287,48 @@ export function AssistantChatPanel(props: AssistantChatPanelProps) {
         }
       />
 
-      <AssistantComposer
-        canRetry={chat.messages.length > 0}
-        isStreaming={chat.isStreaming}
-        message={message}
-        onChangeMessage={(nextMessage) =>
-          props.onPromptSuggestionChange({
-            // 用户手动改写文本即视为自由提问，重置回 auto 让服务端分类，
-            // 避免上一次快捷问题 / 洞察卡片的 mode 粘住、把自由提问误路由。
-            message: nextMessage,
-            mode: "auto",
-          })
-        }
-        onClear={chat.clearConversation}
-        onRetry={() => void chat.retryLast()}
-        onStop={chat.abort}
-        onSubmit={(event) => void handleSubmit(event)}
-      />
+      {mode === "next_week_plan" ? (
+        <form
+          onSubmit={(event) => void handleSubmit(event)}
+          style={planActionStyle(theme)}
+        >
+          <button
+            disabled={chat.isStreaming}
+            style={planSubmitStyle(chat.isStreaming)}
+            type="submit"
+          >
+            {chat.isStreaming ? "正在生成计划…" : "按以上设置生成计划"}
+          </button>
+          <button
+            disabled={chat.isStreaming}
+            onClick={() =>
+              props.onPromptSuggestionChange({ message: "", mode: "auto" })
+            }
+            style={planCancelStyle(theme, chat.isStreaming)}
+            type="button"
+          >
+            取消
+          </button>
+        </form>
+      ) : (
+        <AssistantComposer
+          canRetry={chat.messages.length > 0}
+          isStreaming={chat.isStreaming}
+          message={message}
+          onChangeMessage={(nextMessage) =>
+            props.onPromptSuggestionChange({
+              // 用户手动改写文本即视为自由提问，重置回 auto 让服务端分类，
+              // 避免上一次快捷问题 / 洞察卡片的 mode 粘住、把自由提问误路由。
+              message: nextMessage,
+              mode: "auto",
+            })
+          }
+          onClear={chat.clearConversation}
+          onRetry={() => void chat.retryLast()}
+          onStop={chat.abort}
+          onSubmit={(event) => void handleSubmit(event)}
+        />
+      )}
 
       {chat.errorMessage ? (
         <StateNotice
@@ -280,3 +345,49 @@ const panelStyle: React.CSSProperties = {
   display: "grid",
   gap: 12,
 };
+
+function planActionStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    background: `${theme.gradients.card}, ${theme.colors.surf}`,
+    border: `1px solid ${theme.colors.bdr}`,
+    borderRadius: theme.radius.card,
+    boxShadow: theme.shadows.card,
+    display: "grid",
+    gap: 8,
+    gridTemplateColumns: "2fr 1fr",
+    padding: 14,
+  };
+}
+
+function planSubmitStyle(disabled: boolean): React.CSSProperties {
+  return {
+    background: BRAND_NEON,
+    border: "none",
+    borderRadius: 12,
+    color: "#0f0f0f",
+    cursor: disabled ? "not-allowed" : "pointer",
+    fontSize: 13,
+    fontWeight: 800,
+    opacity: disabled ? 0.55 : 1,
+    padding: "12px 14px",
+  };
+}
+
+function planCancelStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+  disabled: boolean,
+): React.CSSProperties {
+  return {
+    background: theme.colors.surf2,
+    border: `1px solid ${theme.colors.bdr}`,
+    borderRadius: 12,
+    color: theme.colors.tx2,
+    cursor: disabled ? "not-allowed" : "pointer",
+    fontSize: 13,
+    fontWeight: 700,
+    opacity: disabled ? 0.55 : 1,
+    padding: "12px 14px",
+  };
+}

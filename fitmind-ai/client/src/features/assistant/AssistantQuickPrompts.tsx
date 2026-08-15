@@ -89,9 +89,9 @@ function buildPromptCards(
 ): PromptCardDefinition[] {
   return [
     {
-      description: "总结本周训练频率、总量、主要动作、肌群分布和 Evidence。",
+      description: "回顾已经完成的训练频率、总量、主要动作和肌群分布。",
       prompt: { mode: "weekly_report", message: "帮我做一份本周训练报告" },
-      title: "本周训练报告",
+      title: "回顾本周训练",
     },
     {
       description:
@@ -105,9 +105,9 @@ function buildPromptCards(
       title: "平台期诊断",
     },
     {
-      description: "基于 Evidence + Sources 生成下周训练草案，不把它当作处方。",
-      prompt: { mode: "next_week_plan", message: "给我一个下周训练草案" },
-      title: "下周训练草案",
+      description: "确认下周训练天数、单次时长和器械后，生成可编辑草案。",
+      prompt: { mode: "next_week_plan", message: "" },
+      title: "制定下周计划",
     },
     {
       description: "快速查看最近训练次数、组数、训练量和主要动作。",

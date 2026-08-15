@@ -194,7 +194,7 @@ describe("generateNextWeekPlan", () => {
     );
   });
 
-  it("caps the plan at four exercises", () => {
+  it("caps the expanded weekly plan at twelve exercises", () => {
     const plan = generateNextWeekPlan({
       ...baseInput,
       topExercises: Array.from({ length: 8 }, (_, index) => ({
@@ -205,7 +205,7 @@ describe("generateNextWeekPlan", () => {
       })),
     });
 
-    expect(plan.exercises.length).toBeLessThanOrEqual(4);
+    expect(plan.exercises.length).toBeLessThanOrEqual(12);
   });
 
   it("switches to the strength rep/intensity scheme from the profile goal", () => {
@@ -252,7 +252,9 @@ describe("generateNextWeekPlan", () => {
 
     expect(plan.notes.some((note) => note.includes("knee"))).toBe(true);
     expect(plan.notes.some((note) => note.includes("shoulder"))).toBe(true);
-    expect(plan.notes.some((note) => note.includes("每周 3 天"))).toBe(true);
+    expect(plan.notes.some((note) => note.includes("3 个灵活训练日"))).toBe(
+      true,
+    );
   });
 
   it("uses more working sets when adding frequency, and surfaces the weak area", () => {
@@ -427,4 +429,144 @@ describe("generateNextWeekPlan", () => {
     expect(plan.exercises.some((exercise) => exercise.sets > 1)).toBe(true);
     expect(plan.exercises.every((exercise) => exercise.sets >= 1)).toBe(true);
   });
+
+  it("hard-filters the catalog by this week's equipment and known injury risks", () => {
+    const plan = generateNextWeekPlan({
+      ...baseInput,
+      topExercises: [],
+      profile: {
+        goal: "general_fitness",
+        weeklyDays: 2,
+        availableEquipment: ["bodyweight"],
+        injuryConstraints: ["knee"],
+      },
+      preferences: {
+        weeklyDays: 2,
+        sessionDurationMinutes: 30,
+        availableEquipment: ["bodyweight"],
+      },
+      exerciseCatalog: [
+        catalogExercise(1, "俯卧撑", "bodyweight", "horizontal_push", [
+          "chest",
+        ]),
+        catalogExercise(2, "自重深蹲", "bodyweight", "squat", ["quads"]),
+        catalogExercise(3, "杠铃卧推", "barbell", "horizontal_push", ["chest"]),
+        catalogExercise(4, "平板支撑", "bodyweight", "anti_extension", [
+          "core",
+        ]),
+        catalogExercise(5, "反手引体", "bodyweight", "vertical_pull", ["back"]),
+        catalogExercise(6, "俯身 Y 举", "bodyweight", "shoulder_flexion", [
+          "shoulders",
+        ]),
+      ],
+    });
+
+    expect(plan.exercises.length).toBeGreaterThan(0);
+    expect(
+      plan.exercises.every((exercise) => exercise.equipment === "bodyweight"),
+    ).toBe(true);
+    expect(
+      plan.exercises.map((exercise) => exercise.exercise_name),
+    ).not.toContain("自重深蹲");
+    expect(
+      plan.exercises.map((exercise) => exercise.exercise_name),
+    ).not.toContain("杠铃卧推");
+  });
+
+  it("builds a weight-safe starter plan and real session groups without history", () => {
+    const catalog = Array.from({ length: 8 }, (_, index) =>
+      catalogExercise(
+        index + 1,
+        `动作 ${index + 1}`,
+        "dumbbell",
+        index % 2 === 0 ? "horizontal_push" : "horizontal_pull",
+        [index % 2 === 0 ? "chest" : "back"],
+      ),
+    );
+    const plan = generateNextWeekPlan({
+      ...baseInput,
+      topExercises: [],
+      profile: {
+        goal: "hypertrophy",
+        weeklyDays: 3,
+        availableEquipment: ["dumbbell"],
+        injuryConstraints: [],
+      },
+      preferences: { weeklyDays: 3, sessionDurationMinutes: 45 },
+      exerciseCatalog: catalog,
+    });
+
+    expect(plan.sessions).toHaveLength(3);
+    expect(plan.sessions?.map((session) => session.session_index)).toEqual([
+      1, 2, 3,
+    ]);
+    expect(
+      plan.exercises.every((exercise) => exercise.target_weight_kg === null),
+    ).toBe(true);
+    expect(
+      plan.sessions
+        ?.flatMap((session) => session.exercises)
+        .map((exercise) => exercise.exercise_name)
+        .sort(),
+    ).toEqual(plan.exercises.map((exercise) => exercise.exercise_name).sort());
+    expect(
+      plan.sessions?.every((session) =>
+        session.exercises.every((exercise) => (exercise.rest_seconds ?? 0) > 0),
+      ),
+    ).toBe(true);
+  });
+
+  it("uses temporary days, duration, focus and fatigue without mutating profile defaults", () => {
+    const plan = generateNextWeekPlan({
+      ...baseInput,
+      topExercises: [],
+      progressionMode: "add_frequency",
+      profile: {
+        goal: "hypertrophy",
+        weeklyDays: 5,
+        availableEquipment: ["dumbbell"],
+        injuryConstraints: [],
+      },
+      preferences: {
+        weeklyDays: 2,
+        sessionDurationMinutes: 30,
+        readiness: "fatigued",
+        focusAreas: ["core"],
+      },
+      exerciseCatalog: [
+        catalogExercise(1, "哑铃卧推", "dumbbell", "horizontal_push", [
+          "chest",
+        ]),
+        catalogExercise(2, "俄罗斯转体", "dumbbell", "rotation", ["core"]),
+        catalogExercise(3, "哑铃划船", "dumbbell", "horizontal_pull", ["back"]),
+        catalogExercise(4, "哑铃弯举", "dumbbell", "elbow_flexion", ["biceps"]),
+        catalogExercise(5, "哑铃侧平举", "dumbbell", "shoulder_abduction", [
+          "shoulders",
+        ]),
+        catalogExercise(6, "哑铃硬拉", "dumbbell", "hinge", ["hamstrings"]),
+      ],
+    });
+
+    expect(plan.strategy).toBe("consolidate");
+    expect(plan.sessions).toHaveLength(2);
+    expect(plan.exercises[0]?.exercise_name).toBe("俄罗斯转体");
+    expect(plan.notes.some((note) => note.includes("30 分钟"))).toBe(true);
+  });
 });
+
+function catalogExercise(
+  index: number,
+  exerciseName: string,
+  equipment: string,
+  movementPattern: string,
+  primaryMuscles: string[],
+) {
+  return {
+    exerciseId: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+    exerciseName,
+    equipment,
+    movementPattern,
+    primaryMuscles,
+    defaultRestSeconds: 90,
+  };
+}

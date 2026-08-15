@@ -3,6 +3,7 @@ import type {
   AssistantDateRangeClarificationOption,
   AssistantExerciseClarificationOption,
   AssistantMode,
+  AssistantPlanPreferencesWire,
 } from "./assistant-types";
 
 /** A clarification option the user just tapped, if any. */
@@ -16,6 +17,7 @@ export interface BuildAssistantRequestInput {
   mode: AssistantMode;
   selectedExerciseId?: string | null | undefined;
   sessionId?: string | null | undefined;
+  planPreferences?: AssistantPlanPreferencesWire | undefined;
   /** IANA zone; defaults to the device's. Injectable for tests. */
   timeZone?: string | undefined;
 }
@@ -71,6 +73,9 @@ export function buildAssistantRequestPayload(
     ...(explicitRange ?? {}),
     ...(exerciseId === undefined ? {} : { exercise_id: exerciseId }),
     ...(input.sessionId ? { session_id: input.sessionId } : {}),
+    ...(input.mode === "next_week_plan" && input.planPreferences
+      ? { plan_preferences: input.planPreferences }
+      : {}),
   };
 }
 

@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { Icon } from "../../components/Icon";
 import { useTheme } from "../../theme/ThemeContext";
 import type { UseCurrentPlanResult } from "../assistant/use-current-plan";
@@ -7,6 +9,8 @@ export interface TrainingPlanCardProps {
   currentPlan: UseCurrentPlanResult;
   onOpenAssistant: () => void;
 }
+
+type CurrentPlanSnapshot = NonNullable<UseCurrentPlanResult["plan"]>["plan"];
 
 /**
  * Compact neon weekly-plan card for the training tab (design Screens §2).
@@ -21,14 +25,16 @@ export interface TrainingPlanCardProps {
  */
 export function TrainingPlanCard(props: TrainingPlanCardProps) {
   const { theme } = useTheme();
+  const [isExpanded, setIsExpanded] = useState(false);
   const { plan, isMutating, actionError, abandon } = props.currentPlan;
 
   if (!plan) {
     return null;
   }
 
-  const exercisePct = Math.round(plan.adherence.exercise_adherence_ratio * 100);
-  const setPct = Math.round(plan.adherence.set_adherence_ratio * 100);
+  const adherence = plan.adherence ?? EMPTY_PLAN_ADHERENCE;
+  const exercisePct = Math.round(adherence.exercise_adherence_ratio * 100);
+  const setPct = Math.round(adherence.set_adherence_ratio * 100);
 
   return (
     <section style={cardStyle(theme)}>
@@ -48,13 +54,23 @@ export function TrainingPlanCard(props: TrainingPlanCardProps) {
 
       <p style={rangeStyle(theme)}>
         {plan.startDate} ~ {plan.endDate} · 动作{" "}
-        {plan.adherence.trained_exercise_count}/
-        {plan.adherence.planned_exercise_count} 已练 · 组数依从 {setPct}%
+        {adherence.trained_exercise_count}/{adherence.planned_exercise_count}{" "}
+        已练 · 组数依从 {setPct}%
       </p>
 
       <div style={trackStyle(theme)}>
         <div style={fillStyle(theme, exercisePct)} />
       </div>
+
+      <button
+        onClick={() => setIsExpanded((currentValue) => !currentValue)}
+        style={detailsToggleStyle(theme)}
+        type="button"
+      >
+        {isExpanded ? "收起本周计划" : "展开查看本周计划"}
+      </button>
+
+      {isExpanded ? <PlanDetails plan={plan.plan} /> : null}
 
       <button
         onClick={props.onOpenAssistant}
@@ -68,6 +84,65 @@ export function TrainingPlanCard(props: TrainingPlanCardProps) {
     </section>
   );
 }
+
+function PlanDetails(props: { plan: CurrentPlanSnapshot }) {
+  const { theme } = useTheme();
+  const sessions = props.plan.sessions;
+
+  if (sessions && sessions.length > 0) {
+    return (
+      <div style={sessionListStyle}>
+        {sessions.map((session) => (
+          <section key={session.session_index} style={sessionStyle(theme)}>
+            <div style={sessionHeaderStyle}>
+              <strong>{session.title}</strong>
+              <span style={sessionMetaStyle(theme)}>
+                约 {session.estimated_duration_minutes} 分钟
+              </span>
+            </div>
+            <PlanExerciseList exercises={session.exercises} />
+          </section>
+        ))}
+      </div>
+    );
+  }
+
+  return <PlanExerciseList exercises={props.plan.exercises} />;
+}
+
+function PlanExerciseList(props: {
+  exercises: CurrentPlanSnapshot["exercises"];
+}) {
+  const { theme } = useTheme();
+
+  return (
+    <ol style={exerciseListStyle}>
+      {props.exercises.map((exercise) => (
+        <li key={exercise.exercise_name} style={exerciseRowStyle(theme)}>
+          <span>{exercise.exercise_name}</span>
+          <span style={exerciseMetaStyle(theme)}>
+            {exercise.sets} 组 ×{" "}
+            {formatRepRange(exercise.rep_min, exercise.rep_max)}
+            {exercise.rest_seconds ? ` · 休息 ${exercise.rest_seconds} 秒` : ""}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function formatRepRange(min: number, max: number): string {
+  return min === max ? `${min} 次` : `${min}-${max} 次`;
+}
+
+const EMPTY_PLAN_ADHERENCE = {
+  planned_exercise_count: 0,
+  trained_exercise_count: 0,
+  extra_exercise_count: 0,
+  exercise_adherence_ratio: 0,
+  set_adherence_ratio: 0,
+  exercises: [],
+} as const;
 
 function cardStyle(
   theme: ReturnType<typeof useTheme>["theme"],
@@ -168,6 +243,87 @@ function ctaStyle(
     fontWeight: 700,
     justifySelf: "start",
     padding: "8px 10px",
+  };
+}
+
+function detailsToggleStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    background: theme.colors.surf2,
+    border: `1px solid ${theme.colors.bdr}`,
+    borderRadius: 10,
+    color: theme.colors.ac,
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 700,
+    justifySelf: "start",
+    padding: "8px 10px",
+  };
+}
+
+const sessionListStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 8,
+};
+
+function sessionStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    border: `1px solid ${theme.colors.bdr}`,
+    borderRadius: 10,
+    overflow: "hidden",
+  };
+}
+
+const sessionHeaderStyle: React.CSSProperties = {
+  alignItems: "center",
+  display: "flex",
+  justifyContent: "space-between",
+  padding: "9px 11px",
+};
+
+function sessionMetaStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    color: theme.colors.tx3,
+    fontSize: 11,
+  };
+}
+
+const exerciseListStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 1,
+  listStylePosition: "inside",
+  margin: 0,
+  padding: 0,
+};
+
+function exerciseRowStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    alignItems: "center",
+    background: theme.colors.soft,
+    color: theme.colors.tx,
+    display: "flex",
+    fontSize: 12,
+    gap: 8,
+    justifyContent: "space-between",
+    padding: "9px 11px",
+  };
+}
+
+function exerciseMetaStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    color: theme.colors.tx2,
+    flex: "0 0 auto",
+    fontSize: 11,
+    textAlign: "right",
   };
 }
 

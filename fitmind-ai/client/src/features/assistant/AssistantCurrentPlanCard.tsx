@@ -5,6 +5,7 @@ import { useToast } from "../../components/ToastProvider";
 import { useTheme } from "../../theme/ThemeContext";
 import { getToneColors, type SemanticTone } from "../../theme/tokens";
 import type {
+  PlanAdherence,
   PlanAdherenceExercise,
   PlanAdherenceStatus,
 } from "./planned-workout-api";
@@ -93,7 +94,8 @@ export function AssistantCurrentPlanCard(props: AssistantCurrentPlanCardProps) {
     );
   }
 
-  const setAdherencePct = Math.round(plan.adherence.set_adherence_ratio * 100);
+  const adherence: PlanAdherence = plan.adherence ?? EMPTY_PLAN_ADHERENCE;
+  const setAdherencePct = Math.round(adherence.set_adherence_ratio * 100);
   const isExpired =
     classifyPlanLifecycle({
       endDate: plan.endDate,
@@ -170,24 +172,56 @@ export function AssistantCurrentPlanCard(props: AssistantCurrentPlanCardProps) {
 
         <span style={metaStyle(theme)}>
           {plan.startDate} ~ {plan.endDate} · 动作{" "}
-          {plan.adherence.trained_exercise_count}/
-          {plan.adherence.planned_exercise_count} 已练 · 组数依从{" "}
-          {setAdherencePct}%
+          {adherence.trained_exercise_count}/{adherence.planned_exercise_count}{" "}
+          已练 · 组数依从 {setAdherencePct}%
         </span>
 
         {isExpanded ? (
           <>
-            <div style={listStyle}>
-              {plan.adherence.exercises.map((exercise, index) => (
-                <PlanAdherenceRow
-                  exercise={exercise}
-                  key={`${exercise.exercise_name}-${index}`}
-                />
-              ))}
-            </div>
-            {plan.adherence.extra_exercise_count > 0 ? (
+            {plan.plan.sessions && plan.plan.sessions.length > 0 ? (
+              <div style={sessionListStyle}>
+                {plan.plan.sessions.map((session) => (
+                  <section
+                    key={session.session_index}
+                    style={sessionStyle(theme)}
+                  >
+                    <div style={sessionHeaderStyle}>
+                      <strong>{session.title}</strong>
+                      <span style={metaStyle(theme)}>
+                        约 {session.estimated_duration_minutes} 分钟
+                      </span>
+                    </div>
+                    <div style={listStyle}>
+                      {session.exercises.map((plannedExercise, index) => {
+                        const exerciseAdherence = adherence.exercises.find(
+                          (item) =>
+                            item.exercise_name.trim().toLowerCase() ===
+                            plannedExercise.exercise_name.trim().toLowerCase(),
+                        );
+                        return exerciseAdherence ? (
+                          <PlanAdherenceRow
+                            exercise={exerciseAdherence}
+                            key={`${plannedExercise.exercise_name}-${index}`}
+                          />
+                        ) : null;
+                      })}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            ) : (
+              <div style={listStyle}>
+                {adherence.exercises.map((exercise, index) => (
+                  <PlanAdherenceRow
+                    exercise={exercise}
+                    key={`${exercise.exercise_name}-${index}`}
+                  />
+                ))}
+              </div>
+            )}
+            {adherence.extra_exercise_count > 0 ? (
               <span style={metaStyle(theme)}>
-                另有 {plan.adherence.extra_exercise_count} 个计划外动作也练了。
+                另有 {adherence.extra_exercise_count} 个计划外动作也练了。
               </span>
             ) : null}
           </>
@@ -200,6 +234,15 @@ export function AssistantCurrentPlanCard(props: AssistantCurrentPlanCardProps) {
     </Card>
   );
 }
+
+const EMPTY_PLAN_ADHERENCE: PlanAdherence = {
+  planned_exercise_count: 0,
+  trained_exercise_count: 0,
+  extra_exercise_count: 0,
+  exercise_adherence_ratio: 0,
+  set_adherence_ratio: 0,
+  exercises: [],
+};
 
 function retryButtonStyle(
   theme: ReturnType<typeof useTheme>["theme"],
@@ -247,6 +290,28 @@ function PlanAdherenceRow(props: { exercise: PlanAdherenceExercise }) {
 const bodyStyle: React.CSSProperties = {
   display: "grid",
   gap: 12,
+};
+
+const sessionListStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 8,
+};
+
+function sessionStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+): React.CSSProperties {
+  return {
+    border: `1px solid ${theme.colors.bdr}`,
+    borderRadius: 10,
+    overflow: "hidden",
+  };
+}
+
+const sessionHeaderStyle: React.CSSProperties = {
+  alignItems: "center",
+  display: "flex",
+  justifyContent: "space-between",
+  padding: "8px 10px",
 };
 
 const headerRowStyle: React.CSSProperties = {

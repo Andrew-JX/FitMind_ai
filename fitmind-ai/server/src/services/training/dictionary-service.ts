@@ -28,6 +28,8 @@ const exerciseRowSchema = z.object({
   nameZh: z.string().min(1),
   movementPattern: z.string().nullable(),
   equipment: z.string().nullable(),
+  isCompound: z.boolean().optional(),
+  defaultRestSeconds: z.number().int().positive().nullable().optional(),
   techniqueCuesZh: z.array(z.string()),
   commonMistakesZh: z.array(z.string()),
   equipmentNotesZh: z.string().nullable(),
@@ -57,6 +59,8 @@ export interface SearchExercisesResult {
     name_zh: string;
     movement_pattern: string | null;
     equipment: string | null;
+    is_compound: boolean;
+    default_rest_seconds: number;
     technique_cues_zh: string[];
     common_mistakes_zh: string[];
     equipment_notes_zh: string | null;
@@ -114,6 +118,8 @@ export async function searchDictionaryExercises(
         name_zh: parsedRow.nameZh,
         movement_pattern: parsedRow.movementPattern,
         equipment: parsedRow.equipment,
+        is_compound: parsedRow.isCompound ?? false,
+        default_rest_seconds: parsedRow.defaultRestSeconds ?? 90,
         technique_cues_zh: parsedRow.techniqueCuesZh,
         common_mistakes_zh: parsedRow.commonMistakesZh,
         equipment_notes_zh: parsedRow.equipmentNotesZh,

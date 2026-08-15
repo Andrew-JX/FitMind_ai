@@ -16,6 +16,24 @@ const pgMock = vi.hoisted(() => {
   return { Pool, connect, end, on, query };
 });
 
+const neonMock = vi.hoisted(() => {
+  const end = vi.fn(async () => undefined);
+  const query = vi.fn(async () => ({ rows: [] }));
+  const connect = vi.fn(async () => ({ query, release: vi.fn() }));
+  const on = vi.fn();
+  const Pool = vi.fn(function MockNeonPool() {
+    return { end, query, connect, on };
+  });
+
+  return { Pool, connect, end, on, query };
+});
+
+const envMock = vi.hoisted(() => ({
+  databaseUrl: "postgresql://test.invalid/fitmind",
+}));
+
+vi.mock("@neondatabase/serverless", () => ({ Pool: neonMock.Pool }));
+
 vi.mock("node:module", () => ({
   createRequire: () => (specifier: string) => {
     if (specifier !== "pg") {
@@ -27,13 +45,19 @@ vi.mock("node:module", () => ({
 }));
 
 vi.mock("../env.js", () => ({
-  loadServerEnv: () => ({ databaseUrl: "postgresql://test.invalid/fitmind" }),
+  loadServerEnv: () => ({ databaseUrl: envMock.databaseUrl }),
 }));
 
-import { closeDbPool, createDbPool, createDbPoolIdleErrorLog } from "./pool.js";
+import {
+  closeDbPool,
+  createDbPool,
+  createDbPoolIdleErrorLog,
+  usesNeonWebSocketTransport,
+} from "./pool.js";
 
 afterEach(async () => {
   await closeDbPool();
+  envMock.databaseUrl = "postgresql://test.invalid/fitmind";
   vi.restoreAllMocks();
   vi.clearAllMocks();
 });
@@ -51,6 +75,35 @@ describe("process database pool", () => {
       allowExitOnIdle: true,
     });
     expect(pgMock.on).toHaveBeenCalledWith("error", expect.any(Function));
+  });
+
+  it("uses the pg-compatible WebSocket pool for Neon URLs", async () => {
+    envMock.databaseUrl =
+      "postgresql://user:password@example.ap-southeast-1.aws.neon.tech/neondb";
+
+    createDbPool();
+
+    expect(neonMock.Pool).toHaveBeenCalledWith({
+      connectionString: envMock.databaseUrl,
+      max: 10,
+      allowExitOnIdle: true,
+    });
+    expect(neonMock.on).toHaveBeenCalledWith("error", expect.any(Function));
+    expect(pgMock.Pool).not.toHaveBeenCalled();
+  });
+
+  it("recognizes only valid Neon database hosts", () => {
+    expect(
+      usesNeonWebSocketTransport(
+        "postgresql://user:password@ep-example.aws.neon.tech/neondb",
+      ),
+    ).toBe(true);
+    expect(
+      usesNeonWebSocketTransport(
+        "postgresql://user:password@neon.tech.attacker.invalid/neondb",
+      ),
+    ).toBe(false);
+    expect(usesNeonWebSocketTransport("not a URL")).toBe(false);
   });
 
   it("keeps repository end as a no-op and reserves draining for closeDbPool", async () => {
@@ -123,7 +176,9 @@ describe("database pool source inventory", () => {
       source: readFileSync(path, "utf8"),
     }));
     const constructorOwners = sources
-      .filter(({ source }) => /\bnew\s+Pool\s*\(/.test(source))
+      .filter(({ source }) =>
+        /\bnew\s+(?:Pool|PoolConstructor)\s*\(/.test(source),
+      )
       .map(({ path }) =>
         path.slice(dbDirectory.length + 1).replaceAll("\\", "/"),
       );

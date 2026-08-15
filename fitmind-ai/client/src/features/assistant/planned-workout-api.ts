@@ -21,16 +21,42 @@ export interface PlanAdherence {
 }
 
 /** Wire-shape plan snapshot stored on a planned workout (snake_case). */
+export interface PlannedWorkoutExercise {
+  exercise_id?: string | undefined;
+  exercise_name: string;
+  sets: number;
+  rep_min: number;
+  rep_max: number;
+  target_weight_kg: number | null;
+  rest_seconds?: number | undefined;
+  equipment?: string | null | undefined;
+  movement_pattern?: string | null | undefined;
+  primary_muscles?: string[] | undefined;
+  alternatives?:
+    | Array<{
+        exercise_id: string;
+        exercise_name: string;
+        equipment: string | null;
+        movement_pattern: string | null;
+        primary_muscles: string[];
+        rest_seconds: number;
+      }>
+    | undefined;
+  basis: string;
+}
+
 export interface PlannedWorkoutPlan {
   strategy: string;
-  exercises: Array<{
-    exercise_name: string;
-    sets: number;
-    rep_min: number;
-    rep_max: number;
-    target_weight_kg: number | null;
-    basis: string;
-  }>;
+  exercises: PlannedWorkoutExercise[];
+  sessions?:
+    | Array<{
+        session_index: number;
+        title: string;
+        focus_areas: string[];
+        estimated_duration_minutes: number;
+        exercises: PlannedWorkoutExercise[];
+      }>
+    | undefined;
   notes: string[];
 }
 
@@ -68,16 +94,54 @@ const PLAN_WINDOW_DAYS = 7;
 export function denormalizePlanDraft(
   plan: AssistantPlanDraft,
 ): PlannedWorkoutPlan {
+  const denormalizeExercise = (
+    exercise: AssistantPlanDraft["exercises"][number],
+  ): PlannedWorkoutExercise => ({
+    ...(exercise.exerciseId ? { exercise_id: exercise.exerciseId } : {}),
+    exercise_name: exercise.exerciseName,
+    sets: exercise.sets,
+    rep_min: exercise.repMin,
+    rep_max: exercise.repMax,
+    target_weight_kg: exercise.targetWeightKg,
+    ...(exercise.restSeconds ? { rest_seconds: exercise.restSeconds } : {}),
+    ...(exercise.equipment !== undefined
+      ? { equipment: exercise.equipment }
+      : {}),
+    ...(exercise.movementPattern !== undefined
+      ? { movement_pattern: exercise.movementPattern }
+      : {}),
+    ...(exercise.primaryMuscles
+      ? { primary_muscles: exercise.primaryMuscles }
+      : {}),
+    ...(exercise.alternatives
+      ? {
+          alternatives: exercise.alternatives.map((alternative) => ({
+            exercise_id: alternative.exerciseId,
+            exercise_name: alternative.exerciseName,
+            equipment: alternative.equipment,
+            movement_pattern: alternative.movementPattern,
+            primary_muscles: alternative.primaryMuscles,
+            rest_seconds: alternative.restSeconds,
+          })),
+        }
+      : {}),
+    basis: exercise.basis,
+  });
+
   return {
     strategy: plan.strategy,
-    exercises: plan.exercises.map((exercise) => ({
-      exercise_name: exercise.exerciseName,
-      sets: exercise.sets,
-      rep_min: exercise.repMin,
-      rep_max: exercise.repMax,
-      target_weight_kg: exercise.targetWeightKg,
-      basis: exercise.basis,
-    })),
+    exercises: plan.exercises.map(denormalizeExercise),
+    ...(plan.sessions
+      ? {
+          sessions: plan.sessions.map((session) => ({
+            session_index: session.sessionIndex,
+            title: session.title,
+            focus_areas: session.focusAreas,
+            estimated_duration_minutes: session.estimatedDurationMinutes,
+            exercises: session.exercises.map(denormalizeExercise),
+          })),
+        }
+      : {}),
     notes: plan.notes,
   };
 }

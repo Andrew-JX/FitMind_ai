@@ -32,6 +32,32 @@ export interface AssistantChatRequestPayload {
   timezone?: string | undefined;
   exercise_id?: string | undefined;
   session_id?: string | undefined;
+  plan_preferences?: AssistantPlanPreferencesWire | undefined;
+}
+
+export type AssistantPlanEquipment =
+  | "barbell"
+  | "dumbbell"
+  | "machine"
+  | "cable"
+  | "bodyweight"
+  | "kettlebell";
+
+export type AssistantPlanFocusArea =
+  | "chest"
+  | "back"
+  | "shoulders"
+  | "arms"
+  | "legs"
+  | "glutes"
+  | "core";
+
+export interface AssistantPlanPreferencesWire {
+  weekly_days?: number | undefined;
+  session_duration_minutes?: 30 | 45 | 60 | 75 | 90 | undefined;
+  available_equipment?: AssistantPlanEquipment[] | undefined;
+  readiness?: "ready" | "fatigued" | undefined;
+  focus_areas?: AssistantPlanFocusArea[] | undefined;
 }
 
 export interface AssistantPromptSuggestion {
@@ -112,18 +138,66 @@ export type AssistantPlanStrategy =
   | "maintain";
 
 export interface AssistantPlannedExercise {
+  exerciseId?: string | undefined;
   exerciseName: string;
   sets: number;
   repMin: number;
   repMax: number;
   targetWeightKg: number | null;
+  restSeconds?: number | undefined;
+  equipment?: string | null | undefined;
+  movementPattern?: string | null | undefined;
+  primaryMuscles?: string[] | undefined;
+  alternatives?: AssistantPlanExerciseAlternative[] | undefined;
   basis: string;
+}
+
+export interface AssistantPlanExerciseAlternative {
+  exerciseId: string;
+  exerciseName: string;
+  equipment: string | null;
+  movementPattern: string | null;
+  primaryMuscles: string[];
+  restSeconds: number;
+}
+
+export interface AssistantPlanSession {
+  sessionIndex: number;
+  title: string;
+  focusAreas: string[];
+  estimatedDurationMinutes: number;
+  exercises: AssistantPlannedExercise[];
 }
 
 export interface AssistantPlanDraft {
   strategy: AssistantPlanStrategy;
   exercises: AssistantPlannedExercise[];
+  sessions?: AssistantPlanSession[] | undefined;
   notes: string[];
+}
+
+export interface AssistantPlannedExerciseWire {
+  exercise_id?: string | undefined;
+  exercise_name?: string | undefined;
+  sets?: number | undefined;
+  rep_min?: number | undefined;
+  rep_max?: number | undefined;
+  target_weight_kg?: number | null | undefined;
+  rest_seconds?: number | undefined;
+  equipment?: string | null | undefined;
+  movement_pattern?: string | null | undefined;
+  primary_muscles?: string[] | undefined;
+  alternatives?:
+    | Array<{
+        exercise_id?: string | undefined;
+        exercise_name?: string | undefined;
+        equipment?: string | null | undefined;
+        movement_pattern?: string | null | undefined;
+        primary_muscles?: string[] | undefined;
+        rest_seconds?: number | undefined;
+      }>
+    | undefined;
+  basis?: string | undefined;
 }
 
 export interface AssistantMessageFaithfulness {
@@ -269,14 +343,14 @@ export interface AssistantStructuredOutput {
   plan?:
     | {
         strategy?: string | undefined;
-        exercises?:
+        exercises?: AssistantPlannedExerciseWire[] | undefined;
+        sessions?:
           | Array<{
-              exercise_name?: string | undefined;
-              sets?: number | undefined;
-              rep_min?: number | undefined;
-              rep_max?: number | undefined;
-              target_weight_kg?: number | null | undefined;
-              basis?: string | undefined;
+              session_index?: number | undefined;
+              title?: string | undefined;
+              focus_areas?: string[] | undefined;
+              estimated_duration_minutes?: number | undefined;
+              exercises?: AssistantPlannedExerciseWire[] | undefined;
             }>
           | undefined;
         notes?: string[] | undefined;

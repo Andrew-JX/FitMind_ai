@@ -19,6 +19,8 @@ import type {
   AgentTrace,
   NextWeekPlanDraft,
   PlanAdherenceContext,
+  PlanExerciseCatalogItem,
+  PlanPreferences,
   PlanProfileContext,
 } from "../agent/react-planner-types.js";
 import { getAthleteProfile } from "../athlete-profile-service.js";
@@ -160,6 +162,43 @@ const assistantModeSchema = z.enum([
   "unsupported",
 ]);
 
+const planEquipmentSchema = z.enum([
+  "barbell",
+  "dumbbell",
+  "machine",
+  "cable",
+  "bodyweight",
+  "kettlebell",
+]);
+
+const planFocusAreaSchema = z.enum([
+  "chest",
+  "back",
+  "shoulders",
+  "arms",
+  "legs",
+  "glutes",
+  "core",
+]);
+
+const planPreferencesSchema = z
+  .object({
+    weekly_days: z.number().int().min(1).max(7).optional(),
+    session_duration_minutes: z
+      .union([
+        z.literal(30),
+        z.literal(45),
+        z.literal(60),
+        z.literal(75),
+        z.literal(90),
+      ])
+      .optional(),
+    available_equipment: z.array(planEquipmentSchema).min(1).max(6).optional(),
+    readiness: z.enum(["ready", "fatigued"]).optional(),
+    focus_areas: z.array(planFocusAreaSchema).max(3).optional(),
+  })
+  .strict();
+
 const mockAssistantTurnSchema = z
   .object({
     mode: assistantModeSchema,
@@ -178,6 +217,7 @@ const mockAssistantTurnSchema = z
       .optional(),
     timezone: z.string().trim().min(1).optional(),
     exercise_id: z.string().uuid().optional(),
+    plan_preferences: planPreferencesSchema.optional(),
   })
   .strict()
   .superRefine((value, ctx) => {
@@ -300,6 +340,7 @@ export interface MockAssistantTurnInput {
   /** IANA zone the client is in; used to read "today" and supported periods. */
   timezone?: string | undefined;
   exercise_id?: string | undefined;
+  plan_preferences?: z.infer<typeof planPreferencesSchema> | undefined;
 }
 
 export interface MockAssistantTurnResponseData {
@@ -1659,6 +1700,7 @@ async function runNextWeekPlanAgentTurn(args: {
   // 运动员档案注入计划生成（个性化 + 安全）；加载失败不影响规划。
   const profile = await loadPlanProfile(userId);
   const planAdherence = await loadPlanAdherenceContext(userId, input);
+  const exerciseCatalog = await loadPlanExerciseCatalog();
 
   try {
     agentOutput = await runNextWeekPlanAgent(
@@ -1668,6 +1710,8 @@ async function runNextWeekPlanAgentTurn(args: {
         endDate: input.end_date,
         exerciseId: input.exercise_id ?? null,
         profile,
+        preferences: mapPlanPreferences(input.plan_preferences),
+        exerciseCatalog,
         planAdherence,
       },
       {
@@ -1788,11 +1832,48 @@ async function loadPlanProfile(
       : {
           goal: dto.goal,
           weeklyDays: dto.weeklyDays,
+          availableEquipment: dto.availableEquipment,
           injuryConstraints: dto.injuryConstraints,
         };
   } catch {
     // Personalization is best-effort; a profile load failure must not break planning.
     return null;
+  }
+}
+
+function mapPlanPreferences(
+  preferences: MockAssistantTurnInput["plan_preferences"],
+): PlanPreferences | null {
+  if (!preferences) return null;
+
+  return {
+    weeklyDays: preferences.weekly_days,
+    sessionDurationMinutes: preferences.session_duration_minutes,
+    availableEquipment: preferences.available_equipment,
+    readiness: preferences.readiness,
+    focusAreas: preferences.focus_areas,
+  };
+}
+
+async function loadPlanExerciseCatalog(): Promise<PlanExerciseCatalogItem[]> {
+  try {
+    const result = await searchDictionaryExercises({});
+
+    return result.items.map((exercise) => ({
+      exerciseId: exercise.id,
+      exerciseName: exercise.name_zh.trim() || exercise.name_en,
+      equipment: exercise.equipment,
+      movementPattern: exercise.movement_pattern,
+      primaryMuscles: exercise.muscles
+        .filter((muscle) => muscle.is_primary)
+        .map((muscle) => muscle.code),
+      defaultRestSeconds: exercise.default_rest_seconds,
+    }));
+  } catch {
+    // The existing historical planner remains usable if dictionary loading is
+    // temporarily unavailable; starter generation and hard filtering then
+    // honestly stay unavailable instead of inventing metadata.
+    return [];
   }
 }
 

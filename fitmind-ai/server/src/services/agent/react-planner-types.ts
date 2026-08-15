@@ -52,7 +52,29 @@ export type PlanGoal =
 export interface PlanProfileContext {
   goal: PlanGoal;
   weeklyDays: number;
+  availableEquipment?: string[] | undefined;
   injuryConstraints: string[];
+}
+
+export type PlanReadiness = "ready" | "fatigued";
+
+/** Temporary generation-only overrides. They never mutate the athlete profile. */
+export interface PlanPreferences {
+  weeklyDays?: number | undefined;
+  sessionDurationMinutes?: number | undefined;
+  availableEquipment?: string[] | undefined;
+  readiness?: PlanReadiness | undefined;
+  focusAreas?: string[] | undefined;
+}
+
+/** Exercise dictionary metadata used by the deterministic planner. */
+export interface PlanExerciseCatalogItem {
+  exerciseId: string;
+  exerciseName: string;
+  equipment: string | null;
+  movementPattern: string | null;
+  primaryMuscles: string[];
+  defaultRestSeconds: number;
 }
 
 export type PlanAdherenceExerciseStatus = "done" | "partial" | "missed";
@@ -77,12 +99,35 @@ export interface PlanAdherenceContext {
 
 /** One prescribed exercise in the executable draft. `target_weight_kg` is null when no weight baseline exists (never fabricated). */
 export interface PlannedExercise {
+  exercise_id?: string | undefined;
   exercise_name: string;
   sets: number;
   rep_min: number;
   rep_max: number;
   target_weight_kg: number | null;
+  rest_seconds?: number | undefined;
+  equipment?: string | null | undefined;
+  movement_pattern?: string | null | undefined;
+  primary_muscles?: string[] | undefined;
+  alternatives?: PlannedExerciseAlternative[] | undefined;
   basis: string;
+}
+
+export interface PlannedExerciseAlternative {
+  exercise_id: string;
+  exercise_name: string;
+  equipment: string | null;
+  movement_pattern: string | null;
+  primary_muscles: string[];
+  rest_seconds: number;
+}
+
+export interface PlannedTrainingSession {
+  session_index: number;
+  title: string;
+  focus_areas: string[];
+  estimated_duration_minutes: number;
+  exercises: PlannedExercise[];
 }
 
 /**
@@ -95,6 +140,7 @@ export interface PlannedExercise {
 export interface NextWeekPlanDraft {
   strategy: ProgressionMode;
   exercises: PlannedExercise[];
+  sessions?: PlannedTrainingSession[] | undefined;
   notes: string[];
 }
 
@@ -129,6 +175,8 @@ export interface NextWeekPlanAgentInput {
   endDate: string;
   exerciseId?: string | null | undefined;
   profile?: PlanProfileContext | null | undefined;
+  preferences?: PlanPreferences | null | undefined;
+  exerciseCatalog?: PlanExerciseCatalogItem[] | undefined;
   planAdherence?: PlanAdherenceContext | null | undefined;
 }
 

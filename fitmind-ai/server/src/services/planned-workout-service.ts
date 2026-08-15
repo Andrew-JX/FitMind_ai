@@ -27,13 +27,30 @@ const dateOnlySchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/u, "Date must use YYYY-MM-DD.");
 
+const plannedExerciseAlternativeSchema = z
+  .object({
+    exercise_id: z.string().uuid(),
+    exercise_name: z.string().trim().min(1),
+    equipment: z.string().nullable(),
+    movement_pattern: z.string().nullable(),
+    primary_muscles: z.array(z.string()),
+    rest_seconds: z.number().int().positive(),
+  })
+  .strict();
+
 const plannedExerciseSchema = z
   .object({
+    exercise_id: z.string().uuid().optional(),
     exercise_name: z.string().trim().min(1),
     sets: z.number().int().min(0),
     rep_min: z.number().int().min(0),
     rep_max: z.number().int().min(0),
     target_weight_kg: z.number().nullable(),
+    rest_seconds: z.number().int().positive().optional(),
+    equipment: z.string().nullable().optional(),
+    movement_pattern: z.string().nullable().optional(),
+    primary_muscles: z.array(z.string()).optional(),
+    alternatives: z.array(plannedExerciseAlternativeSchema).max(3).optional(),
     basis: z.string(),
   })
   .strict();
@@ -42,6 +59,20 @@ const planDraftSchema = z
   .object({
     strategy: z.enum(["consolidate", "add_frequency", "maintain"]),
     exercises: z.array(plannedExerciseSchema).max(MAX_PLAN_EXERCISES),
+    sessions: z
+      .array(
+        z
+          .object({
+            session_index: z.number().int().positive(),
+            title: z.string().trim().min(1),
+            focus_areas: z.array(z.string()).max(6),
+            estimated_duration_minutes: z.number().int().positive(),
+            exercises: z.array(plannedExerciseSchema).max(MAX_PLAN_EXERCISES),
+          })
+          .strict(),
+      )
+      .max(7)
+      .optional(),
     notes: z.array(z.string()).max(MAX_PLAN_NOTES),
   })
   .strict();
