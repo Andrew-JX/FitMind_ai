@@ -33,6 +33,11 @@ async function openProfileSheet(page: import("@playwright/test").Page) {
   await page.getByRole("button", { name: PROFILE_TAB }).click();
   await page.getByRole("button", { name: new RegExp(PROFILE_ENTRY) }).click();
   await expect(page.getByPlaceholder(INJURY_PLACEHOLDER)).toBeVisible();
+  // Mounting the sheet refetches the stored profile, and the response
+  // overwrites the draft fields. Wait for that load to settle — the save
+  // button stays disabled while it runs — or a fast machine fills the form
+  // first and the late response wipes the typed text.
+  await expect(page.getByRole("button", { name: SAVE_PROFILE })).toBeEnabled();
 }
 
 test.describe("withdrawing injury data from the ordinary profile sheet", () => {

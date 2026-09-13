@@ -163,8 +163,9 @@ test.describe("consent catch-up for accounts predating the seam", () => {
       0,
     );
 
-    await page.getByRole("checkbox").check();
-    await page.getByRole("button", { name: /同意并继续/ }).click();
+    // The screen shows the full consent statement as text; the single
+    // explicit button click is the act of agreement.
+    await page.getByRole("button", { name: /我已阅读并同意/ }).click();
 
     await expect(page.getByRole("button", { name: PROFILE_TAB })).toBeVisible();
     expect(mocks.getConsentBodies()).toEqual([
